@@ -1,4 +1,4 @@
-app = "hitchcoxaesthetics-com-7a21"
+app = "hitchcoxaesthetics-com-51cc"
 primary_region = "atl"
 kill_signal = "SIGINT"
 kill_timeout = 5
