@@ -1,0 +1,17 @@
+/* .menu-popover {
+	transform: translateY(0);
+	opacity: 0;
+	transition: transform 0.5s,
+		opacity: 0.5s,
+		display 0.5s allow-discrete;
+}
+
+.menu-popover:popover-open {
+	@starting-style {
+		opacity: 0;
+		transform: translateY(-20px);
+	}
+
+	transform: translateY(0);
+	opacity: 1;
+} */

@@ -1,0 +1,318 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String                @id @default(cuid())
+  phone                String                @unique
+  email                String?               @unique
+  name                 String?
+  type                 String                @default("client")
+  dob                  DateTime?
+  service              Service[]
+  clientAppointments   Appointment[]         @relation("ClientAppointments")
+  providerAppointments Appointment[]         @relation("ProviderAppointments")
+  blockedTime          BlockedTime[]
+  image                UserImage?
+  notes                Note[]
+  roles                Role[]
+  sessions             Session[]
+  connections          Connection[]
+  location             GoogleLocation?       @relation(fields: [locationId], references: [id])
+  locationId           String?
+  address              Address?
+  clientHistory        ClientHistoryRecord[]
+  schedule             WeeklySchedule[]
+  active               Boolean               @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Note {
+  id      String      @id @default(cuid())
+  title   String
+  content String
+  images  NoteImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client   User   @relation(fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  clientId String
+
+  // non-unique foreign key
+  @@index([clientId])
+  // This helps our order by in the user search a LOT
+  @@index([clientId, updatedAt])
+}
+
+model NoteImage {
+  id          String  @id @default(cuid())
+  altText     String?
+  contentType String
+  blob        Bytes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  noteId String
+
+  // non-unique foreign key
+  @@index([noteId])
+}
+
+model Service {
+  id           String        @id @default(cuid())
+  title        String
+  slug         String        @unique
+  hint         String
+  body         String?
+  duration     Int // in minutes
+  provider     User[]
+  appointments Appointment[]
+  order        Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Appointment {
+  id          String    @id @default(cuid())
+  service     Service   @relation(fields: [serviceId], references: [id])
+  start       DateTime? // actual appointment start time
+  end         DateTime? // actual appointment end time
+  windowStart DateTime // scheduled appointment start time
+  windowEnd   DateTime // scheduled appointment end time
+  notes       String?
+  status      String    @default("Active")
+
+  provider   User   @relation(name: "ProviderAppointments", fields: [providerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  providerId String
+  client     User   @relation(name: "ClientAppointments", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  clientId   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  serviceId String
+}
+
+model UserImage {
+  id          String  @id @default(cuid())
+  altText     String?
+  contentType String
+  blob        Bytes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId String @unique
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  expirationDate DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId String
+
+  // non-unique foreign key
+  @@index([userId])
+}
+
+model Permission {
+  id          String @id @default(cuid())
+  action      String // e.g. create, read, update, delete
+  entity      String // e.g. note, user, etc.
+  access      String // e.g. own or any
+  description String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roles Role[]
+
+  @@unique([action, entity, access])
+}
+
+model Role {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  permissions Permission[]
+}
+
+model Verification {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  /// The type of verification, e.g. "email" or "phone"
+  type String
+
+  /// The thing we're trying to verify, e.g. a user's email or phone number
+  target String
+
+  /// The secret key used to generate the otp
+  secret String
+
+  /// The algorithm used to generate the otp
+  algorithm String
+
+  /// The number of digits in the otp
+  digits Int
+
+  /// The number of seconds the otp is valid for
+  period Int
+
+  /// The valid characters for the otp
+  charSet String
+
+  /// When it's safe to delete this verification
+  expiresAt DateTime?
+
+  @@unique([target, type])
+}
+
+model Connection {
+  id           String @id @default(cuid())
+  providerName String
+  providerId   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId String
+
+  @@unique([providerName, providerId])
+}
+
+model ClientHistoryForm {
+  id     String               @id @default(cuid())
+  name   String
+  order  Float
+  slug   String               @unique
+  fields ClientHistoryField[]
+}
+
+model ClientHistoryField {
+  id       String                     @id @default(cuid())
+  slug     String                     @unique
+  active   Boolean                    @default(true)
+  prompt   String
+  records  ClientHistoryRecord[]
+  order    Float
+  type     String
+  required Boolean                    @default(false)
+  options  ClientHistoryFieldOption[]
+  form     ClientHistoryForm          @relation(fields: [formId], references: [id])
+  formId   String
+}
+
+model ClientHistoryFieldOption {
+  id             String                @id @default(cuid())
+  value          String
+  field          ClientHistoryField    @relation(fields: [fieldId], references: [id])
+  fieldId        String
+  historyRecords ClientHistoryRecord[]
+  order          Float
+
+  @@unique([fieldId, value])
+}
+
+model ClientHistoryRecord {
+  id       String                     @id @default(cuid())
+  answer   String?
+  selected ClientHistoryFieldOption[]
+
+  fieldId String
+  field   ClientHistoryField @relation(fields: [fieldId], references: [id])
+  userId  String
+  user    User               @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, fieldId])
+  @@index([userId, fieldId])
+}
+
+model GoogleLocation {
+  id               String  @id
+  name             String?
+  formattedAddress String?
+  addressLine1     String?
+  addressLine2     String?
+  apt              String?
+  city             String?
+  neighborhood     String?
+  county           String?
+  state            String?
+  country          String?
+  zip              String?
+  zip4             String?
+  lat              Float?
+  lng              Float?
+  url              String?
+  json             String?
+  users            User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Address {
+  id           String  @id @default(cuid())
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  county       String?
+  state        String?
+  zip          String?
+  userId       String? @unique
+  user         User?   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BlockedTime {
+  id         String   @id @default(cuid())
+  providerId String
+  start      DateTime
+  end        DateTime
+  reason     String
+  provider   User     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WeeklySchedule {
+  id        String   @id @default(cuid())
+  dayOfWeek String
+  startTime DateTime
+  endTime   DateTime
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, dayOfWeek])
+}
