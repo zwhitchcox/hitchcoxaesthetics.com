@@ -26,11 +26,14 @@ export function init() {
 	const parsed = schema.safeParse(process.env)
 
 	if (parsed.success === false) {
-		console.log(parsed.error)
-		console.error(
-			'❌ Invalid environment variables:',
-			parsed.error.flatten().fieldErrors,
-		)
+		console.error('❌ Invalid environment variables:')
+		for (const error of parsed.error.errors) {
+			console.error(
+				`path: ${(error.path.map(p => p.toString()).join('.'), error.message)}`,
+			)
+			console.error(error.code)
+			console.error(error.message)
+		}
 
 		throw new Error('Invalid environment variables')
 	}
