@@ -31,7 +31,6 @@ export function init() {
 			console.error(`path: ${error.path.map(p => p.toString()).join('.')}`)
 			console.error(`code: ${error.code}`)
 			console.error(`message: ${error.message}`)
-			console.log(JSON.stringify(error, null, 2))
 		}
 
 		throw new Error('Invalid environment variables')
