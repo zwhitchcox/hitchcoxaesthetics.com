@@ -36,10 +36,10 @@ jobs:
         run: pnpm install
 
       - name: 🖼 Build icons
-        run: npm run build:icons
+        run: pnpm build:icons
 
       - name: 🔬 Lint
-        run: npm run lint
+        run: pnpm lint
 
   typecheck:
     name: ʦ TypeScript
@@ -62,7 +62,7 @@ jobs:
         run: pnpm install
 
       - name: 🖼 Build icons
-        run: npm run build:icons
+        run: pnpm build:icons
 
       - name: 🔎 Type check
         run: npm run typecheck --if-present
@@ -91,10 +91,10 @@ jobs:
         run: cp .env.example .env
 
       - name: 🖼 Build icons
-        run: npm run build:icons
+        run: pnpm build:icons
 
       - name: ⚡ Run vitest
-        run: npm run test -- --coverage
+        run: pnpm test -- --coverage
 
   playwright:
     name: 🎭 Playwright
