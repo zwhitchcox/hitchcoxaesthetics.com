@@ -28,11 +28,10 @@ export function init() {
 	if (parsed.success === false) {
 		console.error('❌ Invalid environment variables:')
 		for (const error of parsed.error.errors) {
-			console.error(
-				`path: ${(error.path.map(p => p.toString()).join('.'), error.message)}`,
-			)
-			console.error(error.code)
-			console.error(error.message)
+			console.error(`path: ${error.path.map(p => p.toString()).join('.')}`)
+			console.error(`code: ${error.code}`)
+			console.error(`message: ${error.message}`)
+			console.log(JSON.stringify(error, null, 2))
 		}
 
 		throw new Error('Invalid environment variables')
