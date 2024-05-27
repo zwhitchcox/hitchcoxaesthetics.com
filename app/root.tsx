@@ -88,7 +88,7 @@ export const links: LinksFunction = () => {
 		} as const, // necessary to make typescript happy
 		{ rel: 'stylesheet', href: tailwindStyleSheetUrl },
 		//These should match the css preloads above to avoid css as render blocking resource
-		{ rel: 'icon', type: 'image/svg+xml', href: '/favicons/favicon.svg' },
+		{ rel: 'icon', type: 'image/svg+xml', href: '/favicons/logo.svg' },
 	].filter(Boolean)
 }
 
