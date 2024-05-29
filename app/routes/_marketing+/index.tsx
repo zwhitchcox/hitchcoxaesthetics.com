@@ -50,7 +50,12 @@ export default function Index() {
 							>
 								(865) 248-9365
 							</a>
-							<div>Call Now!</div>
+							<a
+								className="text-md mx-2 my-1 w-36 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
+								href="https://hitchcoxaesthetics.janeapp.com"
+							>
+								Book Now
+							</a>
 							{/* <Link
 								to="/book"
 								className="text-md mx-2 my-1 w-36 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
