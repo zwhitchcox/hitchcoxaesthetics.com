@@ -48,7 +48,7 @@ export default function Index() {
 								href="tel:+18652489365"
 								className="text-md mx-2 my-1 w-36 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
 							>
-								(865) 248-9365
+								(865) 214-7238
 							</a>
 							<a
 								className="text-md mx-2 my-1 w-36 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
