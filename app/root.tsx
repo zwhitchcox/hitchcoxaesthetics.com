@@ -43,7 +43,7 @@ import {
 	DropdownMenuPortal,
 	DropdownMenuTrigger,
 } from '#/app/components/ui/dropdown-menu.tsx'
-import { Icon, href as iconsHref } from '#/app/components/ui/icon.tsx'
+import { Icon } from '#/app/components/ui/icon.tsx'
 import { EpicToaster } from '#/app/components/ui/sonner.tsx'
 import '#/app/styles/global.css'
 import tailwindStyleSheetUrl from '#/app/styles/tailwind.css?url'
@@ -70,8 +70,6 @@ import { useIsProvider, useOptionalUser, useUser } from '#/app/utils/user.ts'
 
 export const links: LinksFunction = () => {
 	return [
-		// Preload svg sprite as a resource to avoid render blocking
-		{ rel: 'preload', href: iconsHref, as: 'image' },
 		{ rel: 'preload', href: tailwindStyleSheetUrl, as: 'style' },
 		// Preload CSS as a resource to avoid render blocking
 		{ rel: 'mask-icon', href: '/favicons/mask-icon.svg' },
@@ -87,7 +85,6 @@ export const links: LinksFunction = () => {
 			crossOrigin: 'use-credentials',
 		} as const, // necessary to make typescript happy
 		{ rel: 'stylesheet', href: tailwindStyleSheetUrl },
-		//These should match the css preloads above to avoid css as render blocking resource
 		{ rel: 'icon', type: 'image/svg+xml', href: '/favicons/logo.svg' },
 	].filter(Boolean)
 }
@@ -95,7 +92,7 @@ export const links: LinksFunction = () => {
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
 	return [
 		{ title: data ? 'Hitchcox Aesthetics' : 'Error | Hitchcox Aesthetics' },
-		{ name: 'description', content: `Your own captain's log` },
+		{ name: 'description', content: `Med Spa in West Knoxville` },
 	]
 }
 
@@ -226,6 +223,38 @@ function Document({
 					async
 					nonce={nonce}
 				></script>
+				{ENV.MODE === 'development' || !ENV.GTM_ID ? null : (
+					<>
+						<script
+							async
+							src={`https://www.googletagmanager.com/gtag/js?id=${ENV.GTM_ID}`}
+						/>
+						<noscript>
+							<iframe
+								title="Google Tag Manager (noscript)"
+								src={`https://www.googletagmanager.com/ns.html?id=${ENV.GTM_ID}`}
+								height="0"
+								width="0"
+								style={{ display: 'none', visibility: 'hidden' }}
+							></iframe>
+						</noscript>
+						{/* <script
+							async
+							id="gtag-init"
+							dangerouslySetInnerHTML={{
+								__html: `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+
+                gtag('config', '${ENV.GA_TRACKING_ID}', {
+									send_page_view: false
+                });
+              `,
+							}}
+						/> */}
+					</>
+				)}
 			</body>
 		</html>
 	)
@@ -237,6 +266,18 @@ function App() {
 	const nonce = useNonce()
 	const theme = useTheme()
 	useToast(data.toast)
+	const location = useLocation()
+	useEffect(() => {
+		if (typeof window === 'undefined') {
+			return
+		}
+		if (typeof gtag !== 'undefined') {
+			gtag('event', 'page_view', {
+				page_location: window.location.href,
+				page_title: document.title,
+			})
+		}
+	}, [location.pathname])
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>

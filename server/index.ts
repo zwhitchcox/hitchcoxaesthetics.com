@@ -143,6 +143,7 @@ app.use(
 					'https://*.gstatic.com',
 					'https://*.google.com',
 					'https://*.googleusercontent.com',
+					'https://*.googletagmanager.com',
 				],
 				'script-src': [
 					"'strict-dynamic'",
@@ -150,6 +151,13 @@ app.use(
 					// @ts-expect-error
 					(_, res) => `'nonce-${res.locals.cspNonce}'`,
 					'https://*.googleapis.com',
+					'https://*.googletagmanager.com',
+				],
+				'script-src-elem': [
+					"'self'",
+					// @ts-expect-error
+					(_, res) => `'nonce-${res.locals.cspNonce}'`,
+					'https://*.googletagmanager.com',
 				],
 				'script-src-attr': [
 					// @ts-expect-error

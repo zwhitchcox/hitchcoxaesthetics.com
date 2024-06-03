@@ -107,6 +107,9 @@ importers:
       '@sentry/remix':
         specifier: ^7.107.0
         version: 7.109.0(@remix-run/node@2.9.2(typescript@5.4.5))(@remix-run/react@2.9.2(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.4.5))(react@18.2.0)
+      '@types/gtag.js':
+        specifier: ^0.0.19
+        version: 0.0.19
       address:
         specifier: ^2.0.2
         version: 2.0.2
@@ -2669,6 +2672,9 @@ packages:
 
   '@types/glob@8.1.0':
     resolution: {integrity: sha512-IO+MJPVhoqz+28h1qLAcBEH2+xHMK6MTyHJc7MTnnYb6wsoLR29POVGJ7LycmVXIqyy/4/2ShP5sUwTXuOwb/w==}
+
+  '@types/gtag.js@0.0.19':
+    resolution: {integrity: sha512-KHoDzrf9rSd0mooKN576PjExpdk/XRrNu4RQnmigsScSTSidwyOUe9kDrHz9UPKjiBrx2QEsSkexbJSgS0j72w==}
 
   '@types/hast@2.3.10':
     resolution: {integrity: sha512-McWspRw8xx8J9HurkVBfYj0xKoE25tOFlHGdx4MJ5xORQrMGZNqJhVQWaIbm6Oyla5kYOXtDiopzKRJzEOkwJw==}
@@ -9482,6 +9488,8 @@ snapshots:
     dependencies:
       '@types/minimatch': 5.1.2
       '@types/node': 20.12.2
+
+  '@types/gtag.js@0.0.19': {}
 
   '@types/hast@2.3.10':
     dependencies:

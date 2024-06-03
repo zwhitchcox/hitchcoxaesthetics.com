@@ -74,6 +74,7 @@
     "@remix-run/server-runtime": "2.9.2",
     "@sentry/profiling-node": "^7.107.0",
     "@sentry/remix": "^7.107.0",
+    "@types/gtag.js": "^0.0.19",
     "address": "^2.0.2",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^9.4.3",
