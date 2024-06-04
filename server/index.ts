@@ -157,6 +157,10 @@ app.use(
 					"'self'",
 					// @ts-expect-error
 					(_, res) => `'nonce-${res.locals.cspNonce}'`,
+					'https://*.googleapis.com',
+					'https://*.gstatic.com',
+					'https://*.google.com',
+					'https://*.googleusercontent.com',
 					'https://*.googletagmanager.com',
 				],
 				'script-src-attr': [
