@@ -134,7 +134,7 @@ app.use(
 					'https://*.gstatic.com',
 					"'self'",
 				].filter(Boolean),
-				'font-src': ["'self'", 'https://*.googletagmanager.com'],
+				'font-src': ["'self'", 'https://*.gstatic.com'],
 				'frame-src': ["'self'"],
 				'img-src': [
 					"'self'",
