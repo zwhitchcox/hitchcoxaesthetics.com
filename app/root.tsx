@@ -199,6 +199,7 @@ function Document({
 	theme?: Theme
 	env?: Record<string, string>
 }) {
+	console.log(ENV.MODE, ENV.GTM_ID)
 	return (
 		<html lang="en" className={`${theme} h-full overflow-x-hidden`}>
 			<head>
@@ -223,22 +224,22 @@ function Document({
 					async
 					nonce={nonce}
 				></script>
-				{ENV.MODE === 'development' || !ENV.GTM_ID ? null : (
-					<>
-						<script
-							async
-							src={`https://www.googletagmanager.com/gtag/js?id=${ENV.GTM_ID}`}
-						/>
-						<noscript>
-							<iframe
-								title="Google Tag Manager (noscript)"
-								src={`https://www.googletagmanager.com/ns.html?id=${ENV.GTM_ID}`}
-								height="0"
-								width="0"
-								style={{ display: 'none', visibility: 'hidden' }}
-							></iframe>
-						</noscript>
-						{/* <script
+				{/* {ENV.MODE === 'development' || !ENV.GTM_ID ? null : ( */}
+				<>
+					<script
+						async
+						src={`https://www.googletagmanager.com/gtag/js?id=${ENV.GTM_ID}`}
+					/>
+					<noscript>
+						<iframe
+							title="Google Tag Manager (noscript)"
+							src={`https://www.googletagmanager.com/ns.html?id=${ENV.GTM_ID}`}
+							height="0"
+							width="0"
+							style={{ display: 'none', visibility: 'hidden' }}
+						></iframe>
+					</noscript>
+					{/* <script
 							async
 							id="gtag-init"
 							dangerouslySetInnerHTML={{
@@ -253,8 +254,8 @@ function Document({
               `,
 							}}
 						/> */}
-					</>
-				)}
+				</>
+				{/* )} */}
 			</body>
 		</html>
 	)
@@ -278,6 +279,7 @@ function App() {
 			})
 		}
 	}, [location.pathname])
+	console.log('gtm id', ENV.GTM_ID)
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>

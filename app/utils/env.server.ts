@@ -14,7 +14,7 @@ const schema = z.object({
 	TWILIO_ACCOUNT_SID: z.string(),
 	TWILIO_PHONE_NUMBER: z.string(),
 	GA_TRACKING_ID: z.string().optional(),
-	GTM_ID: z.string().optional(),
+	GTM_ID: z.string(),
 	DEFAULT_PROVIDER: z.string(),
 })
 
