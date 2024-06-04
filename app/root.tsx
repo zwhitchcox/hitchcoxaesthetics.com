@@ -239,6 +239,17 @@ function Document({
 								style={{ display: 'none', visibility: 'hidden' }}
 							></iframe>
 						</noscript>
+						<script
+							async
+							dangerouslySetInnerHTML={{
+								__html: `
+								window.dataLayer = window.dataLayer || [];
+								function gtag(){dataLayer.push(arguments);}
+								gtag('js', new Date());
+								gtag('config', '${ENV.GTM_ID}');
+							`,
+							}}
+						/>
 						{/* <script
 							async
 							id="gtag-init"
