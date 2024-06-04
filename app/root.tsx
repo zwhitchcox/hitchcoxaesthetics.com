@@ -226,10 +226,6 @@ function Document({
 				></script>
 				{ENV.MODE === 'development' || !ENV.GTM_ID ? null : (
 					<>
-						<script
-							async
-							src={`https://www.googletagmanager.com/gtag/js?id=${ENV.GTM_ID}`}
-						/>
 						<noscript>
 							<iframe
 								title="Google Tag Manager (noscript)"
@@ -239,17 +235,10 @@ function Document({
 								style={{ display: 'none', visibility: 'hidden' }}
 							></iframe>
 						</noscript>
-						<script
+						{/* <script
 							async
-							dangerouslySetInnerHTML={{
-								__html: `
-								window.dataLayer = window.dataLayer || [];
-								function gtag(){dataLayer.push(arguments);}
-								gtag('js', new Date());
-								gtag('config', '${ENV.GTM_ID}');
-							`,
-							}}
-						/>
+							src={`https://www.googletagmanager.com/gtag/js?id=${ENV.GTM_ID}`}
+						/> */}
 						{/* <script
 							async
 							id="gtag-init"
