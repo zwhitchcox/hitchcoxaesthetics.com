@@ -261,6 +261,16 @@ function Document({
 	)
 }
 
+function safeGtag<Command extends keyof Gtag.GtagCommands>(
+	command: Command,
+	...args: Gtag.GtagCommands[Command]
+) {
+	if (typeof window === 'undefined' || !window.gtag) {
+		return
+	}
+	gtag(command, ...args)
+}
+
 function App() {
 	const [isMenuOpen, setIsMenuOpen] = useState(false)
 	const data = useLoaderData<typeof loader>()
@@ -269,17 +279,19 @@ function App() {
 	useToast(data.toast)
 	const location = useLocation()
 	useEffect(() => {
-		if (typeof window === 'undefined') {
-			return
-		}
-		if (typeof gtag !== 'undefined') {
-			gtag('event', 'page_view', {
-				page_location: window.location.href,
-				page_title: document.title,
-			})
-		}
+		safeGtag('event', 'page_view', {
+			page_location: window.location.href,
+			page_title: document.title,
+		})
 	}, [location.pathname])
-	console.log('gtm id', ENV.GTM_ID)
+	useEffect(() => {
+		safeGtag('consent', 'update', {
+			ad_user_data: 'granted',
+			ad_personalization: 'granted',
+			ad_storage: 'granted',
+			analytics_storage: 'granted',
+		})
+	}, [])
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
