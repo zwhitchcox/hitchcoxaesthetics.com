@@ -132,6 +132,7 @@ app.use(
 					'https://*.googleapis.com',
 					'*.google.com',
 					'https://*.gstatic.com',
+					'https://*.google-analytics.com',
 					"'self'",
 				].filter(Boolean),
 				'font-src': ["'self'", 'https://*.gstatic.com'],
