@@ -278,12 +278,12 @@ function App() {
 	const theme = useTheme()
 	useToast(data.toast)
 	const location = useLocation()
-	useEffect(() => {
-		safeGtag('event', 'page_view', {
-			page_location: window.location.href,
-			page_title: document.title,
-		})
-	}, [location.pathname])
+	// useEffect(() => {
+	// 	safeGtag('event', 'page_view', {
+	// 		page_location: window.location.href,
+	// 		page_title: document.title,
+	// 	})
+	// }, [location.pathname])
 	useEffect(() => {
 		safeGtag('consent', 'update', {
 			ad_user_data: 'granted',
