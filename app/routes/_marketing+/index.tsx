@@ -35,23 +35,15 @@ export default function Index() {
 							</div>
 						</div>
 						<div className="flex flex-col items-center justify-center space-y-2">
-							{/* <Button
-								onClick={() => {
-									context.setIsMenuOpen(true)
-								}}
-								className="text-md mx-2 my-1 w-36 rounded-md bg-gray-300 px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-300/80 sm:w-48 sm:text-lg"
-							>
-								Menu
-							</Button> */}
 							<a
 								// eslint-disable-next-line remix-react-routes/use-link-for-routes
 								href="tel:+18652489365"
-								className="text-md mx-2 my-1 w-36 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
+								className="text-md mx-2 my-1 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
 							>
 								(865) 214-7238
 							</a>
 							<a
-								className="text-md mx-2 my-1 w-36 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
+								className="text-md mx-2 my-1 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
 								href="https://hitchcoxaesthetics.janeapp.com"
 							>
 								Book Now

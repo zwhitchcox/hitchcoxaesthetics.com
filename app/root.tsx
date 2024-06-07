@@ -63,7 +63,7 @@ import {
 } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { useRequestInfo } from '#/app/utils/request-info.ts'
-import { getTheme, setTheme, type Theme } from '#/app/utils/theme.server.ts'
+import { setTheme, type Theme } from '#/app/utils/theme.server.ts'
 import { makeTimings, time } from '#/app/utils/timing.server.ts'
 import { getToast } from '#/app/utils/toast.server.ts'
 import { useIsProvider, useOptionalUser, useUser } from '#/app/utils/user.ts'
@@ -145,7 +145,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				origin: getDomainUrl(request),
 				path: new URL(request.url).pathname,
 				userPrefs: {
-					theme: getTheme(request),
+					theme: 'light' as const, // getTheme(request),
 				},
 			},
 			ENV: getEnv(),
@@ -199,7 +199,6 @@ function Document({
 	theme?: Theme
 	env?: Record<string, string>
 }) {
-	console.log(ENV.MODE, ENV.GTM_ID)
 	return (
 		<html lang="en" className={`${theme} h-full overflow-x-hidden`}>
 			<head>
@@ -276,14 +275,8 @@ function App() {
 	const data = useLoaderData<typeof loader>()
 	const nonce = useNonce()
 	const theme = useTheme()
+
 	useToast(data.toast)
-	const location = useLocation()
-	// useEffect(() => {
-	// 	safeGtag('event', 'page_view', {
-	// 		page_location: window.location.href,
-	// 		page_title: document.title,
-	// 	})
-	// }, [location.pathname])
 	useEffect(() => {
 		safeGtag('consent', 'update', {
 			ad_user_data: 'granted',
@@ -297,10 +290,8 @@ function App() {
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
 			<div className="flex h-screen flex-col justify-between">
 				<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
-				<div className="flex-1">
-					<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
-				</div>
-				<Footer />
+				<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
+				{/* <Footer /> */}
 			</div>
 			<EpicToaster closeButton position="top-center" theme={theme} />
 			<EpicProgress />
@@ -308,7 +299,8 @@ function App() {
 	)
 }
 
-const noHeaderPages = ['/']
+// const noHeaderPages = ['/']
+const noHeaderPages: string[] = []
 
 function Header({
 	isMenuOpen,
@@ -323,10 +315,12 @@ function Header({
 	useEffect(() => {
 		setIsMenuOpen(false)
 	}, [location.pathname, setIsMenuOpen])
+	// const data = useLoaderData<typeof loader>()
+	const padding = !['/'].includes(location.pathname)
 	return (
 		<>
 			<header
-				className={`border-subtle sticky top-0 z-40 flex h-[3rem] w-full items-center justify-between border-b bg-black px-4 py-1.5 text-foreground backdrop-blur-lg ${
+				className={`border-subtle ${padding ? 'sticky' : 'fixed'} mix-blend-color-exclusion top-0 z-40 flex h-[3rem] w-full items-center justify-between bg-black px-4 py-1.5 text-foreground ${
 					noHeader ? 'hidden' : ''
 				}`}
 			>
@@ -355,30 +349,36 @@ function Header({
 						></span>
 					</button>
 				</div>
-				<Link to="/" className="flex items-center space-x-4">
-					<div className="flex flex-col items-center justify-center">
-						<p className="mb-[-3px] whitespace-nowrap text-[1.1rem] text-white">
-							SARAH HITCHCOX
-						</p>
-						<p className="text-[0.7rem] text-gray-300 dark:text-gray-300">
-							AESTHETICS
-						</p>
-					</div>
-					<Logo className="size-[2rem] text-white" />
-				</Link>
+				<div className="flex">
+					{/* <ThemeSwitch userPreference={data.requestInfo.userPrefs.theme} /> */}
+					<Link to="/" className="flex items-center space-x-4">
+						<div className="flex flex-col items-center justify-center">
+							<p className="mb-[-3px] whitespace-nowrap text-[1.1rem] text-white">
+								SARAH HITCHCOX
+							</p>
+							<p className="text-[0.7rem] text-gray-300 dark:text-gray-300">
+								AESTHETICS
+							</p>
+						</div>
+						<Logo className="size-[2rem] text-white" />
+					</Link>
+				</div>
 			</header>
-			{noHeader && isMenuOpen && (
-				<button
-					type="button"
-					onClick={() => setIsMenuOpen(false)}
-					className="animate-fadeIn fixed left-5 top-5 z-[60] flex items-center justify-center rounded-full text-gray-300 hover:text-gray-400"
-				>
-					<Icon name="x" className="h-8 w-8" />
-				</button>
-			)}
+			{
+				/*noHeader &&*/ isMenuOpen && (
+					<button
+						type="button"
+						onClick={() => setIsMenuOpen(false)}
+						className="animate-fadeIn fixed left-4 top-2 z-[60] flex items-center justify-center rounded-full text-foreground hover:text-foreground"
+					>
+						<Icon name="x" className="h-8 w-8" />
+					</button>
+				)
+			}
 			<nav
 				className={`nav-menu fixed overflow-y-scroll ${
-					noHeader ? 'top-0 h-[100vh]' : 'top-[3rem] h-[calc(100dvh-3rem)]'
+					// noHeader ? 'top-0 h-[100vh]' : 'top-[3rem] h-[calc(100dvh-3rem)]'
+					'top-0 h-[100vh]'
 				} z-50 flex w-full flex-col items-center justify-center bg-background text-3xl opacity-0 ${
 					isMenuOpen
 						? 'visible opacity-100 transition-opacity duration-300 ease-in-out'
@@ -418,12 +418,10 @@ function _Header() {
 	)
 }
 
-function Footer() {
-	const data = useLoaderData<typeof loader>()
+function _Footer() {
 	return (
 		<div className="container flex justify-between pb-5">
 			<Logo className="text-white" />
-			<ThemeSwitch userPreference={data.requestInfo.userPrefs.theme} />
 		</div>
 	)
 }
@@ -546,7 +544,7 @@ export function useOptimisticThemeMode() {
 	}
 }
 
-function ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
+function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
 	const fetcher = useFetcher<typeof action>()
 
 	const [form] = useForm({
@@ -600,21 +598,28 @@ function useLinks() {
 			to: '/',
 			label: 'Home',
 		},
+		// {
+		// 	to: '/about',
+		// 	label: 'About',
+		// },
+		// {
+		// 	to: '/services',
+		// 	label: 'Services',
+		// },
 		{
-			to: '/about',
-			label: 'About',
+			to: '/services/microneedling',
+			label: 'Microneedling',
 		},
-		{
-			to: '/services',
-			label: 'Services',
-		},
-		{
-			to: '/contact',
-			label: 'Contact',
-		},
+		// {
+		// 	to: '/contact',
+		// 	label: 'Contact',
+		// },
 	]
 	if (!user || (user && !isProvider)) {
-		links.push({ to: '/book', label: 'Book an Appointment' })
+		links.push({
+			to: 'https://hitchcoxaesthetics.janeapp.com/',
+			label: 'Book Now',
+		})
 	}
 	if (user) {
 		links.push(
@@ -624,7 +629,7 @@ function useLinks() {
 		)
 		links.push({ to: '/logout', label: 'Logout' })
 	} else {
-		links.push({ to: '/auth', label: 'Log In' })
+		// links.push({ to: '/auth', label: 'Log In' })
 	}
 
 	return links

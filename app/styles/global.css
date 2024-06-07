@@ -15,3 +15,68 @@
 	transform: translateY(0);
 	opacity: 1;
 } */
+/* .elementToFadeInAndOut {
+	animation: fadeInOut 2s linear 1 forwards;
+}
+
+@keyframes fadeInOut {
+	0% {
+		opacity: 0;
+	}
+	50% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+@keyframes fade-in-out {
+	0%,
+	50% {
+		opacity: 1;
+	}
+	25%,
+	75% {
+		opacity: 0;
+	}
+}
+
+.before-image {
+	animation: fade-in-out 10s infinite;
+} */
+/*
+@keyframes fade-in-out-reverse {
+	0%,
+	50% {
+		opacity: 0;
+	}
+	25%,
+	75% {
+		opacity: 1;
+	}
+}
+
+.after-image {
+	animation: fade-in-out-reverse 10s infinite;
+} */
+
+@keyframes fade-in-out {
+	0%,
+	10% {
+		opacity: 0;
+	}
+	30%,
+	50%,
+	70% {
+		opacity: 1;
+	}
+	90%,
+	100% {
+		opacity: 0;
+	}
+}
+
+.after-image {
+	animation: fade-in-out 12s infinite ease-in-out reverse;
+}
