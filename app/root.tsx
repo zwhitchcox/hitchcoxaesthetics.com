@@ -316,11 +316,13 @@ function Header({
 		setIsMenuOpen(false)
 	}, [location.pathname, setIsMenuOpen])
 	// const data = useLoaderData<typeof loader>()
-	const padding = !['/'].includes(location.pathname)
+	const padding =
+		!['/'].includes(location.pathname) &&
+		!location.pathname.startsWith('/services')
 	return (
 		<>
 			<header
-				className={`border-subtle ${padding ? 'sticky' : 'fixed'} mix-blend-color-exclusion top-0 z-40 flex h-[3rem] w-full items-center justify-between bg-black px-4 py-1.5 text-foreground ${
+				className={`border-subtle ${padding ? 'sticky' : 'fixed'} top-0 z-40 flex h-[3rem] w-full items-center justify-between bg-black px-4 py-1.5 text-foreground sm:mix-blend-difference ${
 					noHeader ? 'hidden' : ''
 				}`}
 			>
@@ -606,6 +608,14 @@ function useLinks() {
 		// 	to: '/services',
 		// 	label: 'Services',
 		// },
+		{
+			to: '/services/botox',
+			label: 'Botox',
+		},
+		{
+			to: '/services/filler',
+			label: 'Filler',
+		},
 		{
 			to: '/services/microneedling',
 			label: 'Microneedling',

@@ -68,7 +68,7 @@ export default function () {
 	return (
 		<>
 			<div className="font-poppins flex w-full flex-col bg-white">
-				<div className="relative h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden sm:flex sm:flex-row">
+				<div className="relative h-[100dvh] w-full flex-col overflow-hidden sm:flex sm:flex-row">
 					<div className="flex flex-1 items-center justify-center bg-[#070707] sm:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)] ">
 						<img
 							src="/img/microneedling/before.jpg"
@@ -115,12 +115,11 @@ export default function () {
 				className="bg-gray-100 px-4 py-8 pb-32 sm:px-8 lg:px-16"
 			>
 				<h1 className="mb-6 text-center text-3xl font-semibold text-gray-800">
-					Microneedling
+					Microneedling | Knoxville
 				</h1>
 				<p className="mx-auto mb-8 max-w-2xl text-lg text-gray-700">
 					{description}
 				</p>
-
 				<h2 className="mb-6 text-center text-2xl font-semibold text-gray-800">
 					FAQs
 				</h2>
@@ -138,22 +137,6 @@ export default function () {
 					))}
 				</ul>
 			</div>
-			{/* <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-800 py-4 text-center">
-				<div className="flex justify-center space-x-4">
-					<a
-						className="text-md w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-						href="https://hitchcoxaesthetics.janeapp.com"
-					>
-						Book Now
-					</a>
-					<button
-						className="text-md w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-						onClick={() => scrollToId('microneedling')}
-					>
-						Learn More
-					</button>
-				</div>
-			</div> */}
 			{showCTA && (
 				<div
 					className={`fixed bottom-0 left-0 right-0 z-50 bg-gray-800 py-4 text-center ${showCTA ? 'fade-in' : ''}`}

@@ -18,7 +18,7 @@ export default function Index() {
 					<img
 						src="/img/sarah.jpg"
 						alt="Sarah Hitchcox"
-						className="z-10 mt-[-3rem] h-auto max-w-full animate-fade-in object-contain lg:translate-y-[7%]"
+						className="z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] animate-fade-in object-contain"
 					/>
 				</div>
 				<div className="absolute bottom-0 z-10 w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
