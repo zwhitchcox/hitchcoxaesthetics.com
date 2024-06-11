@@ -309,3 +309,8 @@ export function useMatchesData<T = Record<string, unknown> | undefined>(
 
 export const useSafeLayoutEffect =
 	typeof document === 'undefined' ? useEffect : useLayoutEffect
+
+export const scrollToId = (id: string) => {
+	const element = document.getElementById(id)
+	element?.scrollIntoView({ behavior: 'smooth' })
+}
