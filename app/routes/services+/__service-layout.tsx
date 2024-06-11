@@ -1,7 +1,7 @@
 import { useLocation } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
-import { scrollToId } from '#app/utils/misc.js'
 import { CTA } from '#app/utils/cta.js'
+import { cn, scrollToId } from '#app/utils/misc.js'
 
 export function ServiceHeader({ children }: { children: React.ReactNode }) {
 	return <h2 className="text-3xl font-semibold text-gray-700">{children}</h2>
@@ -54,27 +54,35 @@ export function ServiceLayout({
 	title,
 	description,
 	children,
+	imgClassName,
 }: {
 	title: string
 	description: string
 	children: React.ReactNode
+	imgClassName?: string
 }) {
 	const location = useLocation()
 	const service = location.pathname.split('/').pop()
 	return (
 		<>
 			<div className="font-poppins flex w-full flex-col bg-white">
-				<div className="relative h-[100dvh] w-full flex-col overflow-hidden sm:flex sm:flex-row">
-					<div className="flex flex-1 items-center justify-center bg-[#070707] sm:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)] ">
+				<div className="relative h-[100dvh] w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
+					<div className="flex w-full flex-1 items-center justify-center bg-[#070707] grayscale duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]">
 						<img
 							src={`/img/${service}/before.jpg`}
 							alt={`Sarah Hitchcox ${title} Before`}
-							className="before-image absolute top-0 z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] object-contain"
+							className={cn(
+								'before-image  absolute top-0 z-10 mt-[-3rem] translate-y-[7%]',
+								imgClassName,
+							)}
 						/>
 						<img
 							src={`/img/${service}/after.jpg`}
 							alt={`Sarah Hitchcox ${title} After`}
-							className="after-image absolute top-0 z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] object-contain"
+							className={cn(
+								'after-image animate-grayscale absolute top-0 z-10 mt-[-3rem] translate-y-[7%]',
+								imgClassName,
+							)}
 						/>
 					</div>
 					<div className="absolute bottom-0 z-10 w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">

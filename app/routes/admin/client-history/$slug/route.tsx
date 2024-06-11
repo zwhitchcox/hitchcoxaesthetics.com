@@ -1,4 +1,4 @@
-import { SEOHandle } from '@nasa-gcn/remix-seo'
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { useParams } from '@remix-run/react'
 
 export const handle: SEOHandle = {

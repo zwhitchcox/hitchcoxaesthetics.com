@@ -1,9 +1,9 @@
 import { invariant } from '@epic-web/invariant'
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { promiseHash } from 'remix-utils/promise'
 
 import { getAvailableWindows } from '#/app/routes/book+/available-windows/$providerId/route.server'
-import { SEOHandle } from '@nasa-gcn/remix-seo'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,

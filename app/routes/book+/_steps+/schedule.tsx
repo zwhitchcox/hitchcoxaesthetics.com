@@ -1,3 +1,4 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import {
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
@@ -11,7 +12,6 @@ import { Calendar } from '#app/components/ui/calendar'
 import { useBookData } from '#app/routes/book+/_steps+/_layout'
 import { dateToMinutes } from '#app/utils/date'
 import { useSafeLayoutEffect } from '#app/utils/misc.js'
-import { SEOHandle } from '@nasa-gcn/remix-seo'
 
 const MINUTE_INTERVAL = 10
 

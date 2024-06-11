@@ -1,3 +1,4 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { type LoaderFunctionArgs } from '@remix-run/node'
 
 import { Button } from '#app/components/ui/button.js'
@@ -5,7 +6,6 @@ import { requestUser } from '#app/utils/auth.server.js'
 import { checkFormRedirect, getForms } from '#app/utils/client.server.js'
 import { redirectWithToast } from '#app/utils/toast.server.js'
 import { bookStepper } from '../book.server'
-import { SEOHandle } from '@nasa-gcn/remix-seo'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,

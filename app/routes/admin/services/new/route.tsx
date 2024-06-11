@@ -5,6 +5,7 @@ import {
 	useForm,
 } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { type ActionFunctionArgs, json, redirect } from '@remix-run/node'
 import { Form, useActionData } from '@remix-run/react'
 import { z } from 'zod'
@@ -14,7 +15,6 @@ import { Card } from '#app/components/ui/card'
 import { StatusButton } from '#app/components/ui/status-button.js'
 import { prisma } from '#app/utils/db.server.js'
 import { useIsPending } from '#app/utils/misc.js'
-import { SEOHandle } from '@nasa-gcn/remix-seo'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,

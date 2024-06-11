@@ -6,8 +6,6 @@ import {
 	ServiceLayout,
 	ServiceParagraph,
 } from './__service-layout'
-import { de } from '@faker-js/faker'
-import Service from '../book+/_steps+/service'
 
 export const meta: MetaFunction = () => [
 	{ title: 'Filler - Knoxville - Sarah Hitchcox Aesthetics' },

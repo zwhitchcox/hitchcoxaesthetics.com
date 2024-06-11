@@ -1,7 +1,4 @@
 import { type MetaFunction } from '@remix-run/node'
-import Logo from '#app/components/logo.js'
-import { CTA } from '#app/utils/cta.js'
-import { scrollToId } from '#app/utils/misc.js'
 import {
 	ServiceCheckMarks,
 	ServiceHeader,
@@ -52,7 +49,11 @@ const bulletPoints = [
 
 export default function () {
 	return (
-		<ServiceLayout title="Botox" description="for wrinkles, fine lines">
+		<ServiceLayout
+			title="Botox"
+			description="for wrinkles, fine lines"
+			imgClassName="w-full"
+		>
 			<ServiceHeader>What is Botox?</ServiceHeader>
 			<ServiceParagraph>
 				Botox is a safe, FDA-approved treatment that helps reduce facial

@@ -1,3 +1,4 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { type ActionFunctionArgs } from '@remix-run/node'
 import { Form, useActionData } from '@remix-run/react'
 import { z } from 'zod'
@@ -7,7 +8,6 @@ import { GeneralErrorBoundary } from '#app/components/error-boundary.js'
 import { ErrorList } from '#app/components/forms.js'
 import { Label } from '#app/components/ui/label.js'
 import { useBookData } from '#app/routes/book+/_steps+/_layout.js'
-import { SEOHandle } from '@nasa-gcn/remix-seo'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,

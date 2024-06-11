@@ -1,9 +1,9 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { useMemo } from 'react'
 import { z } from 'zod'
 
 import { useBookData } from '#/app/routes/book+/_steps+/_layout'
 import { combineSteps } from '#app/utils/stepper.js'
-import { SEOHandle } from '@nasa-gcn/remix-seo'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,

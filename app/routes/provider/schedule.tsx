@@ -30,9 +30,9 @@ import {
 import { Input } from '#app/components/ui/input'
 import { Label } from '#app/components/ui/label'
 import AppointmentEdit from '#app/routes/users+/$id_+/appointments/AppointmentEdit.js'
+import { requireProvider, requireUser } from '#app/utils/auth.server.js'
 import { prisma } from '#app/utils/db.server.js'
 import { AppointmentStatus, UserType } from '#app/utils/types'
-import { requireProvider, requireUser } from '#app/utils/auth.server.js'
 
 enum Intent {
 	Delete = 'Delete',

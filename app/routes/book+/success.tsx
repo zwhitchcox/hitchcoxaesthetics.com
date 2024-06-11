@@ -1,3 +1,4 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { Link, useLoaderData } from '@remix-run/react'
 
@@ -5,7 +6,6 @@ import { Button } from '#app/components/ui/button'
 import { Card } from '#app/components/ui/card'
 import { AppointmentDetails } from '#app/routes/users+/$id_+/appointments/AppointmentDetails.js'
 import { prisma } from '#app/utils/db.server'
-import { SEOHandle } from '@nasa-gcn/remix-seo'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
