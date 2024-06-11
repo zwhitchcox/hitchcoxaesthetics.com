@@ -1,7 +1,5 @@
 import { type MetaFunction } from '@remix-run/node'
 import {
-	ServiceCheckMarks,
-	ServiceFAQ,
 	ServiceHeader,
 	ServiceLayout,
 	ServiceParagraph,
@@ -19,13 +17,15 @@ export default function () {
 			imgClassName="h-full"
 		>
 			<ServiceParagraph>
-				The Motus AZ+ laser is renowned for its effectiveness in hair removal
-				and is particularly noted for its painless treatment process. It's
-				suitable for all skin types, including darker skin tones. Unlike
-				traditional lasers, the Motus AZ+ provides a comfortable experience,
-				making it an ideal choice for clients who are concerned about
-				discomfort. This feature enhances the appeal of the service for a wider
-				range of clients seeking a more pleasant hair removal experience.
+				Experience virtually pain-free hair removal with the Motus AZ+ laser,
+				suitable for all skin types, including darker or tanned skin. Utilizing
+				advanced Moveo technology, this laser delivers energy gradually and
+				uniformly, ensuring a comfortable treatment. Prior to your appointment,
+				the treatment area should be shaved to allow the laser to effectively
+				target hair follicles. The process is quick, typically taking 15-45
+				minutes depending on the treatment area. Most clients achieve optimal
+				results after 6-8 sessions, spaced 4-6 weeks apart. Yearly touch-up
+				sessions are recommended to maintain smooth, hair-free skin.
 			</ServiceParagraph>
 			<ServiceHeader>Service Areas</ServiceHeader>
 			<div className="grid grid-cols-1 gap-8 md:grid-cols-2">
