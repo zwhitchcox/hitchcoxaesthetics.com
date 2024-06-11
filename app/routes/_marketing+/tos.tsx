@@ -7,7 +7,7 @@ export default function TermsOfServiceRoute() {
 			<div className="h-96 overflow-auto rounded-lg bg-white p-6 shadow-md">
 				<h2 className="text-xl font-semibold">1. Introduction</h2>
 				<p>
-					Welcome to [Your Med Spa Name] App! These Terms and Conditions govern
+					Welcome to Hitchox Aesthetics App! These Terms and Conditions govern
 					your use of our app and services. By accessing or using the app, you
 					agree to be bound by these terms.
 				</p>
@@ -97,7 +97,7 @@ export default function TermsOfServiceRoute() {
 				<h2 className="mt-4 text-xl font-semibold">13. Contact Information</h2>
 				<p>
 					If you have any questions about these Terms and Conditions, please
-					contact us at [Contact Information].
+					contact us at sarah[at]hitchcoxaesthetics.com.
 				</p>
 			</div>
 			<button className="focus:shadow-outline mt-6 rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700 focus:outline-none">

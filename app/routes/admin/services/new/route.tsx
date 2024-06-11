@@ -14,6 +14,11 @@ import { Card } from '#app/components/ui/card'
 import { StatusButton } from '#app/components/ui/status-button.js'
 import { prisma } from '#app/utils/db.server.js'
 import { useIsPending } from '#app/utils/misc.js'
+import { SEOHandle } from '@nasa-gcn/remix-seo'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export const ServiceSchema = z.object({
 	title: z.string().min(1, 'Title is required'),

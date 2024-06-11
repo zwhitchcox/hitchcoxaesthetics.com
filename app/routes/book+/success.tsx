@@ -5,6 +5,11 @@ import { Button } from '#app/components/ui/button'
 import { Card } from '#app/components/ui/card'
 import { AppointmentDetails } from '#app/routes/users+/$id_+/appointments/AppointmentDetails.js'
 import { prisma } from '#app/utils/db.server'
+import { SEOHandle } from '@nasa-gcn/remix-seo'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const url = new URL(request.url)

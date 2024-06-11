@@ -291,7 +291,7 @@ function App() {
 			<div className="flex h-screen flex-col justify-between">
 				<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
 				<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
-				{/* <Footer /> */}
+				<Footer />
 			</div>
 			<EpicToaster closeButton position="top-center" theme={theme} />
 			<EpicProgress />
@@ -420,10 +420,36 @@ function _Header() {
 	)
 }
 
-function _Footer() {
+function Footer() {
 	return (
-		<div className="container flex justify-between pb-5">
-			<Logo className="text-white" />
+		<div className="container flex flex-col justify-between space-y-8 py-32 md:flex-row md:space-y-0">
+			<div className="flex flex-col space-y-4">
+				<h2 className="text-2xl font-semibold">Contact Us</h2>
+				<p className="text-lg">
+					5113 Kingston Pike, Suite 15, Knoxville, TN 37919
+				</p>
+				<p className="text-lg">(865) 214-7238</p>
+				<p className="text-lg">sarah@hitchcoxaesthetics.com</p>
+			</div>
+			<div className="flex flex-col space-y-4">
+				<h2 className="text-2xl font-semibold">Find Us</h2>
+				<div className="h-64 w-full">
+					<iframe
+						src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3230.3167435990786!2d-83.99134392401903!3d35.93922081575848!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x885c3daeef676e4f%3A0x36d0dab4a91039cb!2sSarah%20Hitchcox%20Aesthetics!5e0!3m2!1sen!2sus!4v1718065436259!5m2!1sen!2sus"
+						width="100%"
+						height="100%"
+						title="Google Maps | Sarah Hitchcox Aesthetics"
+						style={{ border: 0 }}
+						allowFullScreen={false}
+						loading="lazy"
+					></iframe>
+				</div>
+			</div>
+			<div className="flex flex-col space-y-4 text-lg">
+				<h2 className="text-2xl font-semibold">Legal</h2>
+				<Link to="/tos">Terms of Service</Link>
+				<Link to="/privacy">Privacy Policy</Link>
+			</div>
 		</div>
 	)
 }

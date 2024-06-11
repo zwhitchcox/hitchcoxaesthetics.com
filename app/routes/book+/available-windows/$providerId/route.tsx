@@ -3,6 +3,11 @@ import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { promiseHash } from 'remix-utils/promise'
 
 import { getAvailableWindows } from '#/app/routes/book+/available-windows/$providerId/route.server'
+import { SEOHandle } from '@nasa-gcn/remix-seo'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
 	const providerId = params.providerId ?? process.env.DEFAULT_PROVIDER

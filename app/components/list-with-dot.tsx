@@ -63,6 +63,7 @@ export function ListWithDot({
 							`flex items-center py-3 ${isActive ? 'italic text-muted-foreground' : ''}`
 						}
 						to={link.to}
+						prefetch="intent"
 					>
 						{link.label}
 					</NavLink>

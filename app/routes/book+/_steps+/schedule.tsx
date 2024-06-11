@@ -11,8 +11,13 @@ import { Calendar } from '#app/components/ui/calendar'
 import { useBookData } from '#app/routes/book+/_steps+/_layout'
 import { dateToMinutes } from '#app/utils/date'
 import { useSafeLayoutEffect } from '#app/utils/misc.js'
+import { SEOHandle } from '@nasa-gcn/remix-seo'
 
 const MINUTE_INTERVAL = 10
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export async function action({ request }: ActionFunctionArgs) {
 	return bookStepper.action('schedule')({ request })

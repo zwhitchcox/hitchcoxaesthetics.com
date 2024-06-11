@@ -8,6 +8,11 @@ import { useBookData } from '#/app/routes/book+/_steps+/_layout'
 import { bookStepper } from '#/app/routes/book+/book.server'
 import { ErrorList } from '#app/components/forms.js'
 import { Label } from '#app/components/ui/label'
+import { SEOHandle } from '@nasa-gcn/remix-seo'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export async function action({ request }: ActionFunctionArgs) {
 	return bookStepper.action('provider')({ request })

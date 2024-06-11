@@ -3,6 +3,11 @@ import { Link, Outlet, useLoaderData, useMatches } from '@remix-run/react'
 
 import { Icon } from '#app/components/ui/icon.js'
 import { prisma } from '#app/utils/db.server.js'
+import { SEOHandle } from '@nasa-gcn/remix-seo'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export async function loader() {
 	const services = await prisma.service.findMany({})
