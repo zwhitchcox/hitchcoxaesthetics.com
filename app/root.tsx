@@ -662,6 +662,10 @@ function useLinks() {
 			label: 'Pigmented Lesion Reduction',
 		},
 		{
+			to: '/services/vascular-lesion-reduction',
+			label: 'Vascular Lesion Reduction',
+		},
+		{
 			to: '/about',
 			label: 'About',
 		},
