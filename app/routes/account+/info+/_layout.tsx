@@ -1,3 +1,4 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { redirect, type LoaderFunctionArgs } from '@remix-run/node'
 import {
 	NavLink,
@@ -16,6 +17,10 @@ import {
 } from '#app/utils/auth.server.js'
 import { getForms } from '#app/utils/client.server.js'
 import { cn, useMatchesData } from '#app/utils/misc.js'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export function getNext(
 	forms: { slug: string; completed: boolean }[],
