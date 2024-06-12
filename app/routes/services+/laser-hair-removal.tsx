@@ -74,7 +74,7 @@ export default function () {
 	return (
 		<ServiceLayout
 			title="Laser Hair Removal"
-			description="for lips, cheeks, facial balancing"
+			description="for all skin types, virtually pain-free"
 			imgClassName="h-auto w-full"
 			beforeImgClassName="feathered-image"
 		>

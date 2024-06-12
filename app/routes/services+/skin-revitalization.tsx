@@ -28,16 +28,16 @@ export default function () {
 	return (
 		<ServiceLayout
 			title="Skin Revitalization"
-			description="for lips, cheeks, facial balancing"
+			description="for fine lines, wrinkles, uneven texture"
 			imgClassName="feathered-image h-full"
 			imgContainerClassName="grayscale-0"
 		>
 			<ServiceParagraph>
-				Revitalize your skin with the Motus AZ+ laser, designed to address signs
-				of aging such as fine lines, wrinkles, and uneven texture. The process
-				involves the laser promoting collagen production, leading to smoother,
-				firmer, and more youthful-looking skin. Treatment sessions are quick,
-				often completed within 30-45 minutes, making it easy to fit into your
+				Revitalize your skin with our advanced laser treatment, designed to
+				address signs of aging such as fine lines, wrinkles, and uneven texture.
+				The process promotes collagen production, resulting in smoother, firmer,
+				and more youthful-looking skin. Treatment sessions are quick, often
+				completed within 30-45 minutes, making them easy to fit into your
 				routine. Most clients achieve optimal results after 4-6 sessions, spaced
 				4 weeks apart. Suitable for all skin types, this non-invasive solution
 				offers radiant and refreshed skin with minimal downtime and impressive

@@ -1,10 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
-import Logo from '#app/components/logo.js'
-import { CTA } from '#app/utils/cta.js'
-import Service from '../book+/_steps+/service'
-import { ServiceFAQ, ServiceLayout } from './__service-layout'
-
-const description = `Microneedling is a transformative skincare service designed to rejuvenate and revitalize your skin. This minimally invasive procedure utilizes fine needles to create micro-injuries on the skin surface, promoting natural collagen and elastin production. Ideal for addressing wrinkles, scars, and enhancing overall skin texture, microneedling offers a safe and effective solution for achieving a youthful, radiant complexion.`
+import { ServiceFAQ, ServiceLayout, ServiceParagraph } from './__service-layout'
 
 const faq = [
 	{
@@ -44,6 +38,15 @@ export default function () {
 			title="Microneedling"
 			description="for acne scars, fine lines, wrinkles"
 		>
+			<ServiceParagraph>
+				Microneedling is a transformative skincare service designed to
+				rejuvenate and revitalize your skin. This minimally invasive procedure
+				utilizes fine needles to create micro-injuries on the skin surface,
+				promoting natural collagen and elastin production. Ideal for addressing
+				wrinkles, scars, and enhancing overall skin texture, microneedling
+				offers a safe and effective solution for achieving a youthful, radiant
+				complexion.
+			</ServiceParagraph>
 			<ServiceFAQ faq={faq} />
 		</ServiceLayout>
 	)

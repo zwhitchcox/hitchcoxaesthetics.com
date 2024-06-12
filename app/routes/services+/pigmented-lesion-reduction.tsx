@@ -40,7 +40,7 @@ export default function () {
 	return (
 		<ServiceLayout
 			title="Pigmented Lesion Reduction"
-			description="for lips, cheeks, facial balancing"
+			description="for sun spots, age spots, freckles"
 			imgClassName="object-cover"
 		>
 			<ServiceParagraph>
