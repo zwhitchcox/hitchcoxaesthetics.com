@@ -387,7 +387,7 @@ function Header({
 						: 'pointer-events-none'
 				} fixed`}
 			>
-				<ListWithDot links={links} className="text-4xl" />
+				<ListWithDot links={links} className="px-3 pt-16 text-3xl" />
 			</nav>
 		</>
 	)
@@ -621,7 +621,7 @@ function useLinks() {
 	const user = useOptionalUser()
 	const isProvider = useIsProvider(user)
 
-	const links: { to: string; label: string }[] = []
+	const links: { to: string; label: string; hint?: string }[] = []
 	if (!user || (user && !isProvider)) {
 		links.push({
 			to: 'https://hitchcoxaesthetics.janeapp.com/',
@@ -640,30 +640,37 @@ function useLinks() {
 		{
 			to: '/services/botox',
 			label: 'Botox',
+			hint: 'for wrinkles, fine lines',
 		},
 		{
 			to: '/services/filler',
 			label: 'Filler',
+			hint: 'for lips, cheeks, facial balancing',
 		},
 		{
 			to: '/services/microneedling',
 			label: 'Microneedling',
+			hint: 'for acne scars, fine lines, wrinkles',
 		},
 		{
 			to: '/services/laser-hair-removal',
 			label: 'Laser Hair Removal',
+			hint: 'for all skin types, virtually pain-free',
 		},
 		{
 			to: '/services/skin-revitalization',
 			label: 'Skin Revitalization',
+			hint: 'for fine lines, wrinkles, enlarged pores',
 		},
 		{
 			to: '/services/pigmented-lesion-reduction',
 			label: 'Pigmented Lesion Reduction',
+			hint: 'for sun spots, age spots, freckles',
 		},
 		{
 			to: '/services/vascular-lesion-reduction',
 			label: 'Vascular Lesion Reduction',
+			hint: 'for spider veins, broken capillaries, rosacea',
 		},
 		{
 			to: '/about',

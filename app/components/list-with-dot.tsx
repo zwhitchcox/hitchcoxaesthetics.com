@@ -9,7 +9,7 @@ export function ListWithDot({
 	dotSize = 6,
 }: {
 	className?: string
-	links: { to: string; label: string }[]
+	links: { to: string; label: string; hint?: string }[]
 	dotSize?: number
 }) {
 	const ulRef = useRef<HTMLUListElement>(null)
@@ -46,7 +46,7 @@ export function ListWithDot({
 	const { pathname } = useLocation()
 
 	return (
-		<ul className={cn(className, 'flex flex-col')} ref={ulRef}>
+		<ul className={cn('flex flex-col', className)} ref={ulRef}>
 			<div className="dot rounded-full bg-foreground" style={dotStyle}></div>
 			{links.map((link, index) => (
 				<li
@@ -57,6 +57,7 @@ export function ListWithDot({
 						handleMouseEnter(index)
 					}}
 					onMouseLeave={handleMouseLeave}
+					className="group"
 				>
 					<NavLink
 						className={({ isActive }) =>
@@ -67,6 +68,11 @@ export function ListWithDot({
 					>
 						{link.label}
 					</NavLink>
+					{link.hint && hoveredLinkIndex === index ? (
+						<p className="hidden text-sm text-muted-foreground group-hover:block">
+							{link.hint}
+						</p>
+					) : null}
 				</li>
 			))}
 		</ul>
