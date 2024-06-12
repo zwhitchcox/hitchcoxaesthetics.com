@@ -25,7 +25,7 @@ import {
 	useSubmit,
 } from '@remix-run/react'
 import { withSentry } from '@sentry/remix'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { HoneypotProvider } from 'remix-utils/honeypot/react'
 import { z } from 'zod'
 
@@ -621,78 +621,80 @@ function useLinks() {
 	const user = useOptionalUser()
 	const isProvider = useIsProvider(user)
 
-	const links: { to: string; label: string; hint?: string }[] = []
-	if (!user || (user && !isProvider)) {
-		links.push({
-			to: 'https://hitchcoxaesthetics.janeapp.com/',
-			label: 'Book Now',
-		})
-	}
-	links.push(
-		{
-			to: '/',
-			label: 'Home',
-		},
-		// {
-		// 	to: '/services',
-		// 	label: 'Services',
-		// },
-		{
-			to: '/services/botox',
-			label: 'Botox',
-			hint: 'for wrinkles, fine lines',
-		},
-		{
-			to: '/services/filler',
-			label: 'Filler',
-			hint: 'for lips, cheeks, facial balancing',
-		},
-		{
-			to: '/services/microneedling',
-			label: 'Microneedling',
-			hint: 'for acne scars, fine lines, wrinkles',
-		},
-		{
-			to: '/services/laser-hair-removal',
-			label: 'Laser Hair Removal',
-			hint: 'for all skin types, virtually pain-free',
-		},
-		{
-			to: '/services/skin-revitalization',
-			label: 'Skin Revitalization',
-			hint: 'for fine lines, wrinkles, enlarged pores',
-		},
-		{
-			to: '/services/pigmented-lesion-reduction',
-			label: 'Pigmented Lesion Reduction',
-			hint: 'for sun spots, age spots, freckles',
-		},
-		{
-			to: '/services/vascular-lesion-reduction',
-			label: 'Vascular Lesion Reduction',
-			hint: 'for spider veins, broken capillaries, rosacea',
-		},
-		{
-			to: '/about',
-			label: 'About',
-		},
-		// {
-		// 	to: '/contact',
-		// 	label: 'Contact',
-		// },
-	)
-	if (user) {
+	return useMemo(() => {
+		const links: { to: string; label: string; hint?: string }[] = []
+		if (!user || (user && !isProvider)) {
+			links.push({
+				to: 'https://hitchcoxaesthetics.janeapp.com/',
+				label: 'Book Now',
+			})
+		}
 		links.push(
-			isProvider
-				? { to: '/schedule', label: 'Schedule' }
-				: { to: '/account/info/general', label: 'My Account' },
+			{
+				to: '/',
+				label: 'Home',
+			},
+			// {
+			// 	to: '/services',
+			// 	label: 'Services',
+			// },
+			{
+				to: '/services/botox',
+				label: 'Botox',
+				hint: 'for wrinkles, fine lines',
+			},
+			{
+				to: '/services/filler',
+				label: 'Filler',
+				hint: 'for lips, cheeks, facial balancing',
+			},
+			{
+				to: '/services/microneedling',
+				label: 'Microneedling',
+				hint: 'for acne scars, fine lines, wrinkles',
+			},
+			{
+				to: '/services/laser-hair-removal',
+				label: 'Laser Hair Removal',
+				hint: 'for all skin types, virtually pain-free',
+			},
+			{
+				to: '/services/skin-revitalization',
+				label: 'Skin Revitalization',
+				hint: 'for fine lines, wrinkles, enlarged pores',
+			},
+			{
+				to: '/services/pigmented-lesion-reduction',
+				label: 'Pigmented Lesion Reduction',
+				hint: 'for sun spots, age spots, freckles',
+			},
+			{
+				to: '/services/vascular-lesion-reduction',
+				label: 'Vascular Lesion Reduction',
+				hint: 'for spider veins, broken capillaries, rosacea',
+			},
+			{
+				to: '/about',
+				label: 'About',
+			},
+			// {
+			// 	to: '/contact',
+			// 	label: 'Contact',
+			// },
 		)
-		links.push({ to: '/logout', label: 'Logout' })
-	} else {
-		// links.push({ to: '/auth', label: 'Log In' })
-	}
+		if (user) {
+			links.push(
+				isProvider
+					? { to: '/schedule', label: 'Schedule' }
+					: { to: '/account/info/general', label: 'My Account' },
+			)
+			links.push({ to: '/logout', label: 'Logout' })
+		} else {
+			// links.push({ to: '/auth', label: 'Log In' })
+		}
 
-	return links
+		return links
+	}, [isProvider, user])
 }
 
 export function ErrorBoundary() {
