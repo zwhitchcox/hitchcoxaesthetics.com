@@ -621,14 +621,17 @@ function useLinks() {
 	const user = useOptionalUser()
 	const isProvider = useIsProvider(user)
 
-	const links = [
+	const links: { to: string; label: string }[] = []
+	if (!user || (user && !isProvider)) {
+		links.push({
+			to: 'https://hitchcoxaesthetics.janeapp.com/',
+			label: 'Book Now',
+		})
+	}
+	links.push(
 		{
 			to: '/',
 			label: 'Home',
-		},
-		{
-			to: '/about',
-			label: 'About',
 		},
 		// {
 		// 	to: '/services',
@@ -646,17 +649,27 @@ function useLinks() {
 			to: '/services/microneedling',
 			label: 'Microneedling',
 		},
+		{
+			to: '/services/laser-hair-removal',
+			label: 'Laser Hair Removal',
+		},
+		{
+			to: '/services/skin-revitalization',
+			label: 'Skin Revitalization',
+		},
+		{
+			to: '/services/vascular-lesion-reduction',
+			label: 'Vascular Lesion Reduction',
+		},
+		{
+			to: '/about',
+			label: 'About',
+		},
 		// {
 		// 	to: '/contact',
 		// 	label: 'Contact',
 		// },
-	]
-	if (!user || (user && !isProvider)) {
-		links.push({
-			to: 'https://hitchcoxaesthetics.janeapp.com/',
-			label: 'Book Now',
-		})
-	}
+	)
 	if (user) {
 		links.push(
 			isProvider

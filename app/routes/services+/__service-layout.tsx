@@ -46,6 +46,28 @@ export function ServiceFAQ({
 	)
 }
 
+export function ServiceAreas({
+	areas,
+}: {
+	areas: { name: string; description: string }[]
+}) {
+	return (
+		<div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+			{areas.map(item => (
+				<div
+					key={item.name}
+					className="rounded-lg bg-gray-50 bg-white p-6 shadow-sm"
+				>
+					<h3 className="mb-2 text-xl font-medium text-gray-900">
+						{item.name}
+					</h3>
+					<p className="text-lg text-gray-700">{item.description}</p>
+				</div>
+			))}
+		</div>
+	)
+}
+
 export function ServiceParagraph({ children }: { children: React.ReactNode }) {
 	return <p className="text-lg leading-relaxed text-gray-600">{children}</p>
 }
