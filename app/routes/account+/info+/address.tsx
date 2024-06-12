@@ -1,5 +1,6 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { type Address } from '@prisma/client'
 import {
 	type LoaderFunctionArgs,
@@ -19,6 +20,10 @@ import { Input } from '#app/components/ui/input'
 import { requireUser, requireUserId } from '#app/utils/auth.server.js'
 import { prisma } from '#app/utils/db.server.js'
 import { useRedirectTo } from './_layout'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 const AddressSchema = z.object({
 	intent: z.literal('address'),

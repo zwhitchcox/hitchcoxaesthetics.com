@@ -1,4 +1,9 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { z } from 'zod'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export const FieldTypeSchema = z.enum([
 	'YesNo',

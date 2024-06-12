@@ -1,6 +1,11 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { Outlet, useLocation, useNavigate } from '@remix-run/react'
 
 import { Tabs, TabsList, TabsTrigger } from '#app/components/ui/tabs'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 const tabs = [
 	{

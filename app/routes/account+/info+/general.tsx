@@ -1,5 +1,6 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod'
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import {
 	type ActionFunctionArgs,
 	json,
@@ -18,6 +19,10 @@ import { prisma } from '#app/utils/db.server.js'
 import { useIsPending } from '#app/utils/misc.js'
 import { getAge } from '#app/utils/user.js'
 import { useRedirectTo } from './_layout'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export const UserInfoSchema = z.object({
 	name: z.string().min(1, 'Name is required'),

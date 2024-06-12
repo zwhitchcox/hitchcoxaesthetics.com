@@ -1,3 +1,4 @@
+import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { type Prisma } from '@prisma/client'
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { Outlet, redirect, useLocation } from '@remix-run/react'
@@ -14,6 +15,10 @@ import { useMatchesData } from '#app/utils/misc'
 import { getServices } from '#app/utils/service.server'
 import { redirectWithToast } from '#app/utils/toast.server'
 import { UserType } from '#app/utils/types'
+
+export const handle: SEOHandle = {
+	getSitemapEntries: () => null,
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const services = await getServices()
