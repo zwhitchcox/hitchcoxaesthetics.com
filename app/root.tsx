@@ -658,8 +658,8 @@ function useLinks() {
 			label: 'Skin Revitalization',
 		},
 		{
-			to: '/services/vascular-lesion-reduction',
-			label: 'Vascular Lesion Reduction',
+			to: '/services/pigmented-lesion-reduction',
+			label: 'Pigmented Lesion Reduction',
 		},
 		{
 			to: '/about',

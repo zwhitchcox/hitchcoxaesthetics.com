@@ -39,9 +39,9 @@ const areas = [
 export default function () {
 	return (
 		<ServiceLayout
-			title="Filler"
+			title="Pigmented Lesion Reduction"
 			description="for lips, cheeks, facial balancing"
-			imgClassName="h-full"
+			imgClassName="object-cover"
 		>
 			<ServiceParagraph>
 				Our pigmented lesion reduction service effectively targets and reduces

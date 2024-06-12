@@ -73,9 +73,10 @@ const areas = [
 export default function () {
 	return (
 		<ServiceLayout
-			title="Filler"
+			title="Laser Hair Removal"
 			description="for lips, cheeks, facial balancing"
-			imgClassName="h-full"
+			imgClassName="h-auto w-full"
+			beforeImgClassName="feathered-image"
 		>
 			<ServiceParagraph>
 				Experience virtually pain-free hair removal, suitable for all skin

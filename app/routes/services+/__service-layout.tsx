@@ -54,10 +54,7 @@ export function ServiceAreas({
 	return (
 		<div className="grid grid-cols-1 gap-8 md:grid-cols-2">
 			{areas.map(item => (
-				<div
-					key={item.name}
-					className="rounded-lg bg-gray-50 bg-white p-6 shadow-sm"
-				>
+				<div key={item.name} className="rounded-lg bg-white p-6 shadow-sm">
 					<h3 className="mb-2 text-xl font-medium text-gray-900">
 						{item.name}
 					</h3>
@@ -77,11 +74,15 @@ export function ServiceLayout({
 	description,
 	children,
 	imgClassName,
+	beforeImgClassName,
+	imgContainerClassName,
 }: {
 	title: string
 	description: string
 	children: React.ReactNode
 	imgClassName?: string
+	beforeImgClassName?: string
+	imgContainerClassName?: string
 }) {
 	const location = useLocation()
 	const service = location.pathname.split('/').pop()
@@ -89,20 +90,26 @@ export function ServiceLayout({
 		<>
 			<div className="font-poppins flex w-full flex-col bg-white">
 				<div className="relative h-[100dvh] w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
-					<div className="flex w-full flex-1 items-center justify-center bg-[#070707] grayscale duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]">
+					<div
+						className={cn(
+							'flex w-full flex-1 items-center justify-center bg-[#070707] grayscale duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]',
+							imgContainerClassName,
+						)}
+					>
 						<img
 							src={`/img/${service}/before.jpg`}
 							alt={`Sarah Hitchcox ${title} Before`}
 							className={cn(
-								'before-image  absolute top-0 z-10 mt-[-3rem] translate-y-[7%]',
+								'before-image  absolute top-0 z-10',
 								imgClassName,
+								beforeImgClassName,
 							)}
 						/>
 						<img
 							src={`/img/${service}/after.jpg`}
 							alt={`Sarah Hitchcox ${title} After`}
 							className={cn(
-								'after-image animate-grayscale absolute top-0 z-10 mt-[-3rem] translate-y-[7%]',
+								'after-image animate-grayscale absolute top-0 z-10',
 								imgClassName,
 							)}
 						/>

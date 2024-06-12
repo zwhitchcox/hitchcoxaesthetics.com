@@ -27,9 +27,10 @@ const treatments = [
 export default function () {
 	return (
 		<ServiceLayout
-			title="Filler"
+			title="Skin Revitalization"
 			description="for lips, cheeks, facial balancing"
-			imgClassName="h-full"
+			imgClassName="feathered-image h-full"
+			imgContainerClassName="grayscale-0"
 		>
 			<ServiceParagraph>
 				Revitalize your skin with the Motus AZ+ laser, designed to address signs
