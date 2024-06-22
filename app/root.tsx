@@ -420,6 +420,7 @@ function _Header() {
 	)
 }
 
+// instagram https://www.instagram.com/hitchcoxaesthetics/
 function Footer() {
 	return (
 		<div className="container flex flex-col justify-between space-y-8 py-32 md:flex-row md:space-y-0">
@@ -430,6 +431,17 @@ function Footer() {
 				</p>
 				<p className="text-lg">(865) 214-7238</p>
 				<p className="text-lg">sarah@hitchcoxaesthetics.com</p>
+			</div>
+			<div className="flex flex-col space-y-4 text-lg">
+				<h2 className="text-2xl font-semibold">Follow Us</h2>
+				<a
+					href="https://www.instagram.com/hitchcoxaesthetics/"
+					target="_blank"
+					rel="noopener noreferrer"
+					className="text-lg hover:text-primary"
+				>
+					<Icon name="instagram-logo" className="h-6 w-6" />
+				</a>
 			</div>
 			<div className="flex flex-col space-y-4">
 				<h2 className="text-2xl font-semibold">Find Us</h2>

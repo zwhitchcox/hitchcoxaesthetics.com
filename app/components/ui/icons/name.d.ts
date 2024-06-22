@@ -18,6 +18,7 @@ export type IconName =
 	| 'exit'
 	| 'file-text'
 	| 'github-logo'
+	| 'instagram-logo'
 	| 'laptop'
 	| 'link-2'
 	| 'lock-closed'

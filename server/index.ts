@@ -136,7 +136,7 @@ app.use(
 					"'self'",
 				].filter(Boolean),
 				'font-src': ["'self'", 'https://*.gstatic.com'],
-				'frame-src': ["'self'"],
+				'frame-src': ["'self'", 'https://*.google.com'],
 				'img-src': [
 					"'self'",
 					'data:',
