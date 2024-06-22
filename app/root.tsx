@@ -387,7 +387,7 @@ function Header({
 						: 'pointer-events-none'
 				} fixed`}
 			>
-				<ListWithDot links={links} className="px-3 pt-16 text-3xl" />
+				<ListWithDot links={links} className="px-3 py-16 text-3xl" />
 			</nav>
 		</>
 	)
@@ -674,8 +674,19 @@ function useLinks() {
 				hint: 'for spider veins, broken capillaries, rosacea',
 			},
 			{
+				to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
+				label: 'Shop SkinMedica',
+				hint: 'for skincare products',
+			},
+			{
+				to: 'https://alle.com/',
+				label: 'Allē Rewards',
+				hint: 'for rewards on Botox, filler, and more',
+			},
+			{
 				to: '/about',
 				label: 'About',
+				hint: 'learn more about Sarah Hitchcox',
 			},
 			// {
 			// 	to: '/contact',
