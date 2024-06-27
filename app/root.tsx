@@ -701,7 +701,7 @@ function useLinks() {
 				hint: 'learn more about Sarah Hitchcox',
 			},
 			{
-				to: 'https://maps.app.goo.gl/rxM3Lwzn3VtAgxyS7',
+				to: '/location',
 				label: 'Location',
 				hint: 'find us on Google Maps',
 			},
