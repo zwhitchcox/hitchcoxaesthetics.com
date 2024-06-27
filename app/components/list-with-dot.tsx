@@ -100,6 +100,7 @@ export function ListWithDot({
 								}
 								to={link.to}
 								prefetch="intent"
+								target={link.to.startsWith('http') ? '_blank' : undefined}
 							>
 								{link.label}
 							</NavLink>
