@@ -42,6 +42,8 @@ export default function () {
 		<ServiceLayout
 			title="Juvederm SkinVive"
 			description="for skin hydration, smoothness, and overall appearance"
+			imgClassName="w-full h-full object-cover object-center  cover"
+			imgContainerClassName="grayscale-0"
 		>
 			<ServiceParagraph>
 				Juvederm SkinVive is a cutting-edge treatment designed to enhance skin
