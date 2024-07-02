@@ -44,7 +44,7 @@ export default function Index() {
 							</a>
 							<a
 								className="text-md mx-2 my-1 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-								href="https://hitchcoxaesthetics.janeapp.com"
+								href="https://hitchcoxaesthetics.janeapp.com/#/staff_member/1"
 							>
 								Book Now
 							</a>
