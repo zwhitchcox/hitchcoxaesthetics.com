@@ -691,6 +691,11 @@ function useLinks() {
 				hint: 'for skincare products',
 			},
 			{
+				to: '/services/skinvive',
+				label: 'SkinVive',
+				hint: 'for skin hydration, smoothness, and overall appearance',
+			},
+			{
 				to: 'https://alle.com/',
 				label: 'Allē Rewards',
 				hint: 'for rewards on Botox, filler, and more',
