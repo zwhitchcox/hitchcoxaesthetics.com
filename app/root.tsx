@@ -661,6 +661,11 @@ function useLinks() {
 				hint: 'for lips, cheeks, facial balancing',
 			},
 			{
+				to: '/services/skinvive',
+				label: 'SkinVive',
+				hint: 'for skin hydration, smoothness, and overall appearance',
+			},
+			{
 				to: '/services/microneedling',
 				label: 'Microneedling',
 				hint: 'for acne scars, fine lines, wrinkles',
@@ -689,11 +694,6 @@ function useLinks() {
 				to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
 				label: 'Shop SkinMedica',
 				hint: 'for skincare products',
-			},
-			{
-				to: '/services/skinvive',
-				label: 'SkinVive',
-				hint: 'for skin hydration, smoothness, and overall appearance',
 			},
 			{
 				to: 'https://alle.com/',
