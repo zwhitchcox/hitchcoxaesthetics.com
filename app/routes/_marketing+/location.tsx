@@ -1,6 +1,4 @@
-import { useLocation } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
-import { scrollToId } from '#app/utils/misc.js'
 
 export function ServiceHeader({ children }: { children: React.ReactNode }) {
 	return <h2 className="text-3xl font-semibold text-gray-700">{children}</h2>
@@ -27,8 +25,6 @@ export function ServiceCheckMarks({
 }
 
 export default function ServiceLayout() {
-	const location = useLocation()
-	const service = location.pathname.split('/').pop()
 	return (
 		<>
 			<div className="font-poppins flex w-full flex-col bg-white">
