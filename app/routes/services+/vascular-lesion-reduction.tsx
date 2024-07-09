@@ -34,8 +34,7 @@ export default function () {
 		<ServiceLayout
 			title="Vascular Lesion Reduction"
 			description="for spider veins, rosacea, redness"
-			imgClassName="h-full"
-			imgContainerClassName="grayscale-0"
+			imgClassName="sm:h-full sm:w-auto"
 		>
 			<ServiceParagraph>
 				Our vascular lesions treatment effectively targets conditions such as

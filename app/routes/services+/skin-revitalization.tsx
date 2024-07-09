@@ -29,7 +29,7 @@ export default function () {
 		<ServiceLayout
 			title="Skin Revitalization"
 			description="for fine lines, wrinkles, uneven texture"
-			imgClassName="feathered-image h-full"
+			imgClassName="w-full sm:h-full sm:w-auto object-cover"
 			imgContainerClassName="grayscale-0"
 		>
 			<ServiceParagraph>
