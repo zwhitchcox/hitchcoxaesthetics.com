@@ -92,7 +92,7 @@ export function ServiceLayout({
 				<div className="relative h-[100dvh] w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
 					<div
 						className={cn(
-							'flex w-full flex-1 items-center justify-center bg-[#070707] grayscale duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]',
+							'flex w-full flex-1 items-center justify-center bg-[#070707] duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]',
 							imgContainerClassName,
 						)}
 					>
@@ -117,7 +117,7 @@ export function ServiceLayout({
 					<div className="absolute bottom-0 z-10 w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
 						<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
 							<div className="flex flex-col items-center justify-center">
-								<div className="animate-fade-in whitespace-nowrap text-xl tracking-[.4rem] md:text-2xl lg:text-3xl">
+								<div className="animate-fade-in text-center text-xl tracking-[.4rem] md:text-2xl lg:text-3xl">
 									{title}
 								</div>
 								<Logo className="my-2 h-8 w-8 animate-spin-in text-primary [animation-fill-mode:backwards] md:h-10 md:w-10 lg:h-10 lg:w-10" />
