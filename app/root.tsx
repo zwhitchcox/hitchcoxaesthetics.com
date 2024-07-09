@@ -691,6 +691,11 @@ function useLinks() {
 				hint: 'for spider veins, broken capillaries, rosacea',
 			},
 			{
+				to: '/services/hair-loss-prevention-regrowth',
+				label: 'Hair Loss Prevention & Regrowth',
+				hint: 'for receding hairlines, thinning hair',
+			},
+			{
 				to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
 				label: 'Shop SkinMedica',
 				hint: 'for skincare products',
