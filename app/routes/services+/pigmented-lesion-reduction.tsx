@@ -41,7 +41,7 @@ export default function () {
 		<ServiceLayout
 			title="Pigmented Lesion Reduction"
 			description="for sun spots, age spots, freckles"
-			imgClassName="h-full feathered-image"
+			imgClassName="w-full h-full object-cover"
 		>
 			<ServiceParagraph>
 				Our pigmented lesion reduction service effectively targets and reduces

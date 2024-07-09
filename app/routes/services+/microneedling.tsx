@@ -37,6 +37,7 @@ export default function () {
 		<ServiceLayout
 			title="Microneedling"
 			description="for acne scars, fine lines, wrinkles"
+			imgClassName="w-full h-full object-cover"
 		>
 			<ServiceParagraph>
 				Microneedling is a transformative skincare service designed to

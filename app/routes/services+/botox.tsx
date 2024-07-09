@@ -52,7 +52,7 @@ export default function () {
 		<ServiceLayout
 			title="Botox"
 			description="for wrinkles, fine lines"
-			imgClassName="w-full"
+			imgClassName="w-full h-full object-cover"
 		>
 			<ServiceHeader>What is Botox?</ServiceHeader>
 			<ServiceParagraph>

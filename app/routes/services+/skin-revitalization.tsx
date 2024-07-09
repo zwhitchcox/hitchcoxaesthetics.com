@@ -29,8 +29,7 @@ export default function () {
 		<ServiceLayout
 			title="Skin Revitalization"
 			description="for fine lines, wrinkles, uneven texture"
-			imgClassName="w-full sm:h-full sm:w-auto object-cover"
-			imgContainerClassName="grayscale-0"
+			imgClassName="w-full h-full object-cover"
 		>
 			<ServiceParagraph>
 				Revitalize your skin with our advanced laser treatment, designed to

@@ -89,32 +89,33 @@ export function ServiceLayout({
 	return (
 		<>
 			<div className="font-poppins flex w-full flex-col bg-white">
-				<div className="relative h-[100dvh] w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
+				<div className="relative top-[3rem] flex h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
 					<div
 						className={cn(
-							'flex w-full flex-1 items-center justify-center bg-[#070707] duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]',
+							'relative flex w-full flex-1 items-center justify-center bg-[#070707] duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]',
 							imgContainerClassName,
 						)}
 					>
-						<img
-							src={`/img/${service}/before.jpg`}
-							alt={`Sarah Hitchcox ${title} Before`}
-							className={cn(
-								'before-image  absolute top-0 z-10',
-								imgClassName,
-								beforeImgClassName,
-							)}
-						/>
-						<img
-							src={`/img/${service}/after.jpg`}
-							alt={`Sarah Hitchcox ${title} After`}
-							className={cn(
-								'after-image animate-grayscale absolute top-0 z-10',
-								imgClassName,
-							)}
-						/>
+						<div className="absolute h-full w-full">
+							<img
+								src={`/img/${service}/before.jpg`}
+								alt={`Sarah Hitchcox ${title} Before`}
+								className={cn(
+									'before-image z-10',
+									imgClassName,
+									beforeImgClassName,
+								)}
+							/>
+						</div>
+						<div className="absolute h-full w-full">
+							<img
+								src={`/img/${service}/after.jpg`}
+								alt={`Sarah Hitchcox ${title} After`}
+								className={cn('after-image z-10', imgClassName)}
+							/>
+						</div>
 					</div>
-					<div className="absolute bottom-0 z-10 w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
+					<div className="z-10 flex w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
 						<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
 							<div className="flex flex-col items-center justify-center">
 								<div className="animate-fade-in text-center text-xl tracking-[.4rem] md:text-2xl lg:text-3xl">
