@@ -314,3 +314,13 @@ export const scrollToId = (id: string) => {
 	const element = document.getElementById(id)
 	element?.scrollIntoView({ behavior: 'smooth' })
 }
+
+export function safeGtag<Command extends keyof Gtag.GtagCommands>(
+	command: Command,
+	...args: Gtag.GtagCommands[Command]
+) {
+	if (typeof window === 'undefined' || !window.gtag) {
+		return
+	}
+	gtag(command, ...args)
+}

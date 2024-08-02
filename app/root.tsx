@@ -60,6 +60,7 @@ import {
 	combineHeaders,
 	getDomainUrl,
 	getUserImgSrc,
+	safeGtag,
 } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { useRequestInfo } from '#/app/utils/request-info.ts'
@@ -258,16 +259,6 @@ function Document({
 			</body>
 		</html>
 	)
-}
-
-function safeGtag<Command extends keyof Gtag.GtagCommands>(
-	command: Command,
-	...args: Gtag.GtagCommands[Command]
-) {
-	if (typeof window === 'undefined' || !window.gtag) {
-		return
-	}
-	gtag(command, ...args)
 }
 
 function App() {
@@ -671,6 +662,11 @@ function useLinks() {
 				hint: 'for acne scars, fine lines, wrinkles',
 			},
 			{
+				to: '/services/hair-loss-prevention-regrowth',
+				label: 'Hair Loss Prevention & Regrowth',
+				hint: 'for receding hairlines, thinning hair',
+			},
+			{
 				to: '/services/laser-hair-removal',
 				label: 'Laser Hair Removal',
 				hint: 'for all skin types, virtually pain-free',
@@ -689,11 +685,6 @@ function useLinks() {
 				to: '/services/vascular-lesion-reduction',
 				label: 'Vascular Lesion Reduction',
 				hint: 'for spider veins, broken capillaries, rosacea',
-			},
-			{
-				to: '/services/hair-loss-prevention-regrowth',
-				label: 'Hair Loss Prevention & Regrowth',
-				hint: 'for receding hairlines, thinning hair',
 			},
 			{
 				to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
