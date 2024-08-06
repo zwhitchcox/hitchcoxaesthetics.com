@@ -8,3 +8,8 @@ form builder:
 
 scheduler:
   - should not be able to book more than 3 weeks in advance
+
+services:
+  - make really cool service exploration thing
+  - maybe make stepped menu so you can go back and forth for nested menu
+    levels...should make things more easily digestible
