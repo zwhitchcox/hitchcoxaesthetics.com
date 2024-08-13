@@ -88,8 +88,8 @@ export function ServiceLayout({
 	const service = location.pathname.split('/').pop()
 	return (
 		<>
-			<div className="font-poppins flex w-full flex-col bg-white">
-				<div className="relative top-[3rem] flex h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
+			<div className="font-poppins mt-[3rem] flex h-[calc(100dvh-3rem)] w-full flex-col bg-white">
+				<div className="relative  flex h-[calc(100dvh-3rem)]  w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
 					<div
 						className={cn(
 							'relative flex w-full flex-1 items-center justify-center bg-[#070707] duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]',
@@ -150,7 +150,7 @@ export function ServiceLayout({
 			>
 				<div className="flex w-full flex-col items-center justify-center space-y-12">
 					<div className="w-full max-w-2xl space-y-8">
-						<h1 className="text-center text-5xl font-bold text-gray-800">
+						<h1 className=" text-center text-5xl font-bold text-gray-800">
 							{title} | Knoxville
 						</h1>
 						<div className="flex flex-col space-y-6">{children}</div>
