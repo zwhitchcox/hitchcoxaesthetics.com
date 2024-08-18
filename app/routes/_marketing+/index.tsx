@@ -2,7 +2,6 @@ import { type MetaFunction } from '@remix-run/node'
 
 import { useOutletContext } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
-import { safeGtag } from '#app/utils/misc.js'
 // import { Button } from '#app/components/ui/button'
 
 export const meta: MetaFunction = () => [{ title: 'Sarah Hitchcox Aesthetics' }]

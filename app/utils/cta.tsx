@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState } from 'react'
 import { safeGtag } from './misc'
 
 export function CTA() {

@@ -1,7 +1,7 @@
 import { useLocation } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
 import { CTA } from '#app/utils/cta.js'
-import { cn, safeGtag, scrollToId } from '#app/utils/misc.js'
+import { cn, scrollToId } from '#app/utils/misc.js'
 
 export function ServiceHeader({ children }: { children: React.ReactNode }) {
 	return <h2 className="text-3xl font-semibold text-gray-700">{children}</h2>
