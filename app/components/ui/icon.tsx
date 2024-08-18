@@ -1,4 +1,4 @@
-import { type SVGProps } from 'react'
+import { forwardRef, type SVGProps } from 'react'
 import href from '#/app/components/ui/icons/sprite.svg'
 import { cn } from '#app/utils/misc.tsx'
 import { type IconName } from '@/icon-name'
@@ -34,16 +34,13 @@ const childrenSizeClassName = {
  * you need to wrap the icon and text in a common parent and set the parent to
  * display "flex" (or "inline-flex") with "items-center" and a reasonable gap.
  */
-export function Icon({
-	name,
-	size = 'font',
-	className,
-	children,
-	...props
-}: SVGProps<SVGSVGElement> & {
-	name: IconName
-	size?: Size
-}) {
+export const Icon = forwardRef<
+	SVGSVGElement,
+	SVGProps<SVGSVGElement> & {
+		name: IconName
+		size?: Size
+	}
+>(function Icon({ name, size = 'font', className, children, ...props }, ref) {
 	if (children) {
 		return (
 			<span
@@ -57,9 +54,10 @@ export function Icon({
 	return (
 		<svg
 			{...props}
+			ref={ref}
 			className={cn(sizeClassName[size], 'inline self-center', className)}
 		>
 			<use href={`${href}#${name}`} />
 		</svg>
 	)
-}
+})

@@ -6,33 +6,29 @@ export function CTA() {
 	const phoneIconRef = useRef<SVGSVGElement>(null)
 	const calendarIconRef = useRef<SVGSVGElement>(null)
 
-	useEffect(() => {
-		const wiggleIcons = () => {
-			if (calendarIconRef.current) {
-				calendarIconRef.current.classList.add('wiggle')
-			}
+	// useEffect(() => {
+	// 	const wiggleIcons = () => {
+	// 		if (phoneIconRef.current) {
+	// 			phoneIconRef.current.classList.add('wiggle')
+	// 		}
+	// 		if (calendarIconRef.current) {
+	// 			calendarIconRef.current.classList.add('wiggle')
+	// 		}
 
-			setTimeout(() => {
-				if (calendarIconRef.current) {
-					calendarIconRef.current.classList.remove('wiggle')
-				}
+	// 		setTimeout(() => {
+	// 			if (phoneIconRef.current) {
+	// 				phoneIconRef.current.classList.remove('wiggle')
+	// 			}
+	// 			if (calendarIconRef.current) {
+	// 				calendarIconRef.current.classList.remove('wiggle')
+	// 			}
+	// 		}, 500)
+	// 	}
 
-				if (phoneIconRef.current) {
-					phoneIconRef.current.classList.add('wiggle')
-				}
+	// 	const interval = setInterval(wiggleIcons, 5000) // Wiggle every 30 seconds
 
-				setTimeout(() => {
-					if (phoneIconRef.current) {
-						phoneIconRef.current.classList.remove('wiggle')
-					}
-				}, 500)
-			}, 500)
-		}
-
-		const interval = setInterval(wiggleIcons, 10000)
-
-		return () => clearInterval(interval)
-	}, [])
+	// 	return () => clearInterval(interval) // Cleanup interval on component unmount
+	// }, [])
 
 	const showCTA = true
 
@@ -65,10 +61,10 @@ export function CTA() {
 				>
 					<Icon
 						name="phone"
-						className="mb-[-1px] mr-2 inline-block h-6 w-6"
+						className="mb-[-1px] mr-2 inline-block h-6 w-6 wiggle"
 						ref={phoneIconRef}
 					/>
-					<div className="mt-[-0px]">(865) 214-7238</div>
+					<div className="mt-[-0px] wiggle">(865) 214-7238</div>
 				</a>
 			</div>
 		</div>
