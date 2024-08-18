@@ -91,12 +91,12 @@ export function ListWithDot({
 							key={link.to}
 							onMouseEnter={() => handleMouseEnter(index)}
 							onMouseLeave={handleMouseLeave}
-							className={cn('group/link')}
+							className={cn('group/link', 'py-1')}
 							id={`nav-link-${index}`}
 						>
 							<NavLink
 								className={({ isActive }) =>
-									`flex items-center py-3 ${isActive ? 'italic text-muted-foreground' : ''}`
+									`flex items-center py-2 ${isActive ? 'italic text-muted-foreground' : ''}`
 								}
 								to={link.to}
 								prefetch="intent"

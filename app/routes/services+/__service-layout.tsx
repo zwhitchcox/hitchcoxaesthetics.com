@@ -116,14 +116,19 @@ export function ServiceLayout({
 						</div>
 					</div>
 					<div className="z-10 flex w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
-						<div className="jlgustify-center flex h-full w-full animate-slide-top flex-col items-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
+						<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
 							<div className="flex flex-col items-center justify-center">
 								<div className="animate-fade-in text-center text-xl tracking-[.4rem] md:text-2xl lg:text-3xl">
 									{title}
 								</div>
 								<Logo className="my-2 h-8 w-8 animate-spin-in text-primary [animation-fill-mode:backwards] md:h-10 md:w-10 lg:h-10 lg:w-10" />
-								<div className="text-md text-center tracking-[.3rem] text-gray-600 sm:tracking-[.3rem] md:text-xl">
-									{description}
+								<div className="text-md flex flex-wrap px-2 text-center tracking-[.3rem] text-gray-600 sm:tracking-[.3rem] md:text-xl">
+									{description.split(',').map((item, index) => (
+										<span key={index} className="whitespace-nowrap">
+											{item}
+											{index < description.split(',').length - 1 && ','}
+										</span>
+									))}
 								</div>
 							</div>
 							<div className="flex flex-col items-center justify-center space-y-2">

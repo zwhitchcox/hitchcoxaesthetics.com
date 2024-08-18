@@ -380,7 +380,7 @@ function Header({
 						: 'pointer-events-none'
 				} fixed`}
 			>
-				<ListWithDot links={links} className="px-3 py-16 text-3xl" />
+				<ListWithDot links={links} className="px-3 py-16 text-2xl" />
 			</nav>
 		</>
 	)
@@ -416,7 +416,7 @@ function _Header() {
 // instagram https://www.instagram.com/hitchcoxaesthetics/
 function Footer() {
 	return (
-		<div className="container flex flex-col justify-between space-y-8 py-32 md:flex-row md:space-y-0">
+		<div className="container flex flex-col justify-between space-y-8 py-12 pb-32 md:flex-row md:space-y-0">
 			<div className="flex flex-col space-y-4">
 				<h2 className="text-2xl font-semibold">Contact Us</h2>
 				<p className="text-lg">
