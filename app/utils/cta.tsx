@@ -28,11 +28,11 @@ export function CTA() {
 
 	return showCTA ? (
 		<div
-			className={`fixed bottom-0 left-0 right-0 z-50 bg-gray-800 py-4 text-center ${showCTA ? 'fade-in' : ''} h-[4.2rem]`}
+			className={`fixed bottom-0 left-0 right-0 z-50 bg-black py-4 text-center ${showCTA ? 'fade-in' : ''} h-[4.2rem]`}
 		>
-			<div className="flex justify-center space-x-4">
+			<div className="flex animate-fade-in justify-center space-x-4">
 				<a
-					className="text-md w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
+					className="text-md w-48 rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800 sm:w-48 sm:text-lg"
 					href="https://hitchcoxaesthetics.janeapp.com"
 				>
 					Book Online
@@ -40,7 +40,7 @@ export function CTA() {
 				<a
 					// eslint-disable-next-line remix-react-routes/use-link-for-routes
 					href="tel:+18652489365"
-					className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
+					className="text-md mx-2 w-48 rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800 sm:w-48 sm:text-lg"
 					onClick={() => {
 						safeGtag('event', 'conversion_event_phone_call_lead', {
 							event_category: 'Phone Call',
