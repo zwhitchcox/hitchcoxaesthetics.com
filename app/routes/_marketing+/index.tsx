@@ -1,6 +1,6 @@
 import { type MetaFunction } from '@remix-run/node'
-// import { useOutletContext } from '@remix-run/react'
 
+import { useOutletContext } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
 import { safeGtag } from '#app/utils/misc.js'
 // import { Button } from '#app/components/ui/button'
@@ -8,9 +8,9 @@ import { safeGtag } from '#app/utils/misc.js'
 export const meta: MetaFunction = () => [{ title: 'Sarah Hitchcox Aesthetics' }]
 
 export default function Index() {
-	// const context = useOutletContext<{
-	// 	setIsMenuOpen: (isOpen: boolean) => void
-	// }>()
+	const context = useOutletContext<{
+		setIsMenuOpen: (isOpen: boolean) => void
+	}>()
 
 	return (
 		<div className="font-poppins flex w-full flex-col bg-white">
@@ -39,7 +39,7 @@ export default function Index() {
 							<a
 								// eslint-disable-next-line remix-react-routes/use-link-for-routes
 								href="tel:+18652489365"
-								className="text-md mx-2 my-1 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
+								className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
 								onClick={() => {
 									safeGtag('event', 'conversion_event_phone_call_lead', {
 										event_category: 'Phone Call',
@@ -50,17 +50,17 @@ export default function Index() {
 								(865) 214-7238
 							</a>
 							<a
-								className="text-md mx-2 my-1 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-								href="https://hitchcoxaesthetics.janeapp.com/#/staff_member/1"
+								className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
+								href="https://hitchcoxaesthetics.janeapp.com"
 							>
 								Book Online
 							</a>
-							{/* <Link
-								to="/book"
-								className="text-md mx-2 my-1 w-36 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
+							<button
+								className="text-md mx-2  w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
+								onClick={() => context.setIsMenuOpen(true)}
 							>
-								Book Now
-							</Link> */}
+								Learn More
+							</button>
 						</div>
 					</div>
 				</div>

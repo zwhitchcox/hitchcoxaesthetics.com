@@ -629,7 +629,7 @@ function useLinks() {
 		if (!user || (user && !isProvider)) {
 			links.push({
 				to: 'https://hitchcoxaesthetics.janeapp.com/',
-				label: 'Book Now',
+				label: 'Pricing',
 			})
 		}
 		links.push(
@@ -711,16 +711,16 @@ function useLinks() {
 			// 	label: 'Contact',
 			// },
 		)
-		if (user) {
-			links.push(
-				isProvider
-					? { to: '/schedule', label: 'Schedule' }
-					: { to: '/account/info/general', label: 'My Account' },
-			)
-			links.push({ to: '/logout', label: 'Logout' })
-		} else {
-			// links.push({ to: '/auth', label: 'Log In' })
-		}
+		// if (user) {
+		// 	links.push(
+		// 		isProvider
+		// 			? { to: '/schedule', label: 'Schedule' }
+		// 			: { to: '/account/info/general', label: 'My Account' },
+		// 	)
+		// 	links.push({ to: '/logout', label: 'Logout' })
+		// } else {
+		// 	// links.push({ to: '/auth', label: 'Log In' })
+		// }
 
 		return links
 	}, [isProvider, user])
