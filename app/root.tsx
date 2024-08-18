@@ -636,6 +636,7 @@ function useLinks() {
 			links.push({
 				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
 				label: 'Pricing',
+				hint: 'see prices/book appointment',
 			})
 		}
 		links.push(
@@ -654,11 +655,6 @@ function useLinks() {
 				hint: 'for lips, cheeks, facial balancing',
 			},
 			{
-				to: '/services/skinvive',
-				label: 'SkinVive',
-				hint: 'for skin hydration, smoothness, and overall appearance',
-			},
-			{
 				to: '/services/microneedling',
 				label: 'Microneedling',
 				hint: 'for acne scars, fine lines, wrinkles',
@@ -667,6 +663,11 @@ function useLinks() {
 				to: '/services/hair-loss-prevention-regrowth',
 				label: 'Hair Loss Prevention & Regrowth',
 				hint: 'for receding hairlines, thinning hair',
+			},
+			{
+				to: '/services/skinvive',
+				label: 'SkinVive',
+				hint: 'for skin hydration, smoothness, and overall appearance',
 			},
 			{
 				to: '/services/laser-hair-removal',

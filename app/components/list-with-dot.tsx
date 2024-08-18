@@ -96,19 +96,19 @@ export function ListWithDot({
 						>
 							<NavLink
 								className={({ isActive }) =>
-									`flex items-center py-2 ${isActive ? 'italic text-muted-foreground' : ''}`
+									`flex  flex-col items-center py-2 ${isActive ? 'italic text-muted-foreground' : ''}`
 								}
 								to={link.to}
 								prefetch="intent"
 								target={link.to.startsWith('http') ? '_blank' : undefined}
 							>
-								{link.label}
+								<div>{link.label}</div>
+								{link.hint ? (
+									<p className="block text-sm text-muted-foreground group-hover/link:block">
+										{link.hint}
+									</p>
+								) : null}
 							</NavLink>
-							{link.hint ? (
-								<p className="block text-sm text-muted-foreground group-hover/link:block">
-									{link.hint}
-								</p>
-							) : null}
 						</li>
 					))}
 				</ul>
