@@ -4,7 +4,9 @@ import { useOutletContext } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
 // import { Button } from '#app/components/ui/button'
 
-export const meta: MetaFunction = () => [{ title: 'Sarah Hitchcox Aesthetics' }]
+export const meta: MetaFunction = () => [
+	{ title: 'Sarah Hitchcox Aesthetics | Knoxville Medical Spa' },
+]
 
 export default function Index() {
 	const context = useOutletContext<{
@@ -13,7 +15,7 @@ export default function Index() {
 
 	return (
 		<div className="font-poppins flex w-full flex-col bg-white">
-			<div className="relative h-[calc(100dvh-3.7rem)] w-full flex-col overflow-hidden sm:flex sm:flex-row">
+			<div className="relative h-[calc(100dvh-3.1rem)] w-full flex-col overflow-hidden sm:flex sm:flex-row">
 				<div className="flex flex-1 items-center justify-center bg-[#070707] sm:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)] ">
 					<img
 						src="/img/sarah.jpg"
@@ -21,7 +23,7 @@ export default function Index() {
 						className="z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] animate-fade-in object-contain"
 					/>
 				</div>
-				<div className="absolute bottom-0 z-10 w-full bg-[rgba(255,255,255,.85)] pb-6 text-black sm:relative sm:flex-1">
+				<div className="absolute bottom-0 z-10 w-full bg-white pb-6 text-black sm:relative sm:flex-1">
 					<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards]">
 						<div className="flex flex-col items-center justify-center">
 							<Logo className="lg:h-22 lg:w-22 my-4 h-14 w-14 animate-spin-in text-primary [animation-fill-mode:backwards] md:h-20 md:w-20" />

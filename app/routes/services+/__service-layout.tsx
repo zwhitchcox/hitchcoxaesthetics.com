@@ -89,7 +89,7 @@ export function ServiceLayout({
 	return (
 		<>
 			<div className="font-poppins flex h-[calc(100dvh-3rem)] w-full flex-col bg-white">
-				<div className="relative flex h-[calc(100dvh-3.6rem)]  w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
+				<div className="relative flex h-[calc(100dvh-3.1rem)]  w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
 					<div
 						className={cn(
 							'relative flex w-full flex-1 items-center justify-center bg-[#070707] duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]',
