@@ -628,6 +628,10 @@ function useLinks() {
 
 	return useMemo(() => {
 		const links: { to: string; label: string; hint?: string }[] = []
+		links.push({
+			to: '/',
+			label: 'Home',
+		})
 		if (!user || (user && !isProvider)) {
 			links.push({
 				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
@@ -635,10 +639,6 @@ function useLinks() {
 			})
 		}
 		links.push(
-			{
-				to: '/',
-				label: 'Home',
-			},
 			// {
 			// 	to: '/services',
 			// 	label: 'Services',
