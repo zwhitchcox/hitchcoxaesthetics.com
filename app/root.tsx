@@ -68,6 +68,7 @@ import { setTheme, type Theme } from '#/app/utils/theme.server.ts'
 import { makeTimings, time } from '#/app/utils/timing.server.ts'
 import { getToast } from '#/app/utils/toast.server.ts'
 import { useIsProvider, useOptionalUser, useUser } from '#/app/utils/user.ts'
+import { CTA } from './utils/cta'
 
 export const links: LinksFunction = () => {
 	return [
@@ -283,6 +284,7 @@ function App() {
 				<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
 				<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
 				<Footer />
+				<CTA />
 			</div>
 			<EpicToaster closeButton position="top-center" theme={theme} />
 			<EpicProgress />

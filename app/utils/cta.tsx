@@ -2,33 +2,34 @@ import { useCallback, useEffect, useState } from 'react'
 import { safeGtag } from './misc'
 
 export function CTA() {
-	const [showCTA, setShowCTA] = useState(false)
+	// const [showCTA, setShowCTA] = useState(false)
 
-	useEffect(() => {
-		if (
-			typeof window !== 'undefined' &&
-			window.scrollY > window.innerHeight / 2
-		) {
-			setShowCTA(true)
-		}
-	}, [])
+	// useEffect(() => {
+	// 	if (
+	// 		typeof window !== 'undefined' &&
+	// 		window.scrollY > window.innerHeight / 2
+	// 	) {
+	// 		setShowCTA(true)
+	// 	}
+	// }, [])
 
-	const handleScroll = useCallback(() => {
-		if (window.scrollY > window.innerHeight / 2) {
-			setShowCTA(true)
-		} else {
-			setShowCTA(false)
-		}
-	}, [])
+	// const handleScroll = useCallback(() => {
+	// 	if (window.scrollY > window.innerHeight / 2) {
+	// 		setShowCTA(true)
+	// 	} else {
+	// 		setShowCTA(false)
+	// 	}
+	// }, [])
 
-	useEffect(() => {
-		window.addEventListener('scroll', handleScroll)
-		return () => window.removeEventListener('scroll', handleScroll)
-	}, [handleScroll])
+	// useEffect(() => {
+	// 	window.addEventListener('scroll', handleScroll)
+	// 	return () => window.removeEventListener('scroll', handleScroll)
+	// }, [handleScroll])
+	const showCTA = true
 
 	return showCTA ? (
 		<div
-			className={`fixed bottom-0 left-0 right-0 z-50 bg-gray-800 py-4 text-center ${showCTA ? 'fade-in' : ''}`}
+			className={`fixed bottom-0 left-0 right-0 z-50 bg-gray-800 py-4 text-center ${showCTA ? 'fade-in' : ''} h-[4.2rem]`}
 		>
 			<div className="flex justify-center space-x-4">
 				<a

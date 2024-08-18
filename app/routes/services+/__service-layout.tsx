@@ -89,7 +89,7 @@ export function ServiceLayout({
 	return (
 		<>
 			<div className="font-poppins mt-[3rem] flex h-[calc(100dvh-3rem)] w-full flex-col bg-white">
-				<div className="relative  flex h-[calc(100dvh-3rem)]  w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
+				<div className="relative  flex h-[calc(100dvh-7.2rem)]  w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
 					<div
 						className={cn(
 							'relative flex w-full flex-1 items-center justify-center bg-[#070707] duration-1000 hover:grayscale-0 lg:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]',
@@ -127,7 +127,7 @@ export function ServiceLayout({
 								</div>
 							</div>
 							<div className="flex flex-col items-center justify-center space-y-2">
-								<a
+								{/* <a
 									// eslint-disable-next-line remix-react-routes/use-link-for-routes
 									href="tel:+18652489365"
 									className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
@@ -145,7 +145,7 @@ export function ServiceLayout({
 									href="https://hitchcoxaesthetics.janeapp.com"
 								>
 									Book Online
-								</a>
+								</a> */}
 								<button
 									className="text-md mx-2  w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
 									onClick={() => scrollToId(service!)}

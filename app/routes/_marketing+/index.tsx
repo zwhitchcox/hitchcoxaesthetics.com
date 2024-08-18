@@ -14,7 +14,7 @@ export default function Index() {
 
 	return (
 		<div className="font-poppins flex w-full flex-col bg-white">
-			<div className="relative h-[100dvh] w-full flex-col overflow-hidden sm:flex sm:flex-row">
+			<div className="relative h-[calc(100dvh-4.2rem)] w-full flex-col overflow-hidden sm:flex sm:flex-row">
 				<div className="flex flex-1 items-center justify-center bg-[#070707] sm:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)] ">
 					<img
 						src="/img/sarah.jpg"
@@ -22,7 +22,7 @@ export default function Index() {
 						className="z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] animate-fade-in object-contain"
 					/>
 				</div>
-				<div className="absolute bottom-0 z-10 w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
+				<div className="absolute bottom-0 z-10 w-full bg-white  text-black sm:relative sm:my-0 sm:flex-1">
 					<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards]">
 						<div className="flex flex-col items-center justify-center">
 							<Logo className="lg:h-22 lg:w-22 my-4 h-14 w-14 animate-spin-in text-primary [animation-fill-mode:backwards] md:h-20 md:w-20" />
@@ -36,7 +36,7 @@ export default function Index() {
 							</div>
 						</div>
 						<div className="flex flex-col items-center justify-center space-y-2">
-							<a
+							{/* <a
 								// eslint-disable-next-line remix-react-routes/use-link-for-routes
 								href="tel:+18652489365"
 								className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
@@ -54,7 +54,7 @@ export default function Index() {
 								href="https://hitchcoxaesthetics.janeapp.com"
 							>
 								Book Online
-							</a>
+							</a> */}
 							<button
 								className="text-md mx-2  w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
 								onClick={() => context.setIsMenuOpen(true)}
