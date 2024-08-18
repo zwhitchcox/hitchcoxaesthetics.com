@@ -104,9 +104,9 @@ export function ListWithDot({
 							>
 								<div>{link.label}</div>
 								{link.hint ? (
-									<p className="block text-sm text-muted-foreground group-hover/link:block">
+									<div className="block text-center text-sm text-muted-foreground group-hover/link:block">
 										{link.hint}
-									</p>
+									</div>
 								) : null}
 							</NavLink>
 						</li>
