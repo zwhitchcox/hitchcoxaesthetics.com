@@ -130,6 +130,34 @@
 	}
 }
 
+@keyframes wiggle-short {
+	0%,
+	100% {
+		transform: rotate(0deg);
+	}
+	25% {
+		transform: rotate(-10deg);
+	}
+	50% {
+		transform: rotate(10deg);
+	}
+	75% {
+		transform: rotate(-10deg);
+	}
+}
+
+.wiggle {
+	animation: wiggle 3s ease-in-out 1;
+}
+
+.icon-container:hover .wiggle-hover {
+	animation: wiggle 3s ease-in-out 1;
+}
+
 .wiggle {
 	animation: wiggle 2s ease-in-out 1;
+}
+
+.icon-container:hover .wiggle-hover {
+	animation: wiggle-short 1s ease-in-out 1;
 }

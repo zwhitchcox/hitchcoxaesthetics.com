@@ -46,12 +46,12 @@ export function CTA() {
 		>
 			<div className="text-md flex w-full animate-fade-in justify-evenly px-2 sm:text-xl">
 				<a
-					className="flex w-56 items-center justify-center rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800"
+					className="icon-container flex w-56 items-center justify-center rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800"
 					href="https://hitchcoxaesthetics.janeapp.com/#/staff_member/1"
 				>
 					<Icon
 						name="calendar"
-						className="mr-2 inline-block h-6 w-6"
+						className="wiggle-hover mr-2 inline-block h-6 w-6"
 						ref={calendarIconRef}
 					/>
 					Book Online
@@ -59,7 +59,7 @@ export function CTA() {
 				<a
 					// eslint-disable-next-line remix-react-routes/use-link-for-routes
 					href="tel:+18652489365"
-					className="flex w-56 items-center justify-center rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800"
+					className="icon-container flex w-56 items-center justify-center rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800"
 					onClick={() => {
 						safeGtag('event', 'conversion_event_phone_call_lead', {
 							event_category: 'Phone Call',
@@ -69,7 +69,7 @@ export function CTA() {
 				>
 					<Icon
 						name="phone"
-						className="mb-[-1px] mr-2 inline-block h-6 w-6"
+						className="wiggle-hover mb-[-1px] mr-2 inline-block h-6 w-6"
 						ref={phoneIconRef}
 					/>
 					<div className="mt-[-0px]">(865) 214-7238</div>
