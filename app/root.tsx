@@ -628,7 +628,7 @@ function useLinks() {
 		const links: { to: string; label: string; hint?: string }[] = []
 		if (!user || (user && !isProvider)) {
 			links.push({
-				to: 'https://hitchcoxaesthetics.janeapp.com/',
+				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
 				label: 'Pricing',
 			})
 		}
