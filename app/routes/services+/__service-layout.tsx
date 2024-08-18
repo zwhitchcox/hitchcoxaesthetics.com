@@ -115,11 +115,11 @@ export function ServiceLayout({
 							/>
 						</div>
 					</div>
-					<div className="z-10 flex w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
+					<div className=" absolute bottom-0 z-10 flex w-full bg-[rgba(255,255,255,.85)] py-4 text-black sm:relative sm:my-0 sm:flex-1">
 						<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
 							<div className="flex flex-col items-center justify-center">
 								<div className="animate-fade-in text-center text-xl tracking-[.4rem] md:text-2xl lg:text-3xl">
-									{title}
+									{title} | Knoxville
 								</div>
 								<Logo className="my-2 h-8 w-8 animate-spin-in text-primary [animation-fill-mode:backwards] md:h-10 md:w-10 lg:h-10 lg:w-10" />
 								<div className="text-md flex flex-wrap justify-center px-2 text-center tracking-[.3rem] text-gray-600 sm:tracking-[.3rem] md:text-xl">
@@ -132,25 +132,6 @@ export function ServiceLayout({
 								</div>
 							</div>
 							<div className="flex flex-col items-center justify-center space-y-2">
-								{/* <a
-									// eslint-disable-next-line remix-react-routes/use-link-for-routes
-									href="tel:+18652489365"
-									className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-									onClick={() => {
-										safeGtag('event', 'conversion_event_phone_call_lead', {
-											event_category: 'Phone Call',
-											event_label: '(865) 214-7238',
-										})
-									}}
-								>
-									(865) 214-7238
-								</a>
-								<a
-									className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-									href="https://hitchcoxaesthetics.janeapp.com"
-								>
-									Book Online
-								</a> */}
 								<button
 									className="text-md mx-2  w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
 									onClick={() => scrollToId(service!)}
