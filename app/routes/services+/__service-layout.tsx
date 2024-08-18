@@ -116,7 +116,7 @@ export function ServiceLayout({
 						</div>
 					</div>
 					<div className="z-10 flex w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
-						<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
+						<div className="jlgustify-center flex h-full w-full animate-slide-top flex-col items-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
 							<div className="flex flex-col items-center justify-center">
 								<div className="animate-fade-in text-center text-xl tracking-[.4rem] md:text-2xl lg:text-3xl">
 									{title}
@@ -163,7 +163,7 @@ export function ServiceLayout({
 			>
 				<div className="flex w-full flex-col items-center justify-center space-y-12">
 					<div className="w-full max-w-2xl space-y-8">
-						<h1 className=" text-center text-5xl font-bold text-gray-800">
+						<h1 className=" text-center text-3xl font-bold text-gray-800 sm:text-4xl">
 							{title} | Knoxville
 						</h1>
 						<div className="flex flex-col space-y-6">{children}</div>
