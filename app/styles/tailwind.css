@@ -80,21 +80,56 @@
 }
 
 @keyframes wiggle {
-	0%,
-	100% {
+	0% {
 		transform: rotate(0deg);
+		animation-timing-function: ease-in;
+	}
+	5% {
+		transform: rotate(-10deg);
+		animation-timing-function: ease-in-out;
+	}
+	15% {
+		transform: rotate(10deg);
+		animation-timing-function: ease-in-out;
 	}
 	25% {
 		transform: rotate(-10deg);
+		animation-timing-function: ease-in-out;
 	}
-	50% {
+	35% {
 		transform: rotate(10deg);
+		animation-timing-function: ease-in-out;
+	}
+	45% {
+		transform: rotate(-10deg);
+		animation-timing-function: ease-in-out;
+	}
+	55% {
+		transform: rotate(10deg);
+		animation-timing-function: ease-in-out;
+	}
+	65% {
+		transform: rotate(-10deg);
+		animation-timing-function: ease-in-out;
 	}
 	75% {
+		transform: rotate(10deg);
+		animation-timing-function: ease-in-out;
+	}
+	85% {
 		transform: rotate(-10deg);
+		animation-timing-function: ease-in-out;
+	}
+	95% {
+		transform: rotate(10deg);
+		animation-timing-function: ease-out;
+	}
+	100% {
+		transform: rotate(0deg);
+		animation-timing-function: ease-out;
 	}
 }
 
 .wiggle {
-	animation: wiggle 0.5s ease-in-out;
+	animation: wiggle 2s ease-in-out 1;
 }
