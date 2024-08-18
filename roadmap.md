@@ -1,4 +1,6 @@
-move services to db with content
+- move services to db with content
+- on home page, make all services as well as about info
+- maybe add pricing info
 
 ```yml
 cookie-stepper:
