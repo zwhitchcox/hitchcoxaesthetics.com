@@ -21,7 +21,7 @@ export default function Index() {
 						className="z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] animate-fade-in object-contain"
 					/>
 				</div>
-				<div className="absolute bottom-0 z-10 w-full bg-white pb-6 text-black sm:relative sm:flex-1">
+				<div className="absolute bottom-0 z-10 w-full bg-[rgba(255,255,255,.85)] pb-6 text-black sm:relative sm:flex-1">
 					<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards]">
 						<div className="flex flex-col items-center justify-center">
 							<Logo className="lg:h-22 lg:w-22 my-4 h-14 w-14 animate-spin-in text-primary [animation-fill-mode:backwards] md:h-20 md:w-20" />
@@ -35,25 +35,6 @@ export default function Index() {
 							</div>
 						</div>
 						<div className="flex flex-col items-center justify-center space-y-2">
-							{/* <a
-								// eslint-disable-next-line remix-react-routes/use-link-for-routes
-								href="tel:+18652489365"
-								className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-								onClick={() => {
-									safeGtag('event', 'conversion_event_phone_call_lead', {
-										event_category: 'Phone Call',
-										event_label: '(865) 214-7238',
-									})
-								}}
-							>
-								(865) 214-7238
-							</a>
-							<a
-								className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-								href="https://hitchcoxaesthetics.janeapp.com"
-							>
-								Book Online
-							</a> */}
 							<button
 								className="text-md mx-2  w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
 								onClick={() => context.setIsMenuOpen(true)}
