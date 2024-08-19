@@ -100,7 +100,6 @@ function fieldsToSchema(
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-	console.log('action')
 	const user = await requireUser(request)
 	const { slug } = params
 	const formData = await request.formData()
