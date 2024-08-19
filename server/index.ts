@@ -133,10 +133,16 @@ app.use(
 					'*.google.com',
 					'https://*.gstatic.com',
 					'https://*.google-analytics.com',
+					'https://www.googleadservices.com',
 					"'self'",
 				].filter(Boolean),
 				'font-src': ["'self'", 'https://*.gstatic.com'],
-				'frame-src': ["'self'", 'https://*.google.com'],
+				'frame-src': [
+					"'self'",
+					'https://*.google.com',
+
+					'https://td.doubleclick.net',
+				],
 				'img-src': [
 					"'self'",
 					'data:',
@@ -163,6 +169,7 @@ app.use(
 					'https://*.google.com',
 					'https://*.googleusercontent.com',
 					'https://*.googletagmanager.com',
+					'https://googleads.g.doubleclick.net',
 				],
 				'script-src-attr': [
 					// @ts-expect-error
