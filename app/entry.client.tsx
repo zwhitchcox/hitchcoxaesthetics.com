@@ -20,7 +20,7 @@ if (ENV.MODE !== 'development' && ENV.GTM_ID) {
 		j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl
 		// @ts-ignore
 		f.parentNode.insertBefore(j, f)
-	})(window, document, 'script', 'dataLayer', 'GTM-MP2TD9N3')
+	})(window, document, 'script', 'dataLayer', ENV.GTM_ID)
 }
 
 startTransition(() => {
