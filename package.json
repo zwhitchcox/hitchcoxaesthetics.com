@@ -147,6 +147,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.67",
     "@types/react-dom": "^18.2.22",
+    "@types/react-gtm-module": "^2.0.3",
     "@types/set-cookie-parser": "^2.4.7",
     "@types/source-map-support": "^0.5.10",
     "@vitejs/plugin-react": "^4.2.1",

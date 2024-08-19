@@ -200,6 +200,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
+      react-gtm-module:
+        specifier: ^2.0.11
+        version: 2.0.11
       react-otp-input:
         specifier: ^3.1.1
         version: 3.1.1(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -321,6 +324,9 @@ importers:
       '@types/react-dom':
         specifier: ^18.2.22
         version: 18.2.23
+      '@types/react-gtm-module':
+        specifier: ^2.0.3
+        version: 2.0.3
       '@types/set-cookie-parser':
         specifier: ^2.4.7
         version: 2.4.7
@@ -2739,6 +2745,9 @@ packages:
 
   '@types/react-dom@18.2.23':
     resolution: {integrity: sha512-ZQ71wgGOTmDYpnav2knkjr3qXdAFu0vsk8Ci5w3pGAIdj7/kKAyn+VsQDhXsmzzzepAiI9leWMmubXz690AI/A==}
+
+  '@types/react-gtm-module@2.0.3':
+    resolution: {integrity: sha512-fL2zKdDFN5LckSsVBXEhhm9M4tFTM9oHJfGcfZJzktQkzpOTGtDM8oXIP9d9UBDxO4xLNZhS22dlgRVv6wgK9w==}
 
   '@types/react@18.2.73':
     resolution: {integrity: sha512-XcGdod0Jjv84HOC7N5ziY3x+qL0AfmubvKOZ9hJjJ2yd5EE+KYjWhdOjt387e9HPheHkdggF9atTifMRtyAaRA==}
@@ -5941,6 +5950,9 @@ packages:
     resolution: {integrity: sha512-09oMVl/jN0/Re0bT0sEqYjyyFSCN/Tg0YmzjC9wfYpnMx02Apk40XXitySDfUBMR9EgTdr6T4lYknACqiLK3mg==}
     engines: {node: '>=18.0.0'}
     hasBin: true
+
+  react-gtm-module@2.0.11:
+    resolution: {integrity: sha512-8gyj4TTxeP7eEyc2QKawEuQoAZdjKvMY4pgWfycGmqGByhs17fR+zEBs0JUDq4US/l+vbTl+6zvUIx27iDo/Vw==}
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
@@ -9550,6 +9562,8 @@ snapshots:
   '@types/react-dom@18.2.23':
     dependencies:
       '@types/react': 18.2.73
+
+  '@types/react-gtm-module@2.0.3': {}
 
   '@types/react@18.2.73':
     dependencies:
@@ -13425,6 +13439,8 @@ snapshots:
       - uglify-js
       - utf-8-validate
       - webpack-cli
+
+  react-gtm-module@2.0.11: {}
 
   react-is@16.13.1: {}
 

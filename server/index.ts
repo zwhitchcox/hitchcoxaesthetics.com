@@ -140,7 +140,6 @@ app.use(
 				'frame-src': [
 					"'self'",
 					'https://*.google.com',
-
 					'https://td.doubleclick.net',
 				],
 				'img-src': [
@@ -170,6 +169,7 @@ app.use(
 					'https://*.googleusercontent.com',
 					'https://*.googletagmanager.com',
 					'https://googleads.g.doubleclick.net',
+					'http://www.gstatic.com',
 				],
 				'script-src-attr': [
 					// @ts-expect-error

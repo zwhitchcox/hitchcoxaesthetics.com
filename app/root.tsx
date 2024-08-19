@@ -27,6 +27,7 @@ import {
 import { withSentry } from '@sentry/remix'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { HoneypotProvider } from 'remix-utils/honeypot/react'
+import { useHydrated } from 'remix-utils/use-hydrated'
 import { z } from 'zod'
 
 import { GeneralErrorBoundary } from '#/app/components/error-boundary.tsx'
@@ -57,6 +58,7 @@ import { prisma } from '#/app/utils/db.server.ts'
 import { getEnv } from '#/app/utils/env.server.ts'
 import { honeypot } from '#/app/utils/honeypot.server.ts'
 import {
+	addGTM,
 	combineHeaders,
 	getDomainUrl,
 	getUserImgSrc,
@@ -190,6 +192,13 @@ export async function action({ request }: ActionFunctionArgs) {
 	return json({ result: submission.reply() }, responseInit)
 }
 
+// add dataLayer to window
+declare global {
+	interface Window {
+		dataLayer: any[]
+	}
+}
+
 function Document({
 	children,
 	nonce,
@@ -201,6 +210,17 @@ function Document({
 	theme?: Theme
 	env?: Record<string, string>
 }) {
+	const isHydrated = useHydrated()
+	const l = 'dataLayer'
+	useEffect(() => {
+		if (typeof window === 'undefined' || !isHydrated) {
+			return
+		}
+		addGTM()
+		window[l] ??= []
+		window[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
+	}, [isHydrated])
+
 	return (
 		<html lang="en" className={`${theme} h-full overflow-x-hidden`}>
 			<head>
@@ -225,8 +245,13 @@ function Document({
 					async
 					nonce={nonce}
 				></script>
-				{ENV.MODE === 'development' || !ENV.GTM_ID ? null : (
+				{!ENV.GTM_ID ? null : (
 					<>
+						{/* <script
+							async
+							src={`https://www.googletagmanager.com/gtm.js?id=${ENV.GTM_ID}&l=${l}`}
+							nonce={nonce}
+						></script> */}
 						<noscript>
 							<iframe
 								title="Google Tag Manager (noscript)"
