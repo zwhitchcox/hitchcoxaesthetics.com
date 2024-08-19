@@ -319,7 +319,8 @@ export function safeGtag<Command extends keyof Gtag.GtagCommands>(
 	command: Command,
 	...args: Gtag.GtagCommands[Command]
 ) {
-	if (typeof window === 'undefined' || !window.gtag) {
+	console.log('gtag', window?.gtag)
+	if (!window?.gtag) {
 		return
 	}
 	console.log('gtag', { command, args })
