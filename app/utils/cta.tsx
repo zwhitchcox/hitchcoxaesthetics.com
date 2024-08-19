@@ -58,7 +58,7 @@ export function CTA() {
 				</a>
 				<a
 					// eslint-disable-next-line remix-react-routes/use-link-for-routes
-					href="tel:+18652489365"
+					href="tel:+18652147238"
 					className="icon-container flex w-56 items-center justify-center rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800"
 					onClick={() => {
 						safeGtag('event', 'conversion_event_phone_call_lead', {
