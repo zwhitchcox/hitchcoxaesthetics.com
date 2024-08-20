@@ -132,25 +132,6 @@ export function ServiceLayout({
 								</div>
 							</div>
 							<div className="flex flex-col items-center justify-center space-y-2">
-								{/* <a
-									// eslint-disable-next-line remix-react-routes/use-link-for-routes
-									href="tel:+18652489365"
-									className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-									onClick={() => {
-										safeGtag('event', 'conversion_event_phone_call_lead', {
-											event_category: 'Phone Call',
-											event_label: '(865) 214-7238',
-										})
-									}}
-								>
-									(865) 214-7238
-								</a>
-								<a
-									className="text-md mx-2 w-48 rounded-md bg-gray-800 px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-black sm:w-48 sm:text-lg"
-									href="https://hitchcoxaesthetics.janeapp.com"
-								>
-									Book Online
-								</a> */}
 								<button
 									className="text-md mx-2  w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
 									onClick={() => scrollToId(service!)}

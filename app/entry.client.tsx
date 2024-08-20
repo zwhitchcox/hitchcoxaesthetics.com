@@ -6,6 +6,6 @@ if (ENV.MODE === 'production' && ENV.SENTRY_DSN) {
 	import('./utils/monitoring.client.tsx').then(({ init }) => init())
 }
 
-startTransition(() => {
+startTransition(function () {
 	hydrateRoot(document, <RemixBrowser />)
 })

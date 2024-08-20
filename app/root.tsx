@@ -62,6 +62,7 @@ import {
 	combineHeaders,
 	getDomainUrl,
 	getUserImgSrc,
+	gtag,
 } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { useRequestInfo } from '#/app/utils/request-info.ts'

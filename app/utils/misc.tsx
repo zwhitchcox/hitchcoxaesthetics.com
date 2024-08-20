@@ -315,10 +315,10 @@ export const scrollToId = (id: string) => {
 	element?.scrollIntoView({ behavior: 'smooth' })
 }
 
-export function gtag() {
+export function gtag(...args: [string, string, Record<string, unknown>]) {
 	if (typeof window === 'undefined') return
 	window.dataLayer ??= []
-	window?.dataLayer.push(arguments)
+	window?.dataLayer.push(args)
 }
 
 export function addGTM() {
