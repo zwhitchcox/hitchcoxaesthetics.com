@@ -245,43 +245,6 @@ function Document({
 					async
 					nonce={nonce}
 				></script>
-				{!ENV.GTM_ID ? null : (
-					<>
-						{/* <script
-							async
-							src={`https://www.googletagmanager.com/gtm.js?id=${ENV.GTM_ID}&l=${l}`}
-							nonce={nonce}
-						></script> */}
-						<noscript>
-							<iframe
-								title="Google Tag Manager (noscript)"
-								src={`https://www.googletagmanager.com/ns.html?id=${ENV.GTM_ID}`}
-								height="0"
-								width="0"
-								style={{ display: 'none', visibility: 'hidden' }}
-							></iframe>
-						</noscript>
-						{/* <script
-							async
-							src={`https://www.googletagmanager.com/gtag/js?id=${ENV.GTM_ID}`}
-						/> */}
-						{/* <script
-							async
-							id="gtag-init"
-							dangerouslySetInnerHTML={{
-								__html: `
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-
-                gtag('config', '${ENV.GA_TRACKING_ID}', {
-									send_page_view: false
-                });
-              `,
-							}}
-						/> */}
-					</>
-				)}
 			</body>
 		</html>
 	)
