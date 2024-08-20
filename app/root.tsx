@@ -63,6 +63,7 @@ import {
 	getDomainUrl,
 	getUserImgSrc,
 	gtag,
+	gtmPush,
 } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { useRequestInfo } from '#/app/utils/request-info.ts'
@@ -193,11 +194,6 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 // add dataLayer to window
-declare global {
-	interface Window {
-		dataLayer: any[]
-	}
-}
 
 function Document({
 	children,
@@ -211,14 +207,12 @@ function Document({
 	env?: Record<string, string>
 }) {
 	const isHydrated = useHydrated()
-	const l = 'dataLayer'
 	useEffect(() => {
 		if (typeof window === 'undefined' || !isHydrated) {
 			return
 		}
 		addGTM()
-		window[l] ??= []
-		window[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
+		gtmPush({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
 	}, [isHydrated])
 
 	return (
@@ -313,13 +307,6 @@ function Header({
 						className={`z-10 flex h-[28px] w-[33px] flex-col justify-between p-[4px]`}
 						onClick={() => {
 							setIsMenuOpen(!isMenuOpen)
-							// window.dataLayer = window.dataLayer || []
-							// window.dataLayer.push({
-							// 	event: 'customEventName',
-							// 	eventCategory: 'Category',
-							// 	eventAction: 'Action',
-							// 	eventLabel: 'Label',
-							// })
 						}}
 					>
 						<span
