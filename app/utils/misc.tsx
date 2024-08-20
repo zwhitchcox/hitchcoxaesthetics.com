@@ -315,15 +315,10 @@ export const scrollToId = (id: string) => {
 	element?.scrollIntoView({ behavior: 'smooth' })
 }
 
-export function safeGtag<Command extends keyof Gtag.GtagCommands>(
-	command: Command,
-	...args: Gtag.GtagCommands[Command]
-) {
-	console.log(window?.gtag)
-	if (!window?.gtag) {
-		return
-	}
-	gtag(command, ...args)
+export function gtag() {
+	if (typeof window === 'undefined') return
+	window.dataLayer ??= []
+	window?.dataLayer.push(arguments)
 }
 
 export function addGTM() {
