@@ -350,6 +350,13 @@ function Header({
 						className={`z-10 flex h-[28px] w-[33px] flex-col justify-between p-[4px]`}
 						onClick={() => {
 							setIsMenuOpen(!isMenuOpen)
+							window.dataLayer = window.dataLayer || []
+							window.dataLayer.push({
+								event: 'customEventName',
+								eventCategory: 'Category',
+								eventAction: 'Action',
+								eventLabel: 'Label',
+							})
 						}}
 					>
 						<span

@@ -19,3 +19,9 @@ cookie-stepper:
     - maybe make stepped menu so you can go back and forth for nested menu
         levels...should make things more easily digestible
 ```
+
+questions:
+
+- when searching botox knoxville, we don't show up, but smiley, sculpt do
+- phone number is not changing even when clicking through ads
+- restricted medical content on site links
