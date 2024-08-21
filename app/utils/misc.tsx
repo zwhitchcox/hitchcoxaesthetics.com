@@ -336,6 +336,12 @@ export function gtmPush(...args: any[]) {
 gtag('js', new Date())
 gtag('config', ENV.GTM_ID)
 gtmPush({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
+gtag('consent', 'default', {
+	ad_user_data: 'denied',
+	ad_personalization: 'denied',
+	ad_storage: 'denied',
+	analytics_storage: 'denied',
+})
 gtag('consent', 'update', {
 	ad_user_data: 'granted',
 	ad_personalization: 'granted',
