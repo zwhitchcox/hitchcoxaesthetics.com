@@ -43,7 +43,7 @@ exec:
     if-candidate: true
 
   - cmd:
-      bash -c "if [ -d /data/hotfix ]; then cp -r /data/hotfix/build/*
+      bash -c "if [ -d /data/hotfix/build ]; then cp -r /data/hotfix/build/*
       /myapp/build && cp -r /data/hotfix/server-build/* /myapp/server-build; fi"
 
   - cmd: npm start

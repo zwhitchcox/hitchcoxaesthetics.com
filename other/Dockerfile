@@ -7,7 +7,7 @@ FROM node:20-bookworm-slim as base
 ENV NODE_ENV production
 
 # Install openssl for Prisma
-RUN apt-get update && apt-get install -y fuse3 openssl sqlite3 ca-certificates
+RUN apt-get update && apt-get install -y fuse3 openssl sqlite3 ca-certificates procps rsync
 
 # Install all node_modules, including dev dependencies
 FROM base as deps
