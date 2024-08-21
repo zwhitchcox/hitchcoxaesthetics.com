@@ -251,14 +251,15 @@ function App() {
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
-			<div className="flex h-screen flex-col justify-between">
+			<div />
+			{/* <div className="flex h-screen flex-col justify-between">
 				<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
 				<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
 				<Footer />
 				<CTA />
 			</div>
 			<EpicToaster closeButton position="top-center" theme={theme} />
-			<EpicProgress />
+			<EpicProgress /> */}
 		</Document>
 	)
 }
