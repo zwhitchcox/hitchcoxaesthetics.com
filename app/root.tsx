@@ -212,7 +212,6 @@ function Document({
 			return
 		}
 		addGTM()
-		gtmPush({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
 	}, [isHydrated])
 
 	return (
@@ -251,14 +250,6 @@ function App() {
 	const theme = useTheme()
 
 	useToast(data.toast)
-	useEffect(() => {
-		gtag('consent', 'default', {
-			ad_user_data: 'granted',
-			ad_personalization: 'granted',
-			ad_storage: 'granted',
-			analytics_storage: 'granted',
-		})
-	}, [])
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>

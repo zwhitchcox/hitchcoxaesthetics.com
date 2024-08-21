@@ -321,7 +321,7 @@ declare global {
 	}
 }
 
-export function gtag(...args: [string, string, Record<string, unknown>]) {
+export function gtag(...args: any[]) {
 	if (typeof window === 'undefined') return
 	window.dataLayer ??= []
 	window?.dataLayer.push(args)
@@ -333,6 +333,14 @@ export function gtmPush(...args: any[]) {
 	window?.dataLayer.push(...args)
 }
 
+gtag('js', new Date())
+gtmPush({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
+gtag('consent', 'update', {
+	ad_user_data: 'granted',
+	ad_personalization: 'granted',
+	ad_storage: 'granted',
+	analytics_storage: 'granted',
+})
 export function addGTM() {
 	;(function (w, d, s, l, i) {
 		// @ts-expect-error
