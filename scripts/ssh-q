@@ -1,0 +1,12 @@
+#!/bin/bash -eup
+
+ADDR=$1; shift
+
+# Quote all arguments
+CMD=""
+for arg in "$@"; do
+    CMD="$CMD \"$arg\""
+done
+
+# Execute the command on the remote machine
+fly ssh console --address "$ADDR" -C "$CMD"
