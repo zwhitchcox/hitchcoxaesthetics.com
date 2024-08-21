@@ -334,6 +334,7 @@ export function gtmPush(...args: any[]) {
 }
 
 gtag('js', new Date())
+gtag('config', ENV.GTM_ID)
 gtmPush({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
 gtag('consent', 'update', {
 	ad_user_data: 'granted',
