@@ -327,15 +327,9 @@ export function gtag(...args: any[]) {
 	window?.dataLayer.push(args)
 }
 
-export function gtmPush(...args: any[]) {
-	if (typeof window === 'undefined') return
-	window.dataLayer ??= []
-	window?.dataLayer.push(...args)
-}
-
 gtag('js', new Date())
 gtag('config', ENV.GTM_ID)
-gtmPush({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
+gtag({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
 gtag('consent', 'default', {
 	ad_user_data: 'denied',
 	ad_personalization: 'denied',
