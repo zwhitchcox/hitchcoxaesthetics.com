@@ -11,26 +11,19 @@ export function CTA() {
 	})
 	useEffect(() => {
 		const wiggleIcons = () => {
-			// Start calendar icon wiggle
 			if (calendarIconRef.current) {
 				calendarIconRef.current.classList.add('wiggle')
 			}
-
-			// Start phone icon wiggle after 1000ms
 			setTimeout(() => {
 				if (phoneIconRef.current) {
 					phoneIconRef.current.classList.add('wiggle')
 				}
 			}, 1000)
-
-			// Remove calendar icon wiggle after 3000ms
 			setTimeout(() => {
 				if (calendarIconRef.current) {
 					calendarIconRef.current.classList.remove('wiggle')
 				}
 			}, 3000)
-
-			// Remove phone icon wiggle after it has wiggled for 3000ms (4000ms after the initial start)
 			setTimeout(() => {
 				if (phoneIconRef.current) {
 					phoneIconRef.current.classList.remove('wiggle')
