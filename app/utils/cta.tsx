@@ -44,6 +44,10 @@ export function CTA() {
 	}, [])
 
 	const callback = useCallback((formatted: string, mobile: string) => {
+		console.log({ formatted, mobile })
+		if (!(formatted && mobile)) {
+			return
+		}
 		setPhone({ formatted, mobile })
 	}, [])
 
