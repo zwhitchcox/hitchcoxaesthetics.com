@@ -1,9 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '#app/components/ui/icon.js'
+import { gtag } from './misc'
 
 export function CTA() {
 	const phoneIconRef = useRef<SVGSVGElement>(null)
 	const calendarIconRef = useRef<SVGSVGElement>(null)
+	const [phone, setPhone] = useState({
+		formatted: ENV.GA_PHONE_NUMBER,
+		mobile: ENV.GA_PHONE_NUMBER,
+	})
 	useEffect(() => {
 		const wiggleIcons = () => {
 			// Start calendar icon wiggle
@@ -37,6 +42,17 @@ export function CTA() {
 
 		return () => clearInterval(interval)
 	}, [])
+
+	const callback = useCallback((formatted: string, mobile: string) => {
+		setPhone({ formatted, mobile })
+	}, [])
+
+	useEffect(() => {
+		gtag('config', `${ENV.GA_CONVERSION_ID}/${ENV.GA_CONVERSION_LABEL}`, {
+			phone_conversion_number: ENV.GA_PHONE_NUMBER,
+			phone_conversion_callback: callback,
+		})
+	}, [callback])
 	const showCTA = true
 
 	return showCTA ? (
@@ -57,7 +73,7 @@ export function CTA() {
 				</a>
 				<a
 					// eslint-disable-next-line remix-react-routes/use-link-for-routes
-					href="tel:+18652147238"
+					href={`tel:${phone.mobile}`}
 					className="icon-container flex w-56 items-center justify-center rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800"
 				>
 					<Icon
@@ -65,7 +81,7 @@ export function CTA() {
 						className="wiggle-hover mb-[-1px] mr-2 inline-block h-6 w-6"
 						ref={phoneIconRef}
 					/>
-					<div className="mt-[-0px]">(865) 214-7238</div>
+					<div className="mt-[-0px]">{phone.formatted}</div>
 				</a>
 			</div>
 		</div>

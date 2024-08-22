@@ -16,6 +16,9 @@ const schema = z.object({
 	GA_TRACKING_ID: z.string().optional(),
 	GTM_ID: z.string().optional(),
 	DEFAULT_PROVIDER: z.string(),
+	GA_PHONE_NUMBER: z.string(),
+	GA_CONVERSION_ID: z.string(),
+	GA_CONVERSION_LABEL: z.string(),
 })
 
 declare global {
@@ -55,6 +58,9 @@ export function getEnv() {
 		DEFAULT_PROVIDER: process.env.DEFAULT_PROVIDER,
 		GA_TRACKING_ID: process.env.GA_TRACKING_ID,
 		GTM_ID: process.env.GTM_ID,
+		GA_PHONE_NUMBER: process.env.GA_PHONE_NUMBER,
+		GA_CONVERSION_ID: process.env.GA_CONVERSION_ID,
+		GA_CONVERSION_LABEL: process.env.GA_CONVERSION_LABEL,
 	}
 }
 

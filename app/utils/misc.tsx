@@ -343,6 +343,9 @@ if (typeof ENV !== 'undefined' && ENV?.GTM_ID) {
 		ad_storage: 'granted',
 		analytics_storage: 'granted',
 	})
+	gtag('config', 'TAG_ID/CONVERSION_LABEL', {
+		phone_conversion_number: '(86',
+	})
 }
 
 export function addGTM() {
