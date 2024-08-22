@@ -123,12 +123,14 @@ export function ServiceLayout({
 								</div>
 								<Logo className="my-2 h-8 w-8 animate-spin-in text-primary [animation-fill-mode:backwards] md:h-10 md:w-10 lg:h-10 lg:w-10" />
 								<div className="text-md flex flex-wrap justify-center px-2 text-center tracking-[.3rem] text-gray-600 sm:tracking-[.3rem] md:text-xl">
-									{description.split(',').map((item, index) => (
-										<span key={index} className="whitespace-nowrap">
-											{item}
-											{index < description.split(',').length - 1 && ','}
-										</span>
-									))}
+									{description.includes(',')
+										? description.split(',').map((item, index) => (
+												<span key={index}>
+													{item}
+													{index < description.split(',').length - 1 && ','}
+												</span>
+											))
+										: description}
 								</div>
 							</div>
 							<div className="flex flex-col items-center justify-center space-y-2">

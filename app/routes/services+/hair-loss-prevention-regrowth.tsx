@@ -42,7 +42,7 @@ export default function () {
 	return (
 		<ServiceLayout
 			title="Microneedling for Hair Loss Prevention & Regrowth"
-			description="Promoting hair regrowth and improving hair density"
+			description="Promoting hair regrowth improving hair density"
 			imgClassName="w-full h-full object-cover"
 		>
 			<ServiceParagraph>
