@@ -41,7 +41,7 @@ export function CTA() {
 
 	return showCTA ? (
 		<div
-			className={`fixed bottom-0 left-0 right-0 z-50 bg-black py-4 text-center ${showCTA ? 'fade-in' : ''} flex h-[3.2rem] items-center justify-center`}
+			className={`fixed bottom-0 left-0 right-0 z-50 bg-black py-4 text-center ${showCTA ? 'fade-in' : ''} shadow-top flex h-[3.2rem] items-center justify-center`}
 		>
 			<div className="text-md flex w-full animate-fade-in justify-evenly px-2 sm:text-xl">
 				<a
