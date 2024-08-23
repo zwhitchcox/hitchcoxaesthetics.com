@@ -324,7 +324,7 @@ declare global {
 export function gtag(...args: any[]) {
 	if (typeof window === 'undefined') return
 	window.dataLayer ??= []
-	window?.dataLayer.push(args)
+	window.dataLayer.push(args)
 }
 
 if (typeof ENV !== 'undefined' && ENV?.GTM_ID) {
@@ -342,9 +342,6 @@ if (typeof ENV !== 'undefined' && ENV?.GTM_ID) {
 		ad_personalization: 'granted',
 		ad_storage: 'granted',
 		analytics_storage: 'granted',
-	})
-	gtag('config', 'TAG_ID/CONVERSION_LABEL', {
-		phone_conversion_number: '(86',
 	})
 }
 
