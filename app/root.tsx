@@ -31,7 +31,7 @@ import { useHydrated } from 'remix-utils/use-hydrated'
 import { z } from 'zod'
 
 import { GeneralErrorBoundary } from '#/app/components/error-boundary.tsx'
-import { ListWithDot } from '#/app/components/list-with-dot'
+import { ListWithDot, type MenuLink } from '#/app/components/list-with-dot'
 import Logo from '#/app/components/logo'
 import { EpicProgress } from '#/app/components/progress-bar.tsx'
 import { SearchBar } from '#/app/components/search-bar.tsx'
@@ -251,7 +251,10 @@ function App() {
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
-			<div className="flex h-screen flex-col justify-between">
+			<div
+				className="flex h-screen flex-col justify-between"
+				style={{ overflow: isMenuOpen ? 'hidden' : '' }}
+			>
 				<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
 				<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
 				<Footer />
@@ -273,6 +276,20 @@ function Header({
 	isMenuOpen: boolean
 	setIsMenuOpen: (isOpen: boolean) => void
 }) {
+	useEffect(() => {
+		const handleEscapeKey = (event: KeyboardEvent) => {
+			if (event.key === 'Escape' && isMenuOpen) {
+				setIsMenuOpen(false)
+			}
+		}
+
+		document.addEventListener('keydown', handleEscapeKey)
+
+		return () => {
+			document.removeEventListener('keydown', handleEscapeKey)
+		}
+	}, [isMenuOpen, setIsMenuOpen])
+
 	const location = useLocation()
 	const noHeader = noHeaderPages.includes(location.pathname)
 	const links = useLinks()
@@ -598,67 +615,61 @@ function useLinks() {
 	const isProvider = useIsProvider(user)
 
 	return useMemo(() => {
-		const links: { to: string; label: string; hint?: string }[] = []
-		links.push({
-			to: '/',
-			label: 'Home',
-		})
-		if (!user || (user && !isProvider)) {
-			links.push({
-				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
-				label: 'Pricing',
-				hint: 'see prices/book appointment',
-			})
-		}
-		links.push(
-			// {
-			// 	to: '/services',
-			// 	label: 'Services',
-			// },
+		const links: MenuLink[] = [
 			{
-				to: '/services/botox',
-				label: 'Botox',
-				hint: 'for wrinkles, fine lines',
+				to: '/',
+				label: 'Home',
 			},
 			{
-				to: '/services/filler',
-				label: 'Filler',
-				hint: 'for lips, cheeks, facial balancing',
-			},
-			{
-				to: '/services/microneedling',
-				label: 'Microneedling',
-				hint: 'for acne scars, fine lines, wrinkles',
-			},
-			{
-				to: '/services/hair-loss-prevention-regrowth',
-				label: 'Hair Loss Prevention & Regrowth',
-				hint: 'for receding hairlines, thinning hair',
-			},
-			{
-				to: '/services/skinvive',
-				label: 'SkinVive',
-				hint: 'for skin hydration, smoothness, and overall appearance',
-			},
-			{
-				to: '/services/laser-hair-removal',
-				label: 'Laser Hair Removal',
-				hint: 'for all skin types, virtually pain-free',
-			},
-			{
-				to: '/services/skin-revitalization',
-				label: 'Skin Revitalization',
-				hint: 'for fine lines, wrinkles, enlarged pores',
-			},
-			{
-				to: '/services/pigmented-lesion-reduction',
-				label: 'Pigmented Lesion Reduction',
-				hint: 'for sun spots, age spots, freckles',
-			},
-			{
-				to: '/services/vascular-lesion-reduction',
-				label: 'Vascular Lesion Reduction',
-				hint: 'for spider veins, broken capillaries, rosacea',
+				to: '/services',
+				label: 'Services',
+				subLinks: [
+					{
+						to: '/services/botox',
+						label: 'Botox',
+						hint: 'for wrinkles, fine lines',
+					},
+					{
+						to: '/services/filler',
+						label: 'Filler',
+						hint: 'for lips, cheeks, facial balancing',
+					},
+					{
+						to: '/services/microneedling',
+						label: 'Microneedling',
+						hint: 'for acne scars, fine lines, wrinkles',
+					},
+					{
+						to: '/services/hair-loss-prevention-regrowth',
+						label: 'Hair Loss Prevention & Regrowth',
+						hint: 'for receding hairlines, thinning hair',
+					},
+					{
+						to: '/services/skinvive',
+						label: 'SkinVive',
+						hint: 'for skin hydration, smoothness, and overall appearance',
+					},
+					{
+						to: '/services/laser-hair-removal',
+						label: 'Laser Hair Removal',
+						hint: 'for all skin types, virtually pain-free',
+					},
+					{
+						to: '/services/skin-revitalization',
+						label: 'Skin Revitalization',
+						hint: 'for fine lines, wrinkles, enlarged pores',
+					},
+					{
+						to: '/services/pigmented-lesion-reduction',
+						label: 'Pigmented Lesion Reduction',
+						hint: 'for sun spots, age spots, freckles',
+					},
+					{
+						to: '/services/vascular-lesion-reduction',
+						label: 'Vascular Lesion Reduction',
+						hint: 'for spider veins, broken capillaries, rosacea',
+					},
+				],
 			},
 			{
 				to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
@@ -680,21 +691,15 @@ function useLinks() {
 				label: 'Location',
 				hint: 'find us on Google Maps',
 			},
-			// {
-			// 	to: '/contact',
-			// 	label: 'Contact',
-			// },
-		)
-		// if (user) {
-		// 	links.push(
-		// 		isProvider
-		// 			? { to: '/schedule', label: 'Schedule' }
-		// 			: { to: '/account/info/general', label: 'My Account' },
-		// 	)
-		// 	links.push({ to: '/logout', label: 'Logout' })
-		// } else {
-		// 	// links.push({ to: '/auth', label: 'Log In' })
-		// }
+		]
+
+		if (!user || (user && !isProvider)) {
+			links.splice(1, 0, {
+				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
+				label: 'Pricing/Book Online',
+				hint: 'see prices/book appointment',
+			})
+		}
 
 		return links
 	}, [isProvider, user])

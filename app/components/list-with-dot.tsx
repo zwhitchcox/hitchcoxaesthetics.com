@@ -1,7 +1,15 @@
 import { NavLink, useLocation } from '@remix-run/react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '#app/utils/misc.js'
+import { Icon } from './ui/icon'
 import { ScrollArea } from './ui/scroll-area'
+
+export type MenuLink = {
+	to: string
+	label: string
+	hint?: string
+	subLinks?: MenuLink[]
+}
 
 export function ListWithDot({
 	links,
@@ -9,16 +17,18 @@ export function ListWithDot({
 	dotSize = 6,
 }: {
 	className?: string
-	links: { to: string; label: string; hint?: string }[]
+	links: MenuLink[]
 	dotSize?: number
 }) {
 	const ulRef = useRef<HTMLUListElement>(null)
+	const scrollAreaRef = useRef<HTMLDivElement>(null)
 	const [hoveredLinkIndex, setHoveredLinkIndex] = useState<number | null>(null)
 	const [selectedLinkIndex, setSelectedLinkIndex] = useState<number | null>(
 		null,
 	)
 	const [dotPosition, setDotPosition] = useState(0)
 	const { pathname } = useLocation()
+	const [activeSubMenu, setActiveSubMenu] = useState<number | null>(null)
 
 	useEffect(() => {
 		const index = links.findIndex(link => link.to === pathname)
@@ -78,40 +88,99 @@ export function ListWithDot({
 		height: dotSize,
 	}
 
-	return (
-		<ScrollArea className="h-full w-full">
-			<div className="flex flex-col items-center">
-				<ul className={cn('relative inline-block', className)} ref={ulRef}>
-					<div
-						className="absolute rounded-full bg-foreground"
-						style={dotStyle}
-					></div>
-					{links.map((link, index) => (
-						<li
-							key={link.to}
-							onMouseEnter={() => handleMouseEnter(index)}
-							onMouseLeave={handleMouseLeave}
-							className={cn('group/link', 'py-1')}
-							id={`nav-link-${index}`}
+	const handleLinkClick = () => {
+		if (scrollAreaRef.current) {
+			scrollAreaRef.current.scrollTop = 0
+		}
+	}
+
+	const renderLinks = (linksToRender: MenuLink[], level: number = 0) => (
+		<ul className={cn('relative inline-block', className)} ref={ulRef}>
+			{level === 0 && (
+				<div
+					className="absolute rounded-full bg-foreground"
+					style={dotStyle}
+				></div>
+			)}
+			{level === 1 && (
+				<li
+					key="back"
+					onMouseEnter={() => handleMouseEnter(-1)}
+					onMouseLeave={handleMouseLeave}
+					className={cn('group/link', 'py-1')}
+					id="nav-link-back"
+				>
+					<button
+						className="flex w-full flex-col items-center py-2"
+						onClick={() => {
+							setActiveSubMenu(null)
+							handleLinkClick()
+						}}
+					>
+						<div className="flex items-center">
+							<Icon name="arrow-left" className="mr-2 h-4 w-4" />
+							Back
+						</div>
+					</button>
+				</li>
+			)}
+			{linksToRender.map((link, index) => (
+				<li
+					key={link.to}
+					onMouseEnter={() => handleMouseEnter(index)}
+					onMouseLeave={handleMouseLeave}
+					className={cn('group/link', 'py-1')}
+					id={`nav-link-${index}`}
+				>
+					{link.subLinks ? (
+						<button
+							className="flex w-full flex-col items-center py-2"
+							onClick={() => {
+								setActiveSubMenu(index)
+								handleLinkClick()
+							}}
 						>
-							<NavLink
-								className={({ isActive }) =>
-									`flex  flex-col items-center py-2 ${isActive ? 'italic text-muted-foreground' : ''}`
-								}
-								to={link.to}
-								prefetch="intent"
-								target={link.to.startsWith('http') ? '_blank' : undefined}
-							>
-								<div>{link.label}</div>
-								{link.hint ? (
-									<div className="block text-center text-sm text-muted-foreground group-hover/link:block">
-										{link.hint}
-									</div>
-								) : null}
-							</NavLink>
-						</li>
-					))}
-				</ul>
+							<div className="flex items-center">
+								{link.label}
+								<Icon name="chevron-right" className="ml-2 h-4 w-4" />
+							</div>
+							{link.hint && (
+								<div className="block text-center text-sm text-muted-foreground group-hover/link:block">
+									{link.hint}
+								</div>
+							)}
+						</button>
+					) : (
+						<NavLink
+							className={({ isActive }) =>
+								`flex flex-col items-center py-2 ${
+									isActive ? 'italic text-muted-foreground' : ''
+								}`
+							}
+							to={link.to}
+							prefetch="intent"
+							target={link.to.startsWith('http') ? '_blank' : undefined}
+							onClick={handleLinkClick}
+						>
+							<div>{link.label}</div>
+							{link.hint && (
+								<div className="block text-center text-sm text-muted-foreground group-hover/link:block">
+									{link.hint}
+								</div>
+							)}
+						</NavLink>
+					)}
+				</li>
+			))}
+		</ul>
+	)
+
+	return (
+		<ScrollArea className="h-full w-full" viewportRef={scrollAreaRef}>
+			<div className="flex flex-col items-center">
+				{activeSubMenu !== null
+					? renderLinks(links[activeSubMenu].subLinks || [], 1)
+					: renderLinks(links)}
 			</div>
 		</ScrollArea>
 	)
