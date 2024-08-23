@@ -252,8 +252,7 @@ function App() {
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
 			<div
-				className="flex h-screen flex-col justify-between"
-				style={{ overflow: isMenuOpen ? 'hidden' : '' }}
+				className={`flex h-screen flex-col justify-between ${isMenuOpen ? 'overflow-hidden' : ''}`}
 			>
 				<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
 				<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
