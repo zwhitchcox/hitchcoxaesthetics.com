@@ -612,13 +612,18 @@ function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
 
 function useLinks() {
 	const user = useOptionalUser()
-	const isProvider = useIsProvider(user)
+	// const isProvider = useIsProvider(user)
 
 	return useMemo(() => {
 		const links: MenuLink[] = [
 			{
 				to: '/',
 				label: 'Home',
+			},
+			{
+				to: '/about',
+				label: 'About',
+				hint: 'learn more about Sarah Hitchcox',
 			},
 			{
 				to: '/services',
@@ -635,6 +640,11 @@ function useLinks() {
 						hint: 'for lips, cheeks, facial balancing',
 					},
 					{
+						to: '/services/skinvive',
+						label: 'SkinVive',
+						hint: 'for skin hydration, smoothness, and overall appearance',
+					},
+					{
 						to: '/services/microneedling',
 						label: 'Microneedling',
 						hint: 'for acne scars, fine lines, wrinkles',
@@ -645,46 +655,53 @@ function useLinks() {
 						hint: 'for receding hairlines, thinning hair',
 					},
 					{
-						to: '/services/skinvive',
-						label: 'SkinVive',
-						hint: 'for skin hydration, smoothness, and overall appearance',
-					},
-					{
-						to: '/services/laser-hair-removal',
-						label: 'Laser Hair Removal',
-						hint: 'for all skin types, virtually pain-free',
-					},
-					{
-						to: '/services/skin-revitalization',
-						label: 'Skin Revitalization',
-						hint: 'for fine lines, wrinkles, enlarged pores',
-					},
-					{
-						to: '/services/pigmented-lesion-reduction',
-						label: 'Pigmented Lesion Reduction',
-						hint: 'for sun spots, age spots, freckles',
-					},
-					{
-						to: '/services/vascular-lesion-reduction',
-						label: 'Vascular Lesion Reduction',
-						hint: 'for spider veins, broken capillaries, rosacea',
+						to: '/services/laser',
+						label: 'Laser Services',
+						subLinks: [
+							{
+								to: '/services/laser/laser-hair-removal',
+								label: 'Laser Hair Removal',
+								hint: 'for all skin types, virtually pain-free',
+							},
+							{
+								to: '/services/laser/skin-revitalization',
+								label: 'Skin Revitalization',
+								hint: 'for fine lines, wrinkles, enlarged pores',
+							},
+							{
+								to: '/services/laser/pigmented-lesion-reduction',
+								label: 'Pigmented Lesion Reduction',
+								hint: 'for sun spots, age spots, freckles',
+							},
+							{
+								to: '/services/laser/vascular-lesion-reduction',
+								label: 'Vascular Lesion Reduction',
+								hint: 'for spider veins, broken capillaries, rosacea',
+							},
+						],
 					},
 				],
 			},
 			{
-				to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
-				label: 'Shop SkinMedica',
-				hint: 'for skincare products',
+				to: '/products',
+				label: 'Products & Rewards',
+				subLinks: [
+					{
+						to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
+						label: 'Shop SkinMedica',
+						hint: 'for skincare products',
+					},
+					{
+						to: 'https://alle.com/',
+						label: 'Allē Rewards',
+						hint: 'for rewards on Botox, filler, and more',
+					},
+				],
 			},
 			{
-				to: 'https://alle.com/',
-				label: 'Allē Rewards',
-				hint: 'for rewards on Botox, filler, and more',
-			},
-			{
-				to: '/about',
-				label: 'About',
-				hint: 'learn more about Sarah Hitchcox',
+				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
+				label: 'Pricing/Book Online',
+				hint: 'see prices/book appointment',
 			},
 			{
 				to: '/location',
@@ -693,16 +710,16 @@ function useLinks() {
 			},
 		]
 
-		if (!user || (user && !isProvider)) {
-			links.splice(1, 0, {
-				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
-				label: 'Pricing/Book Online',
-				hint: 'see prices/book appointment',
-			})
-		}
+		// if (!user || (user && !isProvider)) {
+		// 	links.splice(2, 0, {
+		// 		to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
+		// 		label: 'Pricing/Book Online',
+		// 		hint: 'see prices/book appointment',
+		// 	})
+		// }
 
 		return links
-	}, [isProvider, user])
+	}, [])
 }
 
 export function ErrorBoundary() {

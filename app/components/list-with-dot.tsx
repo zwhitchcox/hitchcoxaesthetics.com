@@ -28,7 +28,7 @@ export function ListWithDot({
 	)
 	const [dotPosition, setDotPosition] = useState(0)
 	const { pathname } = useLocation()
-	const [activeSubMenu, setActiveSubMenu] = useState<number | null>(null)
+	const [activeSubMenus, setActiveSubMenus] = useState<number[]>([])
 
 	useEffect(() => {
 		const index = links.findIndex(link => link.to === pathname)
@@ -102,7 +102,7 @@ export function ListWithDot({
 					style={dotStyle}
 				></div>
 			)}
-			{level === 1 && (
+			{level > 0 && (
 				<li
 					key="back"
 					onMouseEnter={() => handleMouseEnter(-1)}
@@ -113,7 +113,7 @@ export function ListWithDot({
 					<button
 						className="flex w-full flex-col items-center py-2"
 						onClick={() => {
-							setActiveSubMenu(null)
+							setActiveSubMenus(prev => prev.slice(0, -1))
 							handleLinkClick()
 						}}
 					>
@@ -136,7 +136,7 @@ export function ListWithDot({
 						<button
 							className="flex w-full flex-col items-center py-2"
 							onClick={() => {
-								setActiveSubMenu(index)
+								setActiveSubMenus(prev => [...prev, index])
 								handleLinkClick()
 							}}
 						>
@@ -175,12 +175,23 @@ export function ListWithDot({
 		</ul>
 	)
 
+	const getCurrentLinks = (
+		links: MenuLink[],
+		activeSubMenus: number[],
+	): MenuLink[] => {
+		if (activeSubMenus.length === 0) return links
+		const currentSubMenu = links[activeSubMenus[0]]
+		if (!currentSubMenu.subLinks) return links
+		return getCurrentLinks(currentSubMenu.subLinks, activeSubMenus.slice(1))
+	}
+
 	return (
 		<ScrollArea className="h-full w-full" viewportRef={scrollAreaRef}>
 			<div className="flex flex-col items-center">
-				{activeSubMenu !== null
-					? renderLinks(links[activeSubMenu].subLinks || [], 1)
-					: renderLinks(links)}
+				{renderLinks(
+					getCurrentLinks(links, activeSubMenus),
+					activeSubMenus.length,
+				)}
 			</div>
 		</ScrollArea>
 	)
