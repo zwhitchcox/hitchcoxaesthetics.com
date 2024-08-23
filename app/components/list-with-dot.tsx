@@ -4,12 +4,17 @@ import { cn } from '#app/utils/misc.js'
 import { Icon } from './ui/icon'
 import { ScrollArea } from './ui/scroll-area'
 
-export type MenuLink = {
-	to: string
-	label: string
-	hint?: string
-	subLinks?: MenuLink[]
-}
+export type MenuLink =
+	| {
+			to: string
+			label: string
+			hint?: string
+	  }
+	| {
+			label: string
+			hint?: string
+			subLinks: MenuLink[]
+	  }
 
 export function ListWithDot({
 	links,
@@ -31,7 +36,7 @@ export function ListWithDot({
 	const [activeSubMenus, setActiveSubMenus] = useState<number[]>([])
 
 	useEffect(() => {
-		const index = links.findIndex(link => link.to === pathname)
+		const index = links.findIndex(link => 'to' in link && link.to === pathname)
 		const firstLink = document.getElementById('nav-link-0')
 		setSelectedLinkIndex(index !== -1 ? index : null)
 		if (index !== -1) {
@@ -126,13 +131,13 @@ export function ListWithDot({
 			)}
 			{linksToRender.map((link, index) => (
 				<li
-					key={link.to}
+					key={'to' in link ? link.to : `submenu-${index}`}
 					onMouseEnter={() => handleMouseEnter(index)}
 					onMouseLeave={handleMouseLeave}
 					className={cn('group/link', 'py-1')}
 					id={`nav-link-${index}`}
 				>
-					{link.subLinks ? (
+					{'subLinks' in link ? (
 						<button
 							className="flex w-full flex-col items-center py-2"
 							onClick={() => {
@@ -181,7 +186,7 @@ export function ListWithDot({
 	): MenuLink[] => {
 		if (activeSubMenus.length === 0) return links
 		const currentSubMenu = links[activeSubMenus[0]]
-		if (!currentSubMenu.subLinks) return links
+		if (!('subLinks' in currentSubMenu)) return links
 		return getCurrentLinks(currentSubMenu.subLinks, activeSubMenus.slice(1))
 	}
 

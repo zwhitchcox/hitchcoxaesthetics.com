@@ -68,7 +68,7 @@ import { useRequestInfo } from '#/app/utils/request-info.ts'
 import { setTheme, type Theme } from '#/app/utils/theme.server.ts'
 import { makeTimings, time } from '#/app/utils/timing.server.ts'
 import { getToast } from '#/app/utils/toast.server.ts'
-import { useIsProvider, useOptionalUser, useUser } from '#/app/utils/user.ts'
+import { useOptionalUser, useUser } from '#/app/utils/user.ts'
 import { CTA } from './utils/cta'
 
 export const links: LinksFunction = () => {
@@ -610,9 +610,6 @@ function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
 }
 
 function useLinks() {
-	const user = useOptionalUser()
-	// const isProvider = useIsProvider(user)
-
 	return useMemo(() => {
 		const links: MenuLink[] = [
 			{
@@ -624,98 +621,94 @@ function useLinks() {
 				label: 'About',
 				hint: 'learn more about Sarah Hitchcox',
 			},
+			// {
+			// 	label: 'Injectables & Skin Treatments',
+			// 	hint: 'botox, filler, microneedling, skinvive',
+			// 	subLinks: [
 			{
-				to: '/services',
-				label: 'Services',
+				to: '/services/botox',
+				label: 'Botox',
+				hint: 'reduce wrinkles and fine lines',
+			},
+			{
+				to: '/services/filler',
+				label: 'Filler',
+				hint: 'restore youthful contours',
+			},
+			{
+				to: '/services/microneedling',
+				label: 'Microneedling',
+				hint: 'improve acne scars and skin texture',
+			},
+			{
+				to: '/services/skinvive',
+				label: 'SkinVive',
+				hint: 'improve skin texture and glow',
+			},
+			// 	],
+			// },
+			{
+				label: 'Laser Services',
+				hint: 'brown spots, redness, hair removal, skin rejuvenation',
 				subLinks: [
 					{
-						to: '/services/botox',
-						label: 'Botox',
-						hint: 'for wrinkles, fine lines',
+						to: '/services/skin-revitalization',
+						label: 'Skin Revitalization',
+						hint: 'address fine lines, wrinkles, and pores',
 					},
 					{
-						to: '/services/filler',
-						label: 'Filler',
-						hint: 'for lips, cheeks, facial balancing',
+						to: '/services/pigmented-lesion-reduction',
+						label: 'Pigmentation Correction',
+						hint: 'reduce sun spots, age spots, and freckles',
 					},
 					{
-						to: '/services/skinvive',
-						label: 'SkinVive',
-						hint: 'for skin hydration, smoothness, and overall appearance',
+						to: '/services/vascular-lesion-reduction',
+						label: 'Vein & Redness Treatment',
+						hint: 'minimize spider veins and redness',
 					},
 					{
-						to: '/services/microneedling',
-						label: 'Microneedling',
-						hint: 'for acne scars, fine lines, wrinkles',
-					},
-					{
-						to: '/services/hair-loss-prevention-regrowth',
-						label: 'Hair Loss Prevention & Regrowth',
-						hint: 'for receding hairlines, thinning hair',
-					},
-					{
-						to: '/services/laser',
-						label: 'Laser Services',
-						subLinks: [
-							{
-								to: '/services/laser/laser-hair-removal',
-								label: 'Laser Hair Removal',
-								hint: 'for all skin types, virtually pain-free',
-							},
-							{
-								to: '/services/laser/skin-revitalization',
-								label: 'Skin Revitalization',
-								hint: 'for fine lines, wrinkles, enlarged pores',
-							},
-							{
-								to: '/services/laser/pigmented-lesion-reduction',
-								label: 'Pigmented Lesion Reduction',
-								hint: 'for sun spots, age spots, freckles',
-							},
-							{
-								to: '/services/laser/vascular-lesion-reduction',
-								label: 'Vascular Lesion Reduction',
-								hint: 'for spider veins, broken capillaries, rosacea',
-							},
-						],
+						to: '/services/laser-hair-removal',
+						label: 'Laser Hair Removal',
+						hint: 'long-lasting hair reduction for all skin types',
 					},
 				],
 			},
 			{
-				to: '/products',
-				label: 'Products & Rewards',
+				to: '/services/hair-loss-prevention-regrowth',
+				label: 'Hair Restoration',
+				hint: 'solutions for thinning hair and receding hairlines',
+			},
+			{
+				label: 'Shop & Rewards',
 				subLinks: [
 					{
 						to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
-						label: 'Shop SkinMedica',
-						hint: 'for skincare products',
+						label: 'SkinMedica Shop',
+						hint: 'medical grade skincare products',
 					},
 					{
 						to: 'https://alle.com/',
-						label: 'Allē Rewards',
-						hint: 'for rewards on Botox, filler, and more',
+						label: 'Loyalty Program',
+						hint: 'earn rewards on treatments',
 					},
 				],
 			},
 			{
-				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
-				label: 'Pricing/Book Online',
-				hint: 'see prices/book appointment',
-			},
-			{
-				to: '/location',
-				label: 'Location',
-				hint: 'find us on Google Maps',
+				label: 'Book & Visit',
+				subLinks: [
+					{
+						to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
+						label: 'Pricing/Book Online',
+						hint: 'schedule your personalized treatment plan',
+					},
+					{
+						to: '/location',
+						label: 'Visit Us',
+						hint: 'find our location',
+					},
+				],
 			},
 		]
-
-		// if (!user || (user && !isProvider)) {
-		// 	links.splice(2, 0, {
-		// 		to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
-		// 		label: 'Pricing/Book Online',
-		// 		hint: 'see prices/book appointment',
-		// 	})
-		// }
 
 		return links
 	}, [])
