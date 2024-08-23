@@ -679,7 +679,7 @@ function useLinks() {
 				hint: 'solutions for thinning hair and receding hairlines',
 			},
 			{
-				label: 'Shop & Rewards',
+				label: 'Links',
 				subLinks: [
 					{
 						to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
@@ -688,7 +688,7 @@ function useLinks() {
 					},
 					{
 						to: 'https://alle.com/',
-						label: 'Loyalty Program',
+						label: 'Alle Rewards',
 						hint: 'earn rewards on treatments',
 					},
 				],
