@@ -52,6 +52,21 @@ export function ListWithDot({
 		}
 	}, [pathname, links])
 
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Backspace' && activeSubMenus.length > 0) {
+				setActiveSubMenus(prev => prev.slice(0, -1))
+				handleLinkClick()
+			}
+		}
+
+		window.addEventListener('keydown', handleKeyDown)
+
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown)
+		}
+	}, [activeSubMenus])
+
 	const handleMouseEnter = (index: number) => {
 		const firstLink = document.getElementById('nav-link-0')
 		setHoveredLinkIndex(index)

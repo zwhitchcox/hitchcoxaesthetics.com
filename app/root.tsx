@@ -679,6 +679,16 @@ function useLinks() {
 				hint: 'solutions for thinning hair and receding hairlines',
 			},
 			{
+				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
+				label: 'Pricing/Book Online',
+				hint: 'schedule your personalized treatment plan',
+			},
+			{
+				to: '/location',
+				label: 'Find Us',
+				hint: 'find our location',
+			},
+			{
 				label: 'Links',
 				subLinks: [
 					{
@@ -690,21 +700,6 @@ function useLinks() {
 						to: 'https://alle.com/',
 						label: 'Alle Rewards',
 						hint: 'earn rewards on treatments',
-					},
-				],
-			},
-			{
-				label: 'Book & Visit',
-				subLinks: [
-					{
-						to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
-						label: 'Pricing/Book Online',
-						hint: 'schedule your personalized treatment plan',
-					},
-					{
-						to: '/location',
-						label: 'Visit Us',
-						hint: 'find our location',
 					},
 				],
 			},
