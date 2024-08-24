@@ -57,6 +57,7 @@ export default function () {
 		<ServiceLayout
 			title="Filler"
 			description="for lips, cheeks, facial balancing"
+			imgClassName="w-full h-full object-cover object-[50%_20%] sm:object-center"
 		>
 			<div className="w-full max-w-2xl space-y-8">
 				<ServiceHeader>What Are Dermal Fillers?</ServiceHeader>
