@@ -1,3 +1,4 @@
+import { type MetaFunction } from '@remix-run/node'
 import { ServiceFAQ, ServiceLayout, ServiceParagraph } from './__service-layout'
 
 const faq = [
@@ -31,6 +32,10 @@ const faq = [
 			'It is generally recommended to wait 4-6 weeks between sessions to allow the skin to heal and regenerate.',
 	},
 ]
+
+export const meta: MetaFunction = () => {
+	return [{ title: 'Microneedling | Knoxville | Sarah Hitchcox Aesthetics' }]
+}
 
 export default function () {
 	return (

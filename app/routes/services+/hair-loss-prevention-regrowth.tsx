@@ -1,4 +1,14 @@
+import { type MetaFunction } from '@remix-run/node'
 import { ServiceFAQ, ServiceLayout, ServiceParagraph } from './__service-layout'
+
+export const meta: MetaFunction = () => {
+	return [
+		{
+			title:
+				'Microneedling for Hair Loss Prevention & Regrowth | Knoxville | Sarah Hitchcox Aesthetics',
+		},
+	]
+}
 
 const faq = [
 	{

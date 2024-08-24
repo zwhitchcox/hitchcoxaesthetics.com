@@ -7,7 +7,7 @@ import {
 } from './__service-layout'
 
 export const meta: MetaFunction = () => [
-	{ title: 'Laser Hair Removal - Knoxville - Sarah Hitchcox Aesthetics' },
+	{ title: 'Laser Hair Removal | Knoxville | Sarah Hitchcox Aesthetics' },
 ]
 const areas = [
 	{

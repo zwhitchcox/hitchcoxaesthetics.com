@@ -8,7 +8,7 @@ import {
 
 export const meta: MetaFunction = () => [
 	{
-		title: 'Vascular Lesion Reduction - Knoxville - Sarah Hitchcox Aesthetics',
+		title: 'Vascular Lesion Reduction | Knoxville | Sarah Hitchcox Aesthetics',
 	},
 ]
 const treatments = [
