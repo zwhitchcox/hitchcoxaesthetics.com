@@ -40,9 +40,9 @@ const faq = [
 export default function () {
 	return (
 		<ServiceLayout
-			title="Juvederm SkinVive"
+			title="Juvederm SkinVive™"
 			description="for skin hydration, smoothness, and overall appearance"
-			imgClassName="w-full h-full object-cover"
+			imgClassName="w-full h-[calc(100%+2px)] object-cover"
 		>
 			<ServiceParagraph>
 				Juvederm SkinVive is a cutting-edge treatment designed to enhance skin
