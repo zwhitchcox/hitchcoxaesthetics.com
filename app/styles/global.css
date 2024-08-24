@@ -78,7 +78,7 @@
 }
 
 .after-image {
-	animation: fade-in-out 12s infinite ease-in-out reverse;
+	animation: fade-in-out 9s infinite ease-in-out reverse;
 }
 .feathered-image {
 	mask-image: linear-gradient(
