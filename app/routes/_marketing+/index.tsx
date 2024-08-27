@@ -34,6 +34,9 @@ export default function Index() {
 								<div className="text-lg tracking-[.3rem] text-gray-600 sm:tracking-[.8rem] md:text-xl lg:my-2 lg:text-2xl">
 									AESTHETICS
 								</div>
+								<h1 className="text-md text-gray-600 sm:text-lg md:text-xl lg:text-2xl">
+									Knoxville Med Spa
+								</h1>
 							</div>
 						</div>
 						<div className="flex flex-col items-center justify-center space-y-2">
