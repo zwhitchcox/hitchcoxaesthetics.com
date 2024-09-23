@@ -75,7 +75,10 @@ app.get('*', (req, res, next) => {
 
 // redirect www.hepisontheway.com/path to hepisontheway.com/path
 app.get('*', (req, res, next) => {
-	if (req.hostname === 'hitchcoxaesthetics.pharmacy') {
+	if (
+		req.hostname === 'hitchcoxaesthetics.pharmacy' ||
+		req.hostname === 'www.hitchcoxaesthetics.pharmacy'
+	) {
 		const newUrl = `https://hitchcoxaesthetics.com${req.url}`
 		return res.redirect(301, newUrl)
 	}
