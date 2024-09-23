@@ -73,6 +73,15 @@ app.get('*', (req, res, next) => {
 	}
 })
 
+// redirect www.hepisontheway.com/path to hepisontheway.com/path
+app.get('*', (req, res, next) => {
+	if (req.hostname === 'hitchcoxaesthetics.pharmacy') {
+		const newUrl = `https://hitchcoxaesthetics.com${req.url}`
+		return res.redirect(301, newUrl)
+	}
+	next()
+})
+
 app.use(compression())
 
 // http://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
