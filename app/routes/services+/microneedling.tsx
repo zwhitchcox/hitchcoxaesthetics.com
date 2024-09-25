@@ -45,14 +45,22 @@ export default function () {
 			imgClassName="w-full h-full object-cover"
 		>
 			<ServiceParagraph>
-				Microneedling is a transformative skincare service designed to
-				rejuvenate and revitalize your skin. This minimally invasive procedure
-				utilizes fine needles to create micro-injuries on the skin surface,
-				promoting natural collagen and elastin production. Ideal for addressing
-				wrinkles, scars, and enhancing overall skin texture, microneedling
-				offers a safe and effective solution for achieving a youthful, radiant
-				complexion.
+				After 25, your body's natural collagen production starts to decline,
+				which is part of what causes us to age. Microneedling helps stimulate
+				the body's natural collagen production.
 			</ServiceParagraph>
+			<ServiceParagraph>
+				Collagen is a protein in your skin that gives it firmness and
+				elasticity. This helps fight signs of aging like fine lines and
+				wrinkles, and it can also help with acne scarring and enlarged pores, in
+				general making your skin more youthful and smooth.
+			</ServiceParagraph>
+			<ServiceParagraph>
+				The treatment takes about 20 minutes, and the provider will apply a
+				topical numbing cream to make sure you're comfortable throughout the
+				process.
+			</ServiceParagraph>
+			<ServiceParagraph>Please reach out to us to learn more!</ServiceParagraph>
 			<ServiceFAQ faq={faq} />
 		</ServiceLayout>
 	)
