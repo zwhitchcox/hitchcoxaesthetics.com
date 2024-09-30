@@ -231,6 +231,7 @@ function Document({
 				/>
 				<ScrollRestoration nonce={nonce} />
 				<Scripts nonce={nonce} />
+
 				<script
 					src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDPXmzplyM5tJLCWiMoA2cVRynP9Dg5U3s&libraries=places&loading=async"
 					async

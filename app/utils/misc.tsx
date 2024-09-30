@@ -321,10 +321,10 @@ declare global {
 	}
 }
 
-export function gtag(...args: any[]) {
+export function gtag(..._args: any[]) {
 	if (typeof window === 'undefined') return
-	window.dataLayer ??= []
-	window.dataLayer.push(args)
+	window.dataLayer = window.dataLayer ?? []
+	window?.dataLayer.push(arguments)
 }
 
 if (typeof ENV !== 'undefined' && ENV?.GTM_ID) {

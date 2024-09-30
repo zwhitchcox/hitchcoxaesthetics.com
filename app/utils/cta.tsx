@@ -37,7 +37,6 @@ export function CTA() {
 	}, [])
 
 	const callback = useCallback((formatted: string, mobile: string) => {
-		console.log({ formatted, mobile })
 		if (!(formatted && mobile)) {
 			return
 		}
@@ -56,7 +55,7 @@ export function CTA() {
 		<div
 			className={`fixed bottom-0 left-0 right-0 z-50 bg-black py-4 text-center ${showCTA ? 'fade-in' : ''} shadow-top flex h-[3.2rem] items-center justify-center`}
 		>
-			<div className="text-md flex w-full animate-fade-in justify-evenly px-2 sm:text-xl">
+			<div className="flex w-full animate-fade-in justify-evenly px-2 text-sm sm:text-xl">
 				<a
 					className="icon-container flex w-56 items-center justify-center rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800"
 					href="https://hitchcoxaesthetics.janeapp.com/#/staff_member/1"
