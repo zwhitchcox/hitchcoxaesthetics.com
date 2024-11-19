@@ -209,7 +209,7 @@ function Document({
 		if (typeof window === 'undefined' || !isHydrated) {
 			return
 		}
-		addGTM()
+		addGTM(ENV.GTM_ID!)
 	}, [isHydrated])
 
 	return (
@@ -728,3 +728,5 @@ export function ErrorBoundary() {
 		</Document>
 	)
 }
+
+// hello

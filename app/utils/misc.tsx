@@ -345,7 +345,7 @@ if (typeof ENV !== 'undefined' && ENV?.GTM_ID) {
 	})
 }
 
-export function addGTM() {
+export function addGTM(id: string) {
 	;(function (w, d, s, l, i) {
 		// @ts-expect-error
 		w[l] = w[l] || []
@@ -360,5 +360,5 @@ export function addGTM() {
 		j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl
 		// @ts-expect-error
 		f.parentNode.insertBefore(j, f)
-	})(window, document, 'script', 'dataLayer', ENV.GTM_ID)
+	})(window, document, 'script', 'dataLayer', id)
 }
