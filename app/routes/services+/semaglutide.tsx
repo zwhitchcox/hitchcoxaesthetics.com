@@ -18,7 +18,7 @@ export default function () {
 			title="Semaglutide & Tirzepatide (Ozempic) Injections"
 			description="for sustainable weight loss"
 			imgClassName="w-full h-full object-cover"
-			imgNames={[
+			imgs={[
 				'/img/semaglutide/before-female.jpg',
 				'/img/semaglutide/after-female.jpg',
 				'/img/semaglutide/before-male.jpg',
