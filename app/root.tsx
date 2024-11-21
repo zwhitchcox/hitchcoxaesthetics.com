@@ -627,6 +627,11 @@ function useLinks() {
 			// 	hint: 'botox, filler, microneedling, skinvive',
 			// 	subLinks: [
 			{
+				to: '/services/semaglutide',
+				label: 'Semaglutide (Ozempic)',
+				hint: 'weight loss and diabetes management',
+			},
+			{
 				to: '/services/botox',
 				label: 'Botox',
 				hint: 'reduce wrinkles and fine lines',
