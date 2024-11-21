@@ -628,8 +628,8 @@ function useLinks() {
 			// 	subLinks: [
 			{
 				to: '/services/semaglutide',
-				label: 'Semaglutide (Ozempic)',
-				hint: 'weight loss and diabetes management',
+				label: 'Weight Loss',
+				hint: 'semaglutide (ozempic) and tirzepatide injections',
 			},
 			{
 				to: '/services/botox',
