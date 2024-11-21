@@ -1,5 +1,6 @@
 import { useLocation } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
+import Carousel from '#app/utils/carousel.js'
 import { CTA } from '#app/utils/cta.js'
 import { cn, scrollToId } from '#app/utils/misc.js'
 
@@ -74,18 +75,21 @@ export function ServiceLayout({
 	description,
 	children,
 	imgClassName,
-	beforeImgClassName,
 	imgContainerClassName,
+	customClassNames,
+	imgs,
 }: {
 	title: string
 	description: string
 	children: React.ReactNode
 	imgClassName?: string
-	beforeImgClassName?: string
 	imgContainerClassName?: string
+	customClassNames?: (string | undefined)[]
+	imgs?: string[]
 }) {
 	const location = useLocation()
 	const service = location.pathname.split('/').pop()
+	imgs ??= [`/img/${service}/before.jpg`, `/img/${service}/after.jpg`]
 	return (
 		<>
 			<div className="font-poppins flex h-[calc(100dvh-3rem)] w-full flex-col bg-white">
@@ -96,24 +100,11 @@ export function ServiceLayout({
 							imgContainerClassName,
 						)}
 					>
-						<div className="absolute h-full w-full">
-							<img
-								src={`/img/${service}/before.jpg`}
-								alt={`Sarah Hitchcox ${title} Before`}
-								className={cn(
-									'before-image z-10',
-									imgClassName,
-									beforeImgClassName,
-								)}
-							/>
-						</div>
-						<div className="absolute h-full w-full">
-							<img
-								src={`/img/${service}/after.jpg`}
-								alt={`Sarah Hitchcox ${title} After`}
-								className={cn('after-image z-10', imgClassName)}
-							/>
-						</div>
+						<Carousel
+							images={imgs}
+							className={imgClassName}
+							customClassNames={customClassNames}
+						/>
 					</div>
 					<div className="z-10 flex w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
 						<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
