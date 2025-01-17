@@ -19,12 +19,13 @@ const faq = [
 	},
 	{
 		question: 'What is the cost of KYBELLA?',
-		answer: 'Each KYBELLA treatment is $600.',
+		answer:
+			'Each KYBELLA vial is $600, usually 1-3 vials are needed per treatment for moderate to severe submental (under the chin) fat .',
 	},
 	{
 		question: 'Is there downtime?',
 		answer:
-			'Downtime is minimal. Swelling, redness, or bruising may occur after the treatment and typically subsides within a few days.',
+			'Downtime is minimal. Swelling, redness, or bruising may occur after the treatment and typically subsides within a week.',
 	},
 	{
 		question: 'Who is a good candidate for KYBELLA?',
@@ -47,7 +48,7 @@ export default function () {
 		<ServiceLayout
 			title="KYBELLA"
 			description="for submental fat"
-			imgClassName="w-full h-full object-cover"
+			imgClassName="w-full h-full object-cover object-[10%_40%]"
 		>
 			<ServiceParagraph>
 				KYBELLA is an FDA-approved injectable treatment designed to reduce
