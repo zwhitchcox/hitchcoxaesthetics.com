@@ -39,6 +39,23 @@ const ImageCarousel = ({
 					}}
 				/>
 			))}
+
+			<div
+				className={cn(
+					'absolute bottom-0 left-0 bg-black/50 p-1 text-xs text-white transition-opacity duration-1000',
+					currentIndex % 2 == 0 ? 'opacity-60' : 'opacity-0',
+				)}
+			>
+				Before
+			</div>
+			<div
+				className={cn(
+					'absolute bottom-0 left-0 bg-black/50 p-1 text-xs text-white transition-opacity duration-1000',
+					currentIndex % 2 == 1 ? 'opacity-60' : 'opacity-0',
+				)}
+			>
+				After
+			</div>
 		</>
 	)
 }

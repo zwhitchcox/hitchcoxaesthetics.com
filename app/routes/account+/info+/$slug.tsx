@@ -266,7 +266,6 @@ function YesNoDetailsField({
 	const field = useField(meta.name)
 	const errorId = meta.errors?.length ? `${meta.id}-error` : undefined
 	const yesNoErrorId = metaYesNo.errors?.length
-	console.log(metaYesNo.id, metaYesNo.value)
 	return (
 		<div className="flex flex-col gap-4">
 			<Label>{field.prompt}</Label>

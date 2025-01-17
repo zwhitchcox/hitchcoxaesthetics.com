@@ -642,14 +642,19 @@ function useLinks() {
 				hint: 'restore youthful contours',
 			},
 			{
-				to: '/services/microneedling',
-				label: 'Microneedling',
-				hint: 'improve acne scars and skin texture',
-			},
-			{
 				to: '/services/skinvive',
 				label: 'SkinVive',
 				hint: 'improve skin texture and glow',
+			},
+			{
+				to: '/services/kybella',
+				label: 'Kybella',
+				hint: 'reduce submental fat',
+			},
+			{
+				to: '/services/microneedling',
+				label: 'Microneedling',
+				hint: 'improve acne scars and skin texture',
 			},
 			// 	],
 			// },
