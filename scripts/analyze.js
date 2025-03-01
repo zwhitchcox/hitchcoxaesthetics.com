@@ -251,25 +251,19 @@ async function processCsvFile() {
 				}
 
 				// Create the analysis directory if it doesn't exist
-				const analysisDir = path.join(
-					process.cwd(),
-					'app',
-					'routes',
-					'admin+',
-					'analysis',
-				)
-				if (!fs.existsSync(analysisDir)) {
-					fs.mkdirSync(analysisDir, { recursive: true })
+				const dataDir = path.join(process.cwd(), 'data')
+				if (!fs.existsSync(dataDir)) {
+					fs.mkdirSync(dataDir, { recursive: true })
 				}
 
 				// Save the analysis results to a JSON file
 				fs.writeFileSync(
-					path.join(analysisDir, 'analysis-results.json'),
+					path.join(dataDir, 'analysis-results.json'),
 					JSON.stringify(analysisResults, null, 2),
 				)
 
 				console.log(
-					'Analysis completed and results saved to app/routes/admin+/analysis/analysis-results.json',
+					'Analysis completed and results saved to data/analysis-results.json',
 				)
 				resolve(analysisResults)
 			},

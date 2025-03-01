@@ -1,7 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { json } from '@remix-run/node'
-import { useLoaderData } from '@remix-run/react'
+import {
+	useLoaderData,
+	useRouteError,
+	isRouteErrorResponse,
+} from '@remix-run/react'
 import * as d3 from 'd3'
 import {
 	addDays,
@@ -23,6 +27,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from '#app/components/ui/tooltip.tsx'
+import { requireUserWithRole } from '#app/utils/permissions.server'
 
 // Define the Route type for this file
 export interface Route {
@@ -88,15 +93,15 @@ type LoaderData = {
 	error: string | null
 }
 
-export async function loader() {
+export async function loader({ request }: Route['LoaderArgs']) {
+	// First require admin role before proceeding
+	await requireUserWithRole(request, 'admin')
+
 	try {
-		// Read the analysis results from the JSON file in the new location
+		// Read the analysis results from the JSON file
 		const analysisFilePath = path.join(
 			process.cwd(),
-			'app',
-			'routes',
-			'admin+',
-			'analysis',
+			'data',
 			'analysis-results.json',
 		)
 
@@ -1247,6 +1252,47 @@ export default function AnalysisDashboard() {
 					Go to Background Jobs
 				</Button>
 				<Spacer size="md" />
+			</div>
+		</div>
+	)
+}
+
+// Add an error boundary component to handle permission errors
+export function ErrorBoundary() {
+	const error = useRouteError()
+
+	if (isRouteErrorResponse(error) && error.status === 403) {
+		return (
+			<div className="container py-10">
+				<div className="rounded-md border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+					<h1 className="mb-4 text-xl font-bold">Access Denied</h1>
+					<p>You don't have permission to access this page.</p>
+					<p className="mt-2">Required role: admin</p>
+					<Button
+						variant="outline"
+						className="mt-4"
+						onClick={() => (window.location.href = '/')}
+					>
+						Return to Home
+					</Button>
+				</div>
+			</div>
+		)
+	}
+
+	// For any other type of error
+	return (
+		<div className="container py-10">
+			<div className="rounded-md border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+				<h1 className="mb-4 text-xl font-bold">Error</h1>
+				<p>An unexpected error occurred. Please try again later.</p>
+				<Button
+					variant="outline"
+					className="mt-4"
+					onClick={() => (window.location.href = '/')}
+				>
+					Return to Home
+				</Button>
 			</div>
 		</div>
 	)

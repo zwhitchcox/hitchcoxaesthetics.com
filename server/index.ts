@@ -11,6 +11,7 @@ import rateLimit from 'express-rate-limit'
 import getPort, { portNumbers } from 'get-port'
 import helmet from 'helmet'
 import morgan from 'morgan'
+import { initializeBackgroundJobs } from '#/app/utils/background-jobs.server'
 
 installGlobals()
 
@@ -307,6 +308,9 @@ ${lanUrl ? `${chalk.bold('On Your Network:')}  ${chalk.cyan(lanUrl)}` : ''}
 ${chalk.bold('Press Ctrl+C to stop')}
 		`.trim(),
 	)
+
+	// Initialize background jobs after server has started
+	initializeBackgroundJobs()
 })
 
 closeWithGrace(async () => {

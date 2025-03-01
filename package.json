@@ -19,6 +19,7 @@
     "seed": "tsx prisma/seed.ts",
     "push": "prisma db push",
     "script": "tsx prisma/script",
+    "make-admin": "tsx prisma/make-admin.ts",
     "lint": "eslint .",
     "setup": "npm run build && prisma generate && prisma migrate deploy && prisma db seed && playwright install",
     "start": "cross-env NODE_ENV=production node .",

@@ -1,220 +1,27 @@
-import { exec } from 'node:child_process'
-import path from 'node:path'
-import { promisify } from 'node:util'
 import { json } from '@remix-run/node'
-import { Form, useLoaderData } from '@remix-run/react'
+import {
+	Form,
+	useLoaderData,
+	useRouteError,
+	isRouteErrorResponse,
+} from '@remix-run/react'
 import { useState, useEffect } from 'react'
 
 import { Button } from '#app/components/ui/button.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
+import {
+	type JobStatus,
+	runInvoiceDownloadJob,
+	runInvoiceAnalysisJob,
+	getJobStatuses,
+	clearJobError,
+} from '#app/utils/background-jobs.server'
+import { requireUserWithRole } from '#app/utils/permissions.server'
 
 // Define the Route type for this file
 export interface Route {
 	LoaderArgs: { request: Request }
 	ActionArgs: { request: Request }
-}
-
-// Background job types and interfaces
-interface JobStatus {
-	id: string
-	name: string
-	status: 'idle' | 'running' | 'completed' | 'failed'
-	lastRun: string | null
-	nextRun: string | null
-	lastRunDuration: number | null
-	lastError: string | null
-}
-
-// Global job status tracking - in a real app, this should be in a database
-let jobStatuses: Record<string, JobStatus> = {
-	invoiceDownload: {
-		id: 'invoiceDownload',
-		name: 'Invoice Download',
-		status: 'idle',
-		lastRun: null,
-		nextRun: null,
-		lastRunDuration: null,
-		lastError: null,
-	},
-	invoiceAnalysis: {
-		id: 'invoiceAnalysis',
-		name: 'Invoice Analysis',
-		status: 'idle',
-		lastRun: null,
-		nextRun: null,
-		lastRunDuration: null,
-		lastError: null,
-	},
-}
-
-// Keep track of the interval IDs so we can clear them if needed
-let jobIntervals: Record<string, NodeJS.Timeout> = {}
-
-// Initialize background jobs when the server starts
-let isInitialized = false
-
-// Helper to run shell commands
-const execAsync = promisify(exec)
-
-// Run the download invoices job
-async function runInvoiceDownloadJob(): Promise<void> {
-	const job = jobStatuses['invoiceDownload']
-	if (!job) return
-
-	// If already running, don't start again
-	if (job.status === 'running') return
-
-	const startTime = Date.now()
-	job.status = 'running'
-	job.lastRun = new Date().toISOString()
-
-	try {
-		// Path to the download-invoices script
-		const scriptPath = path.join(
-			process.cwd(),
-			'scripts',
-			'download-invoices.js',
-		)
-
-		// Execute the script
-		const { stdout, stderr } = await execAsync(`node ${scriptPath}`)
-
-		if (stderr) {
-			console.error('Invoice download error:', stderr)
-			job.status = 'failed'
-			job.lastError = stderr
-		} else {
-			console.log('Invoice download completed:', stdout)
-			job.status = 'completed'
-			job.lastError = null
-
-			// After successful download, trigger the analysis job
-			await runInvoiceAnalysisJob()
-		}
-	} catch (error) {
-		console.error('Invoice download failed:', error)
-		job.status = 'failed'
-		job.lastError = error instanceof Error ? error.message : String(error)
-	} finally {
-		job.lastRunDuration = Date.now() - startTime
-		job.nextRun = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour from now
-	}
-}
-
-// Run the invoice analysis job
-async function runInvoiceAnalysisJob(): Promise<void> {
-	const job = jobStatuses['invoiceAnalysis']
-	if (!job) return
-
-	// If already running, don't start again
-	if (job.status === 'running') return
-
-	const startTime = Date.now()
-	job.status = 'running'
-	job.lastRun = new Date().toISOString()
-
-	try {
-		// Path to the analyze script
-		const scriptPath = path.join(process.cwd(), 'scripts', 'analyze.js')
-
-		// Execute the script
-		const { stderr } = await execAsync(`node ${scriptPath}`)
-
-		if (stderr && !stderr.includes('Warning')) {
-			console.error('Invoice analysis error:', stderr)
-			job.status = 'failed'
-			job.lastError = stderr
-		} else {
-			console.log('Invoice analysis completed')
-			job.status = 'completed'
-			job.lastError = null
-		}
-	} catch (error) {
-		console.error('Invoice analysis failed:', error)
-		job.status = 'failed'
-		job.lastError = error instanceof Error ? error.message : String(error)
-	} finally {
-		job.lastRunDuration = Date.now() - startTime
-		job.nextRun = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour from now
-	}
-}
-
-// Initialize the background jobs scheduler
-function initializeBackgroundJobs() {
-	if (isInitialized) return
-
-	console.log('Initializing background jobs...')
-
-	// Schedule the invoice download job to run every hour
-	jobIntervals.invoiceDownload = setInterval(
-		() => {
-			runInvoiceDownloadJob().catch(console.error)
-		},
-		60 * 60 * 1000,
-	) // 1 hour
-
-	// Set the next run time
-	const invoiceDownload = jobStatuses['invoiceDownload']
-	const invoiceAnalysis = jobStatuses['invoiceAnalysis']
-
-	if (invoiceDownload) {
-		invoiceDownload.nextRun = new Date(
-			Date.now() + 60 * 60 * 1000,
-		).toISOString()
-	}
-
-	if (invoiceAnalysis) {
-		invoiceAnalysis.nextRun = new Date(
-			Date.now() + 60 * 60 * 1000,
-		).toISOString()
-	}
-
-	isInitialized = true
-	console.log('Background jobs initialized')
-}
-
-// Initialize when this module is loaded
-initializeBackgroundJobs()
-
-// Handle actions from the admin UI
-export async function action({ request }: Route['ActionArgs']) {
-	const formData = await request.formData()
-	const intent = formData.get('intent')
-
-	if (intent === 'run-invoiceDownload') {
-		runInvoiceDownloadJob().catch(console.error)
-		return json({ success: true, message: 'Invoice download job started' })
-	}
-
-	if (intent === 'run-invoiceAnalysis') {
-		runInvoiceAnalysisJob().catch(console.error)
-		return json({ success: true, message: 'Invoice analysis job started' })
-	}
-
-	if (intent?.toString().startsWith('clear-error-')) {
-		const jobId = intent.toString().replace('clear-error-', '')
-		if (jobStatuses[jobId]) {
-			jobStatuses[jobId].lastError = null
-			return json({
-				success: true,
-				message: `Cleared error for ${jobStatuses[jobId].name}`,
-			})
-		}
-	}
-
-	return json({ success: false, message: 'Unknown action' }, { status: 400 })
-}
-
-// Provide the current status to the UI
-export async function loader() {
-	return json({
-		jobStatuses: Object.values(jobStatuses),
-	})
-}
-
-// Define a loader type
-type LoaderData = {
-	jobStatuses: JobStatus[]
 }
 
 // Maps the job status to the StatusButton status
@@ -231,6 +38,53 @@ function mapJobStatusToButtonStatus(
 		default:
 			return 'idle'
 	}
+}
+
+// Handle actions from the admin UI
+export async function action({ request }: Route['ActionArgs']) {
+	// Require admin role before allowing any actions
+	await requireUserWithRole(request, 'admin')
+
+	const formData = await request.formData()
+	const intent = formData.get('intent')
+
+	if (intent === 'run-invoiceDownload') {
+		runInvoiceDownloadJob().catch(console.error)
+		return json({ success: true, message: 'Invoice download job started' })
+	}
+
+	if (intent === 'run-invoiceAnalysis') {
+		runInvoiceAnalysisJob().catch(console.error)
+		return json({ success: true, message: 'Invoice analysis job started' })
+	}
+
+	if (intent?.toString().startsWith('clear-error-')) {
+		const jobId = intent.toString().replace('clear-error-', '')
+		const success = clearJobError(jobId)
+		if (success) {
+			return json({
+				success: true,
+				message: `Cleared error for job ${jobId}`,
+			})
+		}
+	}
+
+	return json({ success: false, message: 'Unknown action' }, { status: 400 })
+}
+
+// Provide the current status to the UI
+export async function loader({ request }: Route['LoaderArgs']) {
+	// Require admin role before showing background jobs status
+	await requireUserWithRole(request, 'admin')
+
+	return json({
+		jobStatuses: getJobStatuses(),
+	})
+}
+
+// Define a loader type
+type LoaderData = {
+	jobStatuses: JobStatus[]
 }
 
 // Admin background jobs UI component
@@ -415,6 +269,47 @@ export default function BackgroundJobsAdmin() {
 						)}
 					</div>
 				</div>
+			</div>
+		</div>
+	)
+}
+
+// Add an error boundary component to handle permission errors
+export function ErrorBoundary() {
+	const error = useRouteError()
+
+	if (isRouteErrorResponse(error) && error.status === 403) {
+		return (
+			<div className="container py-10">
+				<div className="rounded-md border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+					<h1 className="mb-4 text-xl font-bold">Access Denied</h1>
+					<p>You don't have permission to access this page.</p>
+					<p className="mt-2">Required role: admin</p>
+					<Button
+						variant="outline"
+						className="mt-4"
+						onClick={() => (window.location.href = '/')}
+					>
+						Return to Home
+					</Button>
+				</div>
+			</div>
+		)
+	}
+
+	// For any other type of error
+	return (
+		<div className="container py-10">
+			<div className="rounded-md border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+				<h1 className="mb-4 text-xl font-bold">Error</h1>
+				<p>An unexpected error occurred. Please try again later.</p>
+				<Button
+					variant="outline"
+					className="mt-4"
+					onClick={() => (window.location.href = '/')}
+				>
+					Return to Home
+				</Button>
 			</div>
 		</div>
 	)
