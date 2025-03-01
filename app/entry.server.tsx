@@ -15,6 +15,7 @@ import { getEnv, init } from '#/app/utils/env.server.ts'
 import { getInstanceInfo } from '#/app/utils/litefs.server.ts'
 import { NonceProvider } from '#/app/utils/nonce-provider.ts'
 import { makeTimings } from '#/app/utils/timing.server.ts'
+import { initializeBackgroundJobs } from '#app/utils/background-jobs.server'
 
 const ABORT_DELAY = 5000
 
@@ -104,3 +105,6 @@ export function handleError(
 		Sentry.captureException(error)
 	}
 }
+
+// Initialize background jobs after server has started
+initializeBackgroundJobs()

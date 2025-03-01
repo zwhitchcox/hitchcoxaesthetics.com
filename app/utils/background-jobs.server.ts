@@ -131,12 +131,6 @@ export async function runInvoiceAnalysisJob(): Promise<void> {
 export function initializeBackgroundJobs() {
 	if (isInitialized) return
 
-	// Check if we're in a browser environment
-	if (typeof window !== 'undefined') {
-		console.log('Not initializing background jobs in browser environment')
-		return
-	}
-
 	console.log('Initializing background jobs...')
 
 	// Schedule the invoice download job to run every hour
