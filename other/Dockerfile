@@ -27,6 +27,7 @@ ADD package.json pnpm-lock.yaml ./
 RUN npx pnpm prune --prod
 # Rebuild better-sqlite3 for the Linux environment
 RUN cd node_modules/better-sqlite3 && npx node-gyp rebuild
+RUN npx puppeteer browsers install chrome
 
 # Build the app
 FROM base as build
