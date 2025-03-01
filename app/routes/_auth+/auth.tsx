@@ -91,6 +91,7 @@ export const meta: MetaFunction = () => {
 }
 
 export default function AuthRoute() {
+	console.log('load')
 	const actionData = useActionData<typeof action>()
 	const isPending = useIsPending()
 	const [searchParams] = useSearchParams()

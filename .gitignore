@@ -25,3 +25,9 @@ node_modules
 
 *.vite.config
 vite.config.*.timestamp-*
+
+# Jane app data directories and files
+/downloads/
+/debug/
+/data/
+cookies.json
