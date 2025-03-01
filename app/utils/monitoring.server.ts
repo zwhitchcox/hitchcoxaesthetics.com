@@ -1,4 +1,5 @@
-import { ProfilingIntegration } from '@sentry/profiling-node'
+import { type SamplingContext, type TransactionEvent } from '@sentry/core'
+import { nodeProfilingIntegration } from '@sentry/profiling-node'
 import * as Sentry from '@sentry/remix'
 import { prisma } from '#/app/utils/db.server.ts'
 
@@ -20,16 +21,16 @@ export function init() {
 		integrations: [
 			new Sentry.Integrations.Http({ tracing: true }),
 			new Sentry.Integrations.Prisma({ client: prisma }),
-			new ProfilingIntegration(),
+			nodeProfilingIntegration(),
 		],
-		tracesSampler(samplingContext) {
+		tracesSampler(samplingContext: SamplingContext) {
 			// ignore healthcheck transactions by other services (consul, etc.)
 			if (samplingContext.request?.url?.includes('/resources/healthcheck')) {
 				return 0
 			}
 			return 1
 		},
-		beforeSendTransaction(event) {
+		beforeSendTransaction(event: TransactionEvent) {
 			// ignore all healthcheck related transactions
 			//  note that name of header here is case-sensitive
 			if (event.request?.headers?.['x-healthcheck'] === 'true') {

@@ -8,14 +8,14 @@ import {
 } from '@remix-run/react'
 import * as d3 from 'd3'
 import {
-	addDays,
+	// addDays, // Unused import
 	format,
 	parseISO,
 	subDays,
 	startOfWeek,
-	endOfWeek,
+	// endOfWeek, // Unused import
 } from 'date-fns'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 
 import { Spacer } from '#app/components/spacer.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -394,8 +394,8 @@ export default function AnalysisDashboard() {
 	const [chartHeight, setChartHeight] = useState(400)
 	const chartContainerRef = useRef<HTMLDivElement>(null)
 
-	// Date range for custom filtering
-	const now = new Date()
+	// Date range for custom filtering - use useMemo to prevent recreating on every render
+	const now = useMemo(() => new Date(), [])
 	const defaultStartDate = format(subDays(now, 30), 'yyyy-MM-dd')
 	const defaultEndDate = format(now, 'yyyy-MM-dd')
 
@@ -413,7 +413,7 @@ export default function AnalysisDashboard() {
 		} else if (timeframe === 'all') {
 			// Don't change the dates for "all" - we'll ignore them anyway
 		}
-	}, [timeframe])
+	}, [timeframe, now])
 
 	// Responsive chart sizing
 	useEffect(() => {
@@ -432,21 +432,26 @@ export default function AnalysisDashboard() {
 	}, [])
 
 	// Initialize empty values for when analysis results aren't available yet
-	const initialDailyStats: DailyStats = {}
+	const _initialDailyStats: DailyStats = {}
 	const initialGraphData: GraphDataPoint[] = []
 
 	// Prepare data regardless of whether we have results yet
 	let filteredDates: string[] = []
 	let graphData: GraphDataPoint[] = initialGraphData
 	let filteredStats = { revenue: 0, profit: 0, appointments: 0, overhead: 0 }
-	let filteredProfitMargin = 0
+	let _filteredProfitMargin = 0
 	let filteredProfitAfterOverhead = 0
 	let filteredProfitMarginAfterOverhead = 0
 	let lastUpdated = ''
 
 	// Extract data from analysis results if they exist
 	if (analysisResults) {
-		const { dateRange, summary, categoryStats, dailyStats } = analysisResults
+		const {
+			dateRange: _dateRange,
+			summary: _summary,
+			categoryStats: _categoryStats,
+			dailyStats,
+		} = analysisResults
 
 		lastUpdated = formatDate(analysisResults.lastUpdated)
 
@@ -488,7 +493,7 @@ export default function AnalysisDashboard() {
 			{ revenue: 0, profit: 0, appointments: 0, overhead: 0 },
 		)
 
-		filteredProfitMargin =
+		_filteredProfitMargin =
 			filteredStats.revenue > 0
 				? (filteredStats.profit / filteredStats.revenue) * 100
 				: 0
@@ -1089,7 +1094,7 @@ export default function AnalysisDashboard() {
 											count: 0,
 											overhead: 0,
 										}
-										const margin =
+										const _margin =
 											stats.revenue > 0
 												? (stats.profit / stats.revenue) * 100
 												: 0

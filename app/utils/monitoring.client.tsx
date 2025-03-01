@@ -1,4 +1,5 @@
 import { useLocation, useMatches } from '@remix-run/react'
+import { type Event } from '@sentry/core'
 import * as Sentry from '@sentry/remix'
 import { useEffect } from 'react'
 
@@ -6,7 +7,7 @@ export function init() {
 	Sentry.init({
 		dsn: ENV.SENTRY_DSN,
 		environment: ENV.MODE,
-		beforeSend(event) {
+		beforeSend(event: Event) {
 			if (event.request?.url) {
 				const url = new URL(event.request.url)
 				if (
