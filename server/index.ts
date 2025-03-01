@@ -11,7 +11,7 @@ import rateLimit from 'express-rate-limit'
 import getPort, { portNumbers } from 'get-port'
 import helmet from 'helmet'
 import morgan from 'morgan'
-import { initializeBackgroundJobs } from '#/app/utils/background-jobs.server'
+import { initializeBackgroundJobs } from '../app/utils/background-jobs.server'
 
 installGlobals()
 
