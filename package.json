@@ -35,7 +35,8 @@
     "validate": "run-p \"test -- --run\" lint typecheck test:e2e:run",
     "download-invoices": "node scripts/download-invoices.js",
     "analyze": "node scripts/analyze.js",
-    "update-analytics": "npm run download-invoices && npm run analyze"
+    "update-analytics": "npm run download-invoices && npm run analyze",
+    "postinstall": "npx node-gyp rebuild -C node_modules/better-sqlite3"
   },
   "eslintIgnore": [
     "/node_modules",
