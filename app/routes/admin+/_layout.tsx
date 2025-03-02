@@ -21,6 +21,7 @@ const adminMenuItems = [
 	{ path: '/admin', label: 'Dashboard', icon: 'dashboard' as const },
 	{ path: '/admin/reviews', label: 'Reviews', icon: 'star' as const },
 	{ path: '/admin/analysis', label: 'Analysis', icon: 'dashboard' as const },
+	{ path: '/admin/retention', label: 'Customer Retention', icon: 'update' as const },
 	{
 		path: '/admin/appointments',
 		label: 'Appointments',
