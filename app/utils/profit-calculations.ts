@@ -15,23 +15,57 @@ export function calculateProfit(item: string, collected: number) {
 
 	// Use the absolute value for percentage calculations, then apply sign at the end
 	const absoluteAmount = Math.abs(collected)
+
+	// Default profit percentage
 	let profitPercent = 0.5 // Default: 50% of total
 
-	// Determine profit percentage based on item type
-	if (item.match(/Laser|Touch Up Laser|Pigmented Lesion/i)) {
-		profitPercent = 1.0 // 100% of total
-	} else if (item.match(/Botox|Lip Flip|Tox/i)) {
-		profitPercent = 0.5 // 50% of total
-	} else if (item.match(/Microneedling/i)) {
-		// For Microneedling, use fixed cost model instead of percentage
-		const costPerSession = 35
-		return isRefund
-			? -Math.max(absoluteAmount - costPerSession, 0)
-			: Math.max(collected - costPerSession, 0)
-	} else if (item.match(/Skin|Juvederm|Filler/i)) {
-		profitPercent = 0.5 // 50% of total
-	} else if (item.match(/Tirzepatide|Semaglutide/i)) {
-		profitPercent = 0.9 // 90% of total
+	// Get the category for the item
+	const category = getServiceCategory(item)
+
+	// Determine profit percentage based on service category
+	switch (category) {
+		case 'laser':
+			profitPercent = 0.9 // 90% profit margin for laser treatments (high profit margin)
+			break
+
+		case 'botox':
+			profitPercent = 0.4 // 40% profit margin for Botox (moderate profit)
+			break
+
+		case 'filler':
+			profitPercent = 0.45 // 45% profit margin for fillers (moderate-high cost products)
+			break
+
+		case 'skin':
+			profitPercent = 0.65 // 65% profit margin for skincare (varied cost)
+			break
+
+		case 'weight':
+			profitPercent = 0.75 // 75% profit margin for weight loss treatments
+			break
+
+		case 'microneedling':
+			// For Microneedling, use fixed cost model instead of percentage
+			const costPerSession = 35
+			return isRefund
+				? -Math.max(absoluteAmount - costPerSession, 0)
+				: Math.max(collected - costPerSession, 0)
+
+		case 'retail':
+			profitPercent = 0.4 // 40% profit margin for retail products
+			break
+
+		case 'consultation':
+			profitPercent = 0.9 // 90% profit margin for consultations (mostly time cost)
+			break
+
+		case 'cancelled':
+			profitPercent = 1.0 // 100% profit for cancellation fees
+			break
+
+		case 'other':
+		default:
+			profitPercent = 0.5 // 50% default for unclassified services
 	}
 
 	// Apply the sign based on whether it's a refund
@@ -45,21 +79,126 @@ export function calculateProfit(item: string, collected: number) {
  * @returns {string} The category of the service
  */
 export function getServiceCategory(item: string): string {
-	if (item.match(/Laser|Touch Up Laser|Pigmented Lesion/i)) {
+	if (!item) return 'other'
+
+	// Convert to lowercase for case-insensitive matching
+	const itemLower = item.toLowerCase()
+
+	// Laser and light-based treatments
+	if (
+		itemLower.includes('laser') ||
+		itemLower.includes('pigmented lesion') ||
+		itemLower.includes('vascular lesion') ||
+		itemLower.includes('cold sculpting') ||
+		itemLower.includes('hair reduction') ||
+		itemLower.includes('touch up laser')
+	) {
 		return 'laser'
-	} else if (item.match(/Botox|Lip Flip|Tox/i)) {
-		return 'botox'
-	} else if (item.match(/Juvederm|Filler/i)) {
-		return 'filler'
-	} else if (item.match(/Skin/i)) {
-		return 'skin'
-	} else if (item.match(/Tirzepatide|Semaglutide/i)) {
-		return 'weight'
-	} else if (item.match(/Microneedling/i)) {
-		return 'microneedling'
-	} else {
-		return 'other'
 	}
+
+	// Botox and neurotoxins
+	if (
+		itemLower.includes('botox') ||
+		itemLower.includes('tox') ||
+		itemLower.includes('dysport') ||
+		itemLower.includes('xeomin') ||
+		itemLower.includes('lip flip') // Lip flip is a small amount of toxin
+	) {
+		return 'botox'
+	}
+
+	// Fillers
+	if (
+		itemLower.includes('filler') ||
+		itemLower.includes('juvederm') ||
+		itemLower.includes('voluma') ||
+		itemLower.includes('radiesse') ||
+		itemLower.includes('restylane') ||
+		itemLower.includes('kybella') ||
+		itemLower.includes('skinvive') || // SkinVive is a microdroplet filler
+		itemLower.includes('hylenex') // Filler dissolving
+	) {
+		return 'filler'
+	}
+
+	// Skincare treatments and products
+	if (
+		itemLower.includes('skin') ||
+		itemLower.includes('facial') ||
+		itemLower.includes('peel') ||
+		itemLower.includes('chemical peel') ||
+		itemLower.includes('tns advanced') ||
+		itemLower.includes('retinol') ||
+		itemLower.includes('ormedi') ||
+		itemLower.includes('ha⁵') ||
+		itemLower.includes('hydra') ||
+		itemLower.includes('serum') ||
+		itemLower.includes('treatment pads') ||
+		itemLower.includes('brightening') ||
+		itemLower.includes('skinmedica')
+	) {
+		return 'skin'
+	}
+
+	// Weight loss treatments
+	if (
+		itemLower.includes('tirzepatide') ||
+		itemLower.includes('semaglutide') ||
+		itemLower.includes('ozempic') ||
+		itemLower.includes('wegovy') ||
+		itemLower.includes('mounjaro') ||
+		itemLower.includes('weight loss') ||
+		itemLower.includes('lipotropic') ||
+		itemLower.includes('b12 injection') ||
+		itemLower.match(/weight.*blood panel/) ||
+		itemLower.match(/weight.*consultation/)
+	) {
+		return 'weight'
+	}
+
+	// Microneedling treatments
+	if (
+		itemLower.includes('microneedling') ||
+		itemLower.includes('prp') || // Including PRP treatments with microneedling
+		itemLower.includes('pdgf') || // Growth factor treatments
+		itemLower.includes('hair restoration') // Often uses microneedling
+	) {
+		return 'microneedling'
+	}
+
+	// Consultations
+	if (
+		itemLower.includes('consultation') ||
+		itemLower.includes('follow-up') ||
+		itemLower.includes('follow up') ||
+		itemLower.includes('lab') ||
+		itemLower.includes('blood panel')
+	) {
+		return 'consultation'
+	}
+
+	// Retail products
+	if (
+		itemLower.includes('gift certificate') ||
+		itemLower.includes('zofran') || // Medication
+		itemLower.includes('system') ||
+		itemLower.includes('serum') ||
+		itemLower.includes('complex')
+	) {
+		return 'retail'
+	}
+
+	// Cancelled appointments or no-shows
+	if (
+		itemLower.includes('no show') ||
+		itemLower.includes('late cancel') ||
+		itemLower.includes('cancellation')
+	) {
+		return 'cancelled'
+	}
+
+	// If nothing matches, return other
+	return 'other'
 }
 
 /**

@@ -66,6 +66,9 @@ interface CategoryStats {
 	skin: CategoryStat
 	weight: CategoryStat
 	microneedling: CategoryStat
+	consultation: CategoryStat
+	retail: CategoryStat
+	cancelled: CategoryStat
 	other: CategoryStat
 }
 
@@ -285,6 +288,9 @@ export async function loader({ request }: Route['LoaderArgs']) {
 			skin: { count: 0, revenue: 0, profit: 0 },
 			weight: { count: 0, revenue: 0, profit: 0 },
 			microneedling: { count: 0, revenue: 0, profit: 0 },
+			consultation: { count: 0, revenue: 0, profit: 0 },
+			retail: { count: 0, revenue: 0, profit: 0 },
+			cancelled: { count: 0, revenue: 0, profit: 0 },
 			other: { count: 0, revenue: 0, profit: 0 },
 		}
 
@@ -1528,6 +1534,63 @@ export default function AnalysisDashboard() {
 							</li>
 						</ul>
 					</div>
+				</div>
+			</div>
+
+			{/* Category Statistics section */}
+			<div className="mb-8 space-y-6">
+				<h2 className="text-xl font-medium tracking-tight">
+					Category Performance
+				</h2>
+				<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+					{/* Render each category card */}
+					{[
+						'laser',
+						'botox',
+						'filler',
+						'skin',
+						'weight',
+						'microneedling',
+						'consultation',
+						'retail',
+						'cancelled',
+						'other',
+					].map(category => {
+						const stats =
+							analysisResults.categoryStats[category as keyof CategoryStats]
+						return (
+							<div
+								key={category}
+								className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm"
+							>
+								<div className="mb-2 flex items-center justify-between">
+									<h3 className="text-lg font-medium capitalize">{category}</h3>
+									<div className="text-sm text-muted-foreground">
+										{stats.count} {stats.count === 1 ? 'service' : 'services'}
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-4">
+									<div>
+										<div className="text-sm text-muted-foreground">Revenue</div>
+										<div className="text-2xl font-bold">
+											{formatCurrency(stats.revenue)}
+										</div>
+									</div>
+									<div>
+										<div className="text-sm text-muted-foreground">Profit</div>
+										<div className="text-2xl font-bold">
+											{formatCurrency(stats.profit)}
+										</div>
+										<div className="text-xs text-muted-foreground">
+											{stats.revenue > 0
+												? `${((stats.profit / stats.revenue) * 100).toFixed(1)}% margin`
+												: '0% margin'}
+										</div>
+									</div>
+								</div>
+							</div>
+						)
+					})}
 				</div>
 			</div>
 
