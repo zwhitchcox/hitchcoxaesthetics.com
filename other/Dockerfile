@@ -74,13 +74,13 @@ RUN echo "#!/bin/sh\nset -x\nsqlite3 \$DATABASE_URL" > /usr/local/bin/database-c
 WORKDIR /myapp
 
 COPY --from=production-deps /myapp/node_modules /myapp/node_modules
+COPY --from=production-deps /root/.cache/puppeteer/chrome /root/.cache/puppeteer/chrome
 
 COPY --from=build /myapp/server-build /myapp/server-build
 COPY --from=build /myapp/build /myapp/build
 COPY --from=build /myapp/package.json /myapp/package.json
 COPY --from=build /myapp/prisma /myapp/prisma
 COPY --from=build /myapp/app/components/ui/icons /myapp/app/components/ui/icons
-COPY --from=deps /root/.cache/puppeteer/chrome /root/.cache/puppeteer/chrome
 
 # Generate prisma files here as they end up in the wrong directory when we generate them in the build step using pnpm
 RUN npx prisma generate
