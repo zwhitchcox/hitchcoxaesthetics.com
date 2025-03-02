@@ -40,6 +40,7 @@ WORKDIR /myapp
 
 
 COPY --from=deps /myapp/node_modules /myapp/node_modules
+RUN npx puppeteer browsers install chrome
 
 
 # prisma files will be generated in the production image, see below
