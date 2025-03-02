@@ -378,6 +378,7 @@ model InvoiceItem {
   item      String // Service name
   collected Float // Amount collected
   category  String // Service category (laser, botox, etc.)
+  details   String? // Complete invoice data as JSON string
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

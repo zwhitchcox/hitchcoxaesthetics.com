@@ -93,20 +93,36 @@ async function importInvoiceData() {
 		})
 
 		console.log(`Parsed ${records.length} records from CSV`)
+		console.log('Importing invoice data to Prisma database...')
 
-		// First clear existing data (optional - comment out if you want to keep historical data)
-		console.log('Clearing existing invoice data...')
-		await prisma.invoiceItem.deleteMany({})
+		// First, get all existing invoiceIds to check for duplicates
+		const existingInvoices = await prisma.invoiceItem.findMany({
+			select: {
+				id: true,
+				invoiceId: true,
+			},
+		})
+
+		// Create a map for quick lookup
+		const invoiceMap = new Map(
+			existingInvoices.map(invoice => [invoice.invoiceId, invoice.id]),
+		)
+
+		console.log(
+			`Found ${existingInvoices.length} existing invoice records in database`,
+		)
 
 		// Process and import records
 		const batchSize = 100
 		let processed = 0
+		let updated = 0
+		let created = 0
 		let skippedZeroAmount = 0
 		let skippedError = 0
 
 		for (let i = 0; i < records.length; i += batchSize) {
 			const batch = records.slice(i, i + batchSize)
-			const createPromises = batch
+			const promises = batch
 				.map(record => {
 					// Skip records with no transaction
 					if (!record.Collected || parseCollectedAmount(record) <= 0) {
@@ -120,18 +136,51 @@ async function importInvoiceData() {
 						const item = record.Item || 'Unknown Service'
 						const collected = parseCollectedAmount(record)
 						const category = getServiceCategory(item)
+						const invoiceId =
+							record['Invoice #'] || `unknown-${Date.now()}-${Math.random()}`
 
-						return prisma.invoiceItem.create({
-							data: {
-								invoiceId:
-									record['Invoice #'] ||
-									`unknown-${Date.now()}-${Math.random()}`,
-								date,
-								item,
-								collected,
-								category,
-							},
-						})
+						// Store all raw data as JSON
+						const details = JSON.stringify(record)
+
+						// Check if this invoice already exists
+						const existingId = invoiceMap.get(invoiceId)
+
+						if (existingId) {
+							// Update existing record
+							return prisma.invoiceItem
+								.update({
+									where: { id: existingId },
+									data: {
+										date,
+										item,
+										collected,
+										category,
+										details, // Save the complete record data
+										updatedAt: new Date(),
+									},
+								})
+								.then(() => {
+									updated++
+									return true
+								})
+						} else {
+							// Create new record
+							return prisma.invoiceItem
+								.create({
+									data: {
+										invoiceId,
+										date,
+										item,
+										collected,
+										category,
+										details, // Save the complete record data
+									},
+								})
+								.then(() => {
+									created++
+									return true
+								})
+						}
 					} catch (error) {
 						console.error(`Error processing record:`, record, error)
 						skippedError++
@@ -141,21 +190,25 @@ async function importInvoiceData() {
 				.filter(Boolean) // Remove null promises
 
 			// Execute batch
-			await Promise.all(createPromises)
-			processed += createPromises.length
-			console.log(`Processed ${processed}/${records.length} records...`)
+			await Promise.all(promises)
+			processed = created + updated
+			console.log(
+				`Processed ${processed}/${records.length} records (${created} created, ${updated} updated)...`,
+			)
 		}
 
 		console.log(`
 Import Summary:
 - Total records in CSV: ${records.length}
-- Successfully imported: ${processed}
+- Successfully processed: ${processed}
+  - New records created: ${created}
+  - Existing records updated: ${updated}
 - Skipped (zero amount): ${skippedZeroAmount}
 - Skipped (processing errors): ${skippedError}
 		`)
 
 		console.log(
-			`Successfully imported ${processed} invoice records to database`,
+			`Successfully imported ${processed} invoice records to Prisma database`,
 		)
 	} catch (error) {
 		console.error('Error in invoice import process:', error)
