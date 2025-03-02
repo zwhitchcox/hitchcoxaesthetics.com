@@ -29,6 +29,7 @@ ADD package.json pnpm-lock.yaml ./
 RUN npx pnpm prune --prod
 # Rebuild better-sqlite3 for the Linux environment
 RUN cd node_modules/better-sqlite3 && npx node-gyp rebuild
+RUN npx puppeteer browsers install chrome
 
 # Build the app
 FROM base as build
@@ -40,7 +41,6 @@ WORKDIR /myapp
 
 
 COPY --from=deps /myapp/node_modules /myapp/node_modules
-RUN npx puppeteer browsers install chrome
 
 
 # prisma files will be generated in the production image, see below
@@ -80,6 +80,7 @@ COPY --from=build /myapp/build /myapp/build
 COPY --from=build /myapp/package.json /myapp/package.json
 COPY --from=build /myapp/prisma /myapp/prisma
 COPY --from=build /myapp/app/components/ui/icons /myapp/app/components/ui/icons
+COPY --from=deps /root/.cache/puppeteer/chrome /root/.cache/puppeteer/chrome
 
 # Generate prisma files here as they end up in the wrong directory when we generate them in the build step using pnpm
 RUN npx prisma generate
