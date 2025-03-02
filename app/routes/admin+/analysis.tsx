@@ -10,14 +10,8 @@ import {
 } from '@remix-run/react'
 import { parse } from 'csv-parse/sync'
 import * as d3 from 'd3'
-import {
-	// addDays, // Unused import
-	format,
-	parseISO,
-	subDays,
-	startOfWeek,
-	// endOfWeek, // Unused import
-} from 'date-fns'
+import { parseISO, subDays, startOfWeek } from 'date-fns'
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import { useState, useEffect, useRef, useMemo } from 'react'
 
 import { Spacer } from '#app/components/spacer.tsx'
@@ -98,6 +92,39 @@ interface ProfitDetail {
 	date: Date
 }
 
+// Define the time zone for all date operations
+const TIME_ZONE = 'America/New_York' // Eastern Time
+
+/**
+ * Format a date for display in ET timezone
+ */
+function formatDateET(date: Date | string): string {
+	const dateObj = typeof date === 'string' ? new Date(date) : date
+	return formatInTimeZone(dateObj, TIME_ZONE, 'MMM d, yyyy')
+}
+
+/**
+ * Get the current date in ET timezone
+ */
+function getNowInET(): Date {
+	return toZonedTime(new Date(), TIME_ZONE)
+}
+
+/**
+ * Convert a date string from CSV to a Date object in ET
+ */
+function parseETDate(dateString: string): Date {
+	// Parse the date string and convert to ET timezone
+	return toZonedTime(new Date(dateString), TIME_ZONE)
+}
+
+/**
+ * Format a date as YYYY-MM-DD in ET timezone for input fields
+ */
+function formatETDateForInput(date: Date): string {
+	return formatInTimeZone(date, TIME_ZONE, 'yyyy-MM-dd')
+}
+
 /**
  * Calculate profit based on the item type and total amount
  *
@@ -160,21 +187,23 @@ export async function loader({ request }: Route['LoaderArgs']) {
 		const startParam = url.searchParams.get('start')
 		const endParam = url.searchParams.get('end')
 
-		// Set date range based on parameters
-		const endDate = endParam ? new Date(endParam) : new Date()
+		// Set date range based on parameters - using ET timezone
+		const endDate = endParam
+			? toZonedTime(new Date(endParam), TIME_ZONE)
+			: getNowInET()
 		let startDate: Date
 
 		if (startParam) {
-			startDate = new Date(startParam)
+			startDate = toZonedTime(new Date(startParam), TIME_ZONE)
 		} else {
-			startDate = new Date()
+			startDate = getNowInET()
 			if (timeframe === '7d') {
 				startDate.setDate(startDate.getDate() - 7)
 			} else if (timeframe === '30d' || !timeframe) {
 				startDate.setDate(startDate.getDate() - 30)
 			} else if (timeframe === 'all') {
 				// For "all" time, use a very old start date
-				startDate = new Date('2020-01-01')
+				startDate = toZonedTime(new Date('2020-01-01'), TIME_ZONE)
 			}
 		}
 
@@ -234,7 +263,8 @@ export async function loader({ request }: Route['LoaderArgs']) {
 
 		// Process each record
 		records.forEach((record: any) => {
-			const purchaseDate = new Date(record['Purchase Date'])
+			// Parse date and convert to ET timezone
+			const purchaseDate = parseETDate(record['Purchase Date'])
 
 			// Skip records outside the date range
 			if (purchaseDate < startDate || purchaseDate > endDate) {
@@ -366,16 +396,9 @@ function formatCurrency(amount: number) {
 function formatPercent(value: number) {
 	return new Intl.NumberFormat('en-US', {
 		style: 'percent',
+		minimumFractionDigits: 1,
 		maximumFractionDigits: 1,
 	}).format(value / 100)
-}
-
-function formatDate(dateString: string) {
-	try {
-		return format(parseISO(dateString), 'MMM d, yyyy')
-	} catch (e) {
-		return dateString
-	}
 }
 
 // Calculate trend (positive, negative, neutral)
@@ -615,8 +638,8 @@ export default function AnalysisDashboard() {
 
 	const timeframe = searchParams.get('timeframe') || '30d'
 	const startDate =
-		searchParams.get('start') || format(subDays(new Date(), 30), 'yyyy-MM-dd')
-	const endDate = searchParams.get('end') || format(new Date(), 'yyyy-MM-dd')
+		searchParams.get('start') || formatETDateForInput(subDays(getNowInET(), 30))
+	const endDate = searchParams.get('end') || formatETDateForInput(getNowInET())
 
 	const [graphView, setGraphView] = useState<'daily' | 'weekly'>('daily')
 	const chartRef = useRef<SVGSVGElement | null>(null)
@@ -625,7 +648,7 @@ export default function AnalysisDashboard() {
 	const chartContainerRef = useRef<HTMLDivElement>(null)
 
 	// Date range for custom filtering - use useMemo to prevent recreating on every render
-	const now = useMemo(() => new Date(), [])
+	const now = useMemo(() => getNowInET(), [])
 
 	// Function to update URL parameters and navigate
 	const updateDateFilter = (
@@ -656,14 +679,14 @@ export default function AnalysisDashboard() {
 		if (newTimeframe === '7d') {
 			updateDateFilter(
 				newTimeframe,
-				format(subDays(now, 7), 'yyyy-MM-dd'),
-				format(now, 'yyyy-MM-dd'),
+				formatETDateForInput(subDays(now, 7)),
+				formatETDateForInput(now),
 			)
 		} else if (newTimeframe === '30d') {
 			updateDateFilter(
 				newTimeframe,
-				format(subDays(now, 30), 'yyyy-MM-dd'),
-				format(now, 'yyyy-MM-dd'),
+				formatETDateForInput(subDays(now, 30)),
+				formatETDateForInput(now),
 			)
 		} else if (newTimeframe === 'all') {
 			updateDateFilter(newTimeframe)
@@ -733,7 +756,7 @@ export default function AnalysisDashboard() {
 			dailyStats,
 		} = analysisResults
 
-		lastUpdated = formatDate(analysisResults.lastUpdated)
+		lastUpdated = formatDateET(analysisResults.lastUpdated)
 
 		// Simply use all dates from the dailyStats object - server has already filtered them
 		filteredDates = Object.keys(dailyStats || {}).sort()
@@ -771,14 +794,17 @@ export default function AnalysisDashboard() {
 		const prepareGraphData = (): GraphDataPoint[] => {
 			if (graphView === 'daily') {
 				// Daily view - use filtered dates directly
-				return filteredDates.map(dateStr => ({
-					date: dateStr,
-					label: format(parseISO(dateStr), 'MMM d'),
-					revenue: dailyStats[dateStr]?.revenue || 0,
-					profit:
-						(dailyStats[dateStr]?.profit || 0) -
-						(dailyStats[dateStr]?.overhead || 0),
-				}))
+				return filteredDates.map(dateStr => {
+					const date = parseISO(dateStr)
+					return {
+						date: dateStr,
+						label: formatInTimeZone(date, TIME_ZONE, 'MMM d'),
+						revenue: dailyStats[dateStr]?.revenue || 0,
+						profit:
+							(dailyStats[dateStr]?.profit || 0) -
+							(dailyStats[dateStr]?.overhead || 0),
+					}
+				})
 			} else {
 				// Weekly view - group by week
 				const weeklyData: Record<
@@ -793,9 +819,9 @@ export default function AnalysisDashboard() {
 				> = {}
 
 				filteredDates.forEach(dateStr => {
-					const date = parseISO(dateStr)
+					const date = toZonedTime(parseISO(dateStr), TIME_ZONE)
 					const weekStart = startOfWeek(date, { weekStartsOn: 1 }) // Week starts on Monday
-					const weekKey = format(weekStart, 'yyyy-MM-dd')
+					const weekKey = formatInTimeZone(weekStart, TIME_ZONE, 'yyyy-MM-dd')
 
 					if (!weeklyData[weekKey]) {
 						weeklyData[weekKey] = {
@@ -803,7 +829,7 @@ export default function AnalysisDashboard() {
 							revenue: 0,
 							profit: 0,
 							count: 0,
-							label: `Week of ${format(weekStart, 'MMM d')}`,
+							label: `Week of ${formatInTimeZone(weekStart, TIME_ZONE, 'MMM d')}`,
 						}
 					}
 
@@ -994,7 +1020,7 @@ export default function AnalysisDashboard() {
 										value={endDate}
 										onChange={handleEndDateChange}
 										min={startDate}
-										max={format(now, 'yyyy-MM-dd')}
+										max={formatETDateForInput(getNowInET())}
 									/>
 								</div>
 								<Button
@@ -1033,7 +1059,7 @@ export default function AnalysisDashboard() {
 				<div className="text-sm text-muted-foreground">
 					Showing data from{' '}
 					{filteredDates.length > 0
-						? `${formatDate(filteredDates[0] || '')} to ${formatDate(filteredDates[filteredDates.length - 1] || '')}`
+						? `${formatDateET(filteredDates[0] || '')} to ${formatDateET(filteredDates[filteredDates.length - 1] || '')}`
 						: 'no dates available'}
 				</div>
 			</div>
@@ -1367,7 +1393,7 @@ export default function AnalysisDashboard() {
 
 										return (
 											<tr key={dateStr} className="border-t">
-												<td className="p-4">{formatDate(dateStr)}</td>
+												<td className="p-4">{formatDateET(dateStr)}</td>
 												<td className="p-4">{stats.count}</td>
 												<td className="p-4">{formatCurrency(stats.revenue)}</td>
 												<td className="p-4">
