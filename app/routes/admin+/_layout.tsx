@@ -21,7 +21,11 @@ const adminMenuItems = [
 	{ path: '/admin', label: 'Dashboard', icon: 'dashboard' as const },
 	{ path: '/admin/reviews', label: 'Reviews', icon: 'star' as const },
 	{ path: '/admin/analysis', label: 'Analysis', icon: 'dashboard' as const },
-	{ path: '/admin/retention', label: 'Customer Retention', icon: 'update' as const },
+	{
+		path: '/admin/retention',
+		label: 'Customer Retention',
+		icon: 'update' as const,
+	},
 	{
 		path: '/admin/appointments',
 		label: 'Appointments',
@@ -41,7 +45,7 @@ export default function AdminLayout() {
 	const location = useLocation()
 
 	return (
-		<div className="container-fluid mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+		<div className="mx-auto w-full max-w-[2400px] px-4 py-8 sm:px-6 lg:px-8">
 			<div className="mb-6 flex items-center justify-between">
 				<h1 className="text-3xl font-bold">Admin Dashboard</h1>
 				<Link
@@ -99,7 +103,7 @@ export function ErrorBoundary() {
 
 	if (isRouteErrorResponse(error) && error.status === 403) {
 		return (
-			<div className="container-fluid mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+			<div className="mx-auto w-full max-w-[2400px] px-4 py-10 sm:px-6 lg:px-8">
 				<div className="rounded-md border border-destructive/50 bg-destructive/10 p-6 text-destructive">
 					<h1 className="mb-4 text-xl font-bold">Access Denied</h1>
 					<p>You don't have permission to access the admin area.</p>
@@ -118,7 +122,7 @@ export function ErrorBoundary() {
 
 	// For any other type of error
 	return (
-		<div className="container-fluid mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+		<div className="mx-auto w-full max-w-[2400px] px-4 py-10 sm:px-6 lg:px-8">
 			<div className="rounded-md border border-destructive/50 bg-destructive/10 p-6 text-destructive">
 				<h1 className="mb-4 text-xl font-bold">Error</h1>
 				<p>

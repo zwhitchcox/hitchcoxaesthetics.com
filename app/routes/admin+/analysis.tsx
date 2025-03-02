@@ -1118,14 +1118,12 @@ export default function AnalysisDashboard() {
 				</div>
 			</div>
 
-			{/* KPI summary cards */}
-			<div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+			{/* Summary Cards */}
+			<div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
 				<div className="rounded-lg border bg-card p-5 shadow-sm">
-					<div className="flex items-start justify-between">
+					<p className="text-sm font-medium text-muted-foreground">Revenue</p>
+					<div className="flex items-end">
 						<div>
-							<p className="text-sm font-medium text-muted-foreground">
-								Total Revenue
-							</p>
 							<h3 className="text-2xl font-bold">
 								{formatCurrency(filteredStats.revenue)}
 							</h3>
@@ -1147,7 +1145,30 @@ export default function AnalysisDashboard() {
 
 				<div className="rounded-lg border bg-card p-5 shadow-sm">
 					<p className="text-sm font-medium text-muted-foreground">
-						Net Profit
+						Profit (Before Overhead)
+					</p>
+					<h3 className="text-2xl font-bold">
+						{formatCurrency(filteredStats.profit)}
+					</h3>
+					<TooltipProvider>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<p className="mt-2 flex items-center text-sm text-muted-foreground">
+									<Icon name="update" className="mr-1 h-4 w-4" />
+									Margin:{' '}
+									{formatPercent(filteredStats.profit / filteredStats.revenue)}
+								</p>
+							</TooltipTrigger>
+							<TooltipContent>
+								Profit margin before applying overhead costs
+							</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
+				</div>
+
+				<div className="rounded-lg border bg-card p-5 shadow-sm">
+					<p className="text-sm font-medium text-muted-foreground">
+						Net Profit (After Overhead)
 					</p>
 					<h3 className="text-2xl font-bold">
 						{formatCurrency(filteredProfitAfterOverhead)}
@@ -1169,14 +1190,14 @@ export default function AnalysisDashboard() {
 
 				<div className="rounded-lg border bg-card p-5 shadow-sm">
 					<p className="text-sm font-medium text-muted-foreground">
-						Total Appointments
+						Appointments
 					</p>
 					<h3 className="text-2xl font-bold">{filteredStats.appointments}</h3>
 					<TooltipProvider>
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<p className="mt-2 flex items-center text-sm text-muted-foreground">
-									<Icon name="avatar" className="mr-1 h-4 w-4" />
+									<Icon name="update" className="mr-1 h-4 w-4" />
 									Avg. value:{' '}
 									{formatCurrency(
 										filteredStats.revenue / (filteredStats.appointments || 1),
@@ -1372,7 +1393,8 @@ export default function AnalysisDashboard() {
 									<th className="p-4 text-left font-medium">Date</th>
 									<th className="p-4 text-left font-medium">Appointments</th>
 									<th className="p-4 text-left font-medium">Revenue</th>
-									<th className="p-4 text-left font-medium">Profit</th>
+									<th className="p-4 text-left font-medium">Profit (Before)</th>
+									<th className="p-4 text-left font-medium">Profit (After)</th>
 									<th className="p-4 text-left font-medium">Margin</th>
 								</tr>
 							</thead>
@@ -1387,7 +1409,7 @@ export default function AnalysisDashboard() {
 											count: 0,
 											overhead: 0,
 										}
-										const _margin =
+										const marginBeforeOverhead =
 											stats.revenue > 0
 												? (stats.profit / stats.revenue) * 100
 												: 0
@@ -1402,6 +1424,12 @@ export default function AnalysisDashboard() {
 												<td className="p-4">{formatDateET(dateStr)}</td>
 												<td className="p-4">{stats.count}</td>
 												<td className="p-4">{formatCurrency(stats.revenue)}</td>
+												<td className="p-4">
+													{formatCurrency(stats.profit)}
+													<span className="ml-1 text-xs text-muted-foreground">
+														({formatPercent(marginBeforeOverhead)} margin)
+													</span>
+												</td>
 												<td className="p-4">
 													{formatCurrency(profitAfterOverhead)}
 													<span
@@ -1427,12 +1455,12 @@ export default function AnalysisDashboard() {
 															className="ml-2 h-6 px-2 py-0 text-xs"
 														>
 															{marginAfterOverhead > 30
-																? 'High'
+																? 'Great'
 																: marginAfterOverhead > 15
-																	? 'Medium'
+																	? 'Good'
 																	: marginAfterOverhead > 0
-																		? 'Low'
-																		: 'Loss'}
+																		? 'Fair'
+																		: 'Poor'}
 														</StatusButton>
 													</div>
 												</td>
