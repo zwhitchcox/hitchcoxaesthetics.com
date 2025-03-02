@@ -899,7 +899,7 @@ export default function AnalysisDashboard() {
 
 				<div className="rounded-lg border bg-card p-5 shadow-sm">
 					<p className="text-sm font-medium text-muted-foreground">
-						Operating Days
+						Calendar Days
 					</p>
 					<h3 className="text-2xl font-bold">{filteredDates.length}</h3>
 					<TooltipProvider>
@@ -910,7 +910,9 @@ export default function AnalysisDashboard() {
 									Overhead: {formatCurrency(filteredStats.overhead)}
 								</p>
 							</TooltipTrigger>
-							<TooltipContent>Total overhead costs for period</TooltipContent>
+							<TooltipContent>
+								Overhead costs applied to every calendar day
+							</TooltipContent>
 						</Tooltip>
 					</TooltipProvider>
 				</div>

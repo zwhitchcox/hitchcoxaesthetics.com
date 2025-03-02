@@ -77,6 +77,26 @@ function calculateProfit(item, total) {
 }
 
 /**
+ * Generate an array of all dates between start and end dates, inclusive
+ *
+ * @param {Date} startDate - The start date
+ * @param {Date} endDate - The end date
+ * @returns {string[]} Array of dates in ISO format (YYYY-MM-DD)
+ */
+function getAllDatesBetween(startDate, endDate) {
+	const dates = []
+	const currentDate = new Date(startDate)
+
+	// Add one day at a time until we reach the end date
+	while (currentDate <= endDate) {
+		dates.push(currentDate.toISOString().split('T')[0])
+		currentDate.setDate(currentDate.getDate() + 1)
+	}
+
+	return dates
+}
+
+/**
  * Process a CSV file and calculate detailed profitability metrics
  * @returns {Promise<Object>} Analysis results
  */
@@ -119,6 +139,17 @@ async function processCsvFile() {
 				const profitDetails = []
 				const skippedRecords = []
 				const dailyStats = {}
+
+				// Initialize all days in the date range with overhead
+				const allDatesInRange = getAllDatesBetween(startDate, endDate)
+				allDatesInRange.forEach(dateStr => {
+					dailyStats[dateStr] = {
+						revenue: 0,
+						profit: 0,
+						count: 0,
+						overhead: dailyOverhead,
+					}
+				})
 
 				// Category counts and revenue tracking
 				const categoryStats = {
@@ -167,16 +198,8 @@ async function processCsvFile() {
 					totalProfit += calculatedProfit
 					totalRevenue += total
 
-					// Track daily stats
+					// Track daily stats - note that all days already have overhead
 					const dateStr = purchaseDate.toISOString().split('T')[0]
-					if (!dailyStats[dateStr]) {
-						dailyStats[dateStr] = {
-							revenue: 0,
-							profit: 0,
-							count: 0,
-							overhead: dailyOverhead,
-						}
-					}
 					dailyStats[dateStr].revenue += total
 					dailyStats[dateStr].profit += calculatedProfit
 					dailyStats[dateStr].count += 1
@@ -219,8 +242,8 @@ async function processCsvFile() {
 				const averageProfitPerTransaction = totalProfit / totalAppointments || 0
 				const totalProfitMargin = (totalProfit / totalRevenue) * 100 || 0
 
-				// Calculate overhead costs
-				const uniqueDays = Object.keys(dailyStats).length
+				// Calculate overhead costs - now for all calendar days in range
+				const uniqueDays = allDatesInRange.length
 				const totalOverhead = uniqueDays * dailyOverhead
 				const profitAfterOverhead = totalProfit - totalOverhead
 				const profitMarginAfterOverhead =
