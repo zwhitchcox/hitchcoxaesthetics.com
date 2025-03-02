@@ -551,7 +551,7 @@ function createD3Chart(
 		.attr('width', xScale.bandwidth())
 		.attr('height', d => innerHeight - yScale(d.revenue))
 		.attr('fill', 'rgba(59, 130, 246, 0.8)') // Blue for revenue
-		.on('mouseover', function (event, d) {
+		.on('mouseover', function (_ignored, d) {
 			d3.select(this).attr('opacity', 0.7)
 			tooltip.style('visibility', 'visible')
 				.html(`<strong>${d.label}</strong><br/>
@@ -579,7 +579,7 @@ function createD3Chart(
 		.attr('width', xScale.bandwidth() / 3)
 		.attr('height', d => innerHeight - yScale(d.profit))
 		.attr('fill', 'rgba(34, 197, 94, 0.8)') // Green for profit
-		.on('mouseover', function (event, d) {
+		.on('mouseover', function (_ignored, d) {
 			d3.select(this).attr('opacity', 0.7)
 			tooltip.style('visibility', 'visible')
 				.html(`<strong>${d.label}</strong><br/>
@@ -606,7 +606,7 @@ function createD3Chart(
 		.data(['Revenue', 'Profit'])
 		.enter()
 		.append('g')
-		.attr('transform', (d, i) => `translate(${width - 20}, ${i * 20 + 20})`)
+		.attr('transform', (_d, i) => `translate(${width - 20}, ${i * 20 + 20})`)
 
 	legend
 		.append('rect')

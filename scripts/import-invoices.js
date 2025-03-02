@@ -132,97 +132,122 @@ async function importInvoiceData() {
 
 		for (let i = 0; i < records.length; i += batchSize) {
 			const batch = records.slice(i, i + batchSize)
-			const promises = batch
-				.map(async record => {
-					// Skip records with no transaction
-					if (!record.Collected || parseCollectedAmount(record) <= 0) {
-						skippedZeroAmount++
-						return null
-					}
 
-					try {
-						// Get invoice date - use 'Invoice Date' field instead of 'Date'
-						const date = parseETDate(record['Invoice Date'])
-						const item = record.Item || 'Unknown Service'
-						const collected = parseCollectedAmount(record)
-						const category = getServiceCategory(item)
-						const invoiceId =
-							record['Invoice #'] || `unknown-${Date.now()}-${Math.random()}`
-						const details = record.Details || null
-
-						// Extract patient name - could be in one of several possible fields
-						const patientName =
-							record.Patient ||
-							record['Patient Name'] ||
-							record.Customer ||
-							record['Client Name'] ||
-							'Unknown Patient'
-
-						// Find or create patient
-						let patientId
-						const patientNameKey = patientName.toLowerCase()
-
-						if (patientMap.has(patientNameKey)) {
-							// Use existing patient
-							patientId = patientMap.get(patientNameKey)
-							patientsLinked++
-						} else {
-							// Create new patient
-							const newPatient = await prisma.patient.create({
-								data: {
-									name: patientName,
-								},
-							})
-							patientId = newPatient.id
-							patientMap.set(patientNameKey, patientId)
-							patientsCreated++
+			// Process batch with variables passed to a standalone function to avoid closure issues
+			const processBatch = async (recordBatch, counters) => {
+				const promises = recordBatch
+					.map(async record => {
+						// Skip records with no transaction
+						if (!record.Collected || parseCollectedAmount(record) <= 0) {
+							counters.skippedZeroAmount++
+							return null
 						}
 
-						// Check if this invoice already exists
-						const existingId = invoiceMap.get(invoiceId)
+						try {
+							// Get invoice date - use 'Invoice Date' field instead of 'Date'
+							const date = parseETDate(record['Invoice Date'])
+							const item = record.Item || 'Unknown Service'
+							const collected = parseCollectedAmount(record)
+							const category = getServiceCategory(item)
+							const invoiceId =
+								record['Invoice #'] || `unknown-${Date.now()}-${Math.random()}`
+							const details = record.Details || null
 
-						if (existingId) {
-							// Update existing record
-							await prisma.invoiceItem.update({
-								where: { id: existingId },
-								data: {
-									date,
-									item,
-									collected,
-									category,
-									patientId, // Now using patient relation
-									details,
-									updatedAt: new Date(),
-								},
-							})
-							updated++
-							return true
-						} else {
-							// Create new record
-							await prisma.invoiceItem.create({
-								data: {
-									invoiceId,
-									date,
-									item,
-									collected,
-									category,
-									patientId, // Now using patient relation
-									details,
-								},
-							})
-							created++
-							return true
+							// Extract patient name - could be in one of several possible fields
+							const patientName =
+								record.Patient ||
+								record['Patient Name'] ||
+								record.Customer ||
+								record['Client Name'] ||
+								'Unknown Patient'
+
+							// Find or create patient
+							let patientId
+							const patientNameKey = patientName.toLowerCase()
+
+							if (patientMap.has(patientNameKey)) {
+								// Use existing patient
+								patientId = patientMap.get(patientNameKey)
+								counters.patientsLinked++
+							} else {
+								// Create new patient
+								const newPatient = await prisma.patient.create({
+									data: {
+										name: patientName,
+									},
+								})
+								patientId = newPatient.id
+								patientMap.set(patientNameKey, patientId)
+								counters.patientsCreated++
+							}
+
+							// Check if this invoice already exists
+							const existingId = invoiceMap.get(invoiceId)
+
+							if (existingId) {
+								// Update existing record
+								await prisma.invoiceItem.update({
+									where: { id: existingId },
+									data: {
+										date,
+										item,
+										collected,
+										category,
+										patientId, // Now using patient relation
+										details,
+										updatedAt: new Date(),
+									},
+								})
+								counters.updated++
+								return true
+							} else {
+								// Create new record
+								await prisma.invoiceItem.create({
+									data: {
+										invoiceId,
+										date,
+										item,
+										collected,
+										category,
+										patientId, // Now using patient relation
+										details,
+									},
+								})
+								counters.created++
+								return true
+							}
+						} catch (error) {
+							console.error(`Error processing record:`, record, error)
+							counters.skippedError++
+							return null
 						}
-					} catch (error) {
-						console.error(`Error processing record:`, record, error)
-						skippedError++
-						return null
-					}
-				})
-				.filter(Boolean) // Remove null promises
+					})
+					.filter(Boolean) // Remove null promises
 
-			// Execute batch
-			await Promise.all(promises)
+				// Execute batch
+				await Promise.all(promises)
+				return counters
+			}
+
+			// Create a counters object to pass to the processing function
+			const counters = {
+				updated,
+				created,
+				skippedZeroAmount,
+				skippedError,
+				patientsCreated,
+				patientsLinked,
+			}
+
+			// Process the batch and update our counters
+			const updatedCounters = await processBatch(batch, counters)
+			updated = updatedCounters.updated
+			created = updatedCounters.created
+			skippedZeroAmount = updatedCounters.skippedZeroAmount
+			skippedError = updatedCounters.skippedError
+			patientsCreated = updatedCounters.patientsCreated
+			patientsLinked = updatedCounters.patientsLinked
+
 			processed = created + updated
 			console.log(
 				`Processed ${processed}/${records.length} records (${created} created, ${updated} updated)...`,

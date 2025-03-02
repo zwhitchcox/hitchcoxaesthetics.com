@@ -2,7 +2,6 @@ import { json } from '@remix-run/node'
 import {
 	useLoaderData,
 	useNavigate,
-	useSearchParams,
 	useRouteError,
 	isRouteErrorResponse,
 } from '@remix-run/react'
@@ -12,12 +11,11 @@ import {
 	parseISO,
 	format,
 	subMonths,
-	isSameMonth,
 	differenceInMonths,
 } from 'date-fns'
-import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
+import { formatInTimeZone } from 'date-fns-tz'
 import * as React from 'react'
-import { useState, useRef, useMemo, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Spacer } from '#app/components/spacer.tsx'
 import { Button } from '#app/components/ui/button'
 import { Icon } from '#app/components/ui/icon'
@@ -646,7 +644,7 @@ function createD3BarChart(
 			}
 			return 'rgba(59, 130, 246, 0.8)'
 		})
-		.on('mouseover', function (event, d) {
+		.on('mouseover', function (_ignored, d) {
 			d3.select(this).attr('opacity', 0.7)
 			tooltip.style('visibility', 'visible')
 				.html(`<strong>${d.label}</strong><br/>
