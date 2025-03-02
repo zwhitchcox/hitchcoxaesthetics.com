@@ -24,6 +24,15 @@ let jobStatuses: Record<string, JobStatus> = {
 		lastRunDuration: null,
 		lastError: null,
 	},
+	reviewsFetch: {
+		id: 'reviewsFetch',
+		name: 'Reviews Fetch',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
 }
 
 // Keep track of the interval IDs so we can clear them if needed
@@ -77,6 +86,44 @@ export async function runInvoiceDownloadJob(): Promise<void> {
 	}
 }
 
+// Run the fetch reviews job
+export async function runReviewsFetchJob(): Promise<void> {
+	const job = jobStatuses['reviewsFetch']
+	if (!job) return
+
+	// If already running, don't start again
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+
+	try {
+		// Path to the fetch-reviews script
+		const scriptPath = path.join(process.cwd(), 'scripts', 'fetch-reviews.js')
+
+		// Execute the script
+		const { stdout, stderr } = await execAsync(`node ${scriptPath}`)
+
+		if (stderr) {
+			console.error('Reviews fetch error:', stderr)
+			job.status = 'failed'
+			job.lastError = stderr
+		} else {
+			console.log('Reviews fetch completed:', stdout)
+			job.status = 'completed'
+			job.lastError = null
+		}
+	} catch (error) {
+		console.error('Reviews fetch failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Daily
+	}
+}
+
 // Initialize the background jobs scheduler
 export function initializeBackgroundJobs() {
 	if (isInitialized) return
@@ -91,12 +138,27 @@ export function initializeBackgroundJobs() {
 		60 * 60 * 1000,
 	) // 1 hour
 
-	// Set the next run time
-	const invoiceDownload = jobStatuses['invoiceDownload']
+	// Schedule the reviews fetch job to run daily
+	jobIntervals.reviewsFetch = setInterval(
+		() => {
+			runReviewsFetchJob().catch(console.error)
+		},
+		24 * 60 * 60 * 1000,
+	) // 24 hours
 
+	// Set the next run time for invoice download
+	const invoiceDownload = jobStatuses['invoiceDownload']
 	if (invoiceDownload) {
 		invoiceDownload.nextRun = new Date(
 			Date.now() + 60 * 60 * 1000,
+		).toISOString()
+	}
+
+	// Set the next run time for reviews fetch
+	const reviewsFetch = jobStatuses['reviewsFetch']
+	if (reviewsFetch) {
+		reviewsFetch.nextRun = new Date(
+			Date.now() + 24 * 60 * 60 * 1000,
 		).toISOString()
 	}
 
