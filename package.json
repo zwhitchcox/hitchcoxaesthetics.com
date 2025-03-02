@@ -36,7 +36,8 @@
     "download-invoices": "node scripts/download-invoices.js",
     "import-invoices": "node scripts/import-invoices.js",
     "update-invoices": "npm run download-invoices && npm run import-invoices",
-    "fetch-reviews": "node scripts/fetch-reviews.js",
+    "fetch-reviews": "node --no-deprecation scripts/fetch-reviews.js",
+    "fix-review-ratings": "node --no-deprecation scripts/fetch-reviews.js --fix-ratings-only",
     "analyze": "node scripts/analyze.js",
     "update-analytics": "npm run download-invoices && npm run fetch-reviews && npm run analyze"
   },

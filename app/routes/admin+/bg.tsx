@@ -24,6 +24,14 @@ export interface Route {
 	ActionArgs: { request: Request }
 }
 
+// Define job descriptions
+const JOB_DESCRIPTIONS = {
+	invoiceDownload:
+		'Downloads and imports invoice data from the external system.',
+	reviewsFetch:
+		'Fetches Google reviews and stores them in the database with statistical analysis.',
+}
+
 // Maps the job status to the StatusButton status
 function mapJobStatusToButtonStatus(
 	status: JobStatus['status'],
@@ -219,6 +227,19 @@ export default function BackgroundJobsAdmin() {
 												</td>
 											</tr>
 										)}
+										<tr
+											key={`${job.id}-description-row`}
+											className="border-b bg-muted/20"
+										>
+											<td
+												colSpan={6}
+												className="px-4 py-2 text-xs text-muted-foreground"
+											>
+												{JOB_DESCRIPTIONS[
+													job.id as keyof typeof JOB_DESCRIPTIONS
+												] || 'No description available.'}
+											</td>
+										</tr>
 									</>
 								))}
 							</tbody>

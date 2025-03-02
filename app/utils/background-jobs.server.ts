@@ -121,10 +121,14 @@ export async function runReviewsFetchJob(): Promise<void> {
 	try {
 		// Path to the fetch-reviews script
 		const scriptPath = path.join(process.cwd(), 'scripts', 'fetch-reviews.js')
-		console.log('Running fetch-reviews script')
+		console.log(
+			'Running fetch-reviews script to update Google Reviews in database',
+		)
 
 		// Execute the script
-		const { stdout, stderr } = await execAsync(`node ${scriptPath}`)
+		const { stdout, stderr } = await execAsync(
+			`node --no-deprecation ${scriptPath}`,
+		)
 
 		if (stderr) {
 			console.error('Reviews fetch error:', stderr)
