@@ -1,6 +1,8 @@
-import { existsSync } from 'node:fs'
-import { readdir, readFile } from 'node:fs/promises'
-import path from 'node:path'
+import {
+	type GoogleReview,
+	type GoogleLocation,
+	type ReviewStats as DbReviewStats,
+} from '@prisma/client'
 import { json } from '@remix-run/node'
 import {
 	useLoaderData,
@@ -12,6 +14,7 @@ import { format } from 'date-fns'
 import { useEffect, useRef } from 'react'
 
 import { Button } from '#app/components/ui/button.tsx'
+import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 
 // Define the Route type for this file
@@ -38,7 +41,7 @@ interface Review {
 }
 
 // Statistics summary interface
-interface ReviewStats {
+interface AppReviewStats {
 	totalReviews: number
 	averageRating: number
 	ratingDistribution: {
@@ -56,63 +59,205 @@ interface ReviewStats {
 }
 
 interface LoaderData {
-	reviewStats: ReviewStats | null
+	reviewStats: AppReviewStats | null
 	error: string | null
 	lastUpdated: string | null
+}
+
+type LocationWithReviewStats = GoogleLocation & {
+	reviewStats: DbReviewStats | null
 }
 
 export async function loader({ request }: Route['LoaderArgs']) {
 	// Require admin role to access reviews page
 	await requireUserWithRole(request, 'admin')
 
-	const reviewsDir = path.join(process.cwd(), 'reviews')
-
-	// Check if reviews directory exists
-	if (!existsSync(reviewsDir)) {
-		return json({
-			reviewStats: null,
-			error:
-				"Reviews directory not found. You need to run 'npm run fetch-reviews' first.",
-			lastUpdated: null,
-		})
-	}
+	// Force clear any potentially cached data
 
 	try {
-		// Get list of all review files
-		const reviewFiles = await readdir(reviewsDir)
-		const jsonFiles = reviewFiles.filter(file => file.endsWith('.json'))
+		// Get all locations
+		console.log('Fetching all Google Locations from database...')
+		const locations = (await prisma.googleLocation.findMany({
+			include: {
+				reviewStats: true,
+			},
+		})) as LocationWithReviewStats[]
 
-		if (jsonFiles.length === 0) {
+		console.log(`Found ${locations.length} total locations`)
+		locations.forEach(loc => {
+			console.log(`- Location: ${loc.id}, Name: ${loc.name || 'unnamed'}`)
+		})
+
+		if (locations.length === 0) {
 			return json({
 				reviewStats: null,
 				error:
-					"No review files found. You need to run 'npm run fetch-reviews' first.",
+					"No locations found. You need to run 'npm run fetch-reviews' first.",
 				lastUpdated: null,
 			})
 		}
 
-		// Sort files by date (newest first)
-		jsonFiles.sort().reverse()
+		// Get all reviews from all locations
+		console.log(`Fetching reviews for all locations...`)
+		const allReviews = await prisma.googleReview.findMany({
+			orderBy: {
+				createTime: 'desc',
+			},
+		})
 
-		// Get most recent file
-		const mostRecentFile = jsonFiles[0]
-		const filePath = path.join(reviewsDir, mostRecentFile)
+		console.log(`Found ${allReviews.length} total reviews across all locations`)
+		if (allReviews.length > 0) {
+			console.log('Reviews grouped by location:')
+			// Group reviews by location for logging
+			const reviewsByLocation = allReviews.reduce(
+				(acc, review) => {
+					acc[review.locationId] = (acc[review.locationId] || 0) + 1
+					return acc
+				},
+				{} as Record<string, number>,
+			)
 
-		// Read the file content
-		const fileContent = await readFile(filePath, 'utf-8')
-		const reviews = JSON.parse(fileContent) as Review[]
+			Object.entries(reviewsByLocation).forEach(([locId, count]) => {
+				const location = locations.find(l => l.id === locId)
+				console.log(
+					`- Location ${locId} (${location?.name || 'unnamed'}): ${count} reviews`,
+				)
+			})
+		}
 
-		// Get last updated date from filename
-		const dateMatch = mostRecentFile.match(/(\d{4}-\d{2}-\d{2})\.json$/)
-		const lastUpdated = dateMatch ? dateMatch[1] : null
+		// If no reviews were found
+		if (allReviews.length === 0) {
+			return json({
+				reviewStats: null,
+				error:
+					"No reviews found. You need to run 'npm run fetch-reviews' first.",
+				lastUpdated: null,
+			})
+		}
 
-		// Calculate statistics
-		const reviewStats = calculateReviewStats(reviews)
+		// Get the 10 most recent reviews across all locations
+		const recentReviews = allReviews.slice(0, 10)
+
+		console.log('Recent reviews:')
+		recentReviews.forEach((review, i) => {
+			const location = locations.find(l => l.id === review.locationId)
+			console.log(
+				`${i + 1}. ID: ${review.id}, Name: ${review.reviewerName}, Location: ${location?.name || review.locationId}, Comment: ${review.comment?.substring(0, 50)}...`,
+			)
+		})
+
+		// Convert database reviews to the Review interface format
+		const formattedReviews: Review[] = recentReviews.map(
+			(dbReview: GoogleReview) => ({
+				name: dbReview.id,
+				reviewId: dbReview.reviewId,
+				reviewer: {
+					profilePhotoUrl: dbReview.profilePhotoUrl || '',
+					displayName: dbReview.reviewerName,
+				},
+				starRating: dbReview.starRating,
+				comment: dbReview.comment || '',
+				createTime: dbReview.createTime.toISOString(),
+				updateTime: dbReview.updateTime.toISOString(),
+				...(dbReview.hasReply
+					? {
+							reviewReply: {
+								comment: dbReview.replyComment || '',
+								updateTime: dbReview.replyTime?.toISOString() || '',
+							},
+						}
+					: {}),
+			}),
+		)
+
+		// Calculate aggregated statistics from all locations
+		let totalReviews = 0
+		let ratingSum = 0
+		const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+		let repliedCount = 0
+		let unrepliedCount = 0
+		let lastUpdated = new Date(0) // Start with oldest possible date
+
+		// Aggregate monthly review data
+		const monthlyReviews: {
+			[key: string]: { count: number; avgRating: number; ratingSum: number }
+		} = {}
+
+		// Process all reviews to calculate statistics
+		allReviews.forEach(review => {
+			totalReviews++
+
+			// Count by rating
+			const numericRating = convertRatingToNumber(review.starRating)
+			ratingSum += numericRating
+
+			// Update rating distribution
+			if (numericRating >= 1 && numericRating <= 5) {
+				ratingDistribution[numericRating as 1 | 2 | 3 | 4 | 5]++
+			}
+
+			// Count replied/unreplied
+			if (review.hasReply) {
+				repliedCount++
+			} else {
+				unrepliedCount++
+			}
+
+			// Group by month for monthly stats
+			const reviewDate = review.createTime
+			const monthKey = `${reviewDate.getFullYear()}-${String(reviewDate.getMonth() + 1).padStart(2, '0')}`
+
+			if (!monthlyReviews[monthKey]) {
+				monthlyReviews[monthKey] = {
+					count: 0,
+					avgRating: 0,
+					ratingSum: 0,
+				}
+			}
+
+			monthlyReviews[monthKey].count++
+			monthlyReviews[monthKey].ratingSum += numericRating
+		})
+
+		// Calculate average rating for each month
+		Object.keys(monthlyReviews).forEach(month => {
+			monthlyReviews[month].avgRating =
+				monthlyReviews[month].ratingSum / monthlyReviews[month].count
+
+			// Remove the sum as we don't need it in the final data
+			// Using type assertion to avoid TypeScript error on delete operator
+			const monthData = monthlyReviews[month] as { ratingSum?: number }
+			delete monthData.ratingSum
+		})
+
+		// Find the most recent lastUpdated date from all locations with stats
+		locations.forEach(location => {
+			if (
+				location.reviewStats &&
+				location.reviewStats.lastUpdated > lastUpdated
+			) {
+				lastUpdated = location.reviewStats.lastUpdated
+			}
+		})
+
+		// Calculate average rating
+		const averageRating = totalReviews > 0 ? ratingSum / totalReviews : 0
+
+		// Create the final review stats object
+		const reviewStats: AppReviewStats = {
+			totalReviews,
+			averageRating,
+			ratingDistribution,
+			repliedCount,
+			unrepliedCount,
+			monthlyReviews,
+			latestReviews: formattedReviews,
+		}
 
 		return json({
 			reviewStats,
 			error: null,
-			lastUpdated,
+			lastUpdated: lastUpdated.toISOString(),
 		})
 	} catch (error) {
 		console.error('Error loading reviews:', error)
@@ -122,105 +267,6 @@ export async function loader({ request }: Route['LoaderArgs']) {
 			lastUpdated: null,
 		})
 	}
-}
-
-function calculateReviewStats(reviews: Review[]): ReviewStats {
-	// Initialize statistics
-	const stats: ReviewStats = {
-		totalReviews: reviews.length,
-		averageRating: 0,
-		ratingDistribution: {
-			1: 0,
-			2: 0,
-			3: 0,
-			4: 0,
-			5: 0,
-		},
-		repliedCount: 0,
-		unrepliedCount: 0,
-		monthlyReviews: {},
-		latestReviews: [],
-	}
-
-	// Skip calculation if no reviews
-	if (reviews.length === 0) return stats
-
-	// Helper function to convert string rating to number
-	function convertRatingToNumber(rating: string | number): number {
-		if (typeof rating === 'number') return rating
-
-		switch (rating) {
-			case 'ONE':
-				return 1
-			case 'TWO':
-				return 2
-			case 'THREE':
-				return 3
-			case 'FOUR':
-				return 4
-			case 'FIVE':
-				return 5
-			default:
-				return 0 // Default case for unknown ratings
-		}
-	}
-
-	// Total of all ratings
-	let ratingSum = 0
-
-	// Process each review
-	reviews.forEach(review => {
-		// Convert string rating to number
-		const numericRating = convertRatingToNumber(review.starRating)
-
-		// Add to total rating
-		ratingSum += numericRating
-
-		// Add to rating distribution
-		if (numericRating >= 1 && numericRating <= 5) {
-			stats.ratingDistribution[numericRating]++
-		}
-
-		// Count replied vs unreplied
-		if (review.reviewReply) {
-			stats.repliedCount++
-		} else {
-			stats.unrepliedCount++
-		}
-
-		// Group by month
-		if (review.createTime) {
-			const reviewDate = new Date(review.createTime)
-			const monthKey = format(reviewDate, 'yyyy-MM')
-
-			if (!stats.monthlyReviews[monthKey]) {
-				stats.monthlyReviews[monthKey] = {
-					count: 0,
-					avgRating: 0,
-				}
-			}
-
-			stats.monthlyReviews[monthKey].count++
-			stats.monthlyReviews[monthKey].avgRating =
-				(stats.monthlyReviews[monthKey].avgRating *
-					(stats.monthlyReviews[monthKey].count - 1) +
-					numericRating) /
-				stats.monthlyReviews[monthKey].count
-		}
-	})
-
-	// Calculate average rating
-	stats.averageRating = ratingSum / reviews.length
-
-	// Get 10 most recent reviews
-	stats.latestReviews = [...reviews]
-		.sort(
-			(a, b) =>
-				new Date(b.createTime).getTime() - new Date(a.createTime).getTime(),
-		)
-		.slice(0, 10)
-
-	return stats
 }
 
 export default function ReviewsPage() {

@@ -101,6 +101,7 @@ export async function runReviewsFetchJob(): Promise<void> {
 	try {
 		// Path to the fetch-reviews script
 		const scriptPath = path.join(process.cwd(), 'scripts', 'fetch-reviews.js')
+		console.log('Running fetch-reviews script')
 
 		// Execute the script
 		const { stdout, stderr } = await execAsync(`node ${scriptPath}`)

@@ -1,42 +1,229 @@
 // Compiled from fetch-reviews.ts
 import * as fs from 'fs'
-import { writeFile } from 'fs/promises'
 import * as path from 'path'
+import { PrismaClient } from '@prisma/client'
 import dotenv from 'dotenv'
 import { google } from 'googleapis'
+
+// Initialize Prisma client
+const prisma = new PrismaClient()
 
 // Load environment variables
 dotenv.config()
 
-// Make sure reviews directory exists
+// Keep the reviews directory for backwards compatibility
 const reviewsDir = path.join(process.cwd(), 'reviews')
 if (!fs.existsSync(reviewsDir)) {
 	fs.mkdirSync(reviewsDir, { recursive: true })
 }
 
 async function main() {
-	const accounts = await getAccounts()
-	for (const account of accounts) {
-		const locations = await getLocations(account.name)
-		for (const location of locations) {
-			if (!location.title?.includes('Hitchcox Aesthetics')) {
-				continue
+	try {
+		const accounts = await getAccounts()
+		for (const account of accounts) {
+			const locations = await getLocations(account.name)
+			for (const location of locations) {
+				if (!location.title?.includes('Hitchcox Aesthetics')) {
+					continue
+				}
+
+				// Ensure the Google location exists in the database
+				let dbLocation = await prisma.googleLocation.findUnique({
+					where: { id: location.name },
+				})
+
+				if (!dbLocation) {
+					dbLocation = await prisma.googleLocation.create({
+						data: {
+							id: location.name,
+							name: location.title,
+							formattedAddress: location.storefrontAddress?.formattedAddress,
+							city: location.storefrontAddress?.locality,
+							state: location.storefrontAddress?.administrativeArea,
+							zip: location.storefrontAddress?.postalCode,
+							url: location.metadata?.mapsUri || '',
+							json: JSON.stringify(location),
+						},
+					})
+				}
+
+				// Fetch reviews from Google API
+				const reviews = await fetchReviews(account.name, location.name)
+				console.log(`Found ${reviews.length} reviews`)
+
+				// Save to database with transaction
+				await saveReviewsToDatabase(reviews, location.name)
+
+				// Also save to JSON for backup (could be removed later)
+				const today = new Date().toISOString().split('T')[0]
+				const filename = path.join(
+					reviewsDir,
+					`${location.name.replace(/\//g, '-')}-${today}.json`,
+				)
+				fs.writeFileSync(filename, JSON.stringify(reviews, null, 2))
+				console.log(`Saved reviews to database and JSON backup at ${filename}`)
 			}
-			const reviews = await fetchReviews(account.name, location.name)
-			console.log(`Found ${reviews.length} reviews`)
-
-			const today = new Date().toISOString().split('T')[0]
-			const filename = path.join(
-				reviewsDir,
-				`${location.name.replace(/\//g, '-')}-${today}.json`,
-			)
-
-			await writeFile(filename, JSON.stringify(reviews, null, 2))
-			console.log(`Saved reviews to ${filename}`)
 		}
+	} finally {
+		// Make sure to disconnect Prisma client
+		await prisma.$disconnect()
 	}
 }
 
+// Save reviews to database and update stats
+async function saveReviewsToDatabase(reviews, locationId) {
+	// Use a transaction to ensure data consistency
+	await prisma.$transaction(async tx => {
+		// Process and save each review
+		for (const review of reviews) {
+			const reviewData = {
+				id: review.name,
+				reviewId: review.reviewId,
+				starRating: review.starRating || 'FIVE', // Default to five if missing
+				comment: review.comment || '',
+				createTime: new Date(review.createTime),
+				updateTime: new Date(review.updateTime),
+				profilePhotoUrl: review.reviewer?.profilePhotoUrl || null,
+				reviewerName: review.reviewer?.displayName || 'Anonymous',
+				locationId: locationId,
+				hasReply: !!review.reviewReply,
+				replyComment: review.reviewReply?.comment || null,
+				replyTime: review.reviewReply?.updateTime
+					? new Date(review.reviewReply.updateTime)
+					: null,
+			}
+
+			// Upsert the review (create if new, update if exists)
+			await tx.googleReview.upsert({
+				where: { reviewId: review.reviewId },
+				create: reviewData,
+				update: reviewData,
+			})
+		}
+
+		// Calculate and update stats
+		await updateReviewStats(tx, locationId)
+	})
+}
+
+// Calculate and update review statistics
+async function updateReviewStats(tx, locationId) {
+	// Get all reviews for this location
+	const reviews = await tx.googleReview.findMany({
+		where: { locationId },
+	})
+
+	// Calculate stats
+	const totalReviews = reviews.length
+	let ratingSum = 0
+	const ratingDistribution = {
+		ONE: 0,
+		TWO: 0,
+		THREE: 0,
+		FOUR: 0,
+		FIVE: 0,
+	}
+
+	let repliedCount = 0
+	let unrepliedCount = 0
+
+	// Monthly data
+	const monthlyReviews = {}
+
+	for (const review of reviews) {
+		// Count by rating
+		ratingDistribution[review.starRating] =
+			(ratingDistribution[review.starRating] || 0) + 1
+
+		// Count replies
+		if (review.hasReply) {
+			repliedCount++
+		} else {
+			unrepliedCount++
+		}
+
+		// Add to rating sum (convert string ratings to numbers)
+		const numericRating = convertRatingToNumber(review.starRating)
+		ratingSum += numericRating
+
+		// Group by month
+		const reviewDate = review.createTime
+		const monthKey = `${reviewDate.getFullYear()}-${String(reviewDate.getMonth() + 1).padStart(2, '0')}`
+
+		if (!monthlyReviews[monthKey]) {
+			monthlyReviews[monthKey] = {
+				count: 0,
+				avgRating: 0,
+				ratingSum: 0,
+			}
+		}
+
+		monthlyReviews[monthKey].count++
+		monthlyReviews[monthKey].ratingSum += numericRating
+		monthlyReviews[monthKey].avgRating =
+			monthlyReviews[monthKey].ratingSum / monthlyReviews[monthKey].count
+	}
+
+	// Calculate average rating
+	const averageRating = totalReviews > 0 ? ratingSum / totalReviews : 0
+
+	// Clean up the monthly data for storage (remove the ratingSum property)
+	for (const month in monthlyReviews) {
+		delete monthlyReviews[month].ratingSum
+	}
+
+	// Upsert the stats
+	await tx.reviewStats.upsert({
+		where: { locationId },
+		create: {
+			locationId,
+			totalReviews,
+			averageRating,
+			oneStarCount: ratingDistribution.ONE,
+			twoStarCount: ratingDistribution.TWO,
+			threeStarCount: ratingDistribution.THREE,
+			fourStarCount: ratingDistribution.FOUR,
+			fiveStarCount: ratingDistribution.FIVE,
+			repliedCount,
+			unrepliedCount,
+			monthlyReviews: JSON.stringify(monthlyReviews),
+			lastUpdated: new Date(),
+		},
+		update: {
+			totalReviews,
+			averageRating,
+			oneStarCount: ratingDistribution.ONE,
+			twoStarCount: ratingDistribution.TWO,
+			threeStarCount: ratingDistribution.THREE,
+			fourStarCount: ratingDistribution.FOUR,
+			fiveStarCount: ratingDistribution.FIVE,
+			repliedCount,
+			unrepliedCount,
+			monthlyReviews: JSON.stringify(monthlyReviews),
+			lastUpdated: new Date(),
+		},
+	})
+}
+
+// Convert rating string to number
+function convertRatingToNumber(rating) {
+	switch (rating) {
+		case 'ONE':
+			return 1
+		case 'TWO':
+			return 2
+		case 'THREE':
+			return 3
+		case 'FOUR':
+			return 4
+		case 'FIVE':
+			return 5
+		default:
+			return 0
+	}
+}
+
+// Keep the existing functions
 async function getAccounts() {
 	const client = await getGoogleAuthClient()
 	const response = await google

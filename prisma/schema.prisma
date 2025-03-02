@@ -256,7 +256,7 @@ model ClientHistoryRecord {
 }
 
 model GoogleLocation {
-  id               String  @id
+  id               String         @id
   name             String?
   formattedAddress String?
   addressLine1     String?
@@ -274,6 +274,8 @@ model GoogleLocation {
   url              String?
   json             String?
   users            User[]
+  reviews          GoogleReview[]
+  reviewStats      ReviewStats?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -315,4 +317,55 @@ model WeeklySchedule {
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, dayOfWeek])
+}
+
+model GoogleReview {
+  id              String   @id
+  reviewId        String   @unique
+  starRating      String // ONE, TWO, THREE, FOUR, FIVE
+  comment         String?
+  createTime      DateTime
+  updateTime      DateTime
+  profilePhotoUrl String?
+  reviewerName    String
+
+  // Reply data
+  hasReply     Boolean   @default(false)
+  replyComment String?
+  replyTime    DateTime?
+
+  locationId String
+  location   GoogleLocation @relation(fields: [locationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([locationId])
+  @@index([createTime])
+}
+
+model ReviewStats {
+  id         String         @id @default(cuid())
+  locationId String         @unique
+  location   GoogleLocation @relation(fields: [locationId], references: [id])
+
+  totalReviews  Int   @default(0)
+  averageRating Float @default(0)
+
+  // Rating distribution
+  oneStarCount   Int @default(0)
+  twoStarCount   Int @default(0)
+  threeStarCount Int @default(0)
+  fourStarCount  Int @default(0)
+  fiveStarCount  Int @default(0)
+
+  repliedCount   Int @default(0)
+  unrepliedCount Int @default(0)
+
+  // Monthly statistics stored as JSON
+  monthlyReviews String? // JSON string of monthly review data
+
+  lastUpdated DateTime @default(now())
+
+  @@index([locationId])
 }
