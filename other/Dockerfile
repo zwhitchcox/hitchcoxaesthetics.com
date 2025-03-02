@@ -9,6 +9,8 @@ ENV NODE_ENV production
 # Install openssl for Prisma and build tools for native modules
 RUN apt-get update && apt-get install -y fuse3 openssl sqlite3 ca-certificates procps rsync build-essential python3
 
+RUN apt-get install -y chromium-browser
+
 # Install all node_modules, including dev dependencies
 FROM base as deps
 
@@ -38,7 +40,6 @@ WORKDIR /myapp
 
 
 COPY --from=deps /myapp/node_modules /myapp/node_modules
-RUN npx puppeteer browsers install chrome
 
 
 # prisma files will be generated in the production image, see below
