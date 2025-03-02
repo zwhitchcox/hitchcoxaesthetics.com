@@ -12,7 +12,6 @@ import { StatusButton } from '#app/components/ui/status-button.tsx'
 import {
 	type JobStatus,
 	runInvoiceDownloadJob,
-	runInvoiceAnalysisJob,
 	getJobStatuses,
 	clearJobError,
 } from '#app/utils/background-jobs.server'
@@ -51,11 +50,6 @@ export async function action({ request }: Route['ActionArgs']) {
 	if (intent === 'run-invoiceDownload') {
 		runInvoiceDownloadJob().catch(console.error)
 		return json({ success: true, message: 'Invoice download job started' })
-	}
-
-	if (intent === 'run-invoiceAnalysis') {
-		runInvoiceAnalysisJob().catch(console.error)
-		return json({ success: true, message: 'Invoice analysis job started' })
 	}
 
 	if (intent?.toString().startsWith('clear-error-')) {
