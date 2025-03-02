@@ -370,6 +370,20 @@ model ReviewStats {
   @@index([locationId])
 }
 
+// New model for Patient data
+model Patient {
+  id           String        @id @default(cuid())
+  name         String
+  email        String?       @unique
+  phone        String?
+  invoiceItems InvoiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
 // New model to store raw invoice data
 model InvoiceItem {
   id        String   @id @default(cuid())
@@ -380,9 +394,14 @@ model InvoiceItem {
   category  String // Service category (laser, botox, etc.)
   details   String? // Complete invoice data as JSON string
 
+  // Replace direct patientName field with relation
+  patient   Patient? @relation(fields: [patientId], references: [id])
+  patientId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([date])
   @@index([category])
+  @@index([patientId])
 }

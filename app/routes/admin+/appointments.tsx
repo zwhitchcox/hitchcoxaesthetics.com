@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { json } from '@remix-run/node'
 import {
 	useLoaderData,
@@ -8,7 +6,6 @@ import {
 	useSearchParams,
 	useNavigate,
 } from '@remix-run/react'
-import { parse } from 'csv-parse/sync'
 import { subDays } from 'date-fns'
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import { useState, useMemo } from 'react'
@@ -19,12 +16,11 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
+import { prisma } from '#app/utils/db.server'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import {
 	calculateProfit,
-	getServiceCategory,
 	calculateProfitMargin,
-	parseCollectedAmount,
 } from '#app/utils/profit-calculations'
 
 // Define the Route type for this file
@@ -59,14 +55,6 @@ function getNowInET(): Date {
 }
 
 /**
- * Convert a date string from CSV to a Date object in ET
- */
-function parseETDate(dateString: string): Date {
-	// Parse the date string and convert to ET timezone
-	return toZonedTime(new Date(dateString), TIME_ZONE)
-}
-
-/**
  * Format a date as YYYY-MM-DD in ET timezone for input fields
  */
 function formatETDateForInput(date: Date): string {
@@ -83,6 +71,7 @@ interface Appointment {
 	profitMargin: number
 	status: string
 	category: string
+	patientName: string
 }
 
 // Define loader data type
@@ -129,75 +118,45 @@ export async function loader({ request }: Route['LoaderArgs']) {
 			}
 		}
 
-		// Path to the CSV file
-		const csvFilePath = path.join(
-			process.cwd(),
-			'downloads',
-			'table-extract.csv',
-		)
-
-		if (!fs.existsSync(csvFilePath)) {
-			// Return empty data if the file doesn't exist
-			return json<LoaderData>({
-				appointments: null,
-				error:
-					'Appointments data file not found. Please make sure table-extract.csv exists in the downloads directory.',
-				dateRange: {
-					startDate: startDate.toISOString(),
-					endDate: endDate.toISOString(),
+		// Query invoice items WITHOUT patient relation for now
+		const invoiceItems = await prisma.invoiceItem.findMany({
+			where: {
+				date: {
+					gte: startDate,
+					lte: endDate,
 				},
-			})
-		}
-
-		// Read and parse the CSV file
-		const fileContent = fs.readFileSync(csvFilePath, { encoding: 'utf-8' })
-		const records = parse(fileContent, {
-			columns: true,
-			skip_empty_lines: true,
-			trim: true,
-			relaxColumnCount: true,
+				...(category !== 'all' ? { category } : {}),
+			},
+			orderBy: {
+				date: 'desc',
+			},
 		})
 
-		// Process appointments
-		const appointments: Appointment[] = []
-		let counter = 0
+		// Get a list of all patients (separate query)
+		const patients = await prisma.patient.findMany()
+		const patientMap = new Map(patients.map(p => [p.id, p.name]))
 
-		records.forEach((record: any) => {
-			// Parse date and convert to ET timezone
-			const purchaseDate = parseETDate(record['Purchase Date'])
+		// Transform to appointments format
+		const appointments: Appointment[] = invoiceItems.map(item => {
+			const profit = calculateProfit(item.item, item.collected)
+			const profitMargin = calculateProfitMargin(profit, item.collected)
 
-			// Skip records outside the date range
-			if (purchaseDate < startDate || purchaseDate > endDate) {
-				return
-			}
+			// Look up patient name from our map
+			const patientName = item.patientId
+				? patientMap.get(item.patientId) || 'Unknown Patient'
+				: 'Unknown Patient'
 
-			// Use Collected field for revenue calculations
-			const collected = parseCollectedAmount(record)
-			const item = record.Item
-
-			if (isNaN(collected) || collected === 0) {
-				return
-			}
-
-			// Apply category filter if specified
-			const appointmentCategory = getServiceCategory(item)
-			if (category !== 'all' && appointmentCategory !== category) {
-				return
-			}
-
-			const profit = calculateProfit(item, collected)
-			const itemProfitMargin = calculateProfitMargin(profit, collected)
-
-			appointments.push({
-				id: String(++counter), // Generate a unique ID
-				date: purchaseDate,
-				item,
-				total: collected, // Use collected instead of total
+			return {
+				id: item.id,
+				date: item.date,
+				item: item.item,
+				total: item.collected,
 				profit,
-				profitMargin: itemProfitMargin,
-				status: record.Status || 'N/A',
-				category: appointmentCategory,
-			})
+				profitMargin,
+				status: 'Completed', // Default status
+				category: item.category,
+				patientName,
+			}
 		})
 
 		// Sort appointments
@@ -217,6 +176,8 @@ export async function loader({ request }: Route['LoaderArgs']) {
 					comparison = a.item.localeCompare(b.item)
 				} else if (sortBy === 'category') {
 					comparison = a.category.localeCompare(b.category)
+				} else if (sortBy === 'patientName') {
+					comparison = a.patientName.localeCompare(b.patientName)
 				}
 
 				return sortOrder === 'asc' ? comparison : -comparison
@@ -233,6 +194,7 @@ export async function loader({ request }: Route['LoaderArgs']) {
 		})
 	} catch (error) {
 		console.error('Error loading appointments:', error)
+
 		return json<LoaderData>({
 			appointments: null,
 			error:
@@ -358,7 +320,10 @@ export default function AppointmentsPage() {
 		? appointments.filter(
 				appointment =>
 					appointment.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
-					appointment.status.toLowerCase().includes(searchTerm.toLowerCase()),
+					appointment.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+					appointment.patientName
+						.toLowerCase()
+						.includes(searchTerm.toLowerCase()),
 			)
 		: []
 
@@ -491,12 +456,12 @@ export default function AppointmentsPage() {
 			<div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
 				<div>
 					<Label htmlFor="search" className="mb-2 block text-sm font-medium">
-						Search by Service or Status
+						Search by Patient, Service or Status
 					</Label>
 					<Input
 						id="search"
 						type="text"
-						placeholder="Search appointments..."
+						placeholder="Search by patient name, service or status..."
 						value={searchTerm}
 						onChange={e => setSearchTerm(e.target.value)}
 						className="w-full"
@@ -536,6 +501,7 @@ export default function AppointmentsPage() {
 							onChange={e => updateFilter({ sortBy: e.target.value })}
 						>
 							<option value="date">Date</option>
+							<option value="patientName">Patient Name</option>
 							<option value="total">Total</option>
 							<option value="profit">Profit</option>
 							<option value="profitMargin">Profit Margin</option>
@@ -602,6 +568,9 @@ export default function AppointmentsPage() {
 									Date
 								</th>
 								<th className="whitespace-nowrap p-3 text-left font-medium">
+									Patient
+								</th>
+								<th className="whitespace-nowrap p-3 text-left font-medium">
 									Service
 								</th>
 								<th className="whitespace-nowrap p-3 text-left font-medium">
@@ -627,6 +596,9 @@ export default function AppointmentsPage() {
 									<tr key={appointment.id} className="border-t">
 										<td className="whitespace-nowrap p-3">
 											{formatDateTimeET(appointment.date)}
+										</td>
+										<td className="max-w-xs truncate p-3">
+											{appointment.patientName}
 										</td>
 										<td className="max-w-xs truncate p-3">
 											{appointment.item}
@@ -681,7 +653,7 @@ export default function AppointmentsPage() {
 								))
 							) : (
 								<tr>
-									<td colSpan={7} className="p-4 text-center">
+									<td colSpan={8} className="p-4 text-center">
 										{appointments && appointments.length > 0
 											? 'No appointments found matching your search criteria.'
 											: 'No appointments found for the selected time period.'}

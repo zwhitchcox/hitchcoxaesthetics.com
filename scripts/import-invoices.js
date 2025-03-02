@@ -112,6 +112,14 @@ async function importInvoiceData() {
 			`Found ${existingInvoices.length} existing invoice records in database`,
 		)
 
+		// Get all existing patients for quick lookup
+		console.log('Loading existing patients...')
+		const existingPatients = await prisma.patient.findMany()
+		const patientMap = new Map(
+			existingPatients.map(patient => [patient.name.toLowerCase(), patient.id]),
+		)
+		console.log(`Found ${existingPatients.length} existing patient records`)
+
 		// Process and import records
 		const batchSize = 100
 		let processed = 0
@@ -119,11 +127,13 @@ async function importInvoiceData() {
 		let created = 0
 		let skippedZeroAmount = 0
 		let skippedError = 0
+		let patientsCreated = 0
+		let patientsLinked = 0
 
 		for (let i = 0; i < records.length; i += batchSize) {
 			const batch = records.slice(i, i + batchSize)
 			const promises = batch
-				.map(record => {
+				.map(async record => {
 					// Skip records with no transaction
 					if (!record.Collected || parseCollectedAmount(record) <= 0) {
 						skippedZeroAmount++
@@ -138,48 +148,70 @@ async function importInvoiceData() {
 						const category = getServiceCategory(item)
 						const invoiceId =
 							record['Invoice #'] || `unknown-${Date.now()}-${Math.random()}`
-
-						// Store just the Details property from the record
 						const details = record.Details || null
+
+						// Extract patient name - could be in one of several possible fields
+						const patientName =
+							record.Patient ||
+							record['Patient Name'] ||
+							record.Customer ||
+							record['Client Name'] ||
+							'Unknown Patient'
+
+						// Find or create patient
+						let patientId
+						const patientNameKey = patientName.toLowerCase()
+
+						if (patientMap.has(patientNameKey)) {
+							// Use existing patient
+							patientId = patientMap.get(patientNameKey)
+							patientsLinked++
+						} else {
+							// Create new patient
+							const newPatient = await prisma.patient.create({
+								data: {
+									name: patientName,
+								},
+							})
+							patientId = newPatient.id
+							patientMap.set(patientNameKey, patientId)
+							patientsCreated++
+						}
 
 						// Check if this invoice already exists
 						const existingId = invoiceMap.get(invoiceId)
 
 						if (existingId) {
 							// Update existing record
-							return prisma.invoiceItem
-								.update({
-									where: { id: existingId },
-									data: {
-										date,
-										item,
-										collected,
-										category,
-										details, // Save just the Details property
-										updatedAt: new Date(),
-									},
-								})
-								.then(() => {
-									updated++
-									return true
-								})
+							await prisma.invoiceItem.update({
+								where: { id: existingId },
+								data: {
+									date,
+									item,
+									collected,
+									category,
+									patientId, // Now using patient relation
+									details,
+									updatedAt: new Date(),
+								},
+							})
+							updated++
+							return true
 						} else {
 							// Create new record
-							return prisma.invoiceItem
-								.create({
-									data: {
-										invoiceId,
-										date,
-										item,
-										collected,
-										category,
-										details, // Save just the Details property
-									},
-								})
-								.then(() => {
-									created++
-									return true
-								})
+							await prisma.invoiceItem.create({
+								data: {
+									invoiceId,
+									date,
+									item,
+									collected,
+									category,
+									patientId, // Now using patient relation
+									details,
+								},
+							})
+							created++
+							return true
 						}
 					} catch (error) {
 						console.error(`Error processing record:`, record, error)
@@ -203,6 +235,9 @@ Import Summary:
 - Successfully processed: ${processed}
   - New records created: ${created}
   - Existing records updated: ${updated}
+- Patients:
+  - New patients created: ${patientsCreated}
+  - Existing patients linked: ${patientsLinked}
 - Skipped (zero amount): ${skippedZeroAmount}
 - Skipped (processing errors): ${skippedError}
 		`)

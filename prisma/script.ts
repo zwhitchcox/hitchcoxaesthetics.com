@@ -8,11 +8,13 @@ async function main() {
 			},
 		},
 		select: {
-			details: true,
+			item: true,
 		},
 	})
 
-	console.log(invoices)
+	for (const invoice of invoices) {
+		console.log(invoice.item)
+	}
 }
 
 main().catch(console.error)
