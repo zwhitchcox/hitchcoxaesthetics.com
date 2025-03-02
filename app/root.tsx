@@ -362,7 +362,7 @@ function Header({
 				className={`nav-menu fixed overflow-y-scroll ${
 					// noHeader ? 'top-0 h-[100vh]' : 'top-[3rem] h-[calc(100dvh-3rem)]'
 					'top-0 h-[100vh]'
-				} z-50 flex w-full flex-col items-center justify-center bg-background text-3xl opacity-0 ${
+				} z-[60] flex w-full flex-col items-center justify-center bg-background text-3xl opacity-0 ${
 					isMenuOpen
 						? 'visible opacity-100 transition-opacity duration-300 ease-in-out'
 						: 'pointer-events-none'
