@@ -139,8 +139,8 @@ async function importInvoiceData() {
 						const invoiceId =
 							record['Invoice #'] || `unknown-${Date.now()}-${Math.random()}`
 
-						// Store all raw data as JSON
-						const details = JSON.stringify(record)
+						// Store just the Details property from the record
+						const details = record.Details || null
 
 						// Check if this invoice already exists
 						const existingId = invoiceMap.get(invoiceId)
@@ -155,7 +155,7 @@ async function importInvoiceData() {
 										item,
 										collected,
 										category,
-										details, // Save the complete record data
+										details, // Save just the Details property
 										updatedAt: new Date(),
 									},
 								})
@@ -173,7 +173,7 @@ async function importInvoiceData() {
 										item,
 										collected,
 										category,
-										details, // Save the complete record data
+										details, // Save just the Details property
 									},
 								})
 								.then(() => {
