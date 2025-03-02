@@ -95,6 +95,47 @@ interface _ProfitDetail {
 }
 
 /**
+ * Calculate profit for a given item and revenue
+ */
+function calculateProfit(item: string, revenue: number): number {
+	let profitMargin = 0.45 // Default 45% profit margin
+
+	// Apply different profit margins based on service type
+	item = item?.toLowerCase() || ''
+
+	if (item.includes('laser') || item.includes('cold sculpting')) {
+		profitMargin = 0.95 // 95% profit margin
+	} else if (
+		item.includes('botox') ||
+		item.includes('dysport') ||
+		item.includes('xeomin')
+	) {
+		profitMargin = 0.35 // 35% profit margin
+	} else if (
+		item.includes('dermal filler') ||
+		item.includes('juvederm') ||
+		item.includes('radiesse') ||
+		item.includes('restylane')
+	) {
+		profitMargin = 0.35 // 35% profit margin
+	} else if (item.includes('skin') || item.includes('facial')) {
+		profitMargin = 0.65 // 65% profit margin
+	} else if (
+		item.includes('tirzepatide') ||
+		item.includes('semaglutide') ||
+		item.includes('ozempic') ||
+		item.includes('wegovy') ||
+		item.includes('mounjaro')
+	) {
+		profitMargin = 0.4 // 40% profit margin
+	} else if (item.includes('microneedling')) {
+		profitMargin = 0.75 // 75% profit margin
+	}
+
+	return revenue * profitMargin
+}
+
+/**
  * Format a date for display in ET timezone
  */
 function formatDateET(date: Date | string): string {
@@ -126,12 +167,8 @@ function formatETDateForInput(date: Date): string {
 
 /**
  * Generate an array of all dates between start and end dates, inclusive
- *
- * @param {Date} startDate - The start date
- * @param {Date} endDate - The end date
- * @returns {string[]} Array of dates in ISO format (YYYY-MM-DD)
  */
-function _getAllDatesBetween(startDate: Date, endDate: Date) {
+function getAllDatesBetween(startDate: Date, endDate: Date): string[] {
 	const dates = []
 	// Make sure we're working with dates in ET timezone
 	const start = toZonedTime(new Date(startDate), TIME_ZONE)
@@ -180,79 +217,67 @@ export async function loader({ request }: Route['LoaderArgs']) {
 			} else if (timeframe === '30d' || !timeframe) {
 				startDate.setDate(startDate.getDate() - 30)
 			} else if (timeframe === 'all') {
-				// For "all" time, use a very old start date
+				// For "all" time, use a much older start date
 				startDate = toZonedTime(new Date('2020-01-01'), TIME_ZONE)
 			}
 		}
 
-		const _dailyOverhead = 200 // Default $200 per day overhead
+		const dailyOverhead = 200 // Default $200 per day overhead
 
 		// Format dates for querying the database
 		const startDateStr = formatETDateForInput(startDate)
 		const endDateStr = formatETDateForInput(endDate)
 
-		// Check if we have an analysis in the database that covers this time period
 		console.log(
-			`Fetching analysis data for period ${startDateStr} to ${endDateStr}`,
+			`Calculating analysis data for period ${startDateStr} to ${endDateStr}, timeframe: ${timeframe}`,
 		)
 
-		// Get the latest analysis data from the database
-		const analysisData = await prisma.analysisData.findFirst({
+		// Query invoices from the database for the selected time period
+		const invoiceItems = await prisma.invoiceItem.findMany({
 			where: {
-				startDate: { lte: startDateStr },
-				endDate: { gte: endDateStr },
+				date: {
+					gte: startDate,
+					lte: new Date(endDate.getTime() + 24 * 60 * 60 * 1000), // Include full end date
+				},
 			},
 			orderBy: {
-				lastUpdated: 'desc',
-			},
-			include: {
-				dailyStats: {
-					where: {
-						date: {
-							gte: startDateStr,
-							lte: endDateStr,
-						},
-					},
-					orderBy: {
-						date: 'asc',
-					},
-				},
-				categoryStats: true,
+				date: 'asc',
 			},
 		})
 
-		if (!analysisData) {
-			// No analysis data found for this time range
-			console.log('No analysis data found in database for the requested period')
+		if (invoiceItems.length === 0) {
+			// No invoice data found for this time range
+			console.log('No invoice data found in database for the requested period')
 			return json<LoaderData>({
 				analysisResults: null,
 				error:
-					'No analysis data found for the selected time period. Please run the analysis script first.',
+					'No invoice data found for the selected time period. Please import invoices first by running npm run update-invoices.',
 			})
 		}
 
-		console.log(`Found analysis data with ID: ${analysisData.id}`)
+		console.log(`Found ${invoiceItems.length} invoice items for analysis`)
 
-		// Convert the database data to the format expected by the UI
+		// Get all days in the date range
+		const allDatesInRange = getAllDatesBetween(startDate, endDate)
+		const uniqueDays = allDatesInRange.length
+
+		// Initialize analysis stats
+		let totalRevenue = 0
+		let totalProfit = 0
+		let totalAppointments = 0
+
+		// Initialize daily stats with overhead
 		const dailyStats: DailyStats = {}
-		analysisData.dailyStats.forEach(
-			(stat: {
-				date: string
-				revenue: number
-				profit: number
-				count: number
-				overhead: number
-			}) => {
-				dailyStats[stat.date] = {
-					revenue: stat.revenue,
-					profit: stat.profit,
-					count: stat.count,
-					overhead: stat.overhead,
-				}
-			},
-		)
+		allDatesInRange.forEach(dateStr => {
+			dailyStats[dateStr] = {
+				revenue: 0,
+				profit: 0,
+				count: 0,
+				overhead: dailyOverhead,
+			}
+		})
 
-		// Convert category stats
+		// Initialize category stats
 		const categoryStats: CategoryStats = {
 			laser: { count: 0, revenue: 0, profit: 0 },
 			botox: { count: 0, revenue: 0, profit: 0 },
@@ -263,22 +288,56 @@ export async function loader({ request }: Route['LoaderArgs']) {
 			other: { count: 0, revenue: 0, profit: 0 },
 		}
 
-		analysisData.categoryStats.forEach(
-			(stat: {
+		// Process invoice items
+		invoiceItems.forEach(
+			(item: {
+				date: Date
+				collected: number
+				item: string
 				category: string
-				count: number
-				revenue: number
-				profit: number
 			}) => {
-				if (stat.category in categoryStats) {
-					categoryStats[stat.category as keyof CategoryStats] = {
-						count: stat.count,
-						revenue: stat.revenue,
-						profit: stat.profit,
-					}
+				const dateStr = formatInTimeZone(item.date, TIME_ZONE, 'yyyy-MM-dd')
+				const revenue = item.collected
+				const profit = calculateProfit(item.item, revenue)
+				const category = item.category as keyof CategoryStats
+
+				// Skip if date is outside our range (shouldn't happen with our query, but just in case)
+				if (!dailyStats[dateStr]) return
+
+				// Update daily stats
+				dailyStats[dateStr].revenue += revenue
+				dailyStats[dateStr].profit += profit
+				dailyStats[dateStr].count += 1
+
+				// Update totals
+				totalRevenue += revenue
+				totalProfit += profit
+				totalAppointments += 1
+
+				// Update category stats
+				if (category in categoryStats) {
+					categoryStats[category].revenue += revenue
+					categoryStats[category].profit += profit
+					categoryStats[category].count += 1
+				} else {
+					// Fallback to "other" for any unknown category
+					categoryStats.other.revenue += revenue
+					categoryStats.other.profit += profit
+					categoryStats.other.count += 1
 				}
 			},
 		)
+
+		// Calculate derived metrics
+		const totalOverhead = uniqueDays * dailyOverhead
+		const profitAfterOverhead = totalProfit - totalOverhead
+		const totalProfitMargin = calculateProfitMargin(totalProfit, totalRevenue)
+		const profitMarginAfterOverhead = calculateProfitMargin(
+			profitAfterOverhead,
+			totalRevenue,
+		)
+		const averageTransactionValue = totalRevenue / totalAppointments || 0
+		const averageProfitPerTransaction = totalProfit / totalAppointments || 0
 
 		// Create the analysis results in the format expected by the UI
 		const analysisResults: AnalysisResults = {
@@ -287,21 +346,21 @@ export async function loader({ request }: Route['LoaderArgs']) {
 				endDate: endDate.toISOString(),
 			},
 			summary: {
-				totalRevenue: analysisData.totalRevenue,
-				totalProfit: analysisData.totalProfit,
-				totalProfitMargin: analysisData.totalProfitMargin,
-				totalOverhead: analysisData.totalOverhead,
-				profitAfterOverhead: analysisData.profitAfterOverhead,
-				profitMarginAfterOverhead: analysisData.profitMarginAfterOverhead,
-				totalAppointments: analysisData.totalAppointments,
-				averageTransactionValue: analysisData.averageTransactionValue,
-				averageProfitPerTransaction: analysisData.averageProfitPerTransaction,
-				dailyOverhead: analysisData.dailyOverhead,
-				uniqueDays: analysisData.uniqueDays,
+				totalRevenue,
+				totalProfit,
+				totalProfitMargin,
+				totalOverhead,
+				profitAfterOverhead,
+				profitMarginAfterOverhead,
+				totalAppointments,
+				averageTransactionValue,
+				averageProfitPerTransaction,
+				dailyOverhead,
+				uniqueDays,
 			},
 			categoryStats,
 			dailyStats,
-			lastUpdated: analysisData.lastUpdated.toISOString(),
+			lastUpdated: new Date().toISOString(),
 		}
 
 		return json<LoaderData>({

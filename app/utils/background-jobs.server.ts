@@ -64,20 +64,40 @@ export async function runInvoiceDownloadJob(): Promise<void> {
 			'download-invoices.js',
 		)
 
-		// Execute the script
-		const { stdout, stderr } = await execAsync(`node ${scriptPath}`)
+		// Execute the download script
+		console.log('Downloading invoices...')
+		const downloadResult = await execAsync(`node ${scriptPath}`)
 
-		if (stderr) {
-			console.error('Invoice download error:', stderr)
+		if (downloadResult.stderr) {
+			console.error('Invoice download error:', downloadResult.stderr)
 			job.status = 'failed'
-			job.lastError = stderr
+			job.lastError = downloadResult.stderr
+			return
+		}
+
+		console.log('Invoice download completed:', downloadResult.stdout)
+
+		// Now run the import script to process the downloaded data
+		console.log('Importing invoices...')
+		const importScriptPath = path.join(
+			process.cwd(),
+			'scripts',
+			'import-invoices.js',
+		)
+
+		const importResult = await execAsync(`node ${importScriptPath}`)
+
+		if (importResult.stderr) {
+			console.error('Invoice import error:', importResult.stderr)
+			job.status = 'failed'
+			job.lastError = `Download succeeded but import failed: ${importResult.stderr}`
 		} else {
-			console.log('Invoice download completed:', stdout)
+			console.log('Invoice import completed:', importResult.stdout)
 			job.status = 'completed'
 			job.lastError = null
 		}
 	} catch (error) {
-		console.error('Invoice download failed:', error)
+		console.error('Invoice processing failed:', error)
 		job.status = 'failed'
 		job.lastError = error instanceof Error ? error.message : String(error)
 	} finally {

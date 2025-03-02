@@ -34,6 +34,8 @@
     "typecheck": "tsc",
     "validate": "run-p \"test -- --run\" lint typecheck test:e2e:run",
     "download-invoices": "node scripts/download-invoices.js",
+    "import-invoices": "node scripts/import-invoices.js",
+    "update-invoices": "npm run download-invoices && npm run import-invoices",
     "fetch-reviews": "node scripts/fetch-reviews.js",
     "analyze": "node scripts/analyze.js",
     "update-analytics": "npm run download-invoices && npm run fetch-reviews && npm run analyze"
