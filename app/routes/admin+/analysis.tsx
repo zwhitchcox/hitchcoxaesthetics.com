@@ -240,15 +240,25 @@ export async function loader({ request }: Route['LoaderArgs']) {
 		const dailyStats: DailyStats = {}
 
 		// Initialize all days in the date range with overhead
+		// Handle the "all" time case - ensure we don't have too many days
 		const allDatesInRange = getAllDatesBetween(startDate, endDate)
-		allDatesInRange.forEach(dateStr => {
-			dailyStats[dateStr] = {
-				revenue: 0,
-				profit: 0,
-				count: 0,
-				overhead: dailyOverhead,
-			}
-		})
+
+		// Limit the number of days if it's extremely large (for "all" time)
+		if (allDatesInRange.length > 1095) {
+			// > 3 years
+			console.log('Limiting days for performance in "all" time view')
+			// Only process days where we have actual data to avoid excessive memory usage
+		} else {
+			// For normal date ranges, initialize all days
+			allDatesInRange.forEach(dateStr => {
+				dailyStats[dateStr] = {
+					revenue: 0,
+					profit: 0,
+					count: 0,
+					overhead: dailyOverhead,
+				}
+			})
+		}
 
 		// Category counts and revenue tracking
 		const categoryStats = {
@@ -296,8 +306,17 @@ export async function loader({ request }: Route['LoaderArgs']) {
 			totalProfit += calculatedProfit
 			totalRevenue += total
 
-			// Track daily stats
+			// Track daily stats - ensure the date entry exists
 			const dateStr = purchaseDate.toISOString().split('T')[0]
+			if (!dailyStats[dateStr]) {
+				dailyStats[dateStr] = {
+					revenue: 0,
+					profit: 0,
+					count: 0,
+					overhead: dailyOverhead,
+				}
+			}
+
 			dailyStats[dateStr].revenue += total
 			dailyStats[dateStr].profit += calculatedProfit
 			dailyStats[dateStr].count += 1
@@ -770,10 +789,10 @@ export default function AnalysisDashboard() {
 					count: 0,
 					overhead: 0,
 				}
-				acc.revenue += dayStats.revenue
-				acc.profit += dayStats.profit
-				acc.appointments += dayStats.count
-				acc.overhead += dayStats.overhead
+				acc.revenue += dayStats.revenue || 0
+				acc.profit += dayStats.profit || 0
+				acc.appointments += dayStats.count || 0
+				acc.overhead += dayStats.overhead || 0
 				return acc
 			},
 			{ revenue: 0, profit: 0, appointments: 0, overhead: 0 },
@@ -796,13 +815,17 @@ export default function AnalysisDashboard() {
 				// Daily view - use filtered dates directly
 				return filteredDates.map(dateStr => {
 					const date = parseISO(dateStr)
+					const dayStats = dailyStats[dateStr] || {
+						revenue: 0,
+						profit: 0,
+						count: 0,
+						overhead: 0,
+					}
 					return {
 						date: dateStr,
 						label: formatInTimeZone(date, TIME_ZONE, 'MMM d'),
-						revenue: dailyStats[dateStr]?.revenue || 0,
-						profit:
-							(dailyStats[dateStr]?.profit || 0) -
-							(dailyStats[dateStr]?.overhead || 0),
+						revenue: dayStats.revenue || 0,
+						profit: (dayStats.profit || 0) - (dayStats.overhead || 0),
 					}
 				})
 			} else {
@@ -833,10 +856,15 @@ export default function AnalysisDashboard() {
 						}
 					}
 
-					const stats = dailyStats[dateStr]
-					weeklyData[weekKey].revenue += stats?.revenue || 0
+					const stats = dailyStats[dateStr] || {
+						revenue: 0,
+						profit: 0,
+						count: 0,
+						overhead: 0,
+					}
+					weeklyData[weekKey].revenue += stats.revenue || 0
 					weeklyData[weekKey].profit +=
-						(stats?.profit || 0) - (stats?.overhead || 0)
+						(stats.profit || 0) - (stats.overhead || 0)
 					weeklyData[weekKey].count++
 				})
 
