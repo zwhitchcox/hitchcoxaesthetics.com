@@ -113,14 +113,14 @@ function calculateProfit(item: string, revenue: number): number {
 		item.includes('dysport') ||
 		item.includes('xeomin')
 	) {
-		profitMargin = 0.35 // 35% profit margin
+		profitMargin = 0.45
 	} else if (
 		item.includes('dermal filler') ||
 		item.includes('juvederm') ||
 		item.includes('radiesse') ||
 		item.includes('restylane')
 	) {
-		profitMargin = 0.35 // 35% profit margin
+		profitMargin = 0.45 // 45% profit margin
 	} else if (item.includes('skin') || item.includes('facial')) {
 		profitMargin = 0.65 // 65% profit margin
 	} else if (
@@ -130,9 +130,9 @@ function calculateProfit(item: string, revenue: number): number {
 		item.includes('wegovy') ||
 		item.includes('mounjaro')
 	) {
-		profitMargin = 0.4 // 40% profit margin
+		profitMargin = 0.9 // 40% profit margin
 	} else if (item.includes('microneedling')) {
-		profitMargin = 0.75 // 75% profit margin
+		profitMargin = 0.91 // 91% profit margin
 	}
 
 	return revenue * profitMargin
