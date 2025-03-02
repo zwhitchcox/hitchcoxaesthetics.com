@@ -5,7 +5,10 @@ import {
 	useLoaderData,
 	useRouteError,
 	isRouteErrorResponse,
+	useSearchParams,
+	useNavigate,
 } from '@remix-run/react'
+import { parse } from 'csv-parse/sync'
 import * as d3 from 'd3'
 import {
 	// addDays, // Unused import
@@ -87,6 +90,59 @@ interface AnalysisResults {
 	lastUpdated: string
 }
 
+interface ProfitDetail {
+	item: string
+	total: number
+	calculatedProfit: number
+	status: string
+	date: Date
+}
+
+/**
+ * Calculate profit based on the item type and total amount
+ *
+ * @param {string} item The service/product item
+ * @param {number} total The total amount charged
+ * @returns {number} The calculated profit
+ */
+function calculateProfit(item: string, total: number) {
+	// Implement the profit calculation logic
+	if (item.match(/Laser|Touch Up Laser|Pigmented Lesion/i)) {
+		return total // 100% of total
+	} else if (item.match(/Botox|Lip Flip|Tox/i)) {
+		return total * 0.5 // 50% of total
+	} else if (item.match(/Microneedling/i)) {
+		// Ensure profit is not negative, minimum profit is $0
+		return Math.max(total - 35, 0)
+	} else if (item.match(/Skin|Juvederm|Filler/i)) {
+		return total * 0.5 // 50% of total
+	} else if (item.match(/Tirzepatide|Semaglutide/i)) {
+		return total * 0.9 // 90% of total
+	} else {
+		return total * 0.5 // Default: 50% of total
+	}
+}
+
+/**
+ * Generate an array of all dates between start and end dates, inclusive
+ *
+ * @param {Date} startDate - The start date
+ * @param {Date} endDate - The end date
+ * @returns {string[]} Array of dates in ISO format (YYYY-MM-DD)
+ */
+function getAllDatesBetween(startDate: Date, endDate: Date) {
+	const dates = []
+	const currentDate = new Date(startDate)
+
+	// Add one day at a time until we reach the end date
+	while (currentDate <= endDate) {
+		dates.push(currentDate.toISOString().split('T')[0])
+		currentDate.setDate(currentDate.getDate() + 1)
+	}
+
+	return dates
+}
+
 // Define loader data type
 type LoaderData = {
 	analysisResults: AnalysisResults | null
@@ -98,35 +154,203 @@ export async function loader({ request }: Route['LoaderArgs']) {
 	await requireUserWithRole(request, 'admin')
 
 	try {
-		// Read the analysis results from the JSON file
-		const analysisFilePath = path.join(
+		// Get URL params for date filtering
+		const url = new URL(request.url)
+		const timeframe = url.searchParams.get('timeframe') || '30d'
+		const startParam = url.searchParams.get('start')
+		const endParam = url.searchParams.get('end')
+
+		// Set date range based on parameters
+		const endDate = endParam ? new Date(endParam) : new Date()
+		let startDate: Date
+
+		if (startParam) {
+			startDate = new Date(startParam)
+		} else {
+			startDate = new Date()
+			if (timeframe === '7d') {
+				startDate.setDate(startDate.getDate() - 7)
+			} else if (timeframe === '30d' || !timeframe) {
+				startDate.setDate(startDate.getDate() - 30)
+			} else if (timeframe === 'all') {
+				// For "all" time, use a very old start date
+				startDate = new Date('2020-01-01')
+			}
+		}
+
+		const dailyOverhead = 200 // Default $200 per day overhead
+
+		// Path to the CSV file
+		const csvFilePath = path.join(
 			process.cwd(),
-			'data',
-			'analysis-results.json',
+			'downloads',
+			'table-extract.csv',
 		)
 
-		if (!fs.existsSync(analysisFilePath)) {
-			// Return empty data if the file doesn't exist yet
+		if (!fs.existsSync(csvFilePath)) {
+			// Return empty data if the file doesn't exist
 			return json<LoaderData>({
 				analysisResults: null,
-				error: 'Analysis data not found. Please run the analysis job first.',
+				error:
+					'Analysis data file not found. Please make sure table-extract.csv exists in the downloads directory.',
 			})
 		}
 
-		const analysisResults = JSON.parse(
-			fs.readFileSync(analysisFilePath, 'utf-8'),
-		) as AnalysisResults
+		// Read and parse the CSV file
+		const fileContent = fs.readFileSync(csvFilePath, { encoding: 'utf-8' })
+		const records = parse(fileContent, {
+			columns: true,
+			skip_empty_lines: true,
+			trim: true,
+			relaxColumnCount: true,
+		})
+
+		let totalProfit = 0
+		let totalRevenue = 0
+		const profitDetails: ProfitDetail[] = []
+		const dailyStats: DailyStats = {}
+
+		// Initialize all days in the date range with overhead
+		const allDatesInRange = getAllDatesBetween(startDate, endDate)
+		allDatesInRange.forEach(dateStr => {
+			dailyStats[dateStr] = {
+				revenue: 0,
+				profit: 0,
+				count: 0,
+				overhead: dailyOverhead,
+			}
+		})
+
+		// Category counts and revenue tracking
+		const categoryStats = {
+			laser: { count: 0, revenue: 0, profit: 0 },
+			botox: { count: 0, revenue: 0, profit: 0 },
+			filler: { count: 0, revenue: 0, profit: 0 },
+			skin: { count: 0, revenue: 0, profit: 0 },
+			weight: { count: 0, revenue: 0, profit: 0 }, // Tirzepatide/Semaglutide
+			microneedling: { count: 0, revenue: 0, profit: 0 },
+			other: { count: 0, revenue: 0, profit: 0 },
+		}
+
+		// Process each record
+		records.forEach((record: any) => {
+			const purchaseDate = new Date(record['Purchase Date'])
+
+			// Skip records outside the date range
+			if (purchaseDate < startDate || purchaseDate > endDate) {
+				return
+			}
+
+			const total = parseFloat(record.Total)
+			const item = record.Item
+			const status = record.Status
+
+			if (isNaN(total) || total === 0) {
+				return
+			}
+
+			// Skip records with status "no_charge" as they don't contribute to profit
+			if (status && status.toLowerCase() === 'no_charge') {
+				return
+			}
+
+			const calculatedProfit = calculateProfit(item, total)
+			profitDetails.push({
+				item,
+				total,
+				calculatedProfit,
+				status,
+				date: purchaseDate,
+			})
+
+			totalProfit += calculatedProfit
+			totalRevenue += total
+
+			// Track daily stats
+			const dateStr = purchaseDate.toISOString().split('T')[0]
+			dailyStats[dateStr].revenue += total
+			dailyStats[dateStr].profit += calculatedProfit
+			dailyStats[dateStr].count += 1
+
+			// Track category statistics
+			if (item.match(/Laser|Touch Up Laser|Pigmented Lesion/i)) {
+				categoryStats.laser.count++
+				categoryStats.laser.revenue += total
+				categoryStats.laser.profit += calculatedProfit
+			} else if (item.match(/Botox|Lip Flip|Tox/i)) {
+				categoryStats.botox.count++
+				categoryStats.botox.revenue += total
+				categoryStats.botox.profit += calculatedProfit
+			} else if (item.match(/Juvederm|Filler/i)) {
+				categoryStats.filler.count++
+				categoryStats.filler.revenue += total
+				categoryStats.filler.profit += calculatedProfit
+			} else if (item.match(/Skin/i)) {
+				categoryStats.skin.count++
+				categoryStats.skin.revenue += total
+				categoryStats.skin.profit += calculatedProfit
+			} else if (item.match(/Tirzepatide|Semaglutide/i)) {
+				categoryStats.weight.count++
+				categoryStats.weight.revenue += total
+				categoryStats.weight.profit += calculatedProfit
+			} else if (item.match(/Microneedling/i)) {
+				categoryStats.microneedling.count++
+				categoryStats.microneedling.revenue += total
+				categoryStats.microneedling.profit += calculatedProfit
+			} else {
+				categoryStats.other.count++
+				categoryStats.other.revenue += total
+				categoryStats.other.profit += calculatedProfit
+			}
+		})
+
+		// Calculate additional analytics
+		const totalAppointments = profitDetails.length
+		const averageTransactionValue = totalRevenue / totalAppointments || 0
+		const averageProfitPerTransaction = totalProfit / totalAppointments || 0
+		const totalProfitMargin = (totalProfit / totalRevenue) * 100 || 0
+
+		// Calculate overhead costs
+		const uniqueDays = allDatesInRange.length
+		const totalOverhead = uniqueDays * dailyOverhead
+		const profitAfterOverhead = totalProfit - totalOverhead
+		const profitMarginAfterOverhead =
+			(profitAfterOverhead / totalRevenue) * 100 || 0
+
+		// Create the analysis results
+		const analysisResults: AnalysisResults = {
+			dateRange: {
+				startDate: startDate.toISOString(),
+				endDate: endDate.toISOString(),
+			},
+			summary: {
+				totalRevenue,
+				totalProfit,
+				totalProfitMargin,
+				totalOverhead,
+				profitAfterOverhead,
+				profitMarginAfterOverhead,
+				totalAppointments,
+				averageTransactionValue,
+				averageProfitPerTransaction,
+				dailyOverhead,
+				uniqueDays,
+			},
+			categoryStats,
+			dailyStats,
+			lastUpdated: new Date().toISOString(),
+		}
 
 		return json<LoaderData>({
 			analysisResults,
 			error: null,
 		})
 	} catch (error) {
-		console.error('Error loading analysis data:', error)
+		console.error('Error performing analysis:', error)
 		return json<LoaderData>({
 			analysisResults: null,
 			error:
-				'Failed to load analysis data: ' +
+				'Failed to perform analysis: ' +
 				(error instanceof Error ? error.message : String(error)),
 		})
 	}
@@ -385,9 +609,15 @@ function createD3Chart(
 export default function AnalysisDashboard() {
 	const { analysisResults, error } = useLoaderData<typeof loader>()
 
-	const [timeframe, setTimeframe] = useState<'7d' | '30d' | 'all' | 'custom'>(
-		'30d',
-	)
+	// Get search params using Remix's useSearchParams
+	const [searchParams, setSearchParams] = useSearchParams()
+	const navigate = useNavigate()
+
+	const timeframe = searchParams.get('timeframe') || '30d'
+	const startDate =
+		searchParams.get('start') || format(subDays(new Date(), 30), 'yyyy-MM-dd')
+	const endDate = searchParams.get('end') || format(new Date(), 'yyyy-MM-dd')
+
 	const [graphView, setGraphView] = useState<'daily' | 'weekly'>('daily')
 	const chartRef = useRef<SVGSVGElement | null>(null)
 	const [chartWidth, setChartWidth] = useState(800)
@@ -396,24 +626,74 @@ export default function AnalysisDashboard() {
 
 	// Date range for custom filtering - use useMemo to prevent recreating on every render
 	const now = useMemo(() => new Date(), [])
-	const defaultStartDate = format(subDays(now, 30), 'yyyy-MM-dd')
-	const defaultEndDate = format(now, 'yyyy-MM-dd')
 
-	const [startDate, setStartDate] = useState(defaultStartDate)
-	const [endDate, setEndDate] = useState(defaultEndDate)
+	// Function to update URL parameters and navigate
+	const updateDateFilter = (
+		newTimeframe: string,
+		newStart?: string,
+		newEnd?: string,
+	) => {
+		const params = new URLSearchParams(searchParams)
 
-	// Update the date range when timeframe changes
-	useEffect(() => {
-		if (timeframe === '7d') {
-			setStartDate(format(subDays(now, 7), 'yyyy-MM-dd'))
-			setEndDate(format(now, 'yyyy-MM-dd'))
-		} else if (timeframe === '30d') {
-			setStartDate(format(subDays(now, 30), 'yyyy-MM-dd'))
-			setEndDate(format(now, 'yyyy-MM-dd'))
-		} else if (timeframe === 'all') {
-			// Don't change the dates for "all" - we'll ignore them anyway
+		// Update timeframe parameter
+		params.set('timeframe', newTimeframe)
+
+		// Handle start and end dates
+		if (newStart) params.set('start', newStart)
+		else if (params.has('start')) params.delete('start')
+
+		if (newEnd) params.set('end', newEnd)
+		else if (params.has('end')) params.delete('end')
+
+		// Use Remix navigate to update URL and reload the page
+		navigate(`?${params.toString()}`, { replace: true })
+	}
+
+	// Handle timeframe button clicks
+	const handleTimeframeChange = (
+		newTimeframe: '7d' | '30d' | 'all' | 'custom',
+	) => {
+		if (newTimeframe === '7d') {
+			updateDateFilter(
+				newTimeframe,
+				format(subDays(now, 7), 'yyyy-MM-dd'),
+				format(now, 'yyyy-MM-dd'),
+			)
+		} else if (newTimeframe === '30d') {
+			updateDateFilter(
+				newTimeframe,
+				format(subDays(now, 30), 'yyyy-MM-dd'),
+				format(now, 'yyyy-MM-dd'),
+			)
+		} else if (newTimeframe === 'all') {
+			updateDateFilter(newTimeframe)
+		} else if (newTimeframe === 'custom') {
+			updateDateFilter(newTimeframe, startDate, endDate)
 		}
-	}, [timeframe, now])
+	}
+
+	// Handle custom date changes - these don't trigger page reload
+	const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const newStart = e.target.value
+		const params = new URLSearchParams(searchParams)
+		params.set('start', newStart)
+		params.set('timeframe', 'custom')
+		setSearchParams(params)
+	}
+
+	const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const newEnd = e.target.value
+		const params = new URLSearchParams(searchParams)
+		params.set('end', newEnd)
+		params.set('timeframe', 'custom')
+		setSearchParams(params)
+	}
+
+	// Apply button for custom date range
+	const handleApplyDateRange = () => {
+		// Force reload with current params
+		navigate(`?${searchParams.toString()}`, { replace: true })
+	}
 
 	// Responsive chart sizing
 	useEffect(() => {
@@ -455,25 +735,8 @@ export default function AnalysisDashboard() {
 
 		lastUpdated = formatDate(analysisResults.lastUpdated)
 
-		// Filter daily stats by timeframe or custom date range
-		filteredDates = Object.keys(dailyStats || {})
-			.filter(dateStr => {
-				if (timeframe === 'all') return true
-
-				const date = parseISO(dateStr)
-
-				if (timeframe === 'custom') {
-					const customStart = parseISO(startDate)
-					const customEnd = parseISO(endDate)
-					return date >= customStart && date <= customEnd
-				}
-
-				const daysAgo = timeframe === '7d' ? 7 : 30
-				const cutoff = subDays(now, daysAgo)
-
-				return date >= cutoff
-			})
-			.sort()
+		// Simply use all dates from the dailyStats object - server has already filtered them
+		filteredDates = Object.keys(dailyStats || {}).sort()
 
 		// Calculate filtered sums and metrics
 		filteredStats = filteredDates.reduce(
@@ -593,8 +856,9 @@ export default function AnalysisDashboard() {
 					Business Analysis
 				</h1>
 				<div className="rounded-md border p-4">
-					No analysis data available. Please run the analysis job to generate
-					data.
+					No analysis data available. Make sure the CSV data file exists at
+					'downloads/table-extract.csv'. The analysis is performed automatically
+					when this page loads.
 				</div>
 			</div>
 		)
@@ -666,7 +930,7 @@ export default function AnalysisDashboard() {
 						<div className="mb-2 flex space-x-2">
 							<Button
 								variant={timeframe === '7d' ? 'default' : 'outline'}
-								onClick={() => setTimeframe('7d')}
+								onClick={() => handleTimeframeChange('7d')}
 								size="sm"
 							>
 								<Icon name="clock" className="mr-1 h-4 w-4" />
@@ -674,7 +938,7 @@ export default function AnalysisDashboard() {
 							</Button>
 							<Button
 								variant={timeframe === '30d' ? 'default' : 'outline'}
-								onClick={() => setTimeframe('30d')}
+								onClick={() => handleTimeframeChange('30d')}
 								size="sm"
 							>
 								<Icon name="clock" className="mr-1 h-4 w-4" />
@@ -682,7 +946,7 @@ export default function AnalysisDashboard() {
 							</Button>
 							<Button
 								variant={timeframe === 'all' ? 'default' : 'outline'}
-								onClick={() => setTimeframe('all')}
+								onClick={() => handleTimeframeChange('all')}
 								size="sm"
 							>
 								<Icon name="clock" className="mr-1 h-4 w-4" />
@@ -690,7 +954,7 @@ export default function AnalysisDashboard() {
 							</Button>
 							<Button
 								variant={timeframe === 'custom' ? 'default' : 'outline'}
-								onClick={() => setTimeframe('custom')}
+								onClick={() => handleTimeframeChange('custom')}
 								size="sm"
 							>
 								<Icon name="clock" className="mr-1 h-4 w-4" />
@@ -712,7 +976,7 @@ export default function AnalysisDashboard() {
 										type="date"
 										className="rounded-md border border-input bg-background px-3 py-1 text-sm"
 										value={startDate}
-										onChange={e => setStartDate(e.target.value)}
+										onChange={handleStartDateChange}
 										max={endDate}
 									/>
 								</div>
@@ -728,7 +992,7 @@ export default function AnalysisDashboard() {
 										type="date"
 										className="rounded-md border border-input bg-background px-3 py-1 text-sm"
 										value={endDate}
-										onChange={e => setEndDate(e.target.value)}
+										onChange={handleEndDateChange}
 										min={startDate}
 										max={format(now, 'yyyy-MM-dd')}
 									/>
@@ -737,12 +1001,7 @@ export default function AnalysisDashboard() {
 									size="sm"
 									className="mt-5"
 									variant="outline"
-									onClick={() => {
-										// Force refresh calculations
-										const temp = timeframe
-										setTimeframe('all')
-										setTimeout(() => setTimeframe(temp), 10)
-									}}
+									onClick={handleApplyDateRange}
 								>
 									Apply
 								</Button>
@@ -1248,15 +1507,17 @@ export default function AnalysisDashboard() {
 
 			<div className="text-center text-sm text-muted-foreground">
 				<Spacer size="2xs" />
-				<p>Run the analysis job to refresh this data.</p>
+				<p>Data is automatically analyzed on page load.</p>
 				<Spacer size="2xs" />
 				<Button
 					variant="outline"
 					size="sm"
-					onClick={() => (window.location.href = '/admin/bg')}
+					onClick={() =>
+						navigate(`?${searchParams.toString()}`, { replace: true })
+					}
 				>
 					<Icon name="update" className="mr-2 h-4 w-4" />
-					Go to Background Jobs
+					Refresh Analysis
 				</Button>
 				<Spacer size="md" />
 			</div>

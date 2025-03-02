@@ -7,7 +7,7 @@ import puppeteer from 'puppeteer'
 dotenv.config()
 
 // Helper function to add delays for debugging
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 // Cookie file path
 const COOKIE_PATH = path.join(process.cwd(), 'cookies.json')
@@ -132,6 +132,8 @@ async function loginAndDownloadInvoiceCSV() {
 		const startDate = new Date()
 		startDate.setMonth(startDate.getMonth() - 6)
 		const startDateStr = startDate.toISOString().split('T')[0]
+		console.log('startDateStr', startDateStr)
+		console.log('endDateStr', endDateStr)
 
 		const timestamp = Math.floor(Date.now() / 1000)
 
@@ -168,7 +170,7 @@ async function loginAndDownloadInvoiceCSV() {
 		// Rename the downloaded file to table-extract.csv
 		console.log('Renaming downloaded file...')
 		const files = fs.readdirSync(downloadsDir)
-		const csvFiles = files.filter((file) => file.endsWith('.csv'))
+		const csvFiles = files.filter(file => file.endsWith('.csv'))
 
 		if (csvFiles.length > 0) {
 			// Get the most recent CSV file
@@ -220,7 +222,7 @@ loginAndDownloadInvoiceCSV()
 		console.log('Invoice download completed successfully')
 		process.exit(0)
 	})
-	.catch((error) => {
+	.catch(error => {
 		console.error('Error in invoice download:', error)
 		process.exit(1)
 	})
