@@ -1,22 +1,19 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { json } from '@remix-run/node'
 import {
 	useLoaderData,
+	useNavigate,
+	useSearchParams,
 	useRouteError,
 	isRouteErrorResponse,
-	useSearchParams,
-	useNavigate,
 } from '@remix-run/react'
-import { parse } from 'csv-parse/sync'
 import * as d3 from 'd3'
 import { parseISO, subDays, startOfWeek } from 'date-fns'
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
-import { useState, useEffect, useRef, useMemo } from 'react'
-
+import * as React from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { Spacer } from '#app/components/spacer.tsx'
-import { Button } from '#app/components/ui/button.tsx'
-import { Icon } from '#app/components/ui/icon.tsx'
+import { Button } from '#app/components/ui/button'
+import { Icon } from '#app/components/ui/icon'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import {
 	Tooltip,
@@ -24,13 +21,12 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from '#app/components/ui/tooltip.tsx'
+import { prisma } from '#app/utils/db.server'
 import { requireUserWithRole } from '#app/utils/permissions.server'
-import {
-	calculateProfit,
-	getServiceCategory,
-	calculateProfitMargin,
-	parseCollectedAmount,
-} from '#app/utils/profit-calculations'
+import { calculateProfitMargin } from '#app/utils/profit-calculations'
+
+// Time zone constant
+const TIME_ZONE = 'America/New_York'
 
 // Define the Route type for this file
 export interface Route {
@@ -90,16 +86,13 @@ interface AnalysisResults {
 	lastUpdated: string
 }
 
-interface ProfitDetail {
+interface _ProfitDetail {
 	item: string
 	total: number
 	calculatedProfit: number
 	status: string
 	date: Date
 }
-
-// Define the time zone for all date operations
-const TIME_ZONE = 'America/New_York' // Eastern Time
 
 /**
  * Format a date for display in ET timezone
@@ -138,7 +131,7 @@ function formatETDateForInput(date: Date): string {
  * @param {Date} endDate - The end date
  * @returns {string[]} Array of dates in ISO format (YYYY-MM-DD)
  */
-function getAllDatesBetween(startDate: Date, endDate: Date) {
+function _getAllDatesBetween(startDate: Date, endDate: Date) {
 	const dates = []
 	// Make sure we're working with dates in ET timezone
 	const start = toZonedTime(new Date(startDate), TIME_ZONE)
@@ -165,25 +158,22 @@ type LoaderData = {
 }
 
 export async function loader({ request }: Route['LoaderArgs']) {
-	// First require admin role before proceeding
+	// Require admin role before proceeding
 	await requireUserWithRole(request, 'admin')
 
 	try {
-		// Get URL params for date filtering
+		// Parse URL search parameters to get timeframe
 		const url = new URL(request.url)
-		const timeframe = url.searchParams.get('timeframe') || '30d'
+		const timeframe = url.searchParams.get('timeframe')
 		const startParam = url.searchParams.get('start')
 		const endParam = url.searchParams.get('end')
 
-		// Set date range based on parameters - using ET timezone
-		const endDate = endParam
-			? toZonedTime(new Date(endParam), TIME_ZONE)
-			: getNowInET()
-		let startDate: Date
+		// Determine the date range based on the timeframe
+		let startDate = startParam ? parseETDate(startParam) : getNowInET()
+		let endDate = endParam ? parseETDate(endParam) : getNowInET()
 
-		if (startParam) {
-			startDate = toZonedTime(new Date(startParam), TIME_ZONE)
-		} else {
+		// Apply timeframe if specified (and no explicit start/end provided)
+		if (!startParam) {
 			startDate = getNowInET()
 			if (timeframe === '7d') {
 				startDate.setDate(startDate.getDate() - 7)
@@ -195,201 +185,123 @@ export async function loader({ request }: Route['LoaderArgs']) {
 			}
 		}
 
-		const dailyOverhead = 200 // Default $200 per day overhead
+		const _dailyOverhead = 200 // Default $200 per day overhead
 
-		// Path to the CSV file
-		const csvFilePath = path.join(
-			process.cwd(),
-			'downloads',
-			'table-extract.csv',
+		// Format dates for querying the database
+		const startDateStr = formatETDateForInput(startDate)
+		const endDateStr = formatETDateForInput(endDate)
+
+		// Check if we have an analysis in the database that covers this time period
+		console.log(
+			`Fetching analysis data for period ${startDateStr} to ${endDateStr}`,
 		)
 
-		if (!fs.existsSync(csvFilePath)) {
-			// Return empty data if the file doesn't exist
+		// Get the latest analysis data from the database
+		const analysisData = await prisma.analysisData.findFirst({
+			where: {
+				startDate: { lte: startDateStr },
+				endDate: { gte: endDateStr },
+			},
+			orderBy: {
+				lastUpdated: 'desc',
+			},
+			include: {
+				dailyStats: {
+					where: {
+						date: {
+							gte: startDateStr,
+							lte: endDateStr,
+						},
+					},
+					orderBy: {
+						date: 'asc',
+					},
+				},
+				categoryStats: true,
+			},
+		})
+
+		if (!analysisData) {
+			// No analysis data found for this time range
+			console.log('No analysis data found in database for the requested period')
 			return json<LoaderData>({
 				analysisResults: null,
 				error:
-					'Analysis data file not found. Please make sure table-extract.csv exists in the downloads directory.',
+					'No analysis data found for the selected time period. Please run the analysis script first.',
 			})
 		}
 
-		// Read and parse the CSV file
-		const fileContent = fs.readFileSync(csvFilePath, { encoding: 'utf-8' })
-		const records = parse(fileContent, {
-			columns: true,
-			skip_empty_lines: true,
-			trim: true,
-			relaxColumnCount: true,
-		})
+		console.log(`Found analysis data with ID: ${analysisData.id}`)
 
-		let totalProfit = 0
-		let totalRevenue = 0
-		const profitDetails: ProfitDetail[] = []
+		// Convert the database data to the format expected by the UI
 		const dailyStats: DailyStats = {}
-
-		// Initialize all days in the date range with overhead
-		// Handle the "all" time case - ensure we don't have too many days
-		const allDatesInRange = getAllDatesBetween(startDate, endDate)
-
-		// Limit the number of days if it's extremely large (for "all" time)
-		if (allDatesInRange.length > 1095) {
-			// > 3 years
-			console.log('Limiting days for performance in "all" time view')
-			// Only process days where we have actual data to avoid excessive memory usage
-		} else {
-			// For normal date ranges, initialize all days
-			allDatesInRange.forEach(dateStr => {
-				dailyStats[dateStr] = {
-					revenue: 0,
-					profit: 0,
-					count: 0,
-					overhead: dailyOverhead,
+		analysisData.dailyStats.forEach(
+			(stat: {
+				date: string
+				revenue: number
+				profit: number
+				count: number
+				overhead: number
+			}) => {
+				dailyStats[stat.date] = {
+					revenue: stat.revenue,
+					profit: stat.profit,
+					count: stat.count,
+					overhead: stat.overhead,
 				}
-			})
-		}
+			},
+		)
 
-		// Category counts and revenue tracking
-		const categoryStats = {
+		// Convert category stats
+		const categoryStats: CategoryStats = {
 			laser: { count: 0, revenue: 0, profit: 0 },
 			botox: { count: 0, revenue: 0, profit: 0 },
 			filler: { count: 0, revenue: 0, profit: 0 },
 			skin: { count: 0, revenue: 0, profit: 0 },
-			weight: { count: 0, revenue: 0, profit: 0 }, // Tirzepatide/Semaglutide
+			weight: { count: 0, revenue: 0, profit: 0 },
 			microneedling: { count: 0, revenue: 0, profit: 0 },
 			other: { count: 0, revenue: 0, profit: 0 },
 		}
 
-		// Process each record
-		records.forEach((record: any) => {
-			// Parse date and convert to ET timezone
-			const purchaseDate = parseETDate(record['Purchase Date'])
-
-			// Skip records outside the date range
-			if (purchaseDate < startDate || purchaseDate > endDate) {
-				return
-			}
-
-			// Use Collected field for revenue calculations
-			const collected = parseCollectedAmount(record)
-			const item = record.Item
-			const status = record.Status
-
-			if (isNaN(collected) || collected === 0) {
-				return
-			}
-
-			// Skip records with status "no_charge" as they don't contribute to profit
-			if (status && status.toLowerCase() === 'no_charge') {
-				return
-			}
-
-			const calculatedProfit = calculateProfit(item, collected)
-			profitDetails.push({
-				item,
-				total: collected, // Use collected instead of total
-				calculatedProfit,
-				status,
-				date: purchaseDate,
-			})
-
-			totalProfit += calculatedProfit
-			totalRevenue += collected // Use collected instead of total
-
-			// Track daily stats - ensure the date entry exists
-			const dateStr = formatInTimeZone(purchaseDate, TIME_ZONE, 'yyyy-MM-dd')
-			if (!dailyStats[dateStr]) {
-				dailyStats[dateStr] = {
-					revenue: 0,
-					profit: 0,
-					count: 0,
-					overhead: dailyOverhead,
+		analysisData.categoryStats.forEach(
+			(stat: {
+				category: string
+				count: number
+				revenue: number
+				profit: number
+			}) => {
+				if (stat.category in categoryStats) {
+					categoryStats[stat.category as keyof CategoryStats] = {
+						count: stat.count,
+						revenue: stat.revenue,
+						profit: stat.profit,
+					}
 				}
-			}
-
-			dailyStats[dateStr].revenue += collected
-			dailyStats[dateStr].profit += calculatedProfit
-			dailyStats[dateStr].count += 1
-
-			// Update category stats using the shared getServiceCategory function
-			const category = getServiceCategory(item)
-
-			// Update the appropriate category stats
-			switch (category) {
-				case 'laser':
-					categoryStats.laser.count++
-					categoryStats.laser.revenue += collected
-					categoryStats.laser.profit += calculatedProfit
-					break
-				case 'botox':
-					categoryStats.botox.count++
-					categoryStats.botox.revenue += collected
-					categoryStats.botox.profit += calculatedProfit
-					break
-				case 'filler':
-					categoryStats.filler.count++
-					categoryStats.filler.revenue += collected
-					categoryStats.filler.profit += calculatedProfit
-					break
-				case 'skin':
-					categoryStats.skin.count++
-					categoryStats.skin.revenue += collected
-					categoryStats.skin.profit += calculatedProfit
-					break
-				case 'weight':
-					categoryStats.weight.count++
-					categoryStats.weight.revenue += collected
-					categoryStats.weight.profit += calculatedProfit
-					break
-				case 'microneedling':
-					categoryStats.microneedling.count++
-					categoryStats.microneedling.revenue += collected
-					categoryStats.microneedling.profit += calculatedProfit
-					break
-				default:
-					categoryStats.other.count++
-					categoryStats.other.revenue += collected
-					categoryStats.other.profit += calculatedProfit
-					break
-			}
-		})
-
-		// Calculate additional analytics
-		const totalAppointments = profitDetails.length
-		const averageTransactionValue = totalRevenue / totalAppointments || 0
-		const averageProfitPerTransaction = totalProfit / totalAppointments || 0
-		const totalProfitMargin = calculateProfitMargin(totalProfit, totalRevenue)
-
-		// Calculate overhead costs
-		const uniqueDays = allDatesInRange.length
-		const totalOverhead = uniqueDays * dailyOverhead
-		const profitAfterOverhead = totalProfit - totalOverhead
-		const profitMarginAfterOverhead = calculateProfitMargin(
-			profitAfterOverhead,
-			totalRevenue,
+			},
 		)
 
-		// Create the analysis results
+		// Create the analysis results in the format expected by the UI
 		const analysisResults: AnalysisResults = {
 			dateRange: {
 				startDate: startDate.toISOString(),
 				endDate: endDate.toISOString(),
 			},
 			summary: {
-				totalRevenue,
-				totalProfit,
-				totalProfitMargin,
-				totalOverhead,
-				profitAfterOverhead,
-				profitMarginAfterOverhead,
-				totalAppointments,
-				averageTransactionValue,
-				averageProfitPerTransaction,
-				dailyOverhead,
-				uniqueDays,
+				totalRevenue: analysisData.totalRevenue,
+				totalProfit: analysisData.totalProfit,
+				totalProfitMargin: analysisData.totalProfitMargin,
+				totalOverhead: analysisData.totalOverhead,
+				profitAfterOverhead: analysisData.profitAfterOverhead,
+				profitMarginAfterOverhead: analysisData.profitMarginAfterOverhead,
+				totalAppointments: analysisData.totalAppointments,
+				averageTransactionValue: analysisData.averageTransactionValue,
+				averageProfitPerTransaction: analysisData.averageProfitPerTransaction,
+				dailyOverhead: analysisData.dailyOverhead,
+				uniqueDays: analysisData.uniqueDays,
 			},
 			categoryStats,
 			dailyStats,
-			lastUpdated: new Date().toISOString(),
+			lastUpdated: analysisData.lastUpdated.toISOString(),
 		}
 
 		return json<LoaderData>({
@@ -400,9 +312,7 @@ export async function loader({ request }: Route['LoaderArgs']) {
 		console.error('Error performing analysis:', error)
 		return json<LoaderData>({
 			analysisResults: null,
-			error:
-				'Failed to perform analysis: ' +
-				(error instanceof Error ? error.message : String(error)),
+			error: `Error performing analysis: ${error instanceof Error ? error.message : String(error)}`,
 		})
 	}
 }
@@ -1269,7 +1179,7 @@ export default function AnalysisDashboard() {
 											<div className="h-2.5 w-full rounded-full bg-muted">
 												<div
 													className="h-2.5 rounded-full bg-primary"
-													style={{ width: `${percentage}%` }}
+													style={{ width: `${Math.min(percentage, 100)}%` }}
 												></div>
 											</div>
 											<div className="mt-1 text-xs text-muted-foreground">

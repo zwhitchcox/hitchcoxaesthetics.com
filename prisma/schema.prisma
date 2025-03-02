@@ -369,3 +369,53 @@ model ReviewStats {
 
   @@index([locationId])
 }
+
+model DailyStats {
+  id         String       @id @default(cuid())
+  date       String // ISO date string YYYY-MM-DD in Eastern Time
+  revenue    Float        @default(0)
+  profit     Float        @default(0)
+  count      Int          @default(0)
+  overhead   Float        @default(0)
+  analysisId String
+  analysis   AnalysisData @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([date, analysisId])
+  @@index([analysisId, date])
+}
+
+model CategorySummary {
+  id         String       @id @default(cuid())
+  category   String // laser, botox, filler, etc.
+  count      Int          @default(0)
+  revenue    Float        @default(0)
+  profit     Float        @default(0)
+  analysisId String
+  analysis   AnalysisData @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([category, analysisId])
+  @@index([analysisId])
+}
+
+model AnalysisData {
+  id                          String   @id @default(cuid())
+  startDate                   String // ISO date string YYYY-MM-DD in Eastern Time
+  endDate                     String // ISO date string YYYY-MM-DD in Eastern Time
+  totalRevenue                Float    @default(0)
+  totalProfit                 Float    @default(0)
+  totalProfitMargin           Float    @default(0)
+  totalOverhead               Float    @default(0)
+  profitAfterOverhead         Float    @default(0)
+  profitMarginAfterOverhead   Float    @default(0)
+  totalAppointments           Int      @default(0)
+  averageTransactionValue     Float    @default(0)
+  averageProfitPerTransaction Float    @default(0)
+  dailyOverhead               Float    @default(0)
+  uniqueDays                  Int      @default(0)
+  lastUpdated                 DateTime @default(now())
+
+  dailyStats    DailyStats[]
+  categoryStats CategorySummary[]
+
+  @@index([startDate, endDate])
+}
