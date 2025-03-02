@@ -140,11 +140,18 @@ function formatETDateForInput(date: Date): string {
  */
 function getAllDatesBetween(startDate: Date, endDate: Date) {
 	const dates = []
-	const currentDate = new Date(startDate)
+	// Make sure we're working with dates in ET timezone
+	const start = toZonedTime(new Date(startDate), TIME_ZONE)
+	const end = toZonedTime(new Date(endDate), TIME_ZONE)
+
+	// Clone the start date to avoid modifying the original
+	const currentDate = new Date(start)
 
 	// Add one day at a time until we reach the end date
-	while (currentDate <= endDate) {
-		dates.push(currentDate.toISOString().split('T')[0])
+	while (currentDate <= end) {
+		// Format the date in ET timezone to ensure consistency
+		dates.push(formatInTimeZone(currentDate, TIME_ZONE, 'yyyy-MM-dd'))
+		// Add one day
 		currentDate.setDate(currentDate.getDate() + 1)
 	}
 
@@ -289,7 +296,7 @@ export async function loader({ request }: Route['LoaderArgs']) {
 			totalRevenue += collected // Use collected instead of total
 
 			// Track daily stats - ensure the date entry exists
-			const dateStr = purchaseDate.toISOString().split('T')[0]
+			const dateStr = formatInTimeZone(purchaseDate, TIME_ZONE, 'yyyy-MM-dd')
 			if (!dailyStats[dateStr]) {
 				dailyStats[dateStr] = {
 					revenue: 0,
@@ -809,7 +816,8 @@ export default function AnalysisDashboard() {
 			if (graphView === 'daily') {
 				// Daily view - use filtered dates directly
 				return filteredDates.map(dateStr => {
-					const date = parseISO(dateStr)
+					// Make sure to parse the date in ET timezone
+					const date = toZonedTime(parseISO(dateStr), TIME_ZONE)
 					const dayStats = dailyStats[dateStr] || {
 						revenue: 0,
 						profit: 0,
