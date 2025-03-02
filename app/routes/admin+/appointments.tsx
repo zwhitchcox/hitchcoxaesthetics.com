@@ -20,6 +20,12 @@ import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import { requireUserWithRole } from '#app/utils/permissions.server'
+import {
+	calculateProfit,
+	getServiceCategory,
+	calculateProfitMargin,
+	parseCollectedAmount,
+} from '#app/utils/profit-calculations'
 
 // Define the Route type for this file
 export interface Route {
@@ -67,31 +73,6 @@ function formatETDateForInput(date: Date): string {
 	return formatInTimeZone(date, TIME_ZONE, 'yyyy-MM-dd')
 }
 
-/**
- * Calculate profit based on the item type and total amount
- *
- * @param {string} item The service/product item
- * @param {number} total The total amount charged
- * @returns {number} The calculated profit
- */
-function calculateProfit(item: string, total: number) {
-	// Implement the profit calculation logic
-	if (item.match(/Laser|Touch Up Laser|Pigmented Lesion/i)) {
-		return total // 100% of total
-	} else if (item.match(/Botox|Lip Flip|Tox/i)) {
-		return total * 0.5 // 50% of total
-	} else if (item.match(/Microneedling/i)) {
-		// Ensure profit is not negative, minimum profit is $0
-		return Math.max(total - 35, 0)
-	} else if (item.match(/Skin|Juvederm|Filler/i)) {
-		return total * 0.5 // 50% of total
-	} else if (item.match(/Tirzepatide|Semaglutide/i)) {
-		return total * 0.9 // 90% of total
-	} else {
-		return total * 0.5 // Default: 50% of total
-	}
-}
-
 // Appointment interface for display
 interface Appointment {
 	id: string
@@ -111,24 +92,6 @@ type LoaderData = {
 	dateRange: {
 		startDate: string
 		endDate: string
-	}
-}
-
-function getServiceCategory(item: string): string {
-	if (item.match(/Laser|Touch Up Laser|Pigmented Lesion/i)) {
-		return 'laser'
-	} else if (item.match(/Botox|Lip Flip|Tox/i)) {
-		return 'botox'
-	} else if (item.match(/Juvederm|Filler/i)) {
-		return 'filler'
-	} else if (item.match(/Skin/i)) {
-		return 'skin'
-	} else if (item.match(/Tirzepatide|Semaglutide/i)) {
-		return 'weight'
-	} else if (item.match(/Microneedling/i)) {
-		return 'microneedling'
-	} else {
-		return 'other'
 	}
 }
 
@@ -208,11 +171,11 @@ export async function loader({ request }: Route['LoaderArgs']) {
 				return
 			}
 
-			const total = parseFloat(record.Total)
+			// Use Collected field for revenue calculations
+			const collected = parseCollectedAmount(record)
 			const item = record.Item
-			const status = record.Status
 
-			if (isNaN(total) || total === 0) {
+			if (isNaN(collected) || collected === 0) {
 				return
 			}
 
@@ -222,17 +185,17 @@ export async function loader({ request }: Route['LoaderArgs']) {
 				return
 			}
 
-			const profit = calculateProfit(item, total)
-			const profitMargin = (profit / total) * 100
+			const profit = calculateProfit(item, collected)
+			const itemProfitMargin = calculateProfitMargin(profit, collected)
 
 			appointments.push({
 				id: String(++counter), // Generate a unique ID
 				date: purchaseDate,
 				item,
-				total,
+				total: collected, // Use collected instead of total
 				profit,
-				profitMargin,
-				status: status || 'N/A',
+				profitMargin: itemProfitMargin,
+				status: record.Status || 'N/A',
 				category: appointmentCategory,
 			})
 		})

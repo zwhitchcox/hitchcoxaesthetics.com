@@ -25,6 +25,12 @@ import {
 	TooltipTrigger,
 } from '#app/components/ui/tooltip.tsx'
 import { requireUserWithRole } from '#app/utils/permissions.server'
+import {
+	calculateProfit,
+	getServiceCategory,
+	calculateProfitMargin,
+	parseCollectedAmount,
+} from '#app/utils/profit-calculations'
 
 // Define the Route type for this file
 export interface Route {
@@ -123,31 +129,6 @@ function parseETDate(dateString: string): Date {
  */
 function formatETDateForInput(date: Date): string {
 	return formatInTimeZone(date, TIME_ZONE, 'yyyy-MM-dd')
-}
-
-/**
- * Calculate profit based on the item type and total amount
- *
- * @param {string} item The service/product item
- * @param {number} total The total amount charged
- * @returns {number} The calculated profit
- */
-function calculateProfit(item: string, total: number) {
-	// Implement the profit calculation logic
-	if (item.match(/Laser|Touch Up Laser|Pigmented Lesion/i)) {
-		return total // 100% of total
-	} else if (item.match(/Botox|Lip Flip|Tox/i)) {
-		return total * 0.5 // 50% of total
-	} else if (item.match(/Microneedling/i)) {
-		// Ensure profit is not negative, minimum profit is $0
-		return Math.max(total - 35, 0)
-	} else if (item.match(/Skin|Juvederm|Filler/i)) {
-		return total * 0.5 // 50% of total
-	} else if (item.match(/Tirzepatide|Semaglutide/i)) {
-		return total * 0.9 // 90% of total
-	} else {
-		return total * 0.5 // Default: 50% of total
-	}
 }
 
 /**
@@ -281,11 +262,12 @@ export async function loader({ request }: Route['LoaderArgs']) {
 				return
 			}
 
-			const total = parseFloat(record.Total)
+			// Use Collected field for revenue calculations
+			const collected = parseCollectedAmount(record)
 			const item = record.Item
 			const status = record.Status
 
-			if (isNaN(total) || total === 0) {
+			if (isNaN(collected) || collected === 0) {
 				return
 			}
 
@@ -294,17 +276,17 @@ export async function loader({ request }: Route['LoaderArgs']) {
 				return
 			}
 
-			const calculatedProfit = calculateProfit(item, total)
+			const calculatedProfit = calculateProfit(item, collected)
 			profitDetails.push({
 				item,
-				total,
+				total: collected, // Use collected instead of total
 				calculatedProfit,
 				status,
 				date: purchaseDate,
 			})
 
 			totalProfit += calculatedProfit
-			totalRevenue += total
+			totalRevenue += collected // Use collected instead of total
 
 			// Track daily stats - ensure the date entry exists
 			const dateStr = purchaseDate.toISOString().split('T')[0]
@@ -317,39 +299,50 @@ export async function loader({ request }: Route['LoaderArgs']) {
 				}
 			}
 
-			dailyStats[dateStr].revenue += total
+			dailyStats[dateStr].revenue += collected
 			dailyStats[dateStr].profit += calculatedProfit
 			dailyStats[dateStr].count += 1
 
-			// Track category statistics
-			if (item.match(/Laser|Touch Up Laser|Pigmented Lesion/i)) {
-				categoryStats.laser.count++
-				categoryStats.laser.revenue += total
-				categoryStats.laser.profit += calculatedProfit
-			} else if (item.match(/Botox|Lip Flip|Tox/i)) {
-				categoryStats.botox.count++
-				categoryStats.botox.revenue += total
-				categoryStats.botox.profit += calculatedProfit
-			} else if (item.match(/Juvederm|Filler/i)) {
-				categoryStats.filler.count++
-				categoryStats.filler.revenue += total
-				categoryStats.filler.profit += calculatedProfit
-			} else if (item.match(/Skin/i)) {
-				categoryStats.skin.count++
-				categoryStats.skin.revenue += total
-				categoryStats.skin.profit += calculatedProfit
-			} else if (item.match(/Tirzepatide|Semaglutide/i)) {
-				categoryStats.weight.count++
-				categoryStats.weight.revenue += total
-				categoryStats.weight.profit += calculatedProfit
-			} else if (item.match(/Microneedling/i)) {
-				categoryStats.microneedling.count++
-				categoryStats.microneedling.revenue += total
-				categoryStats.microneedling.profit += calculatedProfit
-			} else {
-				categoryStats.other.count++
-				categoryStats.other.revenue += total
-				categoryStats.other.profit += calculatedProfit
+			// Update category stats using the shared getServiceCategory function
+			const category = getServiceCategory(item)
+
+			// Update the appropriate category stats
+			switch (category) {
+				case 'laser':
+					categoryStats.laser.count++
+					categoryStats.laser.revenue += collected
+					categoryStats.laser.profit += calculatedProfit
+					break
+				case 'botox':
+					categoryStats.botox.count++
+					categoryStats.botox.revenue += collected
+					categoryStats.botox.profit += calculatedProfit
+					break
+				case 'filler':
+					categoryStats.filler.count++
+					categoryStats.filler.revenue += collected
+					categoryStats.filler.profit += calculatedProfit
+					break
+				case 'skin':
+					categoryStats.skin.count++
+					categoryStats.skin.revenue += collected
+					categoryStats.skin.profit += calculatedProfit
+					break
+				case 'weight':
+					categoryStats.weight.count++
+					categoryStats.weight.revenue += collected
+					categoryStats.weight.profit += calculatedProfit
+					break
+				case 'microneedling':
+					categoryStats.microneedling.count++
+					categoryStats.microneedling.revenue += collected
+					categoryStats.microneedling.profit += calculatedProfit
+					break
+				default:
+					categoryStats.other.count++
+					categoryStats.other.revenue += collected
+					categoryStats.other.profit += calculatedProfit
+					break
 			}
 		})
 
@@ -357,14 +350,16 @@ export async function loader({ request }: Route['LoaderArgs']) {
 		const totalAppointments = profitDetails.length
 		const averageTransactionValue = totalRevenue / totalAppointments || 0
 		const averageProfitPerTransaction = totalProfit / totalAppointments || 0
-		const totalProfitMargin = (totalProfit / totalRevenue) * 100 || 0
+		const totalProfitMargin = calculateProfitMargin(totalProfit, totalRevenue)
 
 		// Calculate overhead costs
 		const uniqueDays = allDatesInRange.length
 		const totalOverhead = uniqueDays * dailyOverhead
 		const profitAfterOverhead = totalProfit - totalOverhead
-		const profitMarginAfterOverhead =
-			(profitAfterOverhead / totalRevenue) * 100 || 0
+		const profitMarginAfterOverhead = calculateProfitMargin(
+			profitAfterOverhead,
+			totalRevenue,
+		)
 
 		// Create the analysis results
 		const analysisResults: AnalysisResults = {
@@ -798,16 +793,16 @@ export default function AnalysisDashboard() {
 			{ revenue: 0, profit: 0, appointments: 0, overhead: 0 },
 		)
 
-		_filteredProfitMargin =
-			filteredStats.revenue > 0
-				? (filteredStats.profit / filteredStats.revenue) * 100
-				: 0
+		_filteredProfitMargin = calculateProfitMargin(
+			filteredStats.profit,
+			filteredStats.revenue,
+		)
 
 		filteredProfitAfterOverhead = filteredStats.profit - filteredStats.overhead
-		filteredProfitMarginAfterOverhead =
-			filteredStats.revenue > 0
-				? (filteredProfitAfterOverhead / filteredStats.revenue) * 100
-				: 0
+		filteredProfitMarginAfterOverhead = calculateProfitMargin(
+			filteredProfitAfterOverhead,
+			filteredStats.revenue,
+		)
 
 		// Prepare chart data
 		const prepareGraphData = (): GraphDataPoint[] => {
@@ -1414,10 +1409,10 @@ export default function AnalysisDashboard() {
 												? (stats.profit / stats.revenue) * 100
 												: 0
 										const profitAfterOverhead = stats.profit - stats.overhead
-										const marginAfterOverhead =
-											stats.revenue > 0
-												? (profitAfterOverhead / stats.revenue) * 100
-												: 0
+										const marginAfterOverhead = calculateProfitMargin(
+											profitAfterOverhead,
+											stats.revenue,
+										)
 
 										return (
 											<tr key={dateStr} className="border-t">
