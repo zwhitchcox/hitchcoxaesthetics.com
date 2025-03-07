@@ -106,7 +106,11 @@ function calculateProfit(item: string, revenue: number): number {
 	// Apply different profit margins based on service type
 	item = item?.toLowerCase() || ''
 
-	if (item.includes('laser') || item.includes('cold sculpting')) {
+	if (
+		item.includes('laser') ||
+		item.includes('cold sculpting') ||
+		item.includes('vascular')
+	) {
 		profitMargin = 0.95 // 95% profit margin
 	} else if (
 		item.includes('botox') ||

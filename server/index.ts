@@ -10,6 +10,7 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import getPort, { portNumbers } from 'get-port'
 import helmet from 'helmet'
+import { createProxyMiddleware } from 'http-proxy-middleware'
 import morgan from 'morgan'
 
 installGlobals()
@@ -81,6 +82,18 @@ app.get('*', (req, res, next) => {
 	) {
 		const newUrl = `https://hitchcoxaesthetics.com${req.url}`
 		return res.redirect(301, newUrl)
+	}
+	next()
+})
+
+// Proxy book.hitchcoxaesthetics.com to hitchcoxaesthetics.janeapp.com
+app.use((req, res, next) => {
+	if (req.hostname === 'book.hitchcoxaesthetics.com') {
+		return createProxyMiddleware({
+			target: 'https://hitchcoxaesthetics.janeapp.com',
+			changeOrigin: true,
+			secure: true,
+		})(req, res, next)
 	}
 	next()
 })
