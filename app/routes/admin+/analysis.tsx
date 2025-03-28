@@ -162,7 +162,8 @@ function getNowInET(): Date {
  */
 function parseETDate(dateString: string): Date {
 	// Parse the date string and convert to ET timezone
-	return toZonedTime(new Date(dateString), TIME_ZONE)
+	// Use parseISO to properly parse the date and account for timezone
+	return toZonedTime(parseISO(dateString), TIME_ZONE)
 }
 
 /**
@@ -306,7 +307,9 @@ export async function loader({ request }: Route['LoaderArgs']) {
 				item: string
 				category: string
 			}) => {
-				const dateStr = formatInTimeZone(item.date, TIME_ZONE, 'yyyy-MM-dd')
+				// Fix date handling to ensure proper timezone conversion
+				const itemDate = toZonedTime(item.date, TIME_ZONE)
+				const dateStr = formatInTimeZone(itemDate, TIME_ZONE, 'yyyy-MM-dd')
 				const revenue = item.collected
 				const profit = calculateProfit(item.item, revenue)
 				const category = item.category as keyof CategoryStats
