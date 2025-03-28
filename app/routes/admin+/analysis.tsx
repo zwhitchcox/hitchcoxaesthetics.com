@@ -644,9 +644,9 @@ export default function AnalysisDashboard() {
 		searchParams.get('start') || formatETDateForInput(subDays(getNowInET(), 30))
 	const endDate = searchParams.get('end') || formatETDateForInput(getNowInET())
 
-	const [graphView, setGraphView] = useState<'daily' | 'weekly' | 'monthly'>(
-		'daily',
-	)
+	// Use search param for graph view instead of local state
+	const graphView = searchParams.get('view') || 'daily'
+
 	const chartRef = useRef<SVGSVGElement | null>(null)
 	const [chartWidth, setChartWidth] = useState(800)
 	const [chartHeight, setChartHeight] = useState(400)
@@ -673,8 +673,8 @@ export default function AnalysisDashboard() {
 		if (newEnd) params.set('end', newEnd)
 		else if (params.has('end')) params.delete('end')
 
-		// Use Remix navigate to update URL and reload the page
-		navigate(`?${params.toString()}`, { replace: true })
+		// Use setSearchParams instead of navigate
+		setSearchParams(params)
 	}
 
 	// Handle timeframe button clicks
@@ -700,27 +700,32 @@ export default function AnalysisDashboard() {
 		}
 	}
 
-	// Handle custom date changes - these don't trigger page reload
+	// Handle custom date changes
 	const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const newStart = e.target.value
 		const params = new URLSearchParams(searchParams)
-		params.set('start', newStart)
+		params.set('start', e.target.value)
 		params.set('timeframe', 'custom')
 		setSearchParams(params)
 	}
 
 	const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const newEnd = e.target.value
 		const params = new URLSearchParams(searchParams)
-		params.set('end', newEnd)
+		params.set('end', e.target.value)
 		params.set('timeframe', 'custom')
 		setSearchParams(params)
 	}
 
 	// Apply button for custom date range
 	const handleApplyDateRange = () => {
-		// Force reload with current params
+		// Force reload with current params to get new data
 		navigate(`?${searchParams.toString()}`, { replace: true })
+	}
+
+	// Update view type via search params
+	const handleViewChange = (view: 'daily' | 'weekly' | 'monthly') => {
+		const params = new URLSearchParams(searchParams)
+		params.set('view', view)
+		setSearchParams(params)
 	}
 
 	// Responsive chart sizing
@@ -1098,21 +1103,21 @@ export default function AnalysisDashboard() {
 						</span>
 						<Button
 							variant={graphView === 'daily' ? 'default' : 'outline'}
-							onClick={() => setGraphView('daily')}
+							onClick={() => handleViewChange('daily')}
 							size="sm"
 						>
 							Daily
 						</Button>
 						<Button
 							variant={graphView === 'weekly' ? 'default' : 'outline'}
-							onClick={() => setGraphView('weekly')}
+							onClick={() => handleViewChange('weekly')}
 							size="sm"
 						>
 							Weekly
 						</Button>
 						<Button
 							variant={graphView === 'monthly' ? 'default' : 'outline'}
-							onClick={() => setGraphView('monthly')}
+							onClick={() => handleViewChange('monthly')}
 							size="sm"
 						>
 							Monthly
@@ -1688,13 +1693,7 @@ export default function AnalysisDashboard() {
 				<Spacer size="2xs" />
 				<p>Data is automatically analyzed on page load.</p>
 				<Spacer size="2xs" />
-				<Button
-					variant="outline"
-					size="sm"
-					onClick={() =>
-						navigate(`?${searchParams.toString()}`, { replace: true })
-					}
-				>
+				<Button variant="outline" size="sm" onClick={handleApplyDateRange}>
 					<Icon name="update" className="mr-2 h-4 w-4" />
 					Refresh Analysis
 				</Button>
