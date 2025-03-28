@@ -644,7 +644,9 @@ export default function AnalysisDashboard() {
 		searchParams.get('start') || formatETDateForInput(subDays(getNowInET(), 30))
 	const endDate = searchParams.get('end') || formatETDateForInput(getNowInET())
 
-	const [graphView, setGraphView] = useState<'daily' | 'weekly'>('daily')
+	const [graphView, setGraphView] = useState<'daily' | 'weekly' | 'monthly'>(
+		'daily',
+	)
 	const chartRef = useRef<SVGSVGElement | null>(null)
 	const [chartWidth, setChartWidth] = useState(800)
 	const [chartHeight, setChartHeight] = useState(400)
@@ -813,7 +815,7 @@ export default function AnalysisDashboard() {
 						profit: (dayStats.profit || 0) - (dayStats.overhead || 0),
 					}
 				})
-			} else {
+			} else if (graphView === 'weekly') {
 				// Weekly view - group by week
 				const weeklyData: Record<
 					string,
@@ -854,6 +856,48 @@ export default function AnalysisDashboard() {
 				})
 
 				return Object.entries(weeklyData)
+					.sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+					.map(([_, data]) => data)
+			} else {
+				// Monthly view - group by month
+				const monthlyData: Record<
+					string,
+					{
+						date: string
+						revenue: number
+						profit: number
+						count: number
+						label: string
+					}
+				> = {}
+
+				filteredDates.forEach(dateStr => {
+					const date = toZonedTime(parseISO(dateStr), TIME_ZONE)
+					const monthKey = formatInTimeZone(date, TIME_ZONE, 'yyyy-MM')
+
+					if (!monthlyData[monthKey]) {
+						monthlyData[monthKey] = {
+							date: monthKey,
+							revenue: 0,
+							profit: 0,
+							count: 0,
+							label: formatInTimeZone(date, TIME_ZONE, 'MMM yyyy'),
+						}
+					}
+
+					const stats = dailyStats[dateStr] || {
+						revenue: 0,
+						profit: 0,
+						count: 0,
+						overhead: 0,
+					}
+					monthlyData[monthKey].revenue += stats.revenue || 0
+					monthlyData[monthKey].profit +=
+						(stats.profit || 0) - (stats.overhead || 0)
+					monthlyData[monthKey].count++
+				})
+
+				return Object.entries(monthlyData)
 					.sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
 					.map(([_, data]) => data)
 			}
@@ -1066,6 +1110,13 @@ export default function AnalysisDashboard() {
 						>
 							Weekly
 						</Button>
+						<Button
+							variant={graphView === 'monthly' ? 'default' : 'outline'}
+							onClick={() => setGraphView('monthly')}
+							size="sm"
+						>
+							Monthly
+						</Button>
 					</div>
 				</div>
 
@@ -1099,7 +1150,11 @@ export default function AnalysisDashboard() {
 							</div>
 						</div>
 						<div className="text-xs text-muted-foreground">
-							{graphView === 'daily' ? 'Daily view' : 'Weekly view'}
+							{graphView === 'daily'
+								? 'Daily view'
+								: graphView === 'weekly'
+									? 'Weekly view'
+									: 'Monthly view'}
 						</div>
 					</div>
 
