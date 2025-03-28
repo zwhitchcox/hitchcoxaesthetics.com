@@ -224,6 +224,16 @@ export async function loader({ request }: Route['LoaderArgs']) {
 				startDate.setDate(startDate.getDate() - 7)
 			} else if (timeframe === '30d' || !timeframe) {
 				startDate.setDate(startDate.getDate() - 30)
+			} else if (timeframe === '3m') {
+				startDate.setDate(startDate.getDate() - 90) // 3 months ~= 90 days
+			} else if (timeframe === '6m') {
+				startDate.setDate(startDate.getDate() - 180) // 6 months ~= 180 days
+			} else if (timeframe === '1y') {
+				startDate.setDate(startDate.getDate() - 365) // 1 year ~= 365 days
+			} else if (timeframe === 'ytd') {
+				// Year to date - start from January 1st of current year
+				startDate = new Date(startDate.getFullYear(), 0, 1)
+				startDate = toZonedTime(startDate, TIME_ZONE)
 			} else if (timeframe === 'all') {
 				// For "all" time, use a much older start date
 				startDate = toZonedTime(new Date('2020-01-01'), TIME_ZONE)
@@ -679,7 +689,7 @@ export default function AnalysisDashboard() {
 
 	// Handle timeframe button clicks
 	const handleTimeframeChange = (
-		newTimeframe: '7d' | '30d' | 'all' | 'custom',
+		newTimeframe: '7d' | '30d' | '3m' | '6m' | '1y' | 'ytd' | 'all' | 'custom',
 	) => {
 		if (newTimeframe === '7d') {
 			updateDateFilter(
@@ -691,6 +701,32 @@ export default function AnalysisDashboard() {
 			updateDateFilter(
 				newTimeframe,
 				formatETDateForInput(subDays(now, 30)),
+				formatETDateForInput(now),
+			)
+		} else if (newTimeframe === '3m') {
+			updateDateFilter(
+				newTimeframe,
+				formatETDateForInput(subDays(now, 90)),
+				formatETDateForInput(now),
+			)
+		} else if (newTimeframe === '6m') {
+			updateDateFilter(
+				newTimeframe,
+				formatETDateForInput(subDays(now, 180)),
+				formatETDateForInput(now),
+			)
+		} else if (newTimeframe === '1y') {
+			updateDateFilter(
+				newTimeframe,
+				formatETDateForInput(subDays(now, 365)),
+				formatETDateForInput(now),
+			)
+		} else if (newTimeframe === 'ytd') {
+			// Year to date: from January 1st of the current year until today
+			const startOfYear = new Date(now.getFullYear(), 0, 1) // January 1st of current year
+			updateDateFilter(
+				newTimeframe,
+				formatETDateForInput(toZonedTime(startOfYear, TIME_ZONE)),
 				formatETDateForInput(now),
 			)
 		} else if (newTimeframe === 'all') {
@@ -1015,43 +1051,32 @@ export default function AnalysisDashboard() {
 			<div className="mb-10">
 				<div className="mb-4 flex flex-col space-y-4 sm:flex-row sm:items-end sm:space-x-4 sm:space-y-0">
 					<div>
-						<div className="mb-2 flex space-x-2">
-							<Button
-								variant={timeframe === '7d' ? 'default' : 'outline'}
-								onClick={() => handleTimeframeChange('7d')}
-								size="sm"
+						<div className="mb-2">
+							<label
+								htmlFor="timeframe-select"
+								className="mb-1 block pl-1 text-sm font-medium text-foreground"
 							>
-								<Icon name="clock" className="mr-1 h-4 w-4" />
-								Last 7 days
-							</Button>
-							<Button
-								variant={timeframe === '30d' ? 'default' : 'outline'}
-								onClick={() => handleTimeframeChange('30d')}
-								size="sm"
+								Time Frame
+							</label>
+							<select
+								id="timeframe-select"
+								className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm"
+								value={timeframe}
+								onChange={e => handleTimeframeChange(e.target.value as any)}
 							>
-								<Icon name="clock" className="mr-1 h-4 w-4" />
-								Last 30 days
-							</Button>
-							<Button
-								variant={timeframe === 'all' ? 'default' : 'outline'}
-								onClick={() => handleTimeframeChange('all')}
-								size="sm"
-							>
-								<Icon name="clock" className="mr-1 h-4 w-4" />
-								All time
-							</Button>
-							<Button
-								variant={timeframe === 'custom' ? 'default' : 'outline'}
-								onClick={() => handleTimeframeChange('custom')}
-								size="sm"
-							>
-								<Icon name="clock" className="mr-1 h-4 w-4" />
-								Custom
-							</Button>
+								<option value="7d">Last 7 days</option>
+								<option value="30d">Last 30 days</option>
+								<option value="3m">Last 3 months</option>
+								<option value="6m">Last 6 months</option>
+								<option value="1y">Last year</option>
+								<option value="ytd">Year to date</option>
+								<option value="all">All time</option>
+								<option value="custom">Custom range</option>
+							</select>
 						</div>
 
 						{timeframe === 'custom' && (
-							<div className="mt-2 flex items-center space-x-2">
+							<div className="mt-2 flex items-end space-x-2">
 								<div className="flex flex-col">
 									<label
 										htmlFor="start-date"
@@ -1087,7 +1112,6 @@ export default function AnalysisDashboard() {
 								</div>
 								<Button
 									size="sm"
-									className="mt-5"
 									variant="outline"
 									onClick={handleApplyDateRange}
 								>
@@ -1097,31 +1121,37 @@ export default function AnalysisDashboard() {
 						)}
 					</div>
 
-					<div className="ml-auto flex items-center space-x-2">
-						<span className="text-sm font-medium text-muted-foreground">
-							Graph view:
-						</span>
-						<Button
-							variant={graphView === 'daily' ? 'default' : 'outline'}
-							onClick={() => handleViewChange('daily')}
-							size="sm"
+					<div className="ml-auto flex flex-col">
+						<label
+							htmlFor="graph-view"
+							className="mb-1 block pl-1 text-sm font-medium text-foreground"
 						>
-							Daily
-						</Button>
-						<Button
-							variant={graphView === 'weekly' ? 'default' : 'outline'}
-							onClick={() => handleViewChange('weekly')}
-							size="sm"
-						>
-							Weekly
-						</Button>
-						<Button
-							variant={graphView === 'monthly' ? 'default' : 'outline'}
-							onClick={() => handleViewChange('monthly')}
-							size="sm"
-						>
-							Monthly
-						</Button>
+							Graph View
+						</label>
+						<div className="flex space-x-2">
+							<Button
+								id="graph-view"
+								variant={graphView === 'daily' ? 'default' : 'outline'}
+								onClick={() => handleViewChange('daily')}
+								size="sm"
+							>
+								Daily
+							</Button>
+							<Button
+								variant={graphView === 'weekly' ? 'default' : 'outline'}
+								onClick={() => handleViewChange('weekly')}
+								size="sm"
+							>
+								Weekly
+							</Button>
+							<Button
+								variant={graphView === 'monthly' ? 'default' : 'outline'}
+								onClick={() => handleViewChange('monthly')}
+								size="sm"
+							>
+								Monthly
+							</Button>
+						</div>
 					</div>
 				</div>
 
