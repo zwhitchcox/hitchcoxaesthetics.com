@@ -22,7 +22,7 @@ import {
 	cachifiedTimingReporter,
 	type Timings,
 } from '#/app/utils/timing.server.ts'
-import { updatePrimaryCacheValue } from '#app/routes/admin+/cache_.sqlite.server.ts'
+import { updatePrimaryCacheValue } from '#app/routes/cache+/cache_.sqlite.server.js'
 
 const CACHE_DATABASE_PATH = process.env.CACHE_DATABASE_PATH
 
