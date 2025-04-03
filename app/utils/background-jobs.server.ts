@@ -160,8 +160,8 @@ export function initializeBackgroundJobs() {
 		() => {
 			runInvoiceDownloadJob().catch(console.error)
 		},
-		60 * 60 * 1000,
-	) // 1 hour
+		15 * 60 * 1000,
+	) // 15 minutes
 
 	// Schedule the reviews fetch job to run daily
 	jobIntervals.reviewsFetch = setInterval(
