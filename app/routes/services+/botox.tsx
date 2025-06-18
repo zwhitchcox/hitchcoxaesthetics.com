@@ -7,7 +7,7 @@ import {
 } from './__service-layout'
 
 export const meta: MetaFunction = () => [
-	{ title: 'Botox | Knoxville | Sarah Hitchcox Aesthetics' },
+	{ title: 'Botox | Knoxville and Farragut | Sarah Hitchcox Aesthetics' },
 ]
 
 const bulletPoints = [

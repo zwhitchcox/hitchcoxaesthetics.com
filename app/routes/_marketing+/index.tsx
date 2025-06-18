@@ -5,7 +5,7 @@ import Logo from '#app/components/logo.js'
 // import { Button } from '#app/components/ui/button'
 
 export const meta: MetaFunction = () => [
-	{ title: 'Sarah Hitchcox Aesthetics | Knoxville Medical Spa' },
+	{ title: 'Sarah Hitchcox Aesthetics | Knoxville and Farragut Medical Spa' },
 ]
 
 export default function Index() {
@@ -35,7 +35,7 @@ export default function Index() {
 									AESTHETICS
 								</div>
 								<h1 className="text-md text-gray-600 sm:text-lg md:text-xl lg:text-2xl">
-									Knoxville Med Spa
+									Knoxville and Farragut Med Spa
 								</h1>
 							</div>
 						</div>

@@ -18,19 +18,19 @@ export default function About() {
 							Sarah Hitchcox, a Knoxville native and dedicated Registered Nurse,
 							specializes in medical aesthetics, bringing a unique combination
 							of clinical expertise and a passion for enhancing natural beauty
-							to the Knoxville area. With a background primarily in the
-							emergency department, Sarah has developed a profound understanding
-							of patient care and empathy, skills that she now applies in the
-							field of medical aesthetics. Believing in the power of
-							preventative treatments, she focuses on accentuating each
+							to the Knoxville and Farragut area. With a background primarily in
+							the emergency department, Sarah has developed a profound
+							understanding of patient care and empathy, skills that she now
+							applies in the field of medical aesthetics. Believing in the power
+							of preventative treatments, she focuses on accentuating each
 							client&apos;s natural beauty.
 						</p>
 						<p className="text-xl text-gray-700">
 							Currently working towards her Doctor of Nursing Practice degree,
 							Sarah is committed to staying at the forefront of nursing practice
-							and education. In Knoxville, she offers personalized concierge
-							Botox and dermal filler services, emphasizing patient safety,
-							satisfaction, and the celebration of individuality in her
+							and education. In Knoxville and Farragut, she offers personalized
+							concierge Botox and dermal filler services, emphasizing patient
+							safety, satisfaction, and the celebration of individuality in her
 							treatments. Sarah&apos;s practice is grounded in nurturing a
 							trusting relationship with each client, ensuring a seamless
 							journey to enhanced natural beauty.

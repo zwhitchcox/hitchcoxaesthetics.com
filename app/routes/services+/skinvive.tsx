@@ -3,7 +3,10 @@ import { ServiceFAQ, ServiceLayout, ServiceParagraph } from './__service-layout'
 
 export const meta: MetaFunction = () => {
 	return [
-		{ title: 'Juvederm SkinVive | Knoxville | Sarah Hitchcox Aesthetics' },
+		{
+			title:
+				'Juvederm SkinVive | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
+		},
 	]
 }
 

@@ -95,7 +95,10 @@ export const links: LinksFunction = () => {
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
 	return [
 		{ title: data ? 'Hitchcox Aesthetics' : 'Error | Hitchcox Aesthetics' },
-		{ name: 'description', content: `Med Spa in West Knoxville` },
+		{
+			name: 'description',
+			content: `Med Spa in the Knoxville and Farragut area`,
+		},
 	]
 }
 

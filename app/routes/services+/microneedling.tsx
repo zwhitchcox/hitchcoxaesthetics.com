@@ -34,7 +34,12 @@ const faq = [
 ]
 
 export const meta: MetaFunction = () => {
-	return [{ title: 'Microneedling | Knoxville | Sarah Hitchcox Aesthetics' }]
+	return [
+		{
+			title:
+				'Microneedling | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
+		},
+	]
 }
 
 export default function () {

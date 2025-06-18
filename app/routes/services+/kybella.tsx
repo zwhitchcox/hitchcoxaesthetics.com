@@ -40,7 +40,9 @@ const faq = [
 ]
 
 export const meta: MetaFunction = () => {
-	return [{ title: 'KYBELLA | Knoxville | Sarah Hitchcox Aesthetics' }]
+	return [
+		{ title: 'KYBELLA | Knoxville and Farragut | Sarah Hitchcox Aesthetics' },
+	]
 }
 
 export default function () {

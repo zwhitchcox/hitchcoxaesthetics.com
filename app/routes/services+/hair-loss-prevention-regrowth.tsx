@@ -5,7 +5,7 @@ export const meta: MetaFunction = () => {
 	return [
 		{
 			title:
-				'Microneedling for Hair Loss Prevention & Regrowth | Knoxville | Sarah Hitchcox Aesthetics',
+				'Microneedling for Hair Loss Prevention & Regrowth | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
 		},
 	]
 }

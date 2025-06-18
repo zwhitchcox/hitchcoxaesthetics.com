@@ -8,7 +8,8 @@ import {
 
 export const meta: MetaFunction = () => [
 	{
-		title: 'Skin Revitalization | Knoxville | Sarah Hitchcox Aesthetics',
+		title:
+			'Skin Revitalization | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
 	},
 ]
 const treatments = [

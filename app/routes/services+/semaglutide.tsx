@@ -8,7 +8,7 @@ import {
 export const meta: MetaFunction = () => [
 	{
 		title:
-			'Semaglutide (Ozempic) & Tirzepatide | Knoxville | Sarah Hitchcox Aesthetics',
+			'Semaglutide (Ozempic) & Tirzepatide | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
 	},
 ]
 
