@@ -48,7 +48,6 @@ import { Icon } from '#/app/components/ui/icon.tsx'
 import { EpicToaster } from '#/app/components/ui/sonner.tsx'
 import '#/app/styles/global.css'
 import tailwindStyleSheetUrl from '#/app/styles/tailwind.css?url'
-import { locations, formatAddress } from '#/app/utils/locations.ts'
 import { getUserId, logout } from '#/app/utils/auth.server.ts'
 import {
 	ClientHintCheck,
@@ -58,6 +57,7 @@ import {
 import { prisma } from '#/app/utils/db.server.ts'
 import { getEnv } from '#/app/utils/env.server.ts'
 import { honeypot } from '#/app/utils/honeypot.server.ts'
+import { locations, formatAddress } from '#/app/utils/locations.ts'
 import {
 	addGTM,
 	combineHeaders,
@@ -461,8 +461,8 @@ function Footer() {
 									loading="lazy"
 								></iframe>
 							</div>
-					</div>
-				))}
+						</div>
+					))}
 				</div>
 			</div>
 		</div>
@@ -677,6 +677,11 @@ function useLinks() {
 				to: '/services/microneedling',
 				label: 'Microneedling',
 				hint: 'improve acne scars and skin texture',
+			},
+			{
+				to: '/services/everesse',
+				label: 'Everesse',
+				hint: 'non-surgical skin tightening',
 			},
 			// 	],
 			// },
