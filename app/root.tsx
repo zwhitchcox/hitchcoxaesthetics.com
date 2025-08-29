@@ -651,7 +651,7 @@ function useLinks() {
 			{
 				to: '/services/semaglutide',
 				label: 'Weight Loss',
-				hint: 'semaglutide (ozempic) and tirzepatide injections',
+				hint: 'semaglutide (ozempic) and tirzepatide (zepbound) injections',
 			},
 			{
 				to: '/services/botox',
