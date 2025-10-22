@@ -8,14 +8,14 @@ import {
 export const meta: MetaFunction = () => [
 	{
 		title:
-			'Semaglutide (Ozempic) & Tirzepatide | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
+			'Semaglutide & Tirzepatide Weight Loss | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
 	},
 ]
 
 export default function () {
 	return (
 		<ServiceLayout
-			title="Semaglutide (Ozempic) & Tirzepatide Injections"
+			title="Semaglutide & Tirzepatide Injections"
 			description="for sustainable weight loss"
 			imgClassName="w-full h-full object-cover"
 			imgs={[
@@ -26,15 +26,13 @@ export default function () {
 			]}
 		>
 			<ServiceParagraph>
-				Achieve your weight loss goals with Semaglutide and Tirzepatide,
-				innovative medications designed to help regulate appetite and improve
-				blood sugar control. Semaglutide, the active ingredient in Ozempic, is
-				available at about half the price when prescribed as a generic
-				medication. These treatments are part of the GLP-1 receptor agonist
-				class, mimicking natural hormones in your body that promote feelings of
-				fullness and reduce cravings. Both medications are administered as
-				convenient, once-weekly injections, offering a safe, effective, and easy
-				way to support steady and sustainable weight loss.
+				Achieve your weight loss goals with compounded semaglutide and
+				tirzepatide, medications designed to help regulate appetite and improve
+				blood sugar control. These treatments are part of the GLP-1 receptor
+				agonist class, mimicking natural hormones in your body that promote
+				feelings of fullness and reduce cravings. Both medications are
+				administered as convenient, once-weekly injections, offering a safe,
+				effective, and easy way to support steady and sustainable weight loss.
 			</ServiceParagraph>
 
 			<ServiceHeader>
