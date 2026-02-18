@@ -6,7 +6,6 @@ const ImageCarousel = ({
 	className,
 	customClassNames,
 	altTexts,
-	labels,
 	interval = 4000,
 	transitionDuration = 2000,
 }: {
@@ -14,46 +13,48 @@ const ImageCarousel = ({
 	className?: string
 	customClassNames?: (string | undefined)[]
 	altTexts?: string[]
-	labels?: string[]
 	transitionDuration?: number
 	interval?: number
 }) => {
-	const [currentIndex, setCurrentIndex] = useState(0)
+	// Images arrive as [before1, after1, before2, after2, ...]
+	// We treat them as pairs. pairIndex picks which pair, showAfter toggles within.
+	const totalPairs = Math.max(1, Math.floor(images.length / 2))
+	const [pairIndex, setPairIndex] = useState(0)
+	const [showAfter, setShowAfter] = useState(false)
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-	const defaultLabels = images.length === 2 ? ['Before', 'After'] : undefined
-	const displayLabels = labels ?? defaultLabels
+	const currentImageIndex = pairIndex * 2 + (showAfter ? 1 : 0)
 
-	const startTimer = useCallback(() => {
+	const resetTimer = useCallback(() => {
 		if (timerRef.current) clearInterval(timerRef.current)
 		if (images.length <= 1) return
 		timerRef.current = setInterval(() => {
-			setCurrentIndex(prevIndex => (prevIndex + 1) % images.length)
+			setShowAfter(prev => !prev)
 		}, interval)
 	}, [images.length, interval])
 
 	useEffect(() => {
-		startTimer()
+		resetTimer()
 		return () => {
 			if (timerRef.current) clearInterval(timerRef.current)
 		}
-	}, [startTimer])
+	}, [resetTimer])
 
-	const goTo = (index: number) => {
-		setCurrentIndex(index)
-		startTimer() // Reset timer on manual click
+	const nextPair = () => {
+		setPairIndex(prev => (prev + 1) % totalPairs)
+		setShowAfter(false)
+		resetTimer()
 	}
 
-	const next = () => {
-		setCurrentIndex(prevIndex => (prevIndex + 1) % images.length)
-		startTimer()
+	const prevPair = () => {
+		setPairIndex(prev => (prev - 1 + totalPairs) % totalPairs)
+		setShowAfter(false)
+		resetTimer()
 	}
 
-	const prev = () => {
-		setCurrentIndex(
-			prevIndex => (prevIndex - 1 + images.length) % images.length,
-		)
-		startTimer()
+	const toggleBeforeAfter = (after: boolean) => {
+		setShowAfter(after)
+		resetTimer()
 	}
 
 	return (
@@ -64,7 +65,7 @@ const ImageCarousel = ({
 					src={image}
 					alt={altTexts?.[index] ?? `Slide ${index + 1}`}
 					className={`absolute left-0 top-0 w-full object-cover transition-opacity ${
-						index === currentIndex ? 'opacity-100' : 'opacity-0'
+						index === currentImageIndex ? 'opacity-100' : 'opacity-0'
 					} ${cn(className, customClassNames?.[index] ?? '')}`}
 					style={{
 						transitionDuration: `${transitionDuration}ms`,
@@ -75,88 +76,64 @@ const ImageCarousel = ({
 				/>
 			))}
 
-			{/* Navigation Controls */}
-			<div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 p-1 backdrop-blur-sm">
-				{/* Previous Button */}
-				{images.length > 1 && (
-					<button
-						onClick={prev}
-						className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
-						aria-label="Previous image"
-					>
-						<svg
-							className="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
+			{/* Navigation Controls: [<] [Before] [After] [>] */}
+			{images.length > 1 && (
+				<div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 p-1 backdrop-blur-sm">
+					{/* Previous Pair */}
+					{totalPairs > 1 && (
+						<button
+							onClick={prevPair}
+							className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+							aria-label="Previous photo"
 						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M15 19l-7-7 7-7"
-							/>
-						</svg>
-					</button>
-				)}
+							<svg
+								className="h-4 w-4"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M15 19l-7-7 7-7"
+								/>
+							</svg>
+						</button>
+					)}
 
-				{/* Before/After Toggles */}
-				<div className="flex gap-1">
+					{/* Before / After Toggle */}
 					<button
-						onClick={() => {
-							if (currentIndex % 2 !== 0) {
-								goTo(currentIndex - 1)
-							}
-						}}
-						className={cn(
-							'rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-300',
-							currentIndex % 2 === 0
-								? 'bg-white text-black shadow-sm'
-								: 'text-white/70 hover:text-white',
-						)}
+						onClick={() => toggleBeforeAfter(!showAfter)}
+						className="rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-white/20 hover:text-white"
 					>
-						Before
+						{showAfter ? 'After' : 'Before'}
 					</button>
-					<button
-						onClick={() => {
-							if (currentIndex % 2 === 0) {
-								goTo(currentIndex + 1)
-							}
-						}}
-						className={cn(
-							'rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-300',
-							currentIndex % 2 !== 0
-								? 'bg-white text-black shadow-sm'
-								: 'text-white/70 hover:text-white',
-						)}
-					>
-						After
-					</button>
+
+					{/* Next Pair */}
+					{totalPairs > 1 && (
+						<button
+							onClick={nextPair}
+							className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+							aria-label="Next photo"
+						>
+							<svg
+								className="h-4 w-4"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M9 5l7 7-7 7"
+								/>
+							</svg>
+						</button>
+					)}
 				</div>
-
-				{/* Next Button */}
-				{images.length > 1 && (
-					<button
-						onClick={next}
-						className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
-						aria-label="Next image"
-					>
-						<svg
-							className="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M9 5l7 7-7 7"
-							/>
-						</svg>
-					</button>
-				)}
-			</div>
+			)}
 		</>
 	)
 }
