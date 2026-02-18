@@ -23,12 +23,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		.filter(p => p.enabled)
 		.map(p => p.path)
 
-	// All location-service pages (knoxville-botox, farragut-filler, etc.)
+	// All manually authored location-service pages (knoxville-botox, farragut-filler, etc.)
 	const locationServicePaths = Object.keys(locationServices)
+
+	// Auto-generated location-prefixed pages (Case 3 in $.tsx):
+	// For every enabled service page, generate knoxville-{path} and farragut-{path}
+	// Only the first segment gets the location prefix, slashes are preserved:
+	// e.g. filler/cheek-filler → knoxville-filler/cheek-filler
+	const locationPrefixes = ['knoxville', 'farragut']
+	const autoLocationPaths = servicePagePaths.flatMap(p => {
+		const [first, ...rest] = p.split('/')
+		const locPath = rest.length ? `${first}/${rest.join('/')}` : first
+		return locationPrefixes.map(loc => `${loc}-${locPath}`)
+	})
 
 	// Combine and deduplicate
 	const allPaths = [
-		...new Set([...staticPaths, ...servicePagePaths, ...locationServicePaths]),
+		...new Set([
+			...staticPaths,
+			...servicePagePaths,
+			...locationServicePaths,
+			...autoLocationPaths,
+		]),
 	]
 
 	const urls = allPaths

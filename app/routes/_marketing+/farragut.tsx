@@ -31,7 +31,7 @@ export const meta: MetaFunction = () => [
 
 export async function loader() {
 	const categories = getCategoryPages().map(c => ({
-		slug: `farragut-${c.path.replace(/\//g, '-')}`,
+		slug: `farragut-${c.path}`,
 		serviceName: c.name,
 		shortDescription: c.shortDescription,
 		heroImage: getServiceImage(c.path, 'farragut') ?? c.heroImage,

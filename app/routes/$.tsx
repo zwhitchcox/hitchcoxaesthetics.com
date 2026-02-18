@@ -85,8 +85,12 @@ export async function loader({ params }: LoaderFunctionArgs) {
 		const ancestors = baseServicePage ? getAncestors(locPage.serviceSlug) : []
 		const siblings = baseServicePage ? getSiblings(locPage.serviceSlug) : []
 		const children = baseServicePage ? getChildren(locPage.serviceSlug) : []
-		const mapToLocationPath = (p: string) =>
-			`${locPage.locationId}-${p.replace(/\//g, '-')}`
+		const mapToLocationPath = (p: string) => {
+			const [first, ...rest] = p.split('/')
+			return rest.length
+				? `${locPage.locationId}-${first}/${rest.join('/')}`
+				: `${locPage.locationId}-${first}`
+		}
 		// Dynamically assign heroImage based on service + location
 		const dynamicHero = getServiceImage(locPage.serviceSlug, locPage.locationId)
 		const allImages = getAllServiceImages(locPage.serviceSlug)
@@ -136,15 +140,17 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	if (locationMatch) {
 		const [, locationId, remainder] = locationMatch
 		const locationName = locationId === 'knoxville' ? 'Knoxville' : 'Farragut'
-		const basePage = Object.values(sitePages).find(
-			p => p.path.replace(/\//g, '-') === remainder,
-		)
+		const basePage = Object.values(sitePages).find(p => p.path === remainder)
 		if (basePage && basePage.enabled) {
 			const ancestors = getAncestors(basePage.path)
 			const siblings = getSiblings(basePage.path)
 			const children = getChildren(basePage.path)
-			const mapToLocationPath = (p: string) =>
-				`${locationId}-${p.replace(/\//g, '-')}`
+			const mapToLocationPath = (p: string) => {
+				const [first, ...rest] = p.split('/')
+				return rest.length
+					? `${locationId}-${first}/${rest.join('/')}`
+					: `${locationId}-${first}`
+			}
 
 			const dynamicHero = getServiceImage(basePage.path, locationId)
 			const allImages = getAllServiceImages(basePage.path)
