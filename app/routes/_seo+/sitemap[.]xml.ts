@@ -12,7 +12,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		'about',
 		'knoxville',
 		'farragut',
-		'location',
+
 		'support',
 		'privacy',
 		'tos',
