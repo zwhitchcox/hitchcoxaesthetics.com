@@ -76,79 +76,50 @@ export function ServiceCardGrid({
 }) {
 	if (variant === 'thumbnail') {
 		return (
-			<div className="flex flex-col gap-8">
-				{services.map((service, index) => {
-					const isEven = index % 2 === 0
-					return (
-						<Link
-							key={service.slug}
-							to={`/${service.slug}`}
-							prefetch="intent"
-							className={cn(
-								'group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl md:h-80',
-								isEven ? 'md:flex-row' : 'md:flex-row-reverse',
-							)}
-						>
-							{service.heroImage && (
-								<div
-									className={cn(
-										'relative h-64 w-full shrink-0 md:h-full md:w-1/2',
-										isEven
-											? 'md:[clip-path:polygon(0_0,_85%_0,_100%_100%,_0%_100%)]'
-											: 'md:[clip-path:polygon(0_0,_100%_0,_100%_100%,_15%_100%)]',
-									)}
-								>
-									<div className="absolute inset-0 bg-gray-100/10" />
-									<BeforeAfterImage
-										src={service.heroImage}
-										alt={service.serviceName}
-										className="h-full w-full"
-									/>
-								</div>
-							)}
-							<div
-								className={cn(
-									'flex flex-1 flex-col justify-center p-6 md:p-12',
-									'items-start text-left',
-									!isEven && 'md:items-end md:text-right',
-								)}
-							>
-								<h3 className="mb-2 text-2xl font-bold text-gray-900 transition-colors group-hover:text-primary md:mb-4 md:text-3xl">
-									{service.serviceName}
-								</h3>
-								<p className="mb-4 line-clamp-4 text-base leading-relaxed text-gray-500 md:mb-6 md:text-lg">
-									{service.shortDescription}
-								</p>
-								<div
-									className={cn(
-										'mt-auto flex items-center text-base font-semibold text-gray-900 transition-colors group-hover:text-primary md:text-lg',
-										!isEven && 'md:flex-row-reverse',
-									)}
-								>
-									Learn More
-									<svg
-										className={cn(
-											'h-5 w-5 transition-transform duration-300',
-											'ml-2 group-hover:translate-x-1',
-											!isEven &&
-												'md:ml-0 md:mr-2 md:rotate-180 md:group-hover:-translate-x-1',
-										)}
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-									>
-										<path
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											strokeWidth={2}
-											d="M17 8l4 4m0 0l-4 4m4-4H3"
-										/>
-									</svg>
-								</div>
+			<div className="grid gap-6 sm:grid-cols-2">
+				{services.map(service => (
+					<Link
+						key={service.slug}
+						to={`/${service.slug}`}
+						prefetch="intent"
+						className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+					>
+						{service.heroImage && (
+							<div className="relative h-48 w-full shrink-0 sm:h-56">
+								<div className="absolute inset-0 bg-gray-100/10" />
+								<BeforeAfterImage
+									src={service.heroImage}
+									alt={service.serviceName}
+									className="h-full w-full"
+								/>
 							</div>
-						</Link>
-					)
-				})}
+						)}
+						<div className="flex flex-1 flex-col p-5">
+							<h3 className="mb-2 text-xl font-bold text-gray-900 transition-colors group-hover:text-primary">
+								{service.serviceName}
+							</h3>
+							<p className="mb-4 line-clamp-3 text-sm leading-relaxed text-gray-500">
+								{service.shortDescription}
+							</p>
+							<div className="mt-auto flex items-center text-sm font-semibold text-gray-900 transition-colors group-hover:text-primary">
+								Learn More
+								<svg
+									className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M17 8l4 4m0 0l-4 4m4-4H3"
+									/>
+								</svg>
+							</div>
+						</div>
+					</Link>
+				))}
 			</div>
 		)
 	}

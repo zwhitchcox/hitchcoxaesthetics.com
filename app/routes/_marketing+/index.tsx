@@ -3,8 +3,7 @@ import { Link, useLoaderData, useOutletContext } from '@remix-run/react'
 import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
-import { getServiceImage } from '#app/utils/service-images.js'
-import { getCategoryPages } from '#app/utils/site-pages.js'
+import { getCategoryPages } from '#app/utils/site-pages.server.js'
 
 export const meta: MetaFunction = () => [
 	{ title: 'Sarah Hitchcox Aesthetics | Knoxville and Farragut Medical Spa' },
@@ -29,7 +28,7 @@ export async function loader() {
 		slug: c.path,
 		serviceName: c.name,
 		shortDescription: c.shortDescription,
-		heroImage: getServiceImage(c.path) ?? c.heroImage,
+		heroImage: c.heroImage,
 	}))
 	return json({ categories })
 }

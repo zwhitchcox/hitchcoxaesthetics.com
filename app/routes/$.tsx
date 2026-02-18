@@ -11,11 +11,7 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import {
 	locationServices,
 	type ServicePageSection,
-} from '#app/utils/location-service-data.js'
-import {
-	getServiceImage,
-	getAllServiceImages,
-} from '#app/utils/service-images.js'
+} from '#app/utils/location-service-data.server.js'
 import {
 	getPage,
 	getChildren,
@@ -23,7 +19,7 @@ import {
 	getSiblings,
 	sitePages,
 	type SitePage,
-} from '#app/utils/site-pages.js'
+} from '#app/utils/site-pages.server.js'
 import {
 	FAQJsonLd,
 	ServiceCheckMarks,
@@ -42,8 +38,6 @@ type LoaderData = {
 	markdown: string
 	isLocationPage: boolean
 	baseServiceSlug?: string
-	/** All before/after image paths for the hero carousel */
-	serviceImages: string[]
 }
 
 export async function loader({ params }: LoaderFunctionArgs) {
@@ -56,17 +50,6 @@ export async function loader({ params }: LoaderFunctionArgs) {
 		const children = getChildren(splat)
 		const ancestors = getAncestors(splat)
 		const siblings = getSiblings(splat)
-		// Dynamically assign heroImage from before-after images
-		const dynamicHero = getServiceImage(splat)
-		if (dynamicHero) page.heroImage = dynamicHero
-		// Build full carousel image list (alternating before/after)
-		const allImages = getAllServiceImages(splat)
-		const serviceImages = allImages.flatMap(p => [p.before, p.after])
-		// Also assign images to children so card grids show images
-		for (const child of children) {
-			const childHero = getServiceImage(child.path)
-			if (childHero) child.heroImage = childHero
-		}
 		return json<LoaderData>({
 			page,
 			children,
@@ -74,7 +57,6 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			siblings,
 			markdown: page.content,
 			isLocationPage: false,
-			serviceImages,
 		})
 	}
 
@@ -91,10 +73,13 @@ export async function loader({ params }: LoaderFunctionArgs) {
 				? `${locPage.locationId}-${first}/${rest.join('/')}`
 				: `${locPage.locationId}-${first}`
 		}
-		// Dynamically assign heroImage based on service + location
-		const dynamicHero = getServiceImage(locPage.serviceSlug, locPage.locationId)
-		const allImages = getAllServiceImages(locPage.serviceSlug)
-		const serviceImages = allImages.flatMap(p => [p.before, p.after])
+
+		// Look up location-specific heroImage for children/siblings from locationServices
+		const getLocHeroImage = (servicePath: string) => {
+			const locSlug = mapToLocationPath(servicePath)
+			return locationServices[locSlug]?.heroImage
+		}
+
 		const locSitePage: SitePage = {
 			path: locPage.slug,
 			name: `${locPage.locationName} ${locPage.serviceName}`,
@@ -109,7 +94,8 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			whyChooseTitle: locPage.whyChooseTitle,
 			whyChoose: locPage.whyChoose,
 			ctaText: locPage.ctaText,
-			heroImage: dynamicHero ?? locPage.heroImage,
+			heroImage: locPage.heroImage,
+			heroImages: locPage.heroImages,
 		}
 		const markdown = `## ${locPage.h1}\n\n### ${locPage.h2}\n\n${locPage.introParagraph}\n\n${locPage.bodyParagraph}`
 
@@ -118,7 +104,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			children: children.map(c => ({
 				...c,
 				path: mapToLocationPath(c.path),
-				heroImage: getServiceImage(c.path, locPage.locationId) ?? c.heroImage,
+				heroImage: getLocHeroImage(c.path) ?? c.heroImage,
 			})),
 			ancestors: ancestors.map(a => ({
 				...a,
@@ -127,12 +113,11 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			siblings: siblings.map(s => ({
 				...s,
 				path: mapToLocationPath(s.path),
-				heroImage: getServiceImage(s.path, locPage.locationId) ?? s.heroImage,
+				heroImage: getLocHeroImage(s.path) ?? s.heroImage,
 			})),
 			markdown,
 			isLocationPage: true,
 			baseServiceSlug: locPage.serviceSlug,
-			serviceImages,
 		})
 	}
 
@@ -152,16 +137,12 @@ export async function loader({ params }: LoaderFunctionArgs) {
 					: `${locationId}-${first}`
 			}
 
-			const dynamicHero = getServiceImage(basePage.path, locationId)
-			const allImages = getAllServiceImages(basePage.path)
-			const serviceImages = allImages.flatMap(p => [p.before, p.after])
 			const locSitePage: SitePage = {
 				...basePage,
 				path: splat,
 				name: `${locationName} ${basePage.name}`,
 				locationId,
 				locationName,
-				heroImage: dynamicHero ?? basePage.heroImage,
 			}
 
 			return json<LoaderData>({
@@ -169,7 +150,6 @@ export async function loader({ params }: LoaderFunctionArgs) {
 				children: children.map(c => ({
 					...c,
 					path: mapToLocationPath(c.path),
-					heroImage: getServiceImage(c.path, locationId) ?? c.heroImage,
 				})),
 				ancestors: ancestors.map(a => ({
 					...a,
@@ -178,12 +158,10 @@ export async function loader({ params }: LoaderFunctionArgs) {
 				siblings: siblings.map(s => ({
 					...s,
 					path: mapToLocationPath(s.path),
-					heroImage: getServiceImage(s.path, locationId) ?? s.heroImage,
 				})),
 				markdown: basePage.content,
 				isLocationPage: true,
 				baseServiceSlug: basePage.path,
-				serviceImages,
 			})
 		}
 	}
@@ -211,20 +189,11 @@ export default function DynamicPage() {
 		markdown,
 		isLocationPage,
 		baseServiceSlug,
-		serviceImages,
 	} = useLoaderData<LoaderData>()
 
-	// Use all before/after images from the loader for the carousel.
-	// Falls back to deriving a single pair from heroImage if serviceImages is empty.
-	let imgs: string[]
-	if (serviceImages.length > 0) {
-		imgs = serviceImages
-	} else if (page.heroImage) {
-		const beforeImg = page.heroImage.replace('-after.', '-before.')
-		imgs = [beforeImg, page.heroImage]
-	} else {
-		imgs = []
-	}
+	// Carousel images: use heroImages (all before/after pairs) from content-loader
+	const imgs: string[] =
+		page.heroImages ?? (page.heroImage ? [page.heroImage] : [])
 
 	const childCards = (children ?? [])
 		.filter(c => c.enabled)

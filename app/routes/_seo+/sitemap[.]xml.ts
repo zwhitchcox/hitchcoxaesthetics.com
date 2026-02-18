@@ -1,7 +1,7 @@
 import { type LoaderFunctionArgs } from '@remix-run/node'
-import { locationServices } from '#app/utils/location-service-data.js'
+import { locationServices } from '#app/utils/location-service-data.server.js'
 import { getDomainUrl } from '#app/utils/misc.tsx'
-import { sitePages } from '#app/utils/site-pages.js'
+import { sitePages } from '#app/utils/site-pages.server.js'
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const siteUrl = getDomainUrl(request)

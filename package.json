@@ -106,6 +106,7 @@
     "get-port": "^7.0.0",
     "glob": "^10.3.10",
     "googleapis": "^144.0.0",
+    "gray-matter": "^4.0.3",
     "helmet": "^7.1.0",
     "http-proxy-middleware": "^3.0.3",
     "intl-parse-accept-language": "^1.0.0",

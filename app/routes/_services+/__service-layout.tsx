@@ -231,7 +231,7 @@ export function ServiceLayout({
 				className="bg-gray-50 px-6 py-12 pb-32 sm:px-12 lg:px-24"
 			>
 				<div className="flex w-full flex-col items-center justify-center space-y-12">
-					<div className="w-full max-w-2xl space-y-8">
+					<div className="w-full max-w-5xl space-y-8">
 						<div className="flex flex-col space-y-6">{children}</div>
 					</div>
 				</div>

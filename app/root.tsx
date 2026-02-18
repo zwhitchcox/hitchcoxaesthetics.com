@@ -70,9 +70,9 @@ import { setTheme, type Theme } from '#/app/utils/theme.server.ts'
 import { makeTimings, time } from '#/app/utils/timing.server.ts'
 import { getToast } from '#/app/utils/toast.server.ts'
 import { useOptionalUser, useUser } from '#/app/utils/user.ts'
-import { locationServices } from '#app/utils/location-service-data.js'
-import { menuLinks } from '#app/utils/menu-links.js'
-import { isServicePage } from '#app/utils/site-pages.js'
+import { locationServices } from '#/app/utils/location-service-data.server.ts'
+import { menuLinks } from '#/app/utils/menu-links.server.ts'
+import { isServicePage } from '#/app/utils/site-pages.server.ts'
 import { CTA } from './utils/cta'
 
 export const links: LinksFunction = () => {
@@ -190,13 +190,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const { toast, headers: toastHeaders } = await getToast(request)
 	const honeyProps = honeypot.getInputProps()
 
+	// Compute overlay header detection server-side
+	const pathname = new URL(request.url).pathname
+	const pathWithoutLeadingSlash = pathname.replace(/^\//, '')
+	const staticOverlayPages = new Set(['/', '/knoxville', '/farragut'])
+	const locationMatch = pathWithoutLeadingSlash.match(
+		/^(knoxville|farragut)-(.+)$/,
+	)
+	const isLocationServicePage = locationMatch
+		? isServicePage(locationMatch[2]!)
+		: false
+	const isOverlayPage =
+		staticOverlayPages.has(pathname) ||
+		isServicePage(pathWithoutLeadingSlash) ||
+		!!locationServices[pathWithoutLeadingSlash] ||
+		isLocationServicePage
+
 	return json(
 		{
 			user,
 			requestInfo: {
 				hints: getHints(request),
 				origin: getDomainUrl(request),
-				path: new URL(request.url).pathname,
+				path: pathname,
 				userPrefs: {
 					theme: 'light' as const, // getTheme(request),
 				},
@@ -204,6 +220,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			ENV: getEnv(),
 			toast,
 			honeyProps,
+			isOverlayPage,
+			menuLinks,
 		},
 		{
 			headers: combineHeaders(
@@ -406,22 +424,8 @@ function Header({
 	useEffect(() => {
 		setIsMenuOpen(false)
 	}, [location.pathname, setIsMenuOpen])
-	// const data = useLoaderData<typeof loader>()
-	// All service/category pages and location pages get overlay header
-	const staticOverlayPages = new Set(['/', '/knoxville', '/farragut'])
-	const pathWithoutLeadingSlash = location.pathname.replace(/^\//, '')
-	// Check if this is an auto-generated location page (Case 3: knoxville-*/farragut-*)
-	const locationMatch = pathWithoutLeadingSlash.match(
-		/^(knoxville|farragut)-(.+)$/,
-	)
-	const isLocationServicePage = locationMatch
-		? isServicePage(locationMatch[2]!)
-		: false
-	const isOverlayPage =
-		staticOverlayPages.has(location.pathname) ||
-		isServicePage(pathWithoutLeadingSlash) ||
-		!!locationServices[pathWithoutLeadingSlash] ||
-		isLocationServicePage
+	const data = useLoaderData<typeof loader>()
+	const isOverlayPage = data.isOverlayPage
 	const padding = !isOverlayPage
 	return (
 		<>
@@ -744,9 +748,10 @@ function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
 }
 
 function useLinks() {
+	const data = useLoaderData<typeof loader>()
 	return useMemo(() => {
-		return menuLinks
-	}, [])
+		return data.menuLinks
+	}, [data.menuLinks])
 }
 
 export function ErrorBoundary() {

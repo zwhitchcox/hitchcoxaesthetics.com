@@ -4,8 +4,7 @@ import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
 import { getLocationById } from '#app/utils/locations.js'
-import { getServiceImage } from '#app/utils/service-images.js'
-import { getCategoryPages } from '#app/utils/site-pages.js'
+import { getCategoryPages } from '#app/utils/site-pages.server.js'
 
 export const meta: MetaFunction = () => [
 	{
@@ -34,7 +33,7 @@ export async function loader() {
 		slug: `farragut-${c.path}`,
 		serviceName: c.name,
 		shortDescription: c.shortDescription,
-		heroImage: getServiceImage(c.path, 'farragut') ?? c.heroImage,
+		heroImage: c.heroImage,
 	}))
 	return json({ categories })
 }
