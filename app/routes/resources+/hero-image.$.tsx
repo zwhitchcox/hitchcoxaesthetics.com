@@ -1,7 +1,7 @@
-import { type LoaderFunctionArgs } from '@remix-run/node'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
+import { type LoaderFunctionArgs } from '@remix-run/node'
 
 export async function loader({ params }: LoaderFunctionArgs) {
 	const splat = params['*']

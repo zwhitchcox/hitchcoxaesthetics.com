@@ -461,33 +461,9 @@ export function loadAllLocationPages(): Record<string, LocationServiceData> {
 							// We can search the map for a category that claims this service? Expensive.
 							// Alternatively, rely on the fact that we migrated ALL images, so local images should exist.
 							// Inheritance is a fallback.
-							// Let's try to be smart:
-							// If currServiceUrl is "botox", check if "injectables" exists in map.
-							// But "laser-hair-removal" is in "laser-services".
-							// We can iterate CATEGORY_DIRS to see if any matches a key in map?
-							// Or just check all known categories:
-							const knownCategories = [
-								'injectables',
-								'laser-services',
-								'microneedling',
-								'weight-loss',
-							]
-							let foundParent = false
-							for (const cat of knownCategories) {
-								if (
-									cat !== currServiceUrl &&
-									serviceMap[cat] &&
-									currServiceUrl.startsWith(cat)
-								) {
-									// E.g. curr="injectables/botox" -> parent="injectables"
-									// But our URLs are usually "botox" not "injectables/botox".
-									// So this check is weak.
-								}
-								// If we are at "botox", we don't know it belongs to "injectables" without the file structure context.
-								// However, we populated `locMap` by scanning directories. We *could* have stored parent pointer.
-								// But `LocationServiceData` doesn't have parent pointer.
-							}
-							break // Can't easily infer parent category for top-level services without more data.
+							// Can't easily infer parent category for top-level services
+							// without more data (e.g. "botox" -> "injectables").
+							break
 						}
 					} else {
 						// "botox/forehead-lines" -> "botox"
