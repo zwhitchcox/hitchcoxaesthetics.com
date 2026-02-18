@@ -1,5 +1,4 @@
 import { Link } from '@remix-run/react'
-import { useState } from 'react'
 import { cn } from '#app/utils/misc.js'
 
 export type ServiceCardData = {
@@ -9,7 +8,12 @@ export type ServiceCardData = {
 	heroImage?: string
 }
 
-function FadingImage({
+/**
+ * Before/After image pair for service cards.
+ * Uses CSS group-hover from the parent card to toggle between images.
+ * Before shown by default, After revealed on card hover.
+ */
+function BeforeAfterImage({
 	src,
 	alt,
 	className,
@@ -18,14 +22,10 @@ function FadingImage({
 	alt: string
 	className?: string
 }) {
-	const [isHovered, setIsHovered] = useState(false)
-
-	// Determine if we have a pair
 	const isBeforeAfter = src.includes('-after.')
 	const beforeSrc = isBeforeAfter ? src.replace('-after.', '-before.') : null
 	const afterSrc = src
 
-	// If no pair, just show the single image
 	if (!beforeSrc) {
 		return (
 			<img
@@ -39,34 +39,28 @@ function FadingImage({
 	}
 
 	return (
-		<div
-			className={cn('relative h-full w-full overflow-hidden', className)}
-			onMouseEnter={() => setIsHovered(true)}
-			onMouseLeave={() => setIsHovered(false)}
-		>
-			{/* Before Image (Always present as base) */}
+		<div className={cn('relative h-full w-full overflow-hidden', className)}>
+			{/* Before — visible by default, hidden on card hover */}
 			<img
 				src={beforeSrc}
 				alt={`${alt} before`}
-				className="absolute inset-0 h-full w-full object-cover"
+				className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500 group-hover:opacity-0"
 				loading="lazy"
 				decoding="async"
 			/>
-			{/* After Image (Fades in on hover) */}
+			{/* After — hidden by default, visible on card hover */}
 			<img
 				src={afterSrc}
 				alt={`${alt} after`}
-				className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
-				style={{
-					opacity: isHovered ? 1 : 0,
-				}}
+				className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
 				loading="lazy"
 				decoding="async"
 			/>
-			{/* Label Badge */}
+			{/* Label — switches text via hidden/block on group-hover */}
 			<div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-black/50 px-2 py-0.5 backdrop-blur-[2px]">
 				<span className="text-[10px] font-medium uppercase tracking-wider text-white">
-					{isHovered ? 'After' : 'Before'}
+					<span className="group-hover:hidden">Before</span>
+					<span className="hidden group-hover:inline">After</span>
 				</span>
 			</div>
 		</div>
@@ -105,7 +99,7 @@ export function ServiceCardGrid({
 									)}
 								>
 									<div className="absolute inset-0 bg-gray-100/10" />
-									<FadingImage
+									<BeforeAfterImage
 										src={service.heroImage}
 										alt={service.serviceName}
 										className="h-full w-full"

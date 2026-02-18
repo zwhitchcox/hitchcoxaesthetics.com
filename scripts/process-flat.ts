@@ -1090,11 +1090,22 @@ async function stepDeploy() {
 		serviceGroups.get(service)!.push({ before: pair.before, after: pair.after })
 	}
 
-	// Clear and recreate deploy dir
-	if (fs.existsSync(DEPLOY_DIR)) {
-		fs.rmSync(DEPLOY_DIR, { recursive: true })
-	}
+	// Ensure deploy dir exists (additive — never wipe the whole directory)
 	fs.mkdirSync(DEPLOY_DIR, { recursive: true })
+
+	// Remove only the services we're about to redeploy, so stale numbering is cleaned up
+	// but other services' images are preserved.
+	const servicesToDeploy = new Set(serviceGroups.keys())
+	if (servicesToDeploy.size > 0) {
+		const existing = fs.readdirSync(DEPLOY_DIR)
+		for (const file of existing) {
+			// Extract service prefix from deployed filename, e.g. "botox-001-after.webp" → "botox"
+			const match = file.match(/^(.+)-\d{3}-(before|after)\.webp$/)
+			if (match && servicesToDeploy.has(match[1]!)) {
+				fs.unlinkSync(path.join(DEPLOY_DIR, file))
+			}
+		}
+	}
 
 	let totalCopied = 0
 	for (const [service, pairs] of [...serviceGroups.entries()].sort()) {
@@ -1118,7 +1129,7 @@ async function stepDeploy() {
 	}
 
 	console.log(
-		`\ndeploy summary: ${totalCopied} files copied to public/img/before-after/`,
+		`\ndeploy summary: ${totalCopied} files deployed to public/img/before-after/ (${servicesToDeploy.size} services updated, others preserved)`,
 	)
 }
 

@@ -593,15 +593,15 @@ export const locationServices: Record<string, LocationServiceData> = {
 		slug: 'knoxville-semaglutide',
 		locationName: 'Knoxville',
 		locationId: 'knoxville',
-		serviceName: 'Semaglutide & Tirzepatide Weight Loss',
+		serviceName: 'Semaglutide Weight Loss',
 		serviceSlug: 'semaglutide',
 		title: 'Semaglutide Weight Loss in Knoxville | Hitchcox',
 		metaDescription:
-			'Medical weight loss with semaglutide and tirzepatide at our Knoxville med spa on Kingston Pike. Personalized plans for lasting results. Start today.',
-		h1: 'Semaglutide & Tirzepatide Weight Loss in Knoxville',
+			'Medical weight loss with semaglutide at our Knoxville med spa on Kingston Pike. Personalized plans for lasting results. Start today.',
+		h1: 'Semaglutide Weight Loss in Knoxville',
 		h2: 'Medically Supervised Weight Loss at Our Knoxville Office',
 		introParagraph:
-			'Our Kingston Pike office in the Bearden area offers medically supervised weight loss programs featuring semaglutide and tirzepatide. These GLP-1 receptor agonists have transformed the weight loss landscape, helping patients achieve significant, sustainable results when combined with lifestyle modifications. Knoxville clients receive a comprehensive initial assessment, regular check-ins, and dosage adjustments to ensure safe, effective progress.',
+			'Our Kingston Pike office in the Bearden area offers medically supervised weight loss programs featuring semaglutide. This GLP-1 receptor agonist has transformed the weight loss landscape, helping patients achieve significant, sustainable results when combined with lifestyle modifications. Knoxville clients receive a comprehensive initial assessment, regular check-ins, and dosage adjustments to ensure safe, effective progress.',
 		bodyParagraph:
 			"Conveniently located in West Knoxville and just minutes from downtown, our clinic makes it easy to stay on track with your weight loss journey. We understand that every patient's metabolism and health history are different, which is why Sarah develops individualized protocols rather than one-size-fits-all plans. Our Knoxville team provides ongoing support and guidance, so you never feel like you are navigating this process alone.",
 		shortDescription:
@@ -609,7 +609,7 @@ export const locationServices: Record<string, LocationServiceData> = {
 		tagline: 'for sustainable weight loss',
 		whyChooseTitle: 'Expert Semaglutide Weight Loss Clinic in Knoxville, TN',
 		whyChoose:
-			'Sarah Hitchcox Aesthetics is a leading medical weight loss clinic in Knoxville, TN offering semaglutide, Ozempic, and tirzepatide programs with full medical supervision. Our weight loss injections in Knoxville are paired with personalized lifestyle guidance for sustainable results. If you are searching for semaglutide in Knoxville or a trusted weight loss clinic in Knoxville, our Bearden office provides the expert support and customized protocols you need to reach your goals.',
+			'Sarah Hitchcox Aesthetics is a leading medical weight loss clinic in Knoxville, TN offering semaglutide programs with full medical supervision. Our weight loss injections in Knoxville are paired with personalized lifestyle guidance for sustainable results. If you are searching for semaglutide in Knoxville or a trusted weight loss clinic in Knoxville, our Bearden office provides the expert support and customized protocols you need to reach your goals.',
 		ctaText: 'Book Weight Loss Consult in Knoxville',
 		sections: [
 			{
