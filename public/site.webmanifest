@@ -2,7 +2,23 @@
 	"name": "Hitchcox Aesthetics",
 	"short_name": "Hitchcox Aesthetics",
 	"start_url": "/",
-	"icons": [],
+	"icons": [
+		{
+			"src": "/favicons/favicon-32x32.png",
+			"sizes": "32x32",
+			"type": "image/png"
+		},
+		{
+			"src": "/favicons/apple-touch-icon.png",
+			"sizes": "180x180",
+			"type": "image/png"
+		},
+		{
+			"src": "/favicons/logo.svg",
+			"sizes": "any",
+			"type": "image/svg+xml"
+		}
+	],
 	"theme_color": "#A9ADC1",
 	"background_color": "#1f2028",
 	"display": "standalone"

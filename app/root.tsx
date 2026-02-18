@@ -98,7 +98,50 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 		{ title: data ? 'Hitchcox Aesthetics' : 'Error | Hitchcox Aesthetics' },
 		{
 			name: 'description',
-			content: `Med Spa in the Knoxville and Farragut area`,
+			content:
+				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and medical weight loss in Knoxville and Farragut, TN. Book your consultation today.',
+		},
+		// Open Graph
+		{ property: 'og:type', content: 'website' },
+		{ property: 'og:site_name', content: 'Sarah Hitchcox Aesthetics' },
+		{
+			property: 'og:title',
+			content: data
+				? 'Sarah Hitchcox Aesthetics | Knoxville & Farragut Med Spa'
+				: 'Error | Hitchcox Aesthetics',
+		},
+		{
+			property: 'og:description',
+			content:
+				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and medical weight loss in Knoxville and Farragut, TN. Book your consultation today.',
+		},
+		{
+			property: 'og:image',
+			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}/img/sarah.jpg`,
+		},
+		{ property: 'og:image:width', content: '1200' },
+		{ property: 'og:image:height', content: '630' },
+		{
+			property: 'og:url',
+			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}${data?.requestInfo.path ?? '/'}`,
+		},
+		{ property: 'og:locale', content: 'en_US' },
+		// Twitter Card
+		{ name: 'twitter:card', content: 'summary_large_image' },
+		{
+			name: 'twitter:title',
+			content: data
+				? 'Sarah Hitchcox Aesthetics | Knoxville & Farragut Med Spa'
+				: 'Error | Hitchcox Aesthetics',
+		},
+		{
+			name: 'twitter:description',
+			content:
+				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and medical weight loss in Knoxville and Farragut, TN.',
+		},
+		{
+			name: 'twitter:image',
+			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}/img/sarah.jpg`,
 		},
 	]
 }
@@ -209,12 +252,64 @@ function Document({
 	env?: Record<string, string>
 }) {
 	const isHydrated = useHydrated()
+	const location = useLocation()
+	const data = useLoaderData<typeof loader>()
+	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
+	const canonicalUrl = `${origin}${location.pathname}`
+
 	useEffect(() => {
 		if (typeof window === 'undefined' || !isHydrated) {
 			return
 		}
 		addGTM(ENV.GTM_ID!)
 	}, [isHydrated])
+
+	const localBusinessJsonLd = {
+		'@context': 'https://schema.org',
+		'@type': 'MedicalBusiness',
+		name: 'Sarah Hitchcox Aesthetics',
+		description:
+			'Medical spa offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss in Knoxville and Farragut, TN.',
+		url: 'https://hitchcoxaesthetics.com',
+		telephone: '(865) 214-7238',
+		email: 'sarah@hitchcoxaesthetics.com',
+		image: `${origin}/img/sarah.jpg`,
+		priceRange: '$$',
+		address: [
+			{
+				'@type': 'PostalAddress',
+				streetAddress: '5113 Kingston Pike Suite 15',
+				addressLocality: 'Knoxville',
+				addressRegion: 'TN',
+				postalCode: '37919',
+				addressCountry: 'US',
+			},
+			{
+				'@type': 'PostalAddress',
+				streetAddress: '102 S Campbell Station Rd Suite 8',
+				addressLocality: 'Knoxville',
+				addressRegion: 'TN',
+				postalCode: '37934',
+				addressCountry: 'US',
+			},
+		],
+		geo: {
+			'@type': 'GeoCoordinates',
+			latitude: 35.9392,
+			longitude: -83.9913,
+		},
+		sameAs: ['https://www.instagram.com/hitchcoxaesthetics/'],
+		founder: {
+			'@type': 'Person',
+			name: 'Sarah Hitchcox',
+			jobTitle: 'Registered Nurse, Aesthetic Injector',
+		},
+		medicalSpecialty: 'Dermatology',
+		areaServed: [
+			{ '@type': 'City', name: 'Knoxville' },
+			{ '@type': 'City', name: 'Farragut' },
+		],
+	}
 
 	return (
 		<html lang="en" className={`${theme} h-full overflow-x-hidden`}>
@@ -223,7 +318,15 @@ function Document({
 				<Meta />
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width,initial-scale=1" />
+				<link rel="canonical" href={canonicalUrl} />
 				<Links />
+				<script
+					nonce={nonce}
+					type="application/ld+json"
+					dangerouslySetInnerHTML={{
+						__html: JSON.stringify(localBusinessJsonLd),
+					}}
+				/>
 			</head>
 			<body className="bg-background text-foreground">
 				{children}
@@ -301,9 +404,14 @@ function Header({
 		setIsMenuOpen(false)
 	}, [location.pathname, setIsMenuOpen])
 	// const data = useLoaderData<typeof loader>()
-	const padding =
-		!['/'].includes(location.pathname) &&
-		!location.pathname.startsWith('/services')
+	// All service/category pages and location pages get overlay header
+	const staticOverlayPages = new Set(['/', '/knoxville', '/farragut'])
+	const pathWithoutLeadingSlash = location.pathname.replace(/^\//, '')
+	const isOverlayPage =
+		staticOverlayPages.has(location.pathname) ||
+		isServicePage(pathWithoutLeadingSlash) ||
+		!!locationServices[pathWithoutLeadingSlash]
+	const padding = !isOverlayPage
 	return (
 		<>
 			<header
@@ -409,35 +517,15 @@ function _Header() {
 function Footer() {
 	return (
 		<div className="container py-12 pb-32">
-			<div className="flex flex-col justify-between space-y-8 md:flex-row md:space-y-0">
-				<div className="flex flex-col space-y-4">
-					<h2 className="text-2xl font-semibold">Contact Us</h2>
-					<p className="text-lg">(865) 214-7238</p>
-					<p className="text-lg">sarah@hitchcoxaesthetics.com</p>
-				</div>
-				<div className="flex flex-col space-y-4 text-lg">
-					<h2 className="text-2xl font-semibold">Follow Us</h2>
-					<a
-						href="https://www.instagram.com/hitchcoxaesthetics/"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="text-lg hover:text-primary"
-					>
-						<Icon name="instagram-logo" className="h-6 w-6" />
-					</a>
-				</div>
-				<div className="flex flex-col space-y-4 text-lg">
-					<h2 className="text-2xl font-semibold">Legal</h2>
-					<Link to="/tos">Terms of Service</Link>
-					<Link to="/privacy">Privacy Policy</Link>
-				</div>
-			</div>
-			<div className="mt-12 border-t pt-8">
-				<h2 className="mb-6 text-2xl font-semibold">Our Locations</h2>
+			<div className="mb-12 border-b pb-8">
 				<div className="grid gap-8 md:grid-cols-2">
 					{locations.map(location => (
 						<div key={location.id} className="space-y-4">
-							<h3 className="text-xl font-semibold">{location.name}</h3>
+							<Link to={`/${location.id}`}>
+								<h3 className="text-xl font-semibold hover:text-primary hover:underline">
+									{location.name} Med Spa
+								</h3>
+							</Link>
 							<div className="space-y-2">
 								<p className="text-lg">{formatAddress(location)}</p>
 								<a
@@ -450,19 +538,31 @@ function Footer() {
 									Get Directions
 								</a>
 							</div>
-							<div className="h-64 w-full overflow-hidden rounded-lg">
-								<iframe
-									src={location.googleMapsEmbedUrl}
-									width="100%"
-									height="100%"
-									title={`Google Maps | Sarah Hitchcox Aesthetics - ${location.name}`}
-									style={{ border: 0 }}
-									allowFullScreen={false}
-									loading="lazy"
-								></iframe>
-							</div>
 						</div>
 					))}
+				</div>
+			</div>
+			<div className="flex flex-col justify-between space-y-8 md:flex-row md:space-y-0">
+				<div className="flex flex-col space-y-4">
+					<h2 className="text-2xl font-semibold">Contact Our Med Spa</h2>
+					<p className="text-lg">(865) 214-7238</p>
+					<p className="text-lg">sarah@hitchcoxaesthetics.com</p>
+				</div>
+				<div className="flex flex-col space-y-4 text-lg">
+					<h2 className="text-2xl font-semibold">Connect on Social Media</h2>
+					<a
+						href="https://www.instagram.com/hitchcoxaesthetics/"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="text-lg hover:text-primary"
+					>
+						<Icon name="instagram-logo" className="h-6 w-6" />
+					</a>
+				</div>
+				<div className="flex flex-col space-y-4 text-lg">
+					<h2 className="text-2xl font-semibold">Policies & Legal</h2>
+					<Link to="/tos">Terms of Service</Link>
+					<Link to="/privacy">Privacy Policy</Link>
 				</div>
 			</div>
 		</div>
@@ -632,118 +732,13 @@ function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
 	)
 }
 
+import { locationServices } from '#app/utils/location-service-data.js'
+import { menuLinks } from '#app/utils/menu-links.js'
+import { isServicePage } from '#app/utils/site-pages.js'
+
 function useLinks() {
 	return useMemo(() => {
-		const links: MenuLink[] = [
-			{
-				to: '/',
-				label: 'Home',
-			},
-			{
-				to: '/about',
-				label: 'About',
-				hint: 'learn more about Sarah Hitchcox',
-			},
-			// {
-			// 	label: 'Injectables & Skin Treatments',
-			// 	hint: 'botox, filler, microneedling, skinvive',
-			// 	subLinks: [
-			{
-				to: '/services/semaglutide',
-				label: 'Weight Loss',
-				hint: 'semaglutide (ozempic) and tirzepatide (zepbound) injections',
-			},
-			{
-				to: '/services/botox',
-				label: 'Botox',
-				hint: 'reduce wrinkles and fine lines',
-			},
-			{
-				to: '/services/filler',
-				label: 'Filler',
-				hint: 'restore youthful contours',
-			},
-			{
-				to: '/services/skinvive',
-				label: 'SkinVive',
-				hint: 'improve skin texture and glow',
-			},
-			{
-				to: '/services/kybella',
-				label: 'Kybella',
-				hint: 'reduce submental fat',
-			},
-			{
-				to: '/services/microneedling',
-				label: 'Microneedling',
-				hint: 'improve acne scars and skin texture',
-			},
-			{
-				to: '/services/everesse',
-				label: 'Everesse',
-				hint: 'non-surgical skin tightening',
-			},
-			// 	],
-			// },
-			{
-				label: 'Laser Services',
-				hint: 'brown spots, redness, hair removal, skin rejuvenation',
-				subLinks: [
-					{
-						to: '/services/skin-revitalization',
-						label: 'Skin Revitalization',
-						hint: 'address fine lines, wrinkles, and pores',
-					},
-					{
-						to: '/services/pigmented-lesion-reduction',
-						label: 'Pigmentation Correction',
-						hint: 'reduce sun spots, age spots, and freckles',
-					},
-					{
-						to: '/services/vascular-lesion-reduction',
-						label: 'Vein & Redness Treatment',
-						hint: 'minimize spider veins and redness',
-					},
-					{
-						to: '/services/laser-hair-removal',
-						label: 'Laser Hair Removal',
-						hint: 'long-lasting hair reduction for all skin types',
-					},
-				],
-			},
-			{
-				to: '/services/hair-loss-prevention-regrowth',
-				label: 'Hair Restoration',
-				hint: 'solutions for thinning hair and receding hairlines',
-			},
-			{
-				to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
-				label: 'Pricing/Book Online',
-				hint: 'schedule your personalized treatment plan',
-			},
-			{
-				to: '/location',
-				label: 'Find Us',
-				hint: 'find our location',
-			},
-			{
-				label: 'Links',
-				subLinks: [
-					{
-						to: 'https://hitchcoxaesthetics.brilliantconnections.com/',
-						label: 'SkinMedica Shop',
-						hint: 'medical grade skincare products',
-					},
-					{
-						to: 'https://alle.com/',
-						label: 'Alle Rewards',
-						hint: 'earn rewards on treatments',
-					},
-				],
-			},
-		]
-
-		return links
+		return menuLinks
 	}, [])
 }
 

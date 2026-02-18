@@ -1,4 +1,27 @@
+import { type MetaFunction } from '@remix-run/node'
 import Logo from '#app/components/logo.js'
+
+export const meta: MetaFunction = () => [
+	{
+		title:
+			'Location & Directions | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
+	},
+	{
+		name: 'description',
+		content:
+			'Visit Sarah Hitchcox Aesthetics in Knoxville (5113 Kingston Pike) and Farragut (102 S Campbell Station Rd). Botox, fillers, laser treatments, and more. Book your visit today.',
+	},
+	{
+		property: 'og:title',
+		content:
+			'Find Us | Sarah Hitchcox Aesthetics in Knoxville and Farragut, TN',
+	},
+	{
+		property: 'og:description',
+		content:
+			'Visit Sarah Hitchcox Aesthetics in Knoxville and Farragut, TN for Botox, fillers, laser treatments, and more.',
+	},
+]
 
 export function ServiceHeader({ children }: { children: React.ReactNode }) {
 	return <h2 className="text-3xl font-semibold text-gray-700">{children}</h2>

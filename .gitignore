@@ -31,3 +31,13 @@ vite.config.*.timestamp-*
 /debug/
 /data/
 cookies.json
+
+# Image processing
+public/img/candidates/
+public/img/candidates-new/
+public/img/split/
+public/img/processed/
+public/img/flat-for-bg-removal/
+processing-images/
+processing-images-archive/
+.visited-urls
