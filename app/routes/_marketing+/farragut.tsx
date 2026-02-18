@@ -3,7 +3,7 @@ import { Link, useLoaderData } from '@remix-run/react'
 import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
-import { getLocationById, formatAddress } from '#app/utils/locations.js'
+import { getLocationById } from '#app/utils/locations.js'
 import { getServiceImage } from '#app/utils/service-images.js'
 import { getCategoryPages } from '#app/utils/site-pages.js'
 
@@ -129,12 +129,13 @@ export default function FarragutLocation() {
 								heart of Farragut. Ample parking is available.
 							</p>
 							<div className="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-								<a
-									href="tel:8652147238"
+								<Link
+									to="tel:8652147238"
+									reloadDocument
 									className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
 								>
 									Call (865) 214-7238
-								</a>
+								</Link>
 								<a
 									href={location.googleMapsDirectionsUrl}
 									target="_blank"

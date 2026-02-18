@@ -31,7 +31,7 @@ import { useHydrated } from 'remix-utils/use-hydrated'
 import { z } from 'zod'
 
 import { GeneralErrorBoundary } from '#/app/components/error-boundary.tsx'
-import { ListWithDot, type MenuLink } from '#/app/components/list-with-dot'
+import { ListWithDot } from '#/app/components/list-with-dot'
 import Logo from '#/app/components/logo'
 import { EpicProgress } from '#/app/components/progress-bar.tsx'
 import { SearchBar } from '#/app/components/search-bar.tsx'
@@ -70,6 +70,9 @@ import { setTheme, type Theme } from '#/app/utils/theme.server.ts'
 import { makeTimings, time } from '#/app/utils/timing.server.ts'
 import { getToast } from '#/app/utils/toast.server.ts'
 import { useOptionalUser, useUser } from '#/app/utils/user.ts'
+import { locationServices } from '#app/utils/location-service-data.js'
+import { menuLinks } from '#app/utils/menu-links.js'
+import { isServicePage } from '#app/utils/site-pages.js'
 import { CTA } from './utils/cta'
 
 export const links: LinksFunction = () => {
@@ -731,10 +734,6 @@ function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
 		</fetcher.Form>
 	)
 }
-
-import { locationServices } from '#app/utils/location-service-data.js'
-import { menuLinks } from '#app/utils/menu-links.js'
-import { isServicePage } from '#app/utils/site-pages.js'
 
 function useLinks() {
 	return useMemo(() => {

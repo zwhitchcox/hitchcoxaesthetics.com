@@ -132,7 +132,7 @@ async function main() {
 					prefix ? `${prefix}__${entry.name}` : entry.name,
 				)
 			} else if (entry.name.match(/^\d+-source\./)) {
-				const num = entry.name.match(/^(\d+)-source/)?.[1]!
+				const num = entry.name.match(/^(\d+)-source/)?.[1] ?? '000'
 				const outBefore = path.join(
 					OUTPUT_DIR,
 					`${prefix ? prefix + '__' : ''}${num}-before.webp`,

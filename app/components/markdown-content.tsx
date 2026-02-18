@@ -45,6 +45,7 @@ export function MarkdownContent({
 						)
 					},
 					img: props => (
+						// eslint-disable-next-line jsx-a11y/alt-text -- alt is always provided via {...props} from markdown source
 						<img
 							loading="lazy"
 							decoding="async"

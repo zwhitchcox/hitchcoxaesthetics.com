@@ -37,9 +37,9 @@
  *   NOBG_METHOD      'rembg' (default) or 'matte' — fallback bg removal for non-Picthing files
  */
 
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
 import { GoogleGenAI } from '@google/genai'
 import sharp from 'sharp'
 
@@ -302,41 +302,39 @@ async function stepSplit() {
 				const base = file.replace(/\.jpg$/, '')
 
 				let layout = 'BEFORE_LEFT'
-				{
-					for (let attempt = 0; attempt < 3; attempt++) {
-						try {
-							const res = await gemini.models.generateContent({
-								model: 'gemini-2.0-flash',
-								contents: [
-									{
-										role: 'user',
-										parts: [
-											{
-												inlineData: {
-													mimeType: 'image/jpeg',
-													data: b64,
-												},
+				for (let attempt = 0; attempt < 3; attempt++) {
+					try {
+						const res = await gemini.models.generateContent({
+							model: 'gemini-2.0-flash',
+							contents: [
+								{
+									role: 'user',
+									parts: [
+										{
+											inlineData: {
+												mimeType: 'image/jpeg',
+												data: b64,
 											},
-											{
-												text: 'This is a before-and-after comparison. Which side is BEFORE? Reply ONLY: BEFORE_LEFT, BEFORE_RIGHT, BEFORE_TOP, or BEFORE_BOTTOM',
-											},
-										],
-									},
-								],
-							})
-							const answer = (res.text ?? '').trim().toUpperCase()
-							if (answer.includes('RIGHT')) layout = 'BEFORE_RIGHT'
-							else if (answer.includes('TOP')) layout = 'BEFORE_TOP'
-							else if (answer.includes('BOTTOM')) layout = 'BEFORE_BOTTOM'
-							console.log(`  ${file}: Gemini says "${answer}" → ${layout}`)
-							break
-						} catch (err) {
-							console.error(
-								`  ${file}: layout detect error (attempt ${attempt + 1}): ${(err as Error).message.slice(0, 100)}`,
-							)
-							if (attempt < 2)
-								await new Promise(r => setTimeout(r, 5000 * (attempt + 1)))
-						}
+										},
+										{
+											text: 'This is a before-and-after comparison. Which side is BEFORE? Reply ONLY: BEFORE_LEFT, BEFORE_RIGHT, BEFORE_TOP, or BEFORE_BOTTOM',
+										},
+									],
+								},
+							],
+						})
+						const answer = (res.text ?? '').trim().toUpperCase()
+						if (answer.includes('RIGHT')) layout = 'BEFORE_RIGHT'
+						else if (answer.includes('TOP')) layout = 'BEFORE_TOP'
+						else if (answer.includes('BOTTOM')) layout = 'BEFORE_BOTTOM'
+						console.log(`  ${file}: Gemini says "${answer}" → ${layout}`)
+						break
+					} catch (err) {
+						console.error(
+							`  ${file}: layout detect error (attempt ${attempt + 1}): ${(err as Error).message.slice(0, 100)}`,
+						)
+						if (attempt < 2)
+							await new Promise(r => setTimeout(r, 5000 * (attempt + 1)))
 					}
 				}
 

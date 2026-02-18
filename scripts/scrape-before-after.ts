@@ -13,12 +13,15 @@
  *   - cwebp: for PNG -> WebP conversion
  */
 
+import { execSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { execSync } from 'node:child_process'
 import { GoogleGenAI } from '@google/genai'
-import OpenAI from 'openai'
+// import OpenAI from 'openai'
 import sharp from 'sharp'
+
+// Track by content hash to avoid duplicates
 // rembg used for background removal (via scripts/rembg-remove.py)
 
 const PUBLIC_IMG_DIR = path.join(process.cwd(), 'public', 'img')
@@ -149,9 +152,6 @@ async function scrapeBingImages(query: string): Promise<string[]> {
 	return allUrls
 }
 
-// Track by content hash to avoid duplicates
-import { createHash } from 'node:crypto'
-
 function md5(buffer: Buffer): string {
 	return createHash('md5').update(buffer).digest('hex')
 }
@@ -191,18 +191,18 @@ function markUrlVisited(candidatesDir: string, url: string): void {
 // Global set built once at startup — deduplicates by image content
 let knownHashes: Set<string>
 
-function getKnownHashes(candidatesDir: string): Set<string> {
+function _getKnownHashes(candidatesDir: string): Set<string> {
 	const hashFile = path.join(candidatesDir, '.hashes')
 	if (!fs.existsSync(hashFile)) return new Set()
 	return new Set(fs.readFileSync(hashFile, 'utf-8').split('\n').filter(Boolean))
 }
 
-function addKnownHash(candidatesDir: string, hash: string): void {
+function _addKnownHash(candidatesDir: string, hash: string): void {
 	const hashFile = path.join(candidatesDir, '.hashes')
 	fs.appendFileSync(hashFile, hash + '\n')
 }
 
-function markUrlDownloaded(candidatesDir: string, url: string): void {
+function _markUrlDownloaded(candidatesDir: string, url: string): void {
 	const urlsFile = path.join(candidatesDir, '.downloaded-urls')
 	fs.appendFileSync(urlsFile, url + '\n')
 }
@@ -287,7 +287,7 @@ async function isBeforeAfterImage(
 
 // --- Gemini: isolate one side using image generation ---
 
-const MAX_RETRIES = 5
+const _MAX_RETRIES = 5
 
 /** Cache layout analysis per source image so we don't re-analyze for before+after */
 const layoutCache = new Map<
@@ -779,7 +779,7 @@ function getUnsplitItems(
 			srcDir,
 			outDir,
 			sourceFile: f,
-			num: f.match(/^(\d+)-source/)?.[1]!,
+			num: f.match(/^(\d+)-source/)?.[1] ?? '000',
 		}))
 }
 

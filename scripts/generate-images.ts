@@ -11,9 +11,9 @@
  *   tsx scripts/generate-images.ts --generate-script   # outputs scripts/generate-missing.sh
  */
 
+import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { execSync } from 'node:child_process'
 import OpenAI from 'openai'
 import sharp from 'sharp'
 
@@ -311,7 +311,7 @@ function getMissing(): { service: string; type: 'before' | 'after' }[] {
 	return missing
 }
 
-function getMissingServices(): string[] {
+function _getMissingServices(): string[] {
 	const missing = getMissing()
 	return [...new Set(missing.map(m => m.service))]
 }

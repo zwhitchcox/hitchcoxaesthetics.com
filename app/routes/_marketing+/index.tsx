@@ -36,7 +36,7 @@ export async function loader() {
 
 export default function Index() {
 	const { categories } = useLoaderData<typeof loader>()
-	const context = useOutletContext<{
+	const _context = useOutletContext<{
 		setIsMenuOpen: (isOpen: boolean) => void
 	}>()
 

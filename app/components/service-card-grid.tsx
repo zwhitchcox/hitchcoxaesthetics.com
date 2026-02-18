@@ -1,5 +1,5 @@
 import { Link } from '@remix-run/react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { cn } from '#app/utils/misc.js'
 
 export type ServiceCardData = {

@@ -1,5 +1,5 @@
-import { type Config } from 'tailwindcss'
 import typographyPlugin from '@tailwindcss/typography'
+import { type Config } from 'tailwindcss'
 import animatePlugin from 'tailwindcss-animate'
 import radixPlugin from 'tailwindcss-radix'
 import { marketingPreset } from './app/routes/_marketing+/tailwind-preset'

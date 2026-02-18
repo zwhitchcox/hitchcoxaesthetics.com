@@ -15,12 +15,10 @@ import {
 import {
 	getServiceImage,
 	getAllServiceImages,
-	deriveBeforeImage,
 } from '#app/utils/service-images.js'
 import {
 	getPage,
 	getChildren,
-	getParent,
 	getAncestors,
 	getSiblings,
 	sitePages,
@@ -330,7 +328,7 @@ export default function DynamicPage() {
 
 			{/* Full Breadcrumb: Home / Category / Service / Current */}
 			<nav className="mb-6 text-sm text-gray-500">
-				{breadcrumbItems.map((item, i) => (
+				{breadcrumbItems.map(item => (
 					<span key={item.path}>
 						<Link
 							to={item.path}
