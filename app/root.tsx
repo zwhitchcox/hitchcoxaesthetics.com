@@ -410,10 +410,18 @@ function Header({
 	// All service/category pages and location pages get overlay header
 	const staticOverlayPages = new Set(['/', '/knoxville', '/farragut'])
 	const pathWithoutLeadingSlash = location.pathname.replace(/^\//, '')
+	// Check if this is an auto-generated location page (Case 3: knoxville-*/farragut-*)
+	const locationMatch = pathWithoutLeadingSlash.match(
+		/^(knoxville|farragut)-(.+)$/,
+	)
+	const isLocationServicePage = locationMatch
+		? isServicePage(locationMatch[2]!)
+		: false
 	const isOverlayPage =
 		staticOverlayPages.has(location.pathname) ||
 		isServicePage(pathWithoutLeadingSlash) ||
-		!!locationServices[pathWithoutLeadingSlash]
+		!!locationServices[pathWithoutLeadingSlash] ||
+		isLocationServicePage
 	const padding = !isOverlayPage
 	return (
 		<>
