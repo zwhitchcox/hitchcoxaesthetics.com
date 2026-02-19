@@ -66,16 +66,19 @@ export default function PrivacyRoute() {
 					</Link>
 					.
 				</p>
-				<p className="mb-4 text-gray-700">
-					<strong>
-						No mobile information will be shared with third parties or
-						affiliates for marketing or promotional purposes.
-					</strong>{' '}
-					Information sharing to third parties is limited to the following:
-					service providers we use to help deliver text messages (e.g., platform
-					providers), as required by law, and as necessary to protect our
-					rights.
-				</p>
+				<div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+					<p className="font-semibold text-gray-900">
+						SMS consent is not shared with third parties or affiliates.
+					</p>
+					<p className="mt-2 text-gray-700">
+						No mobile information, including SMS consent or opt-in data, will be
+						shared with third parties or affiliates for marketing or promotional
+						purposes. Disclosure of mobile information is strictly limited to:
+						service providers we use to help deliver text messages (e.g.,
+						messaging platform providers), as required by law, and as necessary
+						to protect our rights.
+					</p>
+				</div>
 				<p className="text-gray-700">
 					Supported carriers include but are not limited to AT&amp;T, T-Mobile,
 					Verizon, Sprint, and other major U.S. carriers. Carriers are not
@@ -104,6 +107,11 @@ export default function PrivacyRoute() {
 					</li>
 					<li>
 						Website usage data collected through cookies and analytics tools
+						(e.g., pages visited, browser type, IP address)
+					</li>
+					<li>
+						SMS opt-in status and phone number when you consent to receive text
+						messages
 					</li>
 				</ul>
 			</section>
@@ -119,7 +127,7 @@ export default function PrivacyRoute() {
 					<li>Provide, maintain, and improve our services</li>
 					<li>
 						Send appointment reminders, follow-up care instructions, and service
-						updates
+						updates via email, phone, or text message
 					</li>
 					<li>
 						Process payments and maintain records as required for healthcare
@@ -129,8 +137,45 @@ export default function PrivacyRoute() {
 						Communicate with you about promotions, events, and new services
 						(with your consent)
 					</li>
+					<li>Respond to your inquiries and support requests</li>
 					<li>Comply with legal obligations</li>
 				</ul>
+			</section>
+
+			<section className="mb-12">
+				<h2 className="mb-4 text-2xl font-semibold text-gray-900">
+					Who We Share Your Information With
+				</h2>
+				<p className="mb-4 text-gray-700">
+					We do not sell your personal information. We may share your
+					information only in the following limited circumstances:
+				</p>
+				<ul className="mb-4 list-disc space-y-1 pl-6 text-gray-700">
+					<li>
+						<strong>Service providers:</strong> Third-party vendors who assist
+						us in operating our business, such as appointment scheduling
+						platforms, payment processors, messaging platforms, and analytics
+						tools. These providers are contractually obligated to protect your
+						data and may only use it to perform services on our behalf.
+					</li>
+					<li>
+						<strong>Healthcare providers:</strong> Other providers involved in
+						your care, as described in our HIPAA Notice below.
+					</li>
+					<li>
+						<strong>Legal requirements:</strong> When required by law, subpoena,
+						court order, or government regulation.
+					</li>
+					<li>
+						<strong>Safety:</strong> When necessary to protect the rights,
+						safety, or property of Sarah Hitchcox Aesthetics, our patients, or
+						the public.
+					</li>
+				</ul>
+				<p className="font-semibold text-gray-900">
+					SMS consent and mobile information are never shared with third parties
+					or affiliates for marketing or promotional purposes.
+				</p>
 			</section>
 
 			<section className="mb-12">
