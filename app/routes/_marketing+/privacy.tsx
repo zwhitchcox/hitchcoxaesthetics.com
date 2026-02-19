@@ -50,11 +50,11 @@ export default function PrivacyRoute() {
 					<strong>For help,</strong> reply <strong>HELP</strong> to any message
 					or contact us at{' '}
 					<Link
-						to="tel:8652147238"
+						to="tel:8654898008"
 						reloadDocument
 						className="text-primary underline hover:no-underline"
 					>
-						(865) 214-7238
+						(865) 489-8008
 					</Link>{' '}
 					or{' '}
 					<Link
@@ -331,11 +331,11 @@ export default function PrivacyRoute() {
 					<li>
 						<strong>Phone:</strong>{' '}
 						<Link
-							to="tel:8652147238"
+							to="tel:8654898008"
 							reloadDocument
 							className="text-primary underline hover:no-underline"
 						>
-							(865) 214-7238
+							(865) 489-8008
 						</Link>
 					</li>
 					<li>

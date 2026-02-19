@@ -1,14 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '#app/components/ui/icon.js'
 import { gtag } from './misc'
+import { usePhone } from './phone-context'
 
-export function CTA() {
+/**
+ * CTA bar at the bottom of every page. Uses the phone context for
+ * location-specific numbers. GTM callback can still override.
+ * Memoized to prevent re-renders that would reset GTM's DOM phone replacement.
+ */
+export const CTA = memo(function CTA() {
 	const phoneIconRef = useRef<SVGSVGElement>(null)
 	const calendarIconRef = useRef<SVGSVGElement>(null)
-	const [phone, setPhone] = useState({
-		formatted: ENV.GA_PHONE_NUMBER,
-		mobile: ENV.GA_PHONE_NUMBER,
-	})
+	const contextPhone = usePhone()
+	const [gtmPhone, setGtmPhone] = useState<{
+		formatted: string
+		mobile: string
+	} | null>(null)
+
+	// The displayed phone: GTM override wins if set, otherwise use context
+	const phone = gtmPhone ?? {
+		formatted: contextPhone.formatted,
+		mobile: contextPhone.raw,
+	}
+
 	useEffect(() => {
 		const wiggleIcons = () => {
 			if (calendarIconRef.current) {
@@ -40,7 +54,7 @@ export function CTA() {
 		if (!(formatted && mobile)) {
 			return
 		}
-		setPhone({ formatted, mobile })
+		setGtmPhone({ formatted, mobile })
 	}, [])
 
 	useEffect(() => {
@@ -49,11 +63,10 @@ export function CTA() {
 			phone_conversion_callback: callback,
 		})
 	}, [callback])
-	const showCTA = true
 
-	return showCTA ? (
+	return (
 		<div
-			className={`fixed bottom-0 left-0 right-0 z-50 bg-black py-4 text-center ${showCTA ? 'fade-in' : ''} shadow-top flex h-[3.2rem] items-center justify-center`}
+			className={`fade-in shadow-top fixed bottom-0 left-0 right-0 z-50 flex h-[3.2rem] items-center justify-center bg-black py-4 text-center`}
 		>
 			<div className="flex w-full animate-fade-in justify-evenly px-2 text-sm sm:text-xl">
 				<a
@@ -81,5 +94,5 @@ export function CTA() {
 				</a>
 			</div>
 		</div>
-	) : null
-}
+	)
+})

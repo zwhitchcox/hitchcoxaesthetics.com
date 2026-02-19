@@ -49,7 +49,7 @@ export default function KnoxvilleLocation() {
 		description:
 			'Medical spa in Knoxville offering Botox, dermal fillers, laser treatments, and medical weight loss.',
 		url: 'https://hitchcoxaesthetics.com/knoxville-med-spa',
-		telephone: '(865) 214-7238',
+		telephone: '(865) 489-8008',
 		email: 'sarah@hitchcoxaesthetics.com',
 		image: 'https://hitchcoxaesthetics.com/img/sarah.jpg',
 		priceRange: '$$',
@@ -129,11 +129,11 @@ export default function KnoxvilleLocation() {
 							</p>
 							<div className="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
 								<Link
-									to="tel:8652147238"
+									to="tel:8654898008"
 									reloadDocument
 									className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
 								>
-									Call (865) 214-7238
+									Call (865) 489-8008
 								</Link>
 								<a
 									href={location.googleMapsDirectionsUrl}

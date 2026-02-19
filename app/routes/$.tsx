@@ -1,5 +1,6 @@
 import {
 	json,
+	redirect,
 	type LoaderFunctionArgs,
 	type MetaFunction,
 } from '@remix-run/node'
@@ -31,6 +32,14 @@ import {
 	ServiceParagraph,
 } from './_services+/__service-layout'
 
+/** Convert a base service path to a location-prefixed path */
+function mapToLocationPath(p: string, locationId: string): string {
+	const [first, ...rest] = p.split('/')
+	return rest.length
+		? `${locationId}-${first}/${rest.join('/')}`
+		: `${locationId}-${first}`
+}
+
 type LoaderData = {
 	page: SitePage
 	children: SitePage[]
@@ -45,20 +54,12 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	const splat = params['*'] ?? ''
 	const locationMatch = splat.match(/^(knoxville|farragut)-(.+)$/)
 
-	// Case 1: Direct match in site-pages
+	// Case 1: Direct match in site-pages → 301 redirect to knoxville equivalent
+	// Main service pages no longer exist as standalone pages.
 	const page = getPage(splat)
 	if (page && page.enabled) {
-		const children = getChildren(splat)
-		const ancestors = getAncestors(splat)
-		const siblings = getSiblings(splat)
-		return json<LoaderData>({
-			page,
-			children,
-			ancestors,
-			siblings,
-			markdown: page.content,
-			isLocationPage: false,
-		})
+		const knoxvillePath = mapToLocationPath(splat, 'knoxville')
+		return redirect(`/${knoxvillePath}`, { status: 301 })
 	}
 
 	// Case 2: Location-service match (e.g., "knoxville-botox")
@@ -68,16 +69,10 @@ export async function loader({ params }: LoaderFunctionArgs) {
 		const ancestors = baseServicePage ? getAncestors(locPage.serviceSlug) : []
 		const siblings = baseServicePage ? getSiblings(locPage.serviceSlug) : []
 		const children = baseServicePage ? getChildren(locPage.serviceSlug) : []
-		const mapToLocationPath = (p: string) => {
-			const [first, ...rest] = p.split('/')
-			return rest.length
-				? `${locPage.locationId}-${first}/${rest.join('/')}`
-				: `${locPage.locationId}-${first}`
-		}
 
 		// Look up location-specific heroImage for children/siblings from locationServices
 		const getLocHeroImage = (servicePath: string) => {
-			const locSlug = mapToLocationPath(servicePath)
+			const locSlug = mapToLocationPath(servicePath, locPage.locationId)
 			return locationServices[locSlug]?.heroImage
 		}
 
@@ -104,16 +99,16 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			page: locSitePage,
 			children: children.map(c => ({
 				...c,
-				path: mapToLocationPath(c.path),
+				path: mapToLocationPath(c.path, locPage.locationId),
 				heroImage: getLocHeroImage(c.path) ?? c.heroImage,
 			})),
 			ancestors: ancestors.map(a => ({
 				...a,
-				path: mapToLocationPath(a.path),
+				path: mapToLocationPath(a.path, locPage.locationId),
 			})),
 			siblings: siblings.map(s => ({
 				...s,
-				path: mapToLocationPath(s.path),
+				path: mapToLocationPath(s.path, locPage.locationId),
 				heroImage: getLocHeroImage(s.path) ?? s.heroImage,
 			})),
 			markdown,
@@ -131,12 +126,6 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			const ancestors = getAncestors(basePage.path)
 			const siblings = getSiblings(basePage.path)
 			const children = getChildren(basePage.path)
-			const mapToLocationPath = (p: string) => {
-				const [first, ...rest] = p.split('/')
-				return rest.length
-					? `${locationId}-${first}/${rest.join('/')}`
-					: `${locationId}-${first}`
-			}
 
 			const locSitePage: SitePage = {
 				...basePage,
@@ -150,15 +139,15 @@ export async function loader({ params }: LoaderFunctionArgs) {
 				page: locSitePage,
 				children: children.map(c => ({
 					...c,
-					path: mapToLocationPath(c.path),
+					path: mapToLocationPath(c.path, locationId!),
 				})),
 				ancestors: ancestors.map(a => ({
 					...a,
-					path: mapToLocationPath(a.path),
+					path: mapToLocationPath(a.path, locationId!),
 				})),
 				siblings: siblings.map(s => ({
 					...s,
-					path: mapToLocationPath(s.path),
+					path: mapToLocationPath(s.path, locationId!),
 				})),
 				markdown: basePage.content,
 				isLocationPage: true,
@@ -263,27 +252,32 @@ export default function DynamicPage() {
 		}
 	}
 
-	// Build full breadcrumb: Home -> ancestors (reversed) -> current
+	// Determine the location context from the page
+	const pageLocationId = page.locationId ?? 'knoxville'
+	const pageLocationName =
+		page.locationName ??
+		(pageLocationId === 'knoxville' ? 'Knoxville' : 'Farragut')
+	const otherLocationId =
+		pageLocationId === 'knoxville' ? 'farragut' : 'knoxville'
+	const otherLocationName =
+		pageLocationId === 'knoxville' ? 'Farragut' : 'Knoxville'
+
+	// Build full breadcrumb: Home -> Location Med Spa -> ancestors (reversed) -> current
 	const breadcrumbItems = [
 		{ path: '/', name: 'Home' },
+		...(isLocationPage
+			? [
+					{
+						path: `/${pageLocationId}-med-spa`,
+						name: `${pageLocationName} Med Spa`,
+					},
+				]
+			: []),
 		...[...(ancestors ?? [])].reverse().map(a => ({
 			path: `/${a.path}`,
 			name: a.name,
 		})),
 	]
-	// For location pages, also add the base service page
-	if (isLocationPage && baseServiceSlug) {
-		const basePage = ancestors?.find(a => a.path === baseServiceSlug)
-		if (!basePage) {
-			breadcrumbItems.push({
-				path: `/${baseServiceSlug}`,
-				name: baseServiceSlug
-					.split('-')
-					.map(w => w.charAt(0).toUpperCase() + w.slice(1))
-					.join(' '),
-			})
-		}
-	}
 
 	return (
 		<ServiceLayout
@@ -409,27 +403,30 @@ export default function DynamicPage() {
 				</div>
 			)}
 
-			{/* Location Page: Link to base service */}
+			{/* Cross-location link + location med spa link */}
 			{isLocationPage && baseServiceSlug && (
 				<div className="mt-8 rounded-lg border border-gray-100 bg-white p-6">
 					<p className="text-gray-600">
-						Learn more about{' '}
+						Also available at our{' '}
 						<Link
-							to={`/${baseServiceSlug}`}
+							to={`/${otherLocationId}-${baseServiceSlug.split('/')[0]}${baseServiceSlug.includes('/') ? '/' + baseServiceSlug.split('/').slice(1).join('/') : ''}`}
 							className="font-medium text-primary hover:underline"
 						>
+							{otherLocationName}{' '}
 							{baseServiceSlug
+								.split('/')
+								.pop()!
 								.split('-')
 								.map(w => w.charAt(0).toUpperCase() + w.slice(1))
 								.join(' ')}{' '}
-							treatments
-						</Link>{' '}
-						at Sarah Hitchcox Aesthetics, or{' '}
+							location
+						</Link>
+						, or{' '}
 						<Link
-							to={`/${page.locationId}-med-spa`}
+							to={`/${pageLocationId}-med-spa`}
 							className="font-medium text-primary hover:underline"
 						>
-							explore all services at our {page.locationName} med spa
+							explore all services at our {pageLocationName} med spa
 						</Link>
 						.
 					</p>

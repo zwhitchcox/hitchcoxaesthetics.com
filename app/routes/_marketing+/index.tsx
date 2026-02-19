@@ -3,6 +3,13 @@ import { Link, useLoaderData, useOutletContext } from '@remix-run/react'
 import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from '#app/components/ui/tabs.js'
+import { locationServices } from '#app/utils/location-service-data.server.js'
 import { getCategoryPages } from '#app/utils/site-pages.server.js'
 
 export const meta: MetaFunction = () => [
@@ -23,18 +30,44 @@ export const meta: MetaFunction = () => [
 	},
 ]
 
+function mapToLocationPath(p: string, locationId: string): string {
+	const [first, ...rest] = p.split('/')
+	return rest.length
+		? `${locationId}-${first}/${rest.join('/')}`
+		: `${locationId}-${first}`
+}
+
 export async function loader() {
-	const categories = getCategoryPages().map(c => ({
-		slug: c.path,
-		serviceName: c.name,
-		shortDescription: c.shortDescription,
-		heroImage: c.heroImage,
-	}))
-	return json({ categories })
+	const categories = getCategoryPages()
+
+	const knoxvilleCategories = categories.map(c => {
+		const locSlug = mapToLocationPath(c.path, 'knoxville')
+		const locData = locationServices[locSlug]
+		return {
+			slug: locSlug,
+			serviceName: c.name,
+			shortDescription: c.shortDescription,
+			heroImage: locData?.heroImage ?? c.heroImage,
+		}
+	})
+
+	const farragutCategories = categories.map(c => {
+		const locSlug = mapToLocationPath(c.path, 'farragut')
+		const locData = locationServices[locSlug]
+		return {
+			slug: locSlug,
+			serviceName: c.name,
+			shortDescription: c.shortDescription,
+			heroImage: locData?.heroImage ?? c.heroImage,
+		}
+	})
+
+	return json({ knoxvilleCategories, farragutCategories })
 }
 
 export default function Index() {
-	const { categories } = useLoaderData<typeof loader>()
+	const { knoxvilleCategories, farragutCategories } =
+		useLoaderData<typeof loader>()
 	const _context = useOutletContext<{
 		setIsMenuOpen: (isOpen: boolean) => void
 	}>()
@@ -78,13 +111,63 @@ export default function Index() {
 				</div>
 			</div>
 
-			{/* Services Section */}
+			{/* Services Section with Location Tab Switcher */}
 			<div id="services" className="bg-gray-50 py-20">
 				<div className="mx-auto max-w-7xl px-6">
-					<h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
+					<h2 className="mb-8 text-center text-3xl font-bold text-gray-900">
 						Medical Aesthetic Services
 					</h2>
-					<ServiceCardGrid services={categories} variant="thumbnail" />
+
+					<Tabs defaultValue="knoxville" className="w-full">
+						<div className="mb-12 flex justify-center">
+							<TabsList className="grid h-14 w-full max-w-md grid-cols-2 rounded-full bg-gray-100 p-1">
+								<TabsTrigger
+									value="knoxville"
+									className="h-full rounded-full text-lg font-medium text-gray-600 transition-all data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-md"
+								>
+									Knoxville
+								</TabsTrigger>
+								<TabsTrigger
+									value="farragut"
+									className="h-full rounded-full text-lg font-medium text-gray-600 transition-all data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-md"
+								>
+									Farragut
+								</TabsTrigger>
+							</TabsList>
+						</div>
+
+						<TabsContent value="knoxville">
+							<ServiceCardGrid
+								services={knoxvilleCategories}
+								variant="thumbnail"
+							/>
+							<div className="mt-8 text-center">
+								<Link
+									to="/knoxville-med-spa"
+									className="inline-flex items-center text-primary hover:underline"
+								>
+									View all Knoxville med spa services{' '}
+									<Icon name="arrow-right" className="ml-2 h-4 w-4" />
+								</Link>
+							</div>
+						</TabsContent>
+
+						<TabsContent value="farragut">
+							<ServiceCardGrid
+								services={farragutCategories}
+								variant="thumbnail"
+							/>
+							<div className="mt-8 text-center">
+								<Link
+									to="/farragut-med-spa"
+									className="inline-flex items-center text-primary hover:underline"
+								>
+									View all Farragut med spa services{' '}
+									<Icon name="arrow-right" className="ml-2 h-4 w-4" />
+								</Link>
+							</div>
+						</TabsContent>
+					</Tabs>
 				</div>
 			</div>
 
@@ -100,7 +183,7 @@ export default function Index() {
 							<img
 								src="/img/med-spa-2.webp"
 								alt="Knoxville Med Spa Interior"
-								className="absolute inset-0 z-0 h-full w-full object-cover opacity-60 grayscale transition-transform duration-700 group-hover:scale-105"
+								className="absolute inset-0 z-0 h-full w-full object-cover opacity-60 grayscale transition-all duration-700 group-hover:scale-105 group-hover:grayscale-0"
 								loading="lazy"
 							/>
 							<div className="absolute inset-0 z-10 bg-black/50 transition-opacity duration-300 group-hover:bg-black/40" />
@@ -122,11 +205,10 @@ export default function Index() {
 
 						<div className="group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gray-900 p-12 text-center text-white shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
 							<div className="absolute inset-0 z-0 bg-gray-900" />
-							{/* TODO: Replace with Farragut location image when available */}
 							<img
 								src="/img/knoxville-med-spa.webp"
 								alt="Farragut Med Spa Interior"
-								className="absolute inset-0 z-0 h-full w-full object-cover opacity-60 grayscale transition-transform duration-700 group-hover:scale-105"
+								className="absolute inset-0 z-0 h-full w-full object-cover opacity-60 grayscale transition-all duration-700 group-hover:scale-105 group-hover:grayscale-0"
 								loading="lazy"
 							/>
 							<div className="absolute inset-0 z-10 bg-black/50 transition-opacity duration-300 group-hover:bg-black/40" />

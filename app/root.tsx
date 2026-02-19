@@ -58,8 +58,18 @@ import { prisma } from '#/app/utils/db.server.ts'
 import { getEnv } from '#/app/utils/env.server.ts'
 import { honeypot } from '#/app/utils/honeypot.server.ts'
 import { locationServices } from '#/app/utils/location-service-data.server.ts'
-import { locations, formatAddress } from '#/app/utils/locations.ts'
-import { menuLinks } from '#/app/utils/menu-links.server.ts'
+import {
+	locations,
+	formatAddress,
+	getLocationForPath,
+	getPhoneForPath,
+	getLocationById,
+	DEFAULT_PHONE,
+} from '#/app/utils/locations.ts'
+import {
+	knoxvilleMenuLinks,
+	farragutMenuLinks,
+} from '#/app/utils/menu-links.server.ts'
 import {
 	addGTM,
 	combineHeaders,
@@ -74,6 +84,7 @@ import { makeTimings, time } from '#/app/utils/timing.server.ts'
 import { getToast } from '#/app/utils/toast.server.ts'
 import { useOptionalUser, useUser } from '#/app/utils/user.ts'
 import { CTA } from './utils/cta'
+import { PhoneLink, PhoneProvider } from './utils/phone-context'
 
 export const links: LinksFunction = () => {
 	return [
@@ -210,6 +221,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		!!locationServices[pathWithoutLeadingSlash] ||
 		isLocationServicePage
 
+	// Compute location-specific phone number for this page
+	const phoneForPage = getPhoneForPath(pathname)
+	const locationForPage = getLocationForPath(pathname)
+
 	return json(
 		{
 			user,
@@ -225,7 +240,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			toast,
 			honeyProps,
 			isOverlayPage,
-			menuLinks,
+			knoxvilleMenuLinks,
+			farragutMenuLinks,
+			phoneForPage,
+			locationForPage: locationForPage ?? null,
 		},
 		{
 			headers: combineHeaders(
@@ -289,52 +307,80 @@ function Document({
 		addGTM(ENV.GTM_ID!)
 	}, [isHydrated])
 
-	const localBusinessJsonLd = {
-		'@context': 'https://schema.org',
-		'@type': 'MedicalBusiness',
-		name: 'Sarah Hitchcox Aesthetics',
-		description:
-			'Medical spa offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss in Knoxville and Farragut, TN.',
-		url: 'https://hitchcoxaesthetics.com',
-		telephone: '(865) 214-7238',
-		email: 'sarah@hitchcoxaesthetics.com',
-		image: `${origin}/img/sarah.jpg`,
-		priceRange: '$$',
-		address: [
-			{
-				'@type': 'PostalAddress',
-				streetAddress: '5113 Kingston Pike Suite 15',
-				addressLocality: 'Knoxville',
-				addressRegion: 'TN',
-				postalCode: '37919',
-				addressCountry: 'US',
-			},
-			{
-				'@type': 'PostalAddress',
-				streetAddress: '102 S Campbell Station Rd Suite 8',
-				addressLocality: 'Knoxville',
-				addressRegion: 'TN',
-				postalCode: '37934',
-				addressCountry: 'US',
-			},
-		],
-		geo: {
-			'@type': 'GeoCoordinates',
-			latitude: 35.9392,
-			longitude: -83.9913,
-		},
-		sameAs: ['https://www.instagram.com/hitchcoxaesthetics/'],
-		founder: {
-			'@type': 'Person',
-			name: 'Sarah Hitchcox',
-			jobTitle: 'Registered Nurse, Aesthetic Injector',
-		},
-		medicalSpecialty: 'Dermatology',
-		areaServed: [
-			{ '@type': 'City', name: 'Knoxville' },
-			{ '@type': 'City', name: 'Farragut' },
-		],
-	}
+	// Build location-aware JSON-LD: single location on location pages,
+	// multi-location listing on non-location pages
+	const locId = data?.locationForPage
+	const locData = locId ? getLocationById(locId) : undefined
+
+	const localBusinessJsonLd = locData
+		? {
+				'@context': 'https://schema.org',
+				'@type': 'MedicalBusiness',
+				name: `Sarah Hitchcox Aesthetics - ${locData.name}`,
+				description: `Medical spa in ${locData.name} offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.`,
+				url: `https://hitchcoxaesthetics.com/${locData.id}-med-spa`,
+				telephone: locData.phone,
+				email: 'sarah@hitchcoxaesthetics.com',
+				image: `${origin}/img/sarah.jpg`,
+				priceRange: '$$',
+				address: {
+					'@type': 'PostalAddress',
+					streetAddress: locData.address,
+					addressLocality: locData.city,
+					addressRegion: locData.state,
+					postalCode: locData.zip,
+					addressCountry: 'US',
+				},
+				geo: {
+					'@type': 'GeoCoordinates',
+					latitude: locData.lat,
+					longitude: locData.lng,
+				},
+				sameAs: ['https://www.instagram.com/hitchcoxaesthetics/'],
+				founder: {
+					'@type': 'Person',
+					name: 'Sarah Hitchcox',
+					jobTitle: 'Registered Nurse, Aesthetic Injector',
+				},
+				medicalSpecialty: 'Dermatology',
+				areaServed: { '@type': 'City', name: locData.name },
+			}
+		: {
+				'@context': 'https://schema.org',
+				'@type': 'MedicalBusiness',
+				name: 'Sarah Hitchcox Aesthetics',
+				description:
+					'Medical spa offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss in Knoxville and Farragut, TN.',
+				url: 'https://hitchcoxaesthetics.com',
+				telephone: DEFAULT_PHONE,
+				email: 'sarah@hitchcoxaesthetics.com',
+				image: `${origin}/img/sarah.jpg`,
+				priceRange: '$$',
+				address: locations.map(loc => ({
+					'@type': 'PostalAddress',
+					streetAddress: loc.address,
+					addressLocality: loc.city,
+					addressRegion: loc.state,
+					postalCode: loc.zip,
+					addressCountry: 'US',
+				})),
+				geo: {
+					'@type': 'GeoCoordinates',
+					latitude: 35.9392,
+					longitude: -83.9913,
+				},
+				sameAs: ['https://www.instagram.com/hitchcoxaesthetics/'],
+				founder: {
+					'@type': 'Person',
+					name: 'Sarah Hitchcox',
+					jobTitle: 'Registered Nurse, Aesthetic Injector',
+				},
+				medicalSpecialty: 'Dermatology',
+				areaServed: [
+					{ '@type': 'City', name: 'Knoxville' },
+					{ '@type': 'City', name: 'Farragut' },
+				],
+			}
 
 	return (
 		<html lang="en" className={`${theme} h-full overflow-x-hidden`}>
@@ -384,14 +430,16 @@ function App() {
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
-			<div
-				className={`flex h-screen flex-col justify-between ${isMenuOpen ? 'overflow-hidden' : ''}`}
-			>
-				<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
-				<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
-				<Footer />
-				<CTA />
-			</div>
+			<PhoneProvider>
+				<div
+					className={`flex h-screen flex-col justify-between ${isMenuOpen ? 'overflow-hidden' : ''}`}
+				>
+					<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
+					<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
+					<Footer />
+					<CTA />
+				</div>
+			</PhoneProvider>
 			<EpicToaster closeButton position="top-center" theme={theme} />
 			<EpicProgress />
 		</Document>
@@ -564,7 +612,7 @@ function Footer() {
 			<div className="flex flex-col justify-between space-y-8 md:flex-row md:space-y-0">
 				<div className="flex flex-col space-y-4">
 					<h2 className="text-2xl font-semibold">Contact Our Med Spa</h2>
-					<p className="text-lg">(865) 214-7238</p>
+					<PhoneLink className="text-lg hover:text-primary" />
 					<p className="text-lg">sarah@hitchcoxaesthetics.com</p>
 				</div>
 				<div className="flex flex-col space-y-4 text-lg">
@@ -753,9 +801,14 @@ function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
 
 function useLinks() {
 	const data = useLoaderData<typeof loader>()
+	const location = useLocation()
 	return useMemo(() => {
-		return data.menuLinks
-	}, [data.menuLinks])
+		// On farragut pages, show farragut menu links; otherwise default to knoxville
+		const isFarragut = location.pathname
+			.replace(/^\//, '')
+			.startsWith('farragut')
+		return isFarragut ? data.farragutMenuLinks : data.knoxvilleMenuLinks
+	}, [data.knoxvilleMenuLinks, data.farragutMenuLinks, location.pathname])
 }
 
 export function ErrorBoundary() {

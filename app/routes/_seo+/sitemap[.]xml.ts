@@ -18,7 +18,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		'tos',
 	]
 
-	// All enabled service/category pages from sitePages
+	// Main service pages now 301 redirect to knoxville equivalents,
+	// so we only include location-prefixed pages in the sitemap.
 	const servicePagePaths = Object.values(sitePages)
 		.filter(p => p.enabled)
 		.map(p => p.path)
@@ -28,8 +29,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 	// Auto-generated location-prefixed pages (Case 3 in $.tsx):
 	// For every enabled service page, generate knoxville-{path} and farragut-{path}
-	// Only the first segment gets the location prefix, slashes are preserved:
-	// e.g. filler/cheek-filler → knoxville-filler/cheek-filler
 	const locationPrefixes = ['knoxville', 'farragut']
 	const autoLocationPaths = servicePagePaths.flatMap(p => {
 		const [first, ...rest] = p.split('/')
@@ -37,14 +36,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		return locationPrefixes.map(loc => `${loc}-${locPath}`)
 	})
 
-	// Combine and deduplicate
+	// Combine and deduplicate — exclude bare service paths (they redirect)
 	const allPaths = [
-		...new Set([
-			...staticPaths,
-			...servicePagePaths,
-			...locationServicePaths,
-			...autoLocationPaths,
-		]),
+		...new Set([...staticPaths, ...locationServicePaths, ...autoLocationPaths]),
 	]
 
 	const urls = allPaths

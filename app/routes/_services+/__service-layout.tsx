@@ -3,6 +3,11 @@ import Logo from '#app/components/logo.js'
 import { Icon } from '#app/components/ui/icon.js'
 import Carousel from '#app/utils/carousel.js'
 import { CTA } from '#app/utils/cta.js'
+import {
+	getLocationForPath,
+	getLocationById,
+	DEFAULT_PHONE,
+} from '#app/utils/locations.js'
 import { cn, scrollToId } from '#app/utils/misc.js'
 
 /**
@@ -37,6 +42,7 @@ export function FAQJsonLd({
 
 /**
  * Generates Service JSON-LD structured data for SEO.
+ * Location-aware: on location pages, uses location-specific phone/address.
  */
 export function ServiceJsonLd({
 	name,
@@ -47,6 +53,11 @@ export function ServiceJsonLd({
 	description: string
 	url: string
 }) {
+	const location = useLocation()
+	const locId = getLocationForPath(location.pathname)
+	const locData = locId ? getLocationById(locId) : undefined
+	const phone = locData ? locData.phone : DEFAULT_PHONE
+
 	const jsonLd = {
 		'@context': 'https://schema.org',
 		'@type': 'Service',
@@ -55,14 +66,32 @@ export function ServiceJsonLd({
 		url,
 		provider: {
 			'@type': 'MedicalBusiness',
-			name: 'Sarah Hitchcox Aesthetics',
-			telephone: '(865) 214-7238',
-			url: 'https://hitchcoxaesthetics.com',
+			name: locData
+				? `Sarah Hitchcox Aesthetics - ${locData.name}`
+				: 'Sarah Hitchcox Aesthetics',
+			telephone: phone,
+			url: locData
+				? `https://hitchcoxaesthetics.com/${locData.id}-med-spa`
+				: 'https://hitchcoxaesthetics.com',
+			...(locData
+				? {
+						address: {
+							'@type': 'PostalAddress',
+							streetAddress: locData.address,
+							addressLocality: locData.city,
+							addressRegion: locData.state,
+							postalCode: locData.zip,
+							addressCountry: 'US',
+						},
+					}
+				: {}),
 		},
-		areaServed: [
-			{ '@type': 'City', name: 'Knoxville' },
-			{ '@type': 'City', name: 'Farragut' },
-		],
+		areaServed: locData
+			? { '@type': 'City', name: locData.name }
+			: [
+					{ '@type': 'City', name: 'Knoxville' },
+					{ '@type': 'City', name: 'Farragut' },
+				],
 	}
 
 	return (
