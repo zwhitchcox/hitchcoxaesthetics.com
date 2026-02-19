@@ -71,7 +71,7 @@ import {
 	farragutMenuLinks,
 } from '#/app/utils/menu-links.server.ts'
 import {
-	addGTM,
+	// addGTM,
 	combineHeaders,
 	getDomainUrl,
 	getUserImgSrc,
@@ -294,18 +294,19 @@ function Document({
 	theme?: Theme
 	env?: Record<string, string>
 }) {
-	const isHydrated = useHydrated()
+	const _isHydrated = useHydrated()
 	const location = useLocation()
 	const data = useLoaderData<typeof loader>()
 	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
 	const canonicalUrl = `${origin}${location.pathname}`
 
-	useEffect(() => {
-		if (typeof window === 'undefined' || !isHydrated) {
-			return
-		}
-		addGTM(ENV.GTM_ID!)
-	}, [isHydrated])
+	// GTM temporarily disabled
+	// useEffect(() => {
+	// 	if (typeof window === 'undefined' || !isHydrated) {
+	// 		return
+	// 	}
+	// 	addGTM(ENV.GTM_ID!)
+	// }, [isHydrated])
 
 	// Build location-aware JSON-LD: single location on location pages,
 	// multi-location listing on non-location pages
@@ -397,6 +398,10 @@ function Document({
 					dangerouslySetInnerHTML={{
 						__html: JSON.stringify(localBusinessJsonLd),
 					}}
+				/>
+				<script
+					type="text/javascript"
+					src="//cdn.callrail.com/companies/537900585/0c3f6789c4c11b8e98b9/12/swap.js"
 				/>
 			</head>
 			<body className="bg-background text-foreground">
