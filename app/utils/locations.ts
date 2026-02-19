@@ -65,7 +65,7 @@ export function getLocationForPath(
 /**
  * Get the appropriate phone number for a given URL path.
  * Knoxville pages get the Knoxville number, Farragut pages get the Farragut
- * number, everything else gets the default.
+ * number, home page and other non-location pages get the Knoxville number.
  */
 export function getPhoneForPath(pathname: string): {
 	formatted: string
@@ -76,5 +76,7 @@ export function getPhoneForPath(pathname: string): {
 		const loc = getLocationById(locId)
 		if (loc) return { formatted: loc.phone, raw: loc.phoneRaw }
 	}
-	return { formatted: DEFAULT_PHONE, raw: DEFAULT_PHONE_RAW }
+	// Default to Knoxville number (primary location)
+	const knoxville = getLocationById('knoxville')!
+	return { formatted: knoxville.phone, raw: knoxville.phoneRaw }
 }
