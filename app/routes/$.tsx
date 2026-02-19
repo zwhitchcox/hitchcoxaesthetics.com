@@ -6,6 +6,7 @@ import {
 import { Link, useLoaderData, useLocation } from '@remix-run/react'
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
 import { MarkdownContent } from '#app/components/markdown-content.js'
+import { PricingSection } from '#app/components/pricing-table.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.tsx'
 import {
@@ -353,6 +354,9 @@ export default function DynamicPage() {
 
 			{/* Dynamic Sections */}
 			{page.sections?.map((section, index) => renderSection(section, index))}
+
+			{/* Pricing */}
+			<PricingSection serviceSlug={baseServiceSlug ?? page.path} />
 
 			{/* Sub-service Grid (for pages with children) */}
 			{childCards.length > 0 && (
