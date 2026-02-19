@@ -112,7 +112,7 @@ export default function Index() {
 									5113 Kingston Pike
 								</p>
 								<Link
-									to="/knoxville"
+									to="/knoxville-med-spa"
 									className="rounded-md bg-white px-8 py-3 text-sm font-bold text-black transition hover:bg-gray-200"
 								>
 									Knoxville Services
@@ -138,7 +138,7 @@ export default function Index() {
 									102 S Campbell Station Rd
 								</p>
 								<Link
-									to="/farragut"
+									to="/farragut-med-spa"
 									className="rounded-md bg-white px-8 py-3 text-sm font-bold text-black transition hover:bg-gray-200"
 								>
 									Farragut Services

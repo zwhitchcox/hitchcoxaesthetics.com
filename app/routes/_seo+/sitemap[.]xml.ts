@@ -10,8 +10,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const staticPaths = [
 		'',
 		'about',
-		'knoxville',
-		'farragut',
+		'knoxville-med-spa',
+		'farragut-med-spa',
 
 		'support',
 		'privacy',

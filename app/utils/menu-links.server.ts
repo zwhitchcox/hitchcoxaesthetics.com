@@ -63,12 +63,12 @@ export const menuLinks: MenuLink[] = [
 		hint: 'visit us in Knoxville or Farragut',
 		subLinks: [
 			{
-				to: '/knoxville',
+				to: '/knoxville-med-spa',
 				label: 'Knoxville',
 				hint: 'Kingston Pike',
 			},
 			{
-				to: '/farragut',
+				to: '/farragut-med-spa',
 				label: 'Farragut',
 				hint: 'Campbell Station Rd',
 			},

@@ -193,7 +193,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	// Compute overlay header detection server-side
 	const pathname = new URL(request.url).pathname
 	const pathWithoutLeadingSlash = pathname.replace(/^\//, '')
-	const staticOverlayPages = new Set(['/', '/knoxville', '/farragut'])
+	const staticOverlayPages = new Set([
+		'/',
+		'/knoxville-med-spa',
+		'/farragut-med-spa',
+	])
 	const locationMatch = pathWithoutLeadingSlash.match(
 		/^(knoxville|farragut)-(.+)$/,
 	)
@@ -536,7 +540,7 @@ function Footer() {
 				<div className="grid gap-8 md:grid-cols-2">
 					{locations.map(location => (
 						<div key={location.id} className="space-y-4">
-							<Link to={`/${location.id}`}>
+							<Link to={`/${location.id}-med-spa`}>
 								<h3 className="text-xl font-semibold hover:text-primary hover:underline">
 									{location.name} Med Spa
 								</h3>

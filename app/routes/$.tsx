@@ -426,7 +426,7 @@ export default function DynamicPage() {
 						</Link>{' '}
 						at Sarah Hitchcox Aesthetics, or{' '}
 						<Link
-							to={`/${page.locationId}`}
+							to={`/${page.locationId}-med-spa`}
 							className="font-medium text-primary hover:underline"
 						>
 							explore all services at our {page.locationName} med spa
