@@ -107,10 +107,10 @@ export function ServiceCardGrid({
 						key={service.slug}
 						to={`/${service.slug}`}
 						prefetch="intent"
-						className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+						className="group isolate flex transform-gpu flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
 					>
 						{service.heroImage && (
-							<div className="relative h-48 w-full shrink-0 sm:h-56">
+							<div className="relative h-48 w-full shrink-0 overflow-hidden rounded-t-2xl sm:h-56">
 								<div className="absolute inset-0 bg-gray-100/10" />
 								<BeforeAfterImage
 									src={service.heroImage}
