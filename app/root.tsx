@@ -85,6 +85,7 @@ import { getToast } from '#/app/utils/toast.server.ts'
 import { useOptionalUser, useUser } from '#/app/utils/user.ts'
 import { CTA } from './utils/cta'
 import { PhoneLink, PhoneProvider } from './utils/phone-context'
+import { PostHogProvider } from './utils/posthog'
 
 export const links: LinksFunction = () => {
 	return [
@@ -654,12 +655,25 @@ function Footer() {
 // 	)
 // }
 
+const posthogOptions = {
+	api_host: ENV.REACT_APP_PUBLIC_POSTHOG_HOST,
+}
+
 function AppWithProviders() {
 	const data = useLoaderData<typeof loader>()
 	return (
-		<HoneypotProvider {...data.honeyProps}>
-			<App />
-		</HoneypotProvider>
+		<PostHogProvider
+			apiKey={
+				ENV.MODE === 'development'
+					? undefined
+					: ENV.REACT_APP_PUBLIC_POSTHOG_KEY
+			}
+			options={posthogOptions}
+		>
+			<HoneypotProvider {...data.honeyProps}>
+				<App />
+			</HoneypotProvider>
+		</PostHogProvider>
 	)
 }
 

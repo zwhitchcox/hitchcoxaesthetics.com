@@ -159,6 +159,7 @@ app.use(
 					'https://*.gstatic.com',
 					'https://*.google-analytics.com',
 					'https://www.googleadservices.com',
+					'*.posthog.com',
 					"'self'",
 				].filter(Boolean),
 				'font-src': ["'self'", 'https://*.gstatic.com'],
@@ -183,6 +184,7 @@ app.use(
 					(_, res) => `'nonce-${res.locals.cspNonce}'`,
 					'https://*.googleapis.com',
 					'https://*.googletagmanager.com',
+					'https://*.posthog.com',
 				],
 				'script-src-elem': [
 					"'self'",
@@ -195,6 +197,7 @@ app.use(
 					'https://*.googletagmanager.com',
 					'https://googleads.g.doubleclick.net',
 					'http://www.gstatic.com',
+					'https://*.posthog.com',
 				],
 				'script-src-attr': [
 					// @ts-expect-error

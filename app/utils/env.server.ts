@@ -19,6 +19,8 @@ const schema = z.object({
 	GA_PHONE_NUMBER: z.string(),
 	GA_CONVERSION_ID: z.string(),
 	GA_CONVERSION_LABEL: z.string(),
+	REACT_APP_PUBLIC_POSTHOG_KEY: z.string().optional(),
+	REACT_APP_PUBLIC_POSTHOG_HOST: z.string().optional(),
 })
 
 declare global {
@@ -61,6 +63,8 @@ export function getEnv() {
 		GA_PHONE_NUMBER: process.env.GA_PHONE_NUMBER,
 		GA_CONVERSION_ID: process.env.GA_CONVERSION_ID,
 		GA_CONVERSION_LABEL: process.env.GA_CONVERSION_LABEL,
+		REACT_APP_PUBLIC_POSTHOG_KEY: process.env.REACT_APP_PUBLIC_POSTHOG_KEY,
+		REACT_APP_PUBLIC_POSTHOG_HOST: process.env.REACT_APP_PUBLIC_POSTHOG_HOST,
 	}
 }
 
