@@ -45,7 +45,7 @@ function PricingTable({ category }: { category: PricingCategory }) {
 								<td className="px-5 py-3.5 text-sm text-gray-800">
 									{item.name}
 								</td>
-								<td className="whitespace-nowrap px-5 py-3.5 text-right text-sm font-medium text-gray-900">
+								<td className="px-5 py-3.5 text-right text-sm font-medium text-gray-900">
 									{item.price}
 								</td>
 							</tr>

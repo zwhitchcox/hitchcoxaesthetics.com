@@ -1,4 +1,5 @@
 import { Link } from '@remix-run/react'
+import { useEffect, useState } from 'react'
 import { cn } from '#app/utils/misc.js'
 
 export type ServiceCardData = {
@@ -10,8 +11,8 @@ export type ServiceCardData = {
 
 /**
  * Before/After image pair for service cards.
- * Uses CSS group-hover from the parent card to toggle between images.
- * Before shown by default, After revealed on card hover.
+ * Desktop: CSS group-hover toggles between before/after.
+ * Mobile: auto-cycles between before/after every 3 seconds.
  */
 function BeforeAfterImage({
 	src,
@@ -25,6 +26,17 @@ function BeforeAfterImage({
 	const isBeforeAfter = src.includes('-after.')
 	const beforeSrc = isBeforeAfter ? src.replace('-after.', '-before.') : null
 	const afterSrc = src
+
+	// Auto-cycle for mobile (no hover capability)
+	const [showAfter, setShowAfter] = useState(false)
+
+	useEffect(() => {
+		if (!beforeSrc) return
+		const timer = setInterval(() => {
+			setShowAfter(prev => !prev)
+		}, 3000)
+		return () => clearInterval(timer)
+	}, [beforeSrc])
 
 	if (!beforeSrc) {
 		return (
@@ -40,27 +52,40 @@ function BeforeAfterImage({
 
 	return (
 		<div className={cn('relative h-full w-full overflow-hidden', className)}>
-			{/* Before — visible by default, hidden on card hover */}
+			{/* Before — visible by default; hidden on hover (desktop) or when cycling (mobile) */}
 			<img
 				src={beforeSrc}
 				alt={`${alt} before`}
-				className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500 group-hover:opacity-0"
+				className={cn(
+					'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
+					'md:group-hover:opacity-0',
+					showAfter ? 'opacity-0 md:opacity-100' : 'opacity-100',
+				)}
 				loading="lazy"
 				decoding="async"
 			/>
-			{/* After — hidden by default, visible on card hover */}
+			{/* After — hidden by default; visible on hover (desktop) or when cycling (mobile) */}
 			<img
 				src={afterSrc}
 				alt={`${alt} after`}
-				className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+				className={cn(
+					'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
+					'md:opacity-0 md:group-hover:opacity-100',
+					showAfter ? 'opacity-100 md:opacity-0' : 'opacity-0',
+				)}
 				loading="lazy"
 				decoding="async"
 			/>
-			{/* Label — switches text via hidden/block on group-hover */}
+			{/* Label */}
 			<div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-black/50 px-2 py-0.5 backdrop-blur-[2px]">
 				<span className="text-[10px] font-medium uppercase tracking-wider text-white">
-					<span className="group-hover:hidden">Before</span>
-					<span className="hidden group-hover:inline">After</span>
+					{/* Mobile: driven by state */}
+					<span className="md:hidden">{showAfter ? 'After' : 'Before'}</span>
+					{/* Desktop: driven by hover */}
+					<span className="hidden md:inline">
+						<span className="group-hover:hidden">Before</span>
+						<span className="hidden group-hover:inline">After</span>
+					</span>
 				</span>
 			</div>
 		</div>

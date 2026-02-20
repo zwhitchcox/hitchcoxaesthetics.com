@@ -8,9 +8,20 @@
  * from their parent (e.g. botox) via getPricingForSlug().
  */
 
+import React from 'react'
+
+const NewPatientSpecialPrice = () => (
+	<div className="flex flex-col items-end justify-end gap-1 sm:flex-row sm:items-center">
+		<span>$13/unit</span>
+		<span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+			New Patient Special: $12/unit
+		</span>
+	</div>
+)
+
 export type PricingLineItem = {
 	name: string
-	price: string
+	price: string | React.ReactNode
 }
 
 export type PricingCategory = {
@@ -28,7 +39,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			items: [
 				{
 					name: 'Tox (Botox, Dysport, or Jeuveau)',
-					price: '$13/unit ($12/unit for new patients only)',
+					price: <NewPatientSpecialPrice />,
 				},
 				{ name: 'Lip Flip', price: '$129' },
 			],
@@ -61,7 +72,10 @@ export const pricingData: Record<string, PricingCategory[]> = {
 		{
 			title: 'Botox Pricing',
 			items: [
-				{ name: 'Botox', price: '$13/unit ($12/unit for new patients only)' },
+				{
+					name: 'Botox',
+					price: <NewPatientSpecialPrice />,
+				},
 				{ name: 'Lip Flip', price: '$129' },
 			],
 		},
@@ -70,7 +84,10 @@ export const pricingData: Record<string, PricingCategory[]> = {
 		{
 			title: 'Dysport Pricing',
 			items: [
-				{ name: 'Dysport', price: '$13/unit ($12/unit for new patients only)' },
+				{
+					name: 'Dysport',
+					price: <NewPatientSpecialPrice />,
+				},
 			],
 		},
 	],
@@ -78,7 +95,10 @@ export const pricingData: Record<string, PricingCategory[]> = {
 		{
 			title: 'Jeuveau Pricing',
 			items: [
-				{ name: 'Jeuveau', price: '$13/unit ($12/unit for new patients only)' },
+				{
+					name: 'Jeuveau',
+					price: <NewPatientSpecialPrice />,
+				},
 			],
 		},
 	],
