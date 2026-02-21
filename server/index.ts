@@ -74,6 +74,20 @@ app.get('*', (req, res, next) => {
 	}
 })
 
+// ensure HTTPS only (X-Forwarded-Proto comes from Fly)
+app.use((req, res, next) => {
+	if (req.method !== 'GET') return next()
+
+	const proto = req.get('X-Forwarded-Proto')
+	const host = getHost(req)
+	if (proto === 'http') {
+		res.set('X-Forwarded-Proto', 'https')
+		res.redirect(`https://${host}${req.originalUrl}`)
+		return
+	}
+	next()
+})
+
 // redirect old domains to botoxknoxville.com
 app.get('*', (req, res, next) => {
 	const host = getHost(req)

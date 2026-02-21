@@ -85,5 +85,5 @@ lasting confidence in your profile.
 
 Enhance your new jawline by pairing Kybella with [Jeuveau](/injectables/jeuveau)
 to smooth upper face wrinkles or [SkinVive](/injectables/skinvive) to hydrate
-and glow. Visit our [injectables overview](/injectables) to discover how we can
+and glow. Visit our [Botox Knoxville overview](/botox) to discover how we can
 help you achieve complete facial harmony.

@@ -48,24 +48,25 @@ sections:
 heroImages:
   - before: /img/before-after/botox-001-before.webp
     after: /img/before-after/botox-001-after.webp
-  - before: /img/before-after/botox-002-before.webp
-    after: /img/before-after/botox-002-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-003-before.webp
     after: /img/before-after/botox-003-after.webp
-  - before: /img/before-after/botox-004-before.webp
-    after: /img/before-after/botox-004-after.webp
+    caption: Forehead Wrinkles
   - before: /img/before-after/botox-005-before.webp
     after: /img/before-after/botox-005-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-006-before.webp
     after: /img/before-after/botox-006-after.webp
+    caption: Forehead Lines
   - before: /img/before-after/botox-007-before.webp
     after: /img/before-after/botox-007-after.webp
+    caption: Bunny Lines
   - before: /img/before-after/botox-008-before.webp
     after: /img/before-after/botox-008-after.webp
-  - before: /img/before-after/botox-009-before.webp
-    after: /img/before-after/botox-009-after.webp
+    caption: Forehead Lines
   - before: /img/before-after/botox-010-before.webp
     after: /img/before-after/botox-010-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-brow-lift-001-before.webp
     after: /img/before-after/botox-brow-lift-001-after.webp
     caption: Brow Lift
@@ -244,7 +245,7 @@ specific facial muscles, preventing them from contracting deeply. This action
 softens existing wrinkles and stops them from etching further into the skin.
 Common treatment areas include the forehead, around the eyes, and between the
 brows. As part of our comprehensive menu of
-[injectables in Knoxville](/injectables), Botox is often the first step for
+[Botox in Knoxville](/botox), Botox is often the first step for
 patients seeking a smoother, more youthful complexion without downtime.
 
 ## Comparing Botox and Other Neuromodulators

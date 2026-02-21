@@ -49,6 +49,6 @@ not just your appearance, but your overall well-being.
 As you transform your body, you may want to explore other aesthetic treatments
 to match your new look. [Skin tightening lasers](/laser-services) can help
 address laxity that sometimes accompanies weight loss, while
-[injectables](/injectables) can restore facial volume. Discover how our
+[Botox in Knoxville](/botox) can restore facial volume. Discover how our
 [microneedling services](/microneedling) can also enhance your skin's health as
 part of your total transformation.

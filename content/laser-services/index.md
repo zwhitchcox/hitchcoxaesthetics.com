@@ -82,7 +82,7 @@ ensuring that every visit moves you closer to your aesthetic goals.
 Laser technology pairs seamlessly with other modalities to enhance your overall
 results. Many of our patients combine their laser sessions with
 [microneedling in Knoxville](/microneedling) to further boost collagen
-production or integrate [injectable treatments](/injectables) for complete
+production or integrate [Botox treatments in Knoxville](/botox) for complete
 facial rejuvenation. If you are on a wellness journey, our
 [Knoxville weight loss programs](/weight-loss) can also complement your skin
 transformation, providing a holistic approach to beauty and health.

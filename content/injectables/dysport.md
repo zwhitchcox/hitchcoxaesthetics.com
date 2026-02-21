@@ -45,24 +45,25 @@ sections:
 heroImages:
   - before: /img/before-after/botox-001-before.webp
     after: /img/before-after/botox-001-after.webp
-  - before: /img/before-after/botox-002-before.webp
-    after: /img/before-after/botox-002-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-003-before.webp
     after: /img/before-after/botox-003-after.webp
-  - before: /img/before-after/botox-004-before.webp
-    after: /img/before-after/botox-004-after.webp
+    caption: Forehead Wrinkles
   - before: /img/before-after/botox-005-before.webp
     after: /img/before-after/botox-005-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-006-before.webp
     after: /img/before-after/botox-006-after.webp
+    caption: Forehead Lines
   - before: /img/before-after/botox-007-before.webp
     after: /img/before-after/botox-007-after.webp
+    caption: Bunny Lines
   - before: /img/before-after/botox-008-before.webp
     after: /img/before-after/botox-008-after.webp
-  - before: /img/before-after/botox-009-before.webp
-    after: /img/before-after/botox-009-after.webp
+    caption: Forehead Lines
   - before: /img/before-after/botox-010-before.webp
     after: /img/before-after/botox-010-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-brow-lift-001-before.webp
     after: /img/before-after/botox-brow-lift-001-after.webp
     caption: Brow Lift
@@ -240,7 +241,7 @@ One of the key advantages of Dysport is its rapid onset; many patients begin to
 see smoothing effects in as little as two to three days. This makes it a
 favorite for those wanting quick results before an event. Additionally, its
 spreadability allows for a very smooth, "airbrushed" finish that avoids a heavy
-or stiff appearance. As a core part of our [injectables menu](/injectables),
+or stiff appearance. As a core part of our [Knoxville Botox treatments](/botox),
 Dysport offers a versatile solution for treating frown lines, crow's feet, and
 forehead wrinkles.
 

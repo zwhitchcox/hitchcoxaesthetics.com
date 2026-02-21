@@ -27,34 +27,25 @@ sections:
 heroImages:
   - before: /img/before-after/botox-001-before.webp
     after: /img/before-after/botox-001-after.webp
-    caption: Botox
-  - before: /img/before-after/botox-002-before.webp
-    after: /img/before-after/botox-002-after.webp
-    caption: Botox
+    caption: Frown Lines
   - before: /img/before-after/botox-003-before.webp
     after: /img/before-after/botox-003-after.webp
-    caption: Botox
-  - before: /img/before-after/botox-004-before.webp
-    after: /img/before-after/botox-004-after.webp
-    caption: Botox
+    caption: Forehead Wrinkles
   - before: /img/before-after/botox-005-before.webp
     after: /img/before-after/botox-005-after.webp
-    caption: Botox
+    caption: Frown Lines
   - before: /img/before-after/botox-006-before.webp
     after: /img/before-after/botox-006-after.webp
-    caption: Botox
+    caption: Forehead Lines
   - before: /img/before-after/botox-007-before.webp
     after: /img/before-after/botox-007-after.webp
-    caption: Botox
+    caption: Bunny Lines
   - before: /img/before-after/botox-008-before.webp
     after: /img/before-after/botox-008-after.webp
-    caption: Botox
-  - before: /img/before-after/botox-009-before.webp
-    after: /img/before-after/botox-009-after.webp
-    caption: Botox
+    caption: Forehead Lines
   - before: /img/before-after/botox-010-before.webp
     after: /img/before-after/botox-010-after.webp
-    caption: Botox
+    caption: Frown Lines
   - before: /img/before-after/botox-brow-lift-001-before.webp
     after: /img/before-after/botox-brow-lift-001-after.webp
     caption: Brow Lift

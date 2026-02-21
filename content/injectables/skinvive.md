@@ -78,5 +78,5 @@ altering your facial structure.
 SkinVive works beautifully as a finishing touch to other procedures. Combine it
 with [Jeuveau](/injectables/jeuveau) for wrinkle relaxation or
 [Kybella](/injectables/kybella) for contouring. Learn more about our full range
-of [injectable services](/injectables) to see how we can elevate your skincare
+of [Knoxville Botox services](/botox) to see how we can elevate your skincare
 routine.

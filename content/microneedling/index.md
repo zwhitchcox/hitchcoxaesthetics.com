@@ -111,7 +111,7 @@ supercharge healing and maximize results.
 
 Microneedling serves as an excellent foundation for a holistic aesthetic plan.
 It integrates seamlessly with [laser services](/laser-services) for surface
-polishing or [injectable treatments](/injectables) for volume and wrinkle
+polishing or [Botox treatments in Knoxville](/botox) for volume and wrinkle
 reduction. Additionally, if you are focusing on whole-body wellness, our
 [Knoxville weight loss programs](/weight-loss) can complement your renewed
 confidence.

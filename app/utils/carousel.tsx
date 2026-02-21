@@ -83,10 +83,10 @@ const ImageCarousel = ({
 				/>
 			))}
 
-			{/* Caption — subtle white text, top left */}
+			{/* Caption — subtle white text, bottom left */}
 			{currentCaption && (
-				<div className="absolute left-4 top-4 z-10">
-					<span className="text-sm font-medium tracking-wide text-white/80 drop-shadow-md">
+				<div className="absolute bottom-4 left-4 z-10">
+					<span className="rounded-full bg-black/50 px-3 py-1 text-xs font-medium tracking-wide text-white/90 drop-shadow-md backdrop-blur-sm">
 						{currentCaption}
 					</span>
 				</div>

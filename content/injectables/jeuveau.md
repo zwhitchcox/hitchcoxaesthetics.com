@@ -24,24 +24,25 @@ sections:
 heroImages:
   - before: /img/before-after/botox-001-before.webp
     after: /img/before-after/botox-001-after.webp
-  - before: /img/before-after/botox-002-before.webp
-    after: /img/before-after/botox-002-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-003-before.webp
     after: /img/before-after/botox-003-after.webp
-  - before: /img/before-after/botox-004-before.webp
-    after: /img/before-after/botox-004-after.webp
+    caption: Forehead Wrinkles
   - before: /img/before-after/botox-005-before.webp
     after: /img/before-after/botox-005-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-006-before.webp
     after: /img/before-after/botox-006-after.webp
+    caption: Forehead Lines
   - before: /img/before-after/botox-007-before.webp
     after: /img/before-after/botox-007-after.webp
+    caption: Bunny Lines
   - before: /img/before-after/botox-008-before.webp
     after: /img/before-after/botox-008-after.webp
-  - before: /img/before-after/botox-009-before.webp
-    after: /img/before-after/botox-009-after.webp
+    caption: Forehead Lines
   - before: /img/before-after/botox-010-before.webp
     after: /img/before-after/botox-010-after.webp
+    caption: Frown Lines
   - before: /img/before-after/botox-brow-lift-001-before.webp
     after: /img/before-after/botox-brow-lift-001-after.webp
     caption: Brow Lift
@@ -222,5 +223,5 @@ beautiful results.
 This treatment pairs seamlessly with other injectables. You can combine it with
 [Kybella](/injectables/kybella) for jawline definition or
 [SkinVive](/injectables/skinvive) for enhanced skin quality. Explore our full
-[injectables menu](/injectables) to see how we can customize a comprehensive
+[Knoxville Botox treatments](/botox) to see how we can customize a comprehensive
 anti-aging plan for you.
