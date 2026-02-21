@@ -20,6 +20,13 @@ sections:
       - title: Expert Guidance
         description: Medically supervised programs tailored to your goals.
         icon: user-check
+heroImages:
+  - before: /img/before-after/semaglutide-001-before.webp
+    after: /img/before-after/semaglutide-001-after.webp
+    caption: Semaglutide
+  - before: /img/before-after/semaglutide-002-before.webp
+    after: /img/before-after/semaglutide-002-after.webp
+    caption: Semaglutide
 ---
 
 ## Medical Weight Loss in Knoxville

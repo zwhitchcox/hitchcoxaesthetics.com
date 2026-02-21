@@ -40,6 +40,11 @@ sections:
         answer: >-
           Treated vessels are naturally absorbed by the body. However, new veins
           can form over time, so maintenance may be required.
+heroImages:
+  - before: /img/before-after/vascular-lesion-reduction-001-before.webp
+    after: /img/before-after/vascular-lesion-reduction-001-after.webp
+  - before: /img/before-after/vascular-lesion-reduction-002-before.webp
+    after: /img/before-after/vascular-lesion-reduction-002-after.webp
 ---
 
 ## Vascular Vein Treatment in Knoxville

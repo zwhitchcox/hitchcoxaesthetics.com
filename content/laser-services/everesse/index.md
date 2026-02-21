@@ -91,6 +91,11 @@ sections:
           You may notice early tightening in 2-4 weeks, with peak improvements
           around 12 weeks as new collagen matures. Results vary by age and
           lifestyle; maintenance sessions can help sustain outcomes.
+heroImages:
+  - before: /img/before-after/skin-revitalization-001-before.webp
+    after: /img/before-after/skin-revitalization-001-after.webp
+  - before: /img/before-after/skin-revitalization-002-before.webp
+    after: /img/before-after/skin-revitalization-002-after.webp
 ---
 
 ## Everesse Skin Tightening in Knoxville

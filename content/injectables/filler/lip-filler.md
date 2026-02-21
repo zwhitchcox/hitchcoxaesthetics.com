@@ -20,6 +20,17 @@ sections:
       - title: Hydration
         description: HA fillers hydrate lips from the inside out.
         icon: droplet
+heroImages:
+  - before: /img/before-after/filler-lip-filler-001-before.webp
+    after: /img/before-after/filler-lip-filler-001-after.webp
+  - before: /img/before-after/filler-lip-filler-002-before.webp
+    after: /img/before-after/filler-lip-filler-002-after.webp
+  - before: /img/before-after/filler-lip-filler-003-before.webp
+    after: /img/before-after/filler-lip-filler-003-after.webp
+  - before: /img/before-after/filler-lip-filler-004-before.webp
+    after: /img/before-after/filler-lip-filler-004-after.webp
+  - before: /img/before-after/filler-lip-filler-005-before.webp
+    after: /img/before-after/filler-lip-filler-005-after.webp
 ---
 
 ## Natural Lip Filler Results in Knoxville

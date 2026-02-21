@@ -1,3 +1,9 @@
+export type HeroImagePair = {
+	before: string
+	after: string
+	caption?: string
+}
+
 export type SitePage = {
 	path: string
 	name: string
@@ -6,8 +12,8 @@ export type SitePage = {
 	metaDescription: string
 	content: string
 	heroImage?: string
-	/** All before/after image paths for the carousel (alternating before, after) */
-	heroImages?: string[]
+	/** All before/after image pairs for the carousel */
+	heroImages?: HeroImagePair[]
 	parent?: string
 	children?: string[]
 	enabled: boolean
@@ -39,8 +45,8 @@ export type LocationServiceData = {
 	whyChoose?: string
 	ctaText: string
 	heroImage?: string
-	/** All before/after image paths for the carousel (alternating before, after) */
-	heroImages?: string[]
+	/** All before/after image pairs for the carousel */
+	heroImages?: HeroImagePair[]
 	sections?: ServicePageSection[]
 }
 

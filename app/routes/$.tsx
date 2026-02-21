@@ -98,9 +98,8 @@ export default function DynamicPage() {
 	const { page, children, ancestors, siblings, markdown } =
 		useLoaderData<LoaderData>()
 
-	// Carousel images: use heroImages (all before/after pairs) from content-loader
-	const imgs: string[] =
-		page.heroImages ?? (page.heroImage ? [page.heroImage] : [])
+	// Carousel images: use heroImages (before/after pairs) from frontmatter
+	const imgs = page.heroImages ?? []
 
 	const childCards = (children ?? [])
 		.filter(c => c.enabled)

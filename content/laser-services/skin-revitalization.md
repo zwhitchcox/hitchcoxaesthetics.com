@@ -43,6 +43,11 @@ sections:
           You may notice an immediate glow, with more significant improvements
           in texture and tone appearing over the course of your treatment
           series.
+heroImages:
+  - before: /img/before-after/skin-revitalization-001-before.webp
+    after: /img/before-after/skin-revitalization-001-after.webp
+  - before: /img/before-after/skin-revitalization-002-before.webp
+    after: /img/before-after/skin-revitalization-002-after.webp
 ---
 
 ## Skin Revitalization in Knoxville

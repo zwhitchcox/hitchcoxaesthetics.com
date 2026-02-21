@@ -14,15 +14,13 @@ sections:
     title: Key Benefits of Tirzepatide Weight Loss
     items:
       - title: Dual Action
-        description:
-          Targets both GIP and GLP-1 receptors for enhanced weight loss results.
+        description: Targets both GIP and GLP-1 receptors for enhanced weight loss results.
       - title: Proven Results
         description: >-
           Clinical trials showed up to 22% body weight reduction in some
           patients.
       - title: Weekly Injection
-        description:
-          Simple once-weekly injection that fits easily into your routine.
+        description: Simple once-weekly injection that fits easily into your routine.
   - type: faq-accordion
     title: Tirzepatide Weight Loss FAQs
     items:
@@ -45,6 +43,11 @@ sections:
           Yes. Mounjaro is the brand name for tirzepatide when prescribed for
           diabetes, and Zepbound is the brand name when prescribed specifically
           for weight management. The active ingredient is the same.
+heroImages:
+  - before: /img/before-after/semaglutide-001-before.webp
+    after: /img/before-after/semaglutide-001-after.webp
+  - before: /img/before-after/semaglutide-002-before.webp
+    after: /img/before-after/semaglutide-002-after.webp
 ---
 
 ## Tirzepatide Weight Loss in Knoxville

@@ -20,6 +20,25 @@ sections:
       - title: Gentle Treatment
         description: Minimal discomfort for a sensitive area.
         icon: feather
+heroImages:
+  - before: /img/before-after/botox-crows-feet-001-before.webp
+    after: /img/before-after/botox-crows-feet-001-after.webp
+  - before: /img/before-after/botox-crows-feet-002-before.webp
+    after: /img/before-after/botox-crows-feet-002-after.webp
+  - before: /img/before-after/botox-crows-feet-003-before.webp
+    after: /img/before-after/botox-crows-feet-003-after.webp
+  - before: /img/before-after/botox-crows-feet-004-before.webp
+    after: /img/before-after/botox-crows-feet-004-after.webp
+  - before: /img/before-after/botox-crows-feet-005-before.webp
+    after: /img/before-after/botox-crows-feet-005-after.webp
+  - before: /img/before-after/botox-crows-feet-006-before.webp
+    after: /img/before-after/botox-crows-feet-006-after.webp
+  - before: /img/before-after/botox-crows-feet-007-before.webp
+    after: /img/before-after/botox-crows-feet-007-after.webp
+  - before: /img/before-after/botox-crows-feet-008-before.webp
+    after: /img/before-after/botox-crows-feet-008-after.webp
+  - before: /img/before-after/botox-crows-feet-009-before.webp
+    after: /img/before-after/botox-crows-feet-009-after.webp
 ---
 
 ## Refreshing Crow's Feet in Knoxville

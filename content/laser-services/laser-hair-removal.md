@@ -42,6 +42,15 @@ sections:
         answer: >-
           Laser hair removal offers permanent hair reduction. While some fine
           hair may regrow over time, it is typically much lighter and sparser.
+heroImages:
+  - before: /img/before-after/laser-hair-removal-001-before.webp
+    after: /img/before-after/laser-hair-removal-001-after.webp
+  - before: /img/before-after/laser-hair-removal-002-before.webp
+    after: /img/before-after/laser-hair-removal-002-after.webp
+  - before: /img/before-after/laser-hair-removal-003-before.webp
+    after: /img/before-after/laser-hair-removal-003-after.webp
+  - before: /img/before-after/laser-hair-removal-004-before.webp
+    after: /img/before-after/laser-hair-removal-004-after.webp
 ---
 
 ## Laser Hair Removal in Knoxville

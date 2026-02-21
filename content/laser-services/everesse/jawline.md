@@ -11,6 +11,11 @@ whyChoose: >-
   Achieve a sculpted jawline without needles or surgery. Everesse offers a
   precise, comfortable way to tighten and define the lower face.
 ctaText: Book Jawline Treatment Consultation
+heroImages:
+  - before: /img/before-after/skin-revitalization-001-before.webp
+    after: /img/before-after/skin-revitalization-001-after.webp
+  - before: /img/before-after/skin-revitalization-002-before.webp
+    after: /img/before-after/skin-revitalization-002-after.webp
 ---
 
 ## Jawline Contouring in Knoxville

@@ -20,6 +20,15 @@ sections:
       - title: Simple Solution
         description: A quick injection with lasting results.
         icon: zap
+heroImages:
+  - before: /img/before-after/botox-chin-dimpling-001-before.webp
+    after: /img/before-after/botox-chin-dimpling-001-after.webp
+  - before: /img/before-after/botox-chin-dimpling-002-before.webp
+    after: /img/before-after/botox-chin-dimpling-002-after.webp
+  - before: /img/before-after/botox-chin-dimpling-003-before.webp
+    after: /img/before-after/botox-chin-dimpling-003-after.webp
+  - before: /img/before-after/botox-chin-dimpling-004-before.webp
+    after: /img/before-after/botox-chin-dimpling-004-after.webp
 ---
 
 ## Smoothing Chin Dimpling in Knoxville

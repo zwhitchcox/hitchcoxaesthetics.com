@@ -11,6 +11,11 @@ whyChoose: >-
   Address facial laxity at its source. Everesse stimulates your body's natural
   collagen production for long-lasting, natural-looking firmness.
 ctaText: Book Face Treatment Consultation
+heroImages:
+  - before: /img/before-after/skin-revitalization-001-before.webp
+    after: /img/before-after/skin-revitalization-001-after.webp
+  - before: /img/before-after/skin-revitalization-002-before.webp
+    after: /img/before-after/skin-revitalization-002-after.webp
 ---
 
 ## Non-Surgical Face Lift in Knoxville

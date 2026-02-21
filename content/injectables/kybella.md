@@ -55,6 +55,17 @@ sections:
       - title: Defined Profile
         description: Sculpts the jawline for a sharper appearance.
         icon: user
+heroImages:
+  - before: /img/before-after/kybella-001-before.webp
+    after: /img/before-after/kybella-001-after.webp
+  - before: /img/before-after/kybella-002-before.webp
+    after: /img/before-after/kybella-002-after.webp
+  - before: /img/before-after/kybella-003-before.webp
+    after: /img/before-after/kybella-003-after.webp
+  - before: /img/before-after/kybella-004-before.webp
+    after: /img/before-after/kybella-004-after.webp
+  - before: /img/before-after/kybella-005-before.webp
+    after: /img/before-after/kybella-005-after.webp
 ---
 
 ## Kybella Double Chin Treatment in Knoxville

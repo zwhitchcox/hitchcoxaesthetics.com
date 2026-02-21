@@ -11,6 +11,11 @@ whyChoose: >-
   Rejuvenate your neck with confidence. Everesse targets delicate neck skin
   safely and effectively to restore firmness and texture.
 ctaText: Book Neck Treatment Consultation
+heroImages:
+  - before: /img/before-after/skin-revitalization-001-before.webp
+    after: /img/before-after/skin-revitalization-001-after.webp
+  - before: /img/before-after/skin-revitalization-002-before.webp
+    after: /img/before-after/skin-revitalization-002-after.webp
 ---
 
 ## Neck Tightening Services in Knoxville

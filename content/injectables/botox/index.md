@@ -45,6 +45,186 @@ sections:
         answer: >-
           Not with us. We specialize in natural-looking results that smooth
           lines while maintaining expression.
+heroImages:
+  - before: /img/before-after/botox-001-before.webp
+    after: /img/before-after/botox-001-after.webp
+  - before: /img/before-after/botox-002-before.webp
+    after: /img/before-after/botox-002-after.webp
+  - before: /img/before-after/botox-003-before.webp
+    after: /img/before-after/botox-003-after.webp
+  - before: /img/before-after/botox-004-before.webp
+    after: /img/before-after/botox-004-after.webp
+  - before: /img/before-after/botox-005-before.webp
+    after: /img/before-after/botox-005-after.webp
+  - before: /img/before-after/botox-006-before.webp
+    after: /img/before-after/botox-006-after.webp
+  - before: /img/before-after/botox-007-before.webp
+    after: /img/before-after/botox-007-after.webp
+  - before: /img/before-after/botox-008-before.webp
+    after: /img/before-after/botox-008-after.webp
+  - before: /img/before-after/botox-009-before.webp
+    after: /img/before-after/botox-009-after.webp
+  - before: /img/before-after/botox-010-before.webp
+    after: /img/before-after/botox-010-after.webp
+  - before: /img/before-after/botox-brow-lift-001-before.webp
+    after: /img/before-after/botox-brow-lift-001-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-brow-lift-002-before.webp
+    after: /img/before-after/botox-brow-lift-002-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-brow-lift-003-before.webp
+    after: /img/before-after/botox-brow-lift-003-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-brow-lift-004-before.webp
+    after: /img/before-after/botox-brow-lift-004-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-brow-lift-005-before.webp
+    after: /img/before-after/botox-brow-lift-005-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-bunny-lines-001-before.webp
+    after: /img/before-after/botox-bunny-lines-001-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-002-before.webp
+    after: /img/before-after/botox-bunny-lines-002-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-003-before.webp
+    after: /img/before-after/botox-bunny-lines-003-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-004-before.webp
+    after: /img/before-after/botox-bunny-lines-004-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-005-before.webp
+    after: /img/before-after/botox-bunny-lines-005-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-006-before.webp
+    after: /img/before-after/botox-bunny-lines-006-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-007-before.webp
+    after: /img/before-after/botox-bunny-lines-007-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-chin-dimpling-001-before.webp
+    after: /img/before-after/botox-chin-dimpling-001-after.webp
+    caption: Chin Dimpling
+  - before: /img/before-after/botox-chin-dimpling-002-before.webp
+    after: /img/before-after/botox-chin-dimpling-002-after.webp
+    caption: Chin Dimpling
+  - before: /img/before-after/botox-chin-dimpling-003-before.webp
+    after: /img/before-after/botox-chin-dimpling-003-after.webp
+    caption: Chin Dimpling
+  - before: /img/before-after/botox-chin-dimpling-004-before.webp
+    after: /img/before-after/botox-chin-dimpling-004-after.webp
+    caption: Chin Dimpling
+  - before: /img/before-after/botox-crows-feet-001-before.webp
+    after: /img/before-after/botox-crows-feet-001-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-002-before.webp
+    after: /img/before-after/botox-crows-feet-002-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-003-before.webp
+    after: /img/before-after/botox-crows-feet-003-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-004-before.webp
+    after: /img/before-after/botox-crows-feet-004-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-005-before.webp
+    after: /img/before-after/botox-crows-feet-005-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-006-before.webp
+    after: /img/before-after/botox-crows-feet-006-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-007-before.webp
+    after: /img/before-after/botox-crows-feet-007-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-008-before.webp
+    after: /img/before-after/botox-crows-feet-008-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-009-before.webp
+    after: /img/before-after/botox-crows-feet-009-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-forehead-lines-001-before.webp
+    after: /img/before-after/botox-forehead-lines-001-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-002-before.webp
+    after: /img/before-after/botox-forehead-lines-002-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-003-before.webp
+    after: /img/before-after/botox-forehead-lines-003-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-004-before.webp
+    after: /img/before-after/botox-forehead-lines-004-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-005-before.webp
+    after: /img/before-after/botox-forehead-lines-005-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-006-before.webp
+    after: /img/before-after/botox-forehead-lines-006-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-007-before.webp
+    after: /img/before-after/botox-forehead-lines-007-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-frown-lines-001-before.webp
+    after: /img/before-after/botox-frown-lines-001-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-002-before.webp
+    after: /img/before-after/botox-frown-lines-002-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-003-before.webp
+    after: /img/before-after/botox-frown-lines-003-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-004-before.webp
+    after: /img/before-after/botox-frown-lines-004-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-005-before.webp
+    after: /img/before-after/botox-frown-lines-005-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-006-before.webp
+    after: /img/before-after/botox-frown-lines-006-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-007-before.webp
+    after: /img/before-after/botox-frown-lines-007-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-008-before.webp
+    after: /img/before-after/botox-frown-lines-008-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-gummy-smile-001-before.webp
+    after: /img/before-after/botox-gummy-smile-001-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-002-before.webp
+    after: /img/before-after/botox-gummy-smile-002-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-003-before.webp
+    after: /img/before-after/botox-gummy-smile-003-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-004-before.webp
+    after: /img/before-after/botox-gummy-smile-004-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-005-before.webp
+    after: /img/before-after/botox-gummy-smile-005-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-006-before.webp
+    after: /img/before-after/botox-gummy-smile-006-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-007-before.webp
+    after: /img/before-after/botox-gummy-smile-007-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-lip-flip-001-before.webp
+    after: /img/before-after/botox-lip-flip-001-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-002-before.webp
+    after: /img/before-after/botox-lip-flip-002-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-003-before.webp
+    after: /img/before-after/botox-lip-flip-003-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-004-before.webp
+    after: /img/before-after/botox-lip-flip-004-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-005-before.webp
+    after: /img/before-after/botox-lip-flip-005-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-006-before.webp
+    after: /img/before-after/botox-lip-flip-006-after.webp
+    caption: Lip Flip
 ---
 
 ## Expert Botox Treatments in Knoxville

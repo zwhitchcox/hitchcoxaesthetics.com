@@ -52,6 +52,13 @@ sections:
       - title: Lasting Results
         description: Enjoy improved skin quality for up to 6 months.
         icon: calendar
+heroImages:
+  - before: /img/before-after/skinvive-001-before.webp
+    after: /img/before-after/skinvive-001-after.webp
+  - before: /img/before-after/skinvive-002-before.webp
+    after: /img/before-after/skinvive-002-after.webp
+  - before: /img/before-after/skinvive-003-before.webp
+    after: /img/before-after/skinvive-003-after.webp
 ---
 
 ## SkinVive Hydration Treatments in Knoxville

@@ -20,6 +20,21 @@ sections:
       - title: Expressive
         description: Maintains natural brow movement and expression.
         icon: user
+heroImages:
+  - before: /img/before-after/botox-forehead-lines-001-before.webp
+    after: /img/before-after/botox-forehead-lines-001-after.webp
+  - before: /img/before-after/botox-forehead-lines-002-before.webp
+    after: /img/before-after/botox-forehead-lines-002-after.webp
+  - before: /img/before-after/botox-forehead-lines-003-before.webp
+    after: /img/before-after/botox-forehead-lines-003-after.webp
+  - before: /img/before-after/botox-forehead-lines-004-before.webp
+    after: /img/before-after/botox-forehead-lines-004-after.webp
+  - before: /img/before-after/botox-forehead-lines-005-before.webp
+    after: /img/before-after/botox-forehead-lines-005-after.webp
+  - before: /img/before-after/botox-forehead-lines-006-before.webp
+    after: /img/before-after/botox-forehead-lines-006-after.webp
+  - before: /img/before-after/botox-forehead-lines-007-before.webp
+    after: /img/before-after/botox-forehead-lines-007-after.webp
 ---
 
 ## Smoothing Forehead Lines in Knoxville

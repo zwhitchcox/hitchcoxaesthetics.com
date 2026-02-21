@@ -20,6 +20,17 @@ sections:
       - title: Jowl Reduction
         description: Camouflages the appearance of jowls.
         icon: minimize-2
+heroImages:
+  - before: /img/before-after/filler-jawline-filler-001-before.webp
+    after: /img/before-after/filler-jawline-filler-001-after.webp
+  - before: /img/before-after/filler-jawline-filler-002-before.webp
+    after: /img/before-after/filler-jawline-filler-002-after.webp
+  - before: /img/before-after/filler-jawline-filler-003-before.webp
+    after: /img/before-after/filler-jawline-filler-003-after.webp
+  - before: /img/before-after/filler-jawline-filler-004-before.webp
+    after: /img/before-after/filler-jawline-filler-004-after.webp
+  - before: /img/before-after/filler-jawline-filler-005-before.webp
+    after: /img/before-after/filler-jawline-filler-005-after.webp
 ---
 
 ## Sculpting the Jawline in Knoxville

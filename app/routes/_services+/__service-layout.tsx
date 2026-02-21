@@ -5,6 +5,7 @@ import Carousel from '#app/utils/carousel.js'
 import { CTA } from '#app/utils/cta.js'
 import { getLocationById, PHONE } from '#app/utils/locations.js'
 import { cn, scrollToId } from '#app/utils/misc.js'
+import { type HeroImagePair } from '#app/utils/section-types.js'
 
 /**
  * Generates FAQPage JSON-LD structured data for SEO.
@@ -165,27 +166,19 @@ export function ServiceLayout({
 	children,
 	imgClassName,
 	imgContainerClassName,
-	customClassNames,
 	imgs,
-	imgAltTexts,
 }: {
 	title: string
 	description: string
 	children: React.ReactNode
 	imgClassName?: string
 	imgContainerClassName?: string
-	customClassNames?: (string | undefined)[]
-	imgs?: string[]
-	imgAltTexts?: string[]
+	imgs?: HeroImagePair[]
 }) {
 	const location = useLocation()
 	const service = location.pathname.split('/').pop()
 	// If no images passed, don't render carousel with broken URLs
 	imgs ??= []
-	imgAltTexts ??= [
-		`${title} before treatment at Sarah Hitchcox Aesthetics`,
-		`${title} after treatment at Sarah Hitchcox Aesthetics`,
-	]
 	const serviceUrl = `https://botoxknoxville.com${location.pathname}`
 	return (
 		<>
@@ -198,12 +191,7 @@ export function ServiceLayout({
 							imgContainerClassName,
 						)}
 					>
-						<Carousel
-							images={imgs}
-							className={imgClassName}
-							customClassNames={customClassNames}
-							altTexts={imgAltTexts}
-						/>
+						<Carousel pairs={imgs} className={imgClassName} />
 					</div>
 					<div className="z-10 flex w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
 						<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">

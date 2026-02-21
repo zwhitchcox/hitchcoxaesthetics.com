@@ -20,6 +20,17 @@ sections:
       - title: Refreshed Look
         description: Subtle elevation for a youthful arch.
         icon: star
+heroImages:
+  - before: /img/before-after/botox-brow-lift-001-before.webp
+    after: /img/before-after/botox-brow-lift-001-after.webp
+  - before: /img/before-after/botox-brow-lift-002-before.webp
+    after: /img/before-after/botox-brow-lift-002-after.webp
+  - before: /img/before-after/botox-brow-lift-003-before.webp
+    after: /img/before-after/botox-brow-lift-003-after.webp
+  - before: /img/before-after/botox-brow-lift-004-before.webp
+    after: /img/before-after/botox-brow-lift-004-after.webp
+  - before: /img/before-after/botox-brow-lift-005-before.webp
+    after: /img/before-after/botox-brow-lift-005-after.webp
 ---
 
 ## Non-Surgical Brow Lift in Knoxville

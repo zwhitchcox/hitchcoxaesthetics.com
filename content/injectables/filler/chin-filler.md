@@ -20,6 +20,15 @@ sections:
       - title: Definition
         description: Creates a distinct separation between face and neck.
         icon: check
+heroImages:
+  - before: /img/before-after/filler-chin-filler-001-before.webp
+    after: /img/before-after/filler-chin-filler-001-after.webp
+  - before: /img/before-after/filler-chin-filler-002-before.webp
+    after: /img/before-after/filler-chin-filler-002-after.webp
+  - before: /img/before-after/filler-chin-filler-003-before.webp
+    after: /img/before-after/filler-chin-filler-003-after.webp
+  - before: /img/before-after/filler-chin-filler-004-before.webp
+    after: /img/before-after/filler-chin-filler-004-after.webp
 ---
 
 ## Defining Profiles with Chin Filler in Knoxville

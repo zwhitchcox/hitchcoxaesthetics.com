@@ -86,6 +86,11 @@ sections:
           Schedule a free consultation. We will review your medical history,
           discuss your goals, and if you are a candidate, start you on a
           personalized path to weight loss.
+heroImages:
+  - before: /img/before-after/semaglutide-001-before.webp
+    after: /img/before-after/semaglutide-001-after.webp
+  - before: /img/before-after/semaglutide-002-before.webp
+    after: /img/before-after/semaglutide-002-after.webp
 ---
 
 ## Semaglutide Injections in Knoxville

@@ -1,31 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '#app/utils/misc.js'
+import { type HeroImagePair } from '#app/utils/section-types.js'
 
 const ImageCarousel = ({
-	images,
+	pairs,
 	className,
-	customClassNames,
-	altTexts,
 	interval = 4000,
 	transitionDuration = 2000,
 }: {
-	images: string[]
+	pairs: HeroImagePair[]
 	className?: string
-	customClassNames?: (string | undefined)[]
-	altTexts?: string[]
 	transitionDuration?: number
 	interval?: number
 }) => {
-	// Images arrive as [before1, after1, before2, after2, ...]
-	// We treat them as pairs. pairIndex picks which pair, showAfter toggles within.
-	const totalPairs = Math.max(1, Math.floor(images.length / 2))
+	// Flatten pairs into [before1, after1, before2, after2, ...]
+	const images = pairs.flatMap(p => [p.before, p.after])
+	const captions = pairs.flatMap(p => [p.caption, p.caption])
+
 	const [currentIndex, setCurrentIndex] = useState(0)
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-	// currentIndex maps directly to an image in the array
 	// Even indices = before, odd indices = after
 	const showAfter = currentIndex % 2 === 1
 	const pairIndex = Math.floor(currentIndex / 2)
+	const currentCaption = captions[currentIndex]
 
 	const clearTimer = useCallback(() => {
 		if (timerRef.current) {
@@ -47,15 +45,13 @@ const ImageCarousel = ({
 		return clearTimer
 	}, [startTimer, clearTimer])
 
-	const nextPair = () => {
-		const nextPairIdx = (pairIndex + 1) % totalPairs
-		setCurrentIndex(nextPairIdx * 2)
+	const goNext = () => {
+		setCurrentIndex(prev => (prev + 1) % images.length)
 		startTimer()
 	}
 
-	const prevPair = () => {
-		const prevPairIdx = (pairIndex - 1 + totalPairs) % totalPairs
-		setCurrentIndex(prevPairIdx * 2)
+	const goPrev = () => {
+		setCurrentIndex(prev => (prev - 1 + images.length) % images.length)
 		startTimer()
 	}
 
@@ -74,10 +70,10 @@ const ImageCarousel = ({
 				<img
 					key={index}
 					src={image}
-					alt={altTexts?.[index] ?? `Slide ${index + 1}`}
+					alt={`Treatment result ${Math.floor(index / 2) + 1} ${index % 2 === 0 ? 'before' : 'after'}`}
 					className={`absolute left-0 top-0 w-full object-cover transition-opacity ${
 						index === currentIndex ? 'opacity-100' : 'opacity-0'
-					} ${cn(className, customClassNames?.[index] ?? '')}`}
+					} ${cn(className)}`}
 					style={{
 						transitionDuration: `${transitionDuration}ms`,
 					}}
@@ -87,31 +83,38 @@ const ImageCarousel = ({
 				/>
 			))}
 
+			{/* Caption — subtle white text, top left */}
+			{currentCaption && (
+				<div className="absolute left-4 top-4 z-10">
+					<span className="text-sm font-medium tracking-wide text-white/80 drop-shadow-md">
+						{currentCaption}
+					</span>
+				</div>
+			)}
+
 			{/* Navigation Controls: [<] [Before/After] [>] */}
 			{images.length > 1 && (
 				<div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 p-1 backdrop-blur-sm">
-					{/* Previous Pair */}
-					{totalPairs > 1 && (
-						<button
-							onClick={prevPair}
-							className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
-							aria-label="Previous photo"
+					{/* Previous */}
+					<button
+						onClick={goPrev}
+						className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+						aria-label="Previous photo"
+					>
+						<svg
+							className="h-4 w-4"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
 						>
-							<svg
-								className="h-4 w-4"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M15 19l-7-7 7-7"
-								/>
-							</svg>
-						</button>
-					)}
+							<path
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								strokeWidth={2}
+								d="M15 19l-7-7 7-7"
+							/>
+						</svg>
+					</button>
 
 					{/* Before / After Toggle */}
 					<button
@@ -121,28 +124,26 @@ const ImageCarousel = ({
 						{showAfter ? 'After' : 'Before'}
 					</button>
 
-					{/* Next Pair */}
-					{totalPairs > 1 && (
-						<button
-							onClick={nextPair}
-							className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
-							aria-label="Next photo"
+					{/* Next */}
+					<button
+						onClick={goNext}
+						className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+						aria-label="Next photo"
+					>
+						<svg
+							className="h-4 w-4"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
 						>
-							<svg
-								className="h-4 w-4"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M9 5l7 7-7 7"
-								/>
-							</svg>
-						</button>
-					)}
+							<path
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								strokeWidth={2}
+								d="M9 5l7 7-7 7"
+							/>
+						</svg>
+					</button>
 				</div>
 			)}
 		</>

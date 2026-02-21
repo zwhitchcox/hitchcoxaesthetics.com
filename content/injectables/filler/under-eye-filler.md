@@ -20,6 +20,47 @@ sections:
       - title: Restore Volume
         description: Fills deep hollows and tear troughs.
         icon: droplet
+heroImages:
+  - before: /img/before-after/filler-cheek-filler-001-before.webp
+    after: /img/before-after/filler-cheek-filler-001-after.webp
+  - before: /img/before-after/filler-cheek-filler-002-before.webp
+    after: /img/before-after/filler-cheek-filler-002-after.webp
+  - before: /img/before-after/filler-cheek-filler-003-before.webp
+    after: /img/before-after/filler-cheek-filler-003-after.webp
+  - before: /img/before-after/filler-cheek-filler-004-before.webp
+    after: /img/before-after/filler-cheek-filler-004-after.webp
+  - before: /img/before-after/filler-cheek-filler-005-before.webp
+    after: /img/before-after/filler-cheek-filler-005-after.webp
+  - before: /img/before-after/filler-cheek-filler-006-before.webp
+    after: /img/before-after/filler-cheek-filler-006-after.webp
+  - before: /img/before-after/filler-chin-filler-001-before.webp
+    after: /img/before-after/filler-chin-filler-001-after.webp
+  - before: /img/before-after/filler-chin-filler-002-before.webp
+    after: /img/before-after/filler-chin-filler-002-after.webp
+  - before: /img/before-after/filler-chin-filler-003-before.webp
+    after: /img/before-after/filler-chin-filler-003-after.webp
+  - before: /img/before-after/filler-chin-filler-004-before.webp
+    after: /img/before-after/filler-chin-filler-004-after.webp
+  - before: /img/before-after/filler-jawline-filler-001-before.webp
+    after: /img/before-after/filler-jawline-filler-001-after.webp
+  - before: /img/before-after/filler-jawline-filler-002-before.webp
+    after: /img/before-after/filler-jawline-filler-002-after.webp
+  - before: /img/before-after/filler-jawline-filler-003-before.webp
+    after: /img/before-after/filler-jawline-filler-003-after.webp
+  - before: /img/before-after/filler-jawline-filler-004-before.webp
+    after: /img/before-after/filler-jawline-filler-004-after.webp
+  - before: /img/before-after/filler-jawline-filler-005-before.webp
+    after: /img/before-after/filler-jawline-filler-005-after.webp
+  - before: /img/before-after/filler-lip-filler-001-before.webp
+    after: /img/before-after/filler-lip-filler-001-after.webp
+  - before: /img/before-after/filler-lip-filler-002-before.webp
+    after: /img/before-after/filler-lip-filler-002-after.webp
+  - before: /img/before-after/filler-lip-filler-003-before.webp
+    after: /img/before-after/filler-lip-filler-003-after.webp
+  - before: /img/before-after/filler-lip-filler-004-before.webp
+    after: /img/before-after/filler-lip-filler-004-after.webp
+  - before: /img/before-after/filler-lip-filler-005-before.webp
+    after: /img/before-after/filler-lip-filler-005-after.webp
 ---
 
 ## Brightening Under-Eyes with Filler in Knoxville

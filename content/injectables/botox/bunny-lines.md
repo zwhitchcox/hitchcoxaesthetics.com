@@ -20,6 +20,21 @@ sections:
       - title: Refined Look
         description: Completes a full-face rejuvenation.
         icon: star
+heroImages:
+  - before: /img/before-after/botox-bunny-lines-001-before.webp
+    after: /img/before-after/botox-bunny-lines-001-after.webp
+  - before: /img/before-after/botox-bunny-lines-002-before.webp
+    after: /img/before-after/botox-bunny-lines-002-after.webp
+  - before: /img/before-after/botox-bunny-lines-003-before.webp
+    after: /img/before-after/botox-bunny-lines-003-after.webp
+  - before: /img/before-after/botox-bunny-lines-004-before.webp
+    after: /img/before-after/botox-bunny-lines-004-after.webp
+  - before: /img/before-after/botox-bunny-lines-005-before.webp
+    after: /img/before-after/botox-bunny-lines-005-after.webp
+  - before: /img/before-after/botox-bunny-lines-006-before.webp
+    after: /img/before-after/botox-bunny-lines-006-after.webp
+  - before: /img/before-after/botox-bunny-lines-007-before.webp
+    after: /img/before-after/botox-bunny-lines-007-after.webp
 ---
 
 ## Treating Bunny Lines in Knoxville

@@ -20,6 +20,19 @@ sections:
       - title: Quick Procedure
         description: Takes less than 10 minutes to perform.
         icon: clock
+heroImages:
+  - before: /img/before-after/botox-lip-flip-001-before.webp
+    after: /img/before-after/botox-lip-flip-001-after.webp
+  - before: /img/before-after/botox-lip-flip-002-before.webp
+    after: /img/before-after/botox-lip-flip-002-after.webp
+  - before: /img/before-after/botox-lip-flip-003-before.webp
+    after: /img/before-after/botox-lip-flip-003-after.webp
+  - before: /img/before-after/botox-lip-flip-004-before.webp
+    after: /img/before-after/botox-lip-flip-004-after.webp
+  - before: /img/before-after/botox-lip-flip-005-before.webp
+    after: /img/before-after/botox-lip-flip-005-after.webp
+  - before: /img/before-after/botox-lip-flip-006-before.webp
+    after: /img/before-after/botox-lip-flip-006-after.webp
 ---
 
 ## The Botox Lip Flip in Knoxville

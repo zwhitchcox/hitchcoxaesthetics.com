@@ -42,6 +42,9 @@ sections:
         answer: >-
           Yes, our laser technology is FDA-cleared and safe for reducing
           pigmentation on various skin types.
+heroImages:
+  - before: /img/before-after/pigmented-lesion-reduction-001-before.webp
+    after: /img/before-after/pigmented-lesion-reduction-001-after.webp
 ---
 
 ## Pigment Correction in Knoxville

@@ -88,6 +88,17 @@ sections:
           Yes, applying minoxidil directly after microneedling can enhance its
           absorption. Additionally, using a specialized serum can provide
           hydration and soothe the scalp.
+heroImages:
+  - before: /img/before-after/microneedling-001-before.webp
+    after: /img/before-after/microneedling-001-after.webp
+  - before: /img/before-after/microneedling-002-before.webp
+    after: /img/before-after/microneedling-002-after.webp
+  - before: /img/before-after/microneedling-003-before.webp
+    after: /img/before-after/microneedling-003-after.webp
+  - before: /img/before-after/microneedling-004-before.webp
+    after: /img/before-after/microneedling-004-after.webp
+  - before: /img/before-after/microneedling-005-before.webp
+    after: /img/before-after/microneedling-005-after.webp
 ---
 
 ## Microneedling for Hair Loss in Knoxville

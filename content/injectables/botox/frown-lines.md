@@ -20,6 +20,23 @@ sections:
       - title: Softened Expression
         description: 'Creates a more approachable, relaxed appearance.'
         icon: user
+heroImages:
+  - before: /img/before-after/botox-frown-lines-001-before.webp
+    after: /img/before-after/botox-frown-lines-001-after.webp
+  - before: /img/before-after/botox-frown-lines-002-before.webp
+    after: /img/before-after/botox-frown-lines-002-after.webp
+  - before: /img/before-after/botox-frown-lines-003-before.webp
+    after: /img/before-after/botox-frown-lines-003-after.webp
+  - before: /img/before-after/botox-frown-lines-004-before.webp
+    after: /img/before-after/botox-frown-lines-004-after.webp
+  - before: /img/before-after/botox-frown-lines-005-before.webp
+    after: /img/before-after/botox-frown-lines-005-after.webp
+  - before: /img/before-after/botox-frown-lines-006-before.webp
+    after: /img/before-after/botox-frown-lines-006-after.webp
+  - before: /img/before-after/botox-frown-lines-007-before.webp
+    after: /img/before-after/botox-frown-lines-007-after.webp
+  - before: /img/before-after/botox-frown-lines-008-before.webp
+    after: /img/before-after/botox-frown-lines-008-after.webp
 ---
 
 ## Eliminating Frown Lines in Knoxville

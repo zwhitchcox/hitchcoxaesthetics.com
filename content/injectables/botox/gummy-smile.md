@@ -20,6 +20,21 @@ sections:
       - title: Fast Results
         description: See improvement in as little as 3 days.
         icon: zap
+heroImages:
+  - before: /img/before-after/botox-gummy-smile-001-before.webp
+    after: /img/before-after/botox-gummy-smile-001-after.webp
+  - before: /img/before-after/botox-gummy-smile-002-before.webp
+    after: /img/before-after/botox-gummy-smile-002-after.webp
+  - before: /img/before-after/botox-gummy-smile-003-before.webp
+    after: /img/before-after/botox-gummy-smile-003-after.webp
+  - before: /img/before-after/botox-gummy-smile-004-before.webp
+    after: /img/before-after/botox-gummy-smile-004-after.webp
+  - before: /img/before-after/botox-gummy-smile-005-before.webp
+    after: /img/before-after/botox-gummy-smile-005-after.webp
+  - before: /img/before-after/botox-gummy-smile-006-before.webp
+    after: /img/before-after/botox-gummy-smile-006-after.webp
+  - before: /img/before-after/botox-gummy-smile-007-before.webp
+    after: /img/before-after/botox-gummy-smile-007-after.webp
 ---
 
 ## Correcting Gummy Smiles in Knoxville

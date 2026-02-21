@@ -75,6 +75,22 @@ sections:
         answer: >-
           It is generally recommended to wait 4-6 weeks between sessions to
           allow the skin to heal and regenerate.
+heroImages:
+  - before: /img/before-after/microneedling-001-before.webp
+    after: /img/before-after/microneedling-001-after.webp
+    caption: Microneedling
+  - before: /img/before-after/microneedling-002-before.webp
+    after: /img/before-after/microneedling-002-after.webp
+    caption: Microneedling
+  - before: /img/before-after/microneedling-003-before.webp
+    after: /img/before-after/microneedling-003-after.webp
+    caption: Microneedling
+  - before: /img/before-after/microneedling-004-before.webp
+    after: /img/before-after/microneedling-004-after.webp
+    caption: Microneedling
+  - before: /img/before-after/microneedling-005-before.webp
+    after: /img/before-after/microneedling-005-after.webp
+    caption: Microneedling
 ---
 
 ## Microneedling in Knoxville

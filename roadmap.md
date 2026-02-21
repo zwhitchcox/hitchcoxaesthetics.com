@@ -1,3 +1,8 @@
+## we should show a hint as to what the picture is of on the when showing pictures of subservices
+
+how do we keep track of which pictures are subservices though? should jsut put
+the pictures in the public image folder and put the pictures in the yaml data
+
 ok, I want to do a serious content rewrite. We need to spam links ORGANICALLY in
 the content of the site. The markdown content should have links to sibliing
 pages and parent pages organically in the content NEVER DOWN. So, a service page

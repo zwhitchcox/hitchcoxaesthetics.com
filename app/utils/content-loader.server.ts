@@ -30,6 +30,7 @@ type Frontmatter = {
 	ctaText?: string
 	faq?: { question: string; answer: string }[]
 	sections?: ServicePageSection[]
+	heroImages?: { before: string; after: string; caption?: string }[]
 }
 
 type LocationFrontmatter = {
@@ -287,13 +288,16 @@ export function loadAllServicePages(): Record<string, SitePage> {
 		scan(categoryDir)
 	}
 
-	// Second pass: build SitePage objects with local hero images
+	// Second pass: build SitePage objects with hero images from frontmatter
 	for (const { category, relativePath, fullPath } of fileEntries) {
 		const urlPath = filePathToUrlPath(category, relativePath)
 		const { fm, content } = parsePage(fullPath)
 		const parent = inferParent(category, urlPath)
 		const children = discoverChildren(category, urlPath, allUrls)
-		const { heroImage, heroImages } = getLocalHeroImages(fullPath)
+
+		// Hero images from frontmatter (public paths)
+		const heroImages = fm.heroImages
+		const heroImage = heroImages?.[0]?.after
 
 		pages[urlPath] = {
 			path: urlPath,
@@ -392,7 +396,7 @@ export function loadAllLocationPages(): Record<string, LocationServiceData> {
 					const introParagraph = paragraphs[0] ?? ''
 					const bodyParagraph = paragraphs.slice(1).join('\n\n')
 
-					const { heroImage, heroImages } = getLocalHeroImages(fullPath)
+					const { heroImage } = getLocalHeroImages(fullPath)
 
 					const pageData: LocationServiceData = {
 						slug,
@@ -413,7 +417,6 @@ export function loadAllLocationPages(): Record<string, LocationServiceData> {
 						ctaText: fm.ctaText,
 						sections: fm.sections,
 						heroImage,
-						heroImages,
 					}
 
 					pages[slug] = pageData

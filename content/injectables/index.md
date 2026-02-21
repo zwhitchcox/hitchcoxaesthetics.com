@@ -24,6 +24,280 @@ sections:
       - title: Sculpt & Define
         description: Kybella permanently reduces chin fat.
         icon: scissors
+heroImages:
+  - before: /img/before-after/botox-001-before.webp
+    after: /img/before-after/botox-001-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-002-before.webp
+    after: /img/before-after/botox-002-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-003-before.webp
+    after: /img/before-after/botox-003-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-004-before.webp
+    after: /img/before-after/botox-004-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-005-before.webp
+    after: /img/before-after/botox-005-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-006-before.webp
+    after: /img/before-after/botox-006-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-007-before.webp
+    after: /img/before-after/botox-007-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-008-before.webp
+    after: /img/before-after/botox-008-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-009-before.webp
+    after: /img/before-after/botox-009-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-010-before.webp
+    after: /img/before-after/botox-010-after.webp
+    caption: Botox
+  - before: /img/before-after/botox-brow-lift-001-before.webp
+    after: /img/before-after/botox-brow-lift-001-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-brow-lift-002-before.webp
+    after: /img/before-after/botox-brow-lift-002-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-brow-lift-003-before.webp
+    after: /img/before-after/botox-brow-lift-003-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-brow-lift-004-before.webp
+    after: /img/before-after/botox-brow-lift-004-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-brow-lift-005-before.webp
+    after: /img/before-after/botox-brow-lift-005-after.webp
+    caption: Brow Lift
+  - before: /img/before-after/botox-bunny-lines-001-before.webp
+    after: /img/before-after/botox-bunny-lines-001-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-002-before.webp
+    after: /img/before-after/botox-bunny-lines-002-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-003-before.webp
+    after: /img/before-after/botox-bunny-lines-003-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-004-before.webp
+    after: /img/before-after/botox-bunny-lines-004-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-005-before.webp
+    after: /img/before-after/botox-bunny-lines-005-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-006-before.webp
+    after: /img/before-after/botox-bunny-lines-006-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-bunny-lines-007-before.webp
+    after: /img/before-after/botox-bunny-lines-007-after.webp
+    caption: Bunny Lines
+  - before: /img/before-after/botox-chin-dimpling-001-before.webp
+    after: /img/before-after/botox-chin-dimpling-001-after.webp
+    caption: Chin Dimpling
+  - before: /img/before-after/botox-chin-dimpling-002-before.webp
+    after: /img/before-after/botox-chin-dimpling-002-after.webp
+    caption: Chin Dimpling
+  - before: /img/before-after/botox-chin-dimpling-003-before.webp
+    after: /img/before-after/botox-chin-dimpling-003-after.webp
+    caption: Chin Dimpling
+  - before: /img/before-after/botox-chin-dimpling-004-before.webp
+    after: /img/before-after/botox-chin-dimpling-004-after.webp
+    caption: Chin Dimpling
+  - before: /img/before-after/botox-crows-feet-001-before.webp
+    after: /img/before-after/botox-crows-feet-001-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-002-before.webp
+    after: /img/before-after/botox-crows-feet-002-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-003-before.webp
+    after: /img/before-after/botox-crows-feet-003-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-004-before.webp
+    after: /img/before-after/botox-crows-feet-004-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-005-before.webp
+    after: /img/before-after/botox-crows-feet-005-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-006-before.webp
+    after: /img/before-after/botox-crows-feet-006-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-007-before.webp
+    after: /img/before-after/botox-crows-feet-007-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-008-before.webp
+    after: /img/before-after/botox-crows-feet-008-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-crows-feet-009-before.webp
+    after: /img/before-after/botox-crows-feet-009-after.webp
+    caption: Crow's Feet
+  - before: /img/before-after/botox-forehead-lines-001-before.webp
+    after: /img/before-after/botox-forehead-lines-001-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-002-before.webp
+    after: /img/before-after/botox-forehead-lines-002-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-003-before.webp
+    after: /img/before-after/botox-forehead-lines-003-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-004-before.webp
+    after: /img/before-after/botox-forehead-lines-004-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-005-before.webp
+    after: /img/before-after/botox-forehead-lines-005-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-006-before.webp
+    after: /img/before-after/botox-forehead-lines-006-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-forehead-lines-007-before.webp
+    after: /img/before-after/botox-forehead-lines-007-after.webp
+    caption: Forehead Lines
+  - before: /img/before-after/botox-frown-lines-001-before.webp
+    after: /img/before-after/botox-frown-lines-001-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-002-before.webp
+    after: /img/before-after/botox-frown-lines-002-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-003-before.webp
+    after: /img/before-after/botox-frown-lines-003-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-004-before.webp
+    after: /img/before-after/botox-frown-lines-004-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-005-before.webp
+    after: /img/before-after/botox-frown-lines-005-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-006-before.webp
+    after: /img/before-after/botox-frown-lines-006-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-007-before.webp
+    after: /img/before-after/botox-frown-lines-007-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-frown-lines-008-before.webp
+    after: /img/before-after/botox-frown-lines-008-after.webp
+    caption: Frown Lines
+  - before: /img/before-after/botox-gummy-smile-001-before.webp
+    after: /img/before-after/botox-gummy-smile-001-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-002-before.webp
+    after: /img/before-after/botox-gummy-smile-002-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-003-before.webp
+    after: /img/before-after/botox-gummy-smile-003-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-004-before.webp
+    after: /img/before-after/botox-gummy-smile-004-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-005-before.webp
+    after: /img/before-after/botox-gummy-smile-005-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-006-before.webp
+    after: /img/before-after/botox-gummy-smile-006-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-gummy-smile-007-before.webp
+    after: /img/before-after/botox-gummy-smile-007-after.webp
+    caption: Gummy Smile
+  - before: /img/before-after/botox-lip-flip-001-before.webp
+    after: /img/before-after/botox-lip-flip-001-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-002-before.webp
+    after: /img/before-after/botox-lip-flip-002-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-003-before.webp
+    after: /img/before-after/botox-lip-flip-003-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-004-before.webp
+    after: /img/before-after/botox-lip-flip-004-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-005-before.webp
+    after: /img/before-after/botox-lip-flip-005-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/botox-lip-flip-006-before.webp
+    after: /img/before-after/botox-lip-flip-006-after.webp
+    caption: Lip Flip
+  - before: /img/before-after/filler-cheek-filler-001-before.webp
+    after: /img/before-after/filler-cheek-filler-001-after.webp
+    caption: Cheek Filler
+  - before: /img/before-after/filler-cheek-filler-002-before.webp
+    after: /img/before-after/filler-cheek-filler-002-after.webp
+    caption: Cheek Filler
+  - before: /img/before-after/filler-cheek-filler-003-before.webp
+    after: /img/before-after/filler-cheek-filler-003-after.webp
+    caption: Cheek Filler
+  - before: /img/before-after/filler-cheek-filler-004-before.webp
+    after: /img/before-after/filler-cheek-filler-004-after.webp
+    caption: Cheek Filler
+  - before: /img/before-after/filler-cheek-filler-005-before.webp
+    after: /img/before-after/filler-cheek-filler-005-after.webp
+    caption: Cheek Filler
+  - before: /img/before-after/filler-cheek-filler-006-before.webp
+    after: /img/before-after/filler-cheek-filler-006-after.webp
+    caption: Cheek Filler
+  - before: /img/before-after/filler-chin-filler-001-before.webp
+    after: /img/before-after/filler-chin-filler-001-after.webp
+    caption: Chin Filler
+  - before: /img/before-after/filler-chin-filler-002-before.webp
+    after: /img/before-after/filler-chin-filler-002-after.webp
+    caption: Chin Filler
+  - before: /img/before-after/filler-chin-filler-003-before.webp
+    after: /img/before-after/filler-chin-filler-003-after.webp
+    caption: Chin Filler
+  - before: /img/before-after/filler-chin-filler-004-before.webp
+    after: /img/before-after/filler-chin-filler-004-after.webp
+    caption: Chin Filler
+  - before: /img/before-after/filler-jawline-filler-001-before.webp
+    after: /img/before-after/filler-jawline-filler-001-after.webp
+    caption: Jawline Filler
+  - before: /img/before-after/filler-jawline-filler-002-before.webp
+    after: /img/before-after/filler-jawline-filler-002-after.webp
+    caption: Jawline Filler
+  - before: /img/before-after/filler-jawline-filler-003-before.webp
+    after: /img/before-after/filler-jawline-filler-003-after.webp
+    caption: Jawline Filler
+  - before: /img/before-after/filler-jawline-filler-004-before.webp
+    after: /img/before-after/filler-jawline-filler-004-after.webp
+    caption: Jawline Filler
+  - before: /img/before-after/filler-jawline-filler-005-before.webp
+    after: /img/before-after/filler-jawline-filler-005-after.webp
+    caption: Jawline Filler
+  - before: /img/before-after/filler-lip-filler-001-before.webp
+    after: /img/before-after/filler-lip-filler-001-after.webp
+    caption: Lip Filler
+  - before: /img/before-after/filler-lip-filler-002-before.webp
+    after: /img/before-after/filler-lip-filler-002-after.webp
+    caption: Lip Filler
+  - before: /img/before-after/filler-lip-filler-003-before.webp
+    after: /img/before-after/filler-lip-filler-003-after.webp
+    caption: Lip Filler
+  - before: /img/before-after/filler-lip-filler-004-before.webp
+    after: /img/before-after/filler-lip-filler-004-after.webp
+    caption: Lip Filler
+  - before: /img/before-after/filler-lip-filler-005-before.webp
+    after: /img/before-after/filler-lip-filler-005-after.webp
+    caption: Lip Filler
+  - before: /img/before-after/kybella-001-before.webp
+    after: /img/before-after/kybella-001-after.webp
+    caption: Kybella
+  - before: /img/before-after/kybella-002-before.webp
+    after: /img/before-after/kybella-002-after.webp
+    caption: Kybella
+  - before: /img/before-after/kybella-003-before.webp
+    after: /img/before-after/kybella-003-after.webp
+    caption: Kybella
+  - before: /img/before-after/kybella-004-before.webp
+    after: /img/before-after/kybella-004-after.webp
+    caption: Kybella
+  - before: /img/before-after/kybella-005-before.webp
+    after: /img/before-after/kybella-005-after.webp
+    caption: Kybella
+  - before: /img/before-after/skinvive-001-before.webp
+    after: /img/before-after/skinvive-001-after.webp
+    caption: Skinvive
+  - before: /img/before-after/skinvive-002-before.webp
+    after: /img/before-after/skinvive-002-after.webp
+    caption: Skinvive
+  - before: /img/before-after/skinvive-003-before.webp
+    after: /img/before-after/skinvive-003-after.webp
+    caption: Skinvive
 ---
 
 ## Cosmetic Injectables in Knoxville

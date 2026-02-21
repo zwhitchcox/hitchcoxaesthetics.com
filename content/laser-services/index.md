@@ -30,6 +30,34 @@ sections:
       - title: Skin Tightening
         description: Everesse radiofrequency to firm and lift.
         icon: layers
+heroImages:
+  - before: /img/before-after/laser-hair-removal-001-before.webp
+    after: /img/before-after/laser-hair-removal-001-after.webp
+    caption: Laser Hair Removal
+  - before: /img/before-after/laser-hair-removal-002-before.webp
+    after: /img/before-after/laser-hair-removal-002-after.webp
+    caption: Laser Hair Removal
+  - before: /img/before-after/laser-hair-removal-003-before.webp
+    after: /img/before-after/laser-hair-removal-003-after.webp
+    caption: Laser Hair Removal
+  - before: /img/before-after/laser-hair-removal-004-before.webp
+    after: /img/before-after/laser-hair-removal-004-after.webp
+    caption: Laser Hair Removal
+  - before: /img/before-after/skin-revitalization-001-before.webp
+    after: /img/before-after/skin-revitalization-001-after.webp
+    caption: Skin Revitalization
+  - before: /img/before-after/skin-revitalization-002-before.webp
+    after: /img/before-after/skin-revitalization-002-after.webp
+    caption: Skin Revitalization
+  - before: /img/before-after/pigmented-lesion-reduction-001-before.webp
+    after: /img/before-after/pigmented-lesion-reduction-001-after.webp
+    caption: Pigmented Lesion Reduction
+  - before: /img/before-after/vascular-lesion-reduction-001-before.webp
+    after: /img/before-after/vascular-lesion-reduction-001-after.webp
+    caption: Vascular Lesion Reduction
+  - before: /img/before-after/vascular-lesion-reduction-002-before.webp
+    after: /img/before-after/vascular-lesion-reduction-002-after.webp
+    caption: Vascular Lesion Reduction
 ---
 
 ## Laser Skin Services in Knoxville
