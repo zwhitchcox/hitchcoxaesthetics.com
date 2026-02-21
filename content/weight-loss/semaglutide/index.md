@@ -3,12 +3,10 @@ name: Semaglutide
 tagline: for sustainable weight loss
 title: Semaglutide Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Medical weight loss with semaglutide (Ozempic/Wegovy) injections in Knoxville,
-  TN. GLP-1 therapy at about half the price. Free consultations at Sarah
-  Hitchcox Aesthetics.
+  Semaglutide weight loss injections in Knoxville, TN. Medically supervised
+  GLP-1 therapy with personalized dosing at Sarah Hitchcox Aesthetics.
 shortDescription: >-
-  GLP-1 injections for safe, medically supervised weight loss at half the
-  brand-name price.
+  GLP-1 agonist injections for safe, medically supervised weight loss.
 whyChooseTitle: Expert Semaglutide Weight Loss in Knoxville
 whyChoose: >-
   Sarah Hitchcox Aesthetics offers affordable semaglutide weight loss injections

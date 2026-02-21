@@ -3,8 +3,8 @@ name: Tirzepatide
 tagline: for medical weight loss
 title: Tirzepatide Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Tirzepatide (Zepbound/Mounjaro) weight loss injections in Knoxville, TN.
-  Dual-action GIP/GLP-1 medication for significant, sustainable weight loss.
+  Tirzepatide weight loss injections in Knoxville, TN. Dual-action GIP/GLP-1
+  agonist medication for significant, sustainable weight loss.
 shortDescription: >-
   Dual-action GIP/GLP-1 injections for significant, sustainable weight loss
   results.
@@ -40,11 +40,11 @@ sections:
           The most common side effects are nausea, diarrhea, and decreased
           appetite, which typically improve as your body adjusts. Starting at a
           low dose and gradually increasing helps minimize these effects.
-      - question: Is tirzepatide the same as Mounjaro or Zepbound?
+      - question: What is tirzepatide?
         answer: >-
-          Yes. Mounjaro is the brand name for tirzepatide when prescribed for
-          diabetes, and Zepbound is the brand name when prescribed specifically
-          for weight management. The active ingredient is the same.
+          Tirzepatide is a dual-action GIP/GLP-1 agonist that targets two
+          hormonal pathways involved in appetite regulation and metabolism. It
+          is administered as a once-weekly injection.
 heroImages:
   - before: /img/before-after/semaglutide-001-before.webp
     after: /img/before-after/semaglutide-001-after.webp
