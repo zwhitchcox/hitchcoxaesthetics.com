@@ -14,7 +14,7 @@ export const meta: MetaFunction = () => [
 	{
 		name: 'description',
 		content:
-			'Visit Sarah Hitchcox Aesthetics in Bearden, Knoxville, TN (5113 Kingston Pike). Expert Botox, dermal fillers, laser treatments, and medical weight loss.',
+			'Visit Sarah Hitchcox Aesthetics in Bearden, Knoxville, TN (5113 Kingston Pike). Expert Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
 	},
 	{
 		property: 'og:title',
@@ -47,7 +47,7 @@ export default function BeardenLocation() {
 		'@type': 'MedicalBusiness',
 		name: 'Sarah Hitchcox Aesthetics - Bearden (Knoxville)',
 		description:
-			'Medical spa in the Bearden area of Knoxville offering Botox, dermal fillers, laser treatments, and medical weight loss.',
+			'Medical spa in the Bearden area of Knoxville offering Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
 		url: 'https://botoxknoxville.com/bearden',
 		telephone: '(865) 489-8008',
 		email: 'sarah@hitchcoxaesthetics.com',

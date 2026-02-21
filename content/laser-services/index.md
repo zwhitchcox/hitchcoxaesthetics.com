@@ -84,5 +84,5 @@ results. Many of our patients combine their laser sessions with
 [microneedling in Knoxville](/microneedling) to further boost collagen
 production or integrate [Botox treatments in Knoxville](/botox) for complete
 facial rejuvenation. If you are on a wellness journey, our
-[Knoxville weight loss programs](/weight-loss) can also complement your skin
-transformation, providing a holistic approach to beauty and health.
+[GLP-1 weight loss injections in Knoxville](/weight-loss) can also complement
+your skin transformation, providing a holistic approach to beauty and health.

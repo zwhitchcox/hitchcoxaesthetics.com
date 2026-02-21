@@ -10,7 +10,7 @@ export const meta: MetaFunction = () => [
 	{
 		name: 'description',
 		content:
-			'Sarah Hitchcox Aesthetics is a premier med spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
+			'Sarah Hitchcox Aesthetics is a premier med spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and GLP-1 weight loss.',
 	},
 	{
 		property: 'og:title',
@@ -19,7 +19,7 @@ export const meta: MetaFunction = () => [
 	{
 		property: 'og:description',
 		content:
-			'Premier med spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
+			'Premier med spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and GLP-1 weight loss.',
 	},
 ]
 

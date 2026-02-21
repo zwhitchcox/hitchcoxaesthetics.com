@@ -108,7 +108,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 		{
 			name: 'description',
 			content:
-				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and medical weight loss in Knoxville and Farragut, TN. Book your consultation today.',
+				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and GLP-1 weight loss in Knoxville and Farragut, TN. Book your consultation today.',
 		},
 		// Open Graph
 		{ property: 'og:type', content: 'website' },
@@ -122,7 +122,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 		{
 			property: 'og:description',
 			content:
-				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and medical weight loss in Knoxville and Farragut, TN. Book your consultation today.',
+				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and GLP-1 weight loss in Knoxville and Farragut, TN. Book your consultation today.',
 		},
 		{
 			property: 'og:image',
@@ -146,7 +146,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 		{
 			name: 'twitter:description',
 			content:
-				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and medical weight loss in Knoxville and Farragut, TN.',
+				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and GLP-1 weight loss in Knoxville and Farragut, TN.',
 		},
 		{
 			name: 'twitter:image',
@@ -290,7 +290,7 @@ function Document({
 		'@type': 'MedicalBusiness',
 		name: 'Sarah Hitchcox Aesthetics',
 		description:
-			'Medical spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
+			'Medical spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and GLP-1 weight loss.',
 		url: 'https://botoxknoxville.com',
 		telephone: PHONE,
 		email: 'sarah@hitchcoxaesthetics.com',

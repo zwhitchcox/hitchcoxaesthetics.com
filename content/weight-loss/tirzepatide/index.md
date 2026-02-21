@@ -14,13 +14,15 @@ sections:
     title: Key Benefits of Tirzepatide Weight Loss
     items:
       - title: Dual Action
-        description: Targets both GIP and GLP-1 receptors for enhanced weight loss results.
+        description:
+          Targets both GIP and GLP-1 receptors for enhanced weight loss results.
       - title: Proven Results
         description: >-
           Clinical trials showed up to 22% body weight reduction in some
           patients.
       - title: Weekly Injection
-        description: Simple once-weekly injection that fits easily into your routine.
+        description:
+          Simple once-weekly injection that fits easily into your routine.
   - type: faq-accordion
     title: Tirzepatide Weight Loss FAQs
     items:
@@ -68,5 +70,5 @@ you achieve and maintain your target weight.
 
 Compare this option with our [semaglutide program](/weight-loss/semaglutide) to
 see which medication aligns best with your needs. Whichever you choose, our
-[Knoxville weight loss team](/weight-loss) is here to guide you every step of
-the way towards a healthier, more confident lifestyle.
+[Knoxville GLP-1 weight loss team](/weight-loss) is here to guide you every step
+of the way towards a healthier, more confident lifestyle.

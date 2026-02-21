@@ -14,7 +14,7 @@ export const meta: MetaFunction = () => [
 	{
 		name: 'description',
 		content:
-			'Visit Sarah Hitchcox Aesthetics in Farragut, TN (102 S Campbell Station Rd). Expert Botox, dermal fillers, laser treatments, and medical weight loss.',
+			'Visit Sarah Hitchcox Aesthetics in Farragut, TN (102 S Campbell Station Rd). Expert Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
 	},
 	{
 		property: 'og:title',
@@ -47,7 +47,7 @@ export default function FarragutLocation() {
 		'@type': 'MedicalBusiness',
 		name: 'Sarah Hitchcox Aesthetics - Farragut',
 		description:
-			'Medical spa in Farragut offering Botox, dermal fillers, laser treatments, and medical weight loss.',
+			'Medical spa in Farragut offering Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
 		url: 'https://botoxknoxville.com/farragut',
 		telephone: location.phone,
 		email: 'sarah@hitchcoxaesthetics.com',

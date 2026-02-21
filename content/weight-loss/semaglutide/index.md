@@ -113,5 +113,5 @@ If you are considering other options, we also offer
 [tirzepatide injections](/weight-loss/tirzepatide), a dual-action medication. We
 can help you decide which path is right for you during your consultation. Learn
 more about our comprehensive
-[medical weight loss services in Knoxville](/weight-loss) and take the first
-step toward a healthier you.
+[GLP-1 weight loss programs in Knoxville](/weight-loss) and take the first step
+toward a healthier you.
