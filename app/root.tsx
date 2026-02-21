@@ -126,13 +126,13 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 		},
 		{
 			property: 'og:image',
-			content: `${data?.requestInfo.origin ?? 'https://knoxvillebotox.com'}/img/sarah.jpg`,
+			content: `${data?.requestInfo.origin ?? 'https://botoxknoxville.com'}/img/sarah.jpg`,
 		},
 		{ property: 'og:image:width', content: '1200' },
 		{ property: 'og:image:height', content: '630' },
 		{
 			property: 'og:url',
-			content: `${data?.requestInfo.origin ?? 'https://knoxvillebotox.com'}${data?.requestInfo.path ?? '/'}`,
+			content: `${data?.requestInfo.origin ?? 'https://botoxknoxville.com'}${data?.requestInfo.path ?? '/'}`,
 		},
 		{ property: 'og:locale', content: 'en_US' },
 		// Twitter Card
@@ -150,7 +150,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 		},
 		{
 			name: 'twitter:image',
-			content: `${data?.requestInfo.origin ?? 'https://knoxvillebotox.com'}/img/sarah.jpg`,
+			content: `${data?.requestInfo.origin ?? 'https://botoxknoxville.com'}/img/sarah.jpg`,
 		},
 	]
 }
@@ -272,7 +272,7 @@ function Document({
 	const _isHydrated = useHydrated()
 	const location = useLocation()
 	const data = useLoaderData<typeof loader>()
-	const origin = data?.requestInfo?.origin ?? 'https://knoxvillebotox.com'
+	const origin = data?.requestInfo?.origin ?? 'https://botoxknoxville.com'
 	const canonicalUrl = `${origin}${location.pathname}`
 
 	// GTM temporarily disabled
@@ -291,7 +291,7 @@ function Document({
 		name: 'Sarah Hitchcox Aesthetics',
 		description:
 			'Medical spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
-		url: 'https://knoxvillebotox.com',
+		url: 'https://botoxknoxville.com',
 		telephone: PHONE,
 		email: 'sarah@hitchcoxaesthetics.com',
 		image: `${origin}/img/sarah.jpg`,

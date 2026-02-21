@@ -48,10 +48,10 @@ export default function BeardenLocation() {
 		name: 'Sarah Hitchcox Aesthetics - Bearden (Knoxville)',
 		description:
 			'Medical spa in the Bearden area of Knoxville offering Botox, dermal fillers, laser treatments, and medical weight loss.',
-		url: 'https://knoxvillebotox.com/bearden',
+		url: 'https://botoxknoxville.com/bearden',
 		telephone: '(865) 489-8008',
 		email: 'sarah@hitchcoxaesthetics.com',
-		image: 'https://knoxvillebotox.com/img/sarah.jpg',
+		image: 'https://botoxknoxville.com/img/sarah.jpg',
 		priceRange: '$$',
 		address: {
 			'@type': 'PostalAddress',

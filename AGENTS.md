@@ -1,5 +1,7 @@
 # Content & Linking Rules
 
+when committing/pushing, make sure to check the linter/tsc
+
 ## Content Strategy
 
 - **Keywords:** Integrate "Knoxville" keywords naturally. Do not stuff.

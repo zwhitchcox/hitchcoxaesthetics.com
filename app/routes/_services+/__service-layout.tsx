@@ -61,7 +61,7 @@ export function ServiceJsonLd({
 			'@type': 'MedicalBusiness',
 			name: 'Sarah Hitchcox Aesthetics',
 			telephone: PHONE,
-			url: 'https://knoxvillebotox.com',
+			url: 'https://botoxknoxville.com',
 			address: {
 				'@type': 'PostalAddress',
 				streetAddress: bearden.address,
@@ -186,7 +186,7 @@ export function ServiceLayout({
 		`${title} before treatment at Sarah Hitchcox Aesthetics`,
 		`${title} after treatment at Sarah Hitchcox Aesthetics`,
 	]
-	const serviceUrl = `https://knoxvillebotox.com${location.pathname}`
+	const serviceUrl = `https://botoxknoxville.com${location.pathname}`
 	return (
 		<>
 			<ServiceJsonLd name={title} description={description} url={serviceUrl} />

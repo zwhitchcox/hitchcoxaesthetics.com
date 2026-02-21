@@ -48,10 +48,10 @@ export default function FarragutLocation() {
 		name: 'Sarah Hitchcox Aesthetics - Farragut',
 		description:
 			'Medical spa in Farragut offering Botox, dermal fillers, laser treatments, and medical weight loss.',
-		url: 'https://knoxvillebotox.com/farragut',
+		url: 'https://botoxknoxville.com/farragut',
 		telephone: location.phone,
 		email: 'sarah@hitchcoxaesthetics.com',
-		image: 'https://knoxvillebotox.com/img/sarah.jpg',
+		image: 'https://botoxknoxville.com/img/sarah.jpg',
 		priceRange: '$$',
 		address: {
 			'@type': 'PostalAddress',
