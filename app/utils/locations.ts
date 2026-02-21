@@ -1,8 +1,8 @@
 export const locations = [
 	{
-		id: 'knoxville',
-		name: 'Knoxville',
-		// 5113 Kingston Pike Suite 15, Knoxville, TN 37919
+		id: 'bearden',
+		name: 'Bearden',
+		displayName: 'Knoxville (Bearden)',
 		address: '5113 Kingston Pike Suite 15',
 		city: 'Knoxville',
 		state: 'TN',
@@ -19,6 +19,7 @@ export const locations = [
 	{
 		id: 'farragut',
 		name: 'Farragut',
+		displayName: 'Farragut',
 		address: '102 S Campbell Station Rd Suite 8',
 		city: 'Knoxville',
 		state: 'TN',
@@ -36,9 +37,9 @@ export const locations = [
 
 export type Location = (typeof locations)[number]
 
-/** Default phone number for non-location-specific pages */
-export const DEFAULT_PHONE = '(865) 214-7238'
-export const DEFAULT_PHONE_RAW = '8652147238'
+/** Phone number — CallRail will swap this dynamically for tracking */
+export const PHONE = '(865) 489-8008'
+export const PHONE_RAW = '8654898008'
 
 export function getLocationById(id: string): Location | undefined {
 	return locations.find(location => location.id === id)
@@ -46,37 +47,4 @@ export function getLocationById(id: string): Location | undefined {
 
 export function formatAddress(location: Location): string {
 	return `${location.address}, ${location.city}, ${location.state} ${location.zip}`
-}
-
-/**
- * Determine the location context from a URL pathname.
- * Returns 'knoxville' or 'farragut' if the path starts with that prefix,
- * otherwise undefined.
- */
-export function getLocationForPath(
-	pathname: string,
-): 'knoxville' | 'farragut' | undefined {
-	const clean = pathname.replace(/^\//, '')
-	if (clean.startsWith('knoxville')) return 'knoxville'
-	if (clean.startsWith('farragut')) return 'farragut'
-	return undefined
-}
-
-/**
- * Get the appropriate phone number for a given URL path.
- * Knoxville pages get the Knoxville number, Farragut pages get the Farragut
- * number, home page and other non-location pages get the Knoxville number.
- */
-export function getPhoneForPath(pathname: string): {
-	formatted: string
-	raw: string
-} {
-	const locId = getLocationForPath(pathname)
-	if (locId) {
-		const loc = getLocationById(locId)
-		if (loc) return { formatted: loc.phone, raw: loc.phoneRaw }
-	}
-	// Default to Knoxville number (primary location)
-	const knoxville = getLocationById('knoxville')!
-	return { formatted: knoxville.phone, raw: knoxville.phoneRaw }
 }

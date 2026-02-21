@@ -9,22 +9,22 @@ import { getCategoryPages } from '#app/utils/site-pages.server.js'
 export const meta: MetaFunction = () => [
 	{
 		title:
-			'Farragut Med Spa | Botox, Fillers & Lasers | Sarah Hitchcox Aesthetics',
+			'Bearden (West Knoxville) Med Spa | Botox, Fillers & Lasers | Sarah Hitchcox Aesthetics',
 	},
 	{
 		name: 'description',
 		content:
-			'Visit Sarah Hitchcox Aesthetics in Farragut, TN (102 S Campbell Station Rd). Expert Botox, dermal fillers, laser treatments, and medical weight loss.',
+			'Visit Sarah Hitchcox Aesthetics in Bearden, Knoxville, TN (5113 Kingston Pike). Expert Botox, dermal fillers, laser treatments, and medical weight loss.',
 	},
 	{
 		property: 'og:title',
 		content:
-			'Farragut Med Spa | Botox, Fillers & Lasers | Sarah Hitchcox Aesthetics',
+			'Bearden (West Knoxville) Med Spa | Botox, Fillers & Lasers | Sarah Hitchcox Aesthetics',
 	},
 	{
 		property: 'og:description',
 		content:
-			'Visit Sarah Hitchcox Aesthetics in Farragut, TN for expert Botox, fillers, and laser treatments.',
+			'Visit Sarah Hitchcox Aesthetics in Bearden, Knoxville for expert Botox, fillers, and laser treatments.',
 	},
 ]
 
@@ -38,18 +38,18 @@ export async function loader() {
 	return json({ categories })
 }
 
-export default function FarragutLocation() {
+export default function BeardenLocation() {
 	const { categories } = useLoaderData<typeof loader>()
-	const location = getLocationById('farragut')!
+	const location = getLocationById('bearden')!
 
 	const jsonLd = {
 		'@context': 'https://schema.org',
 		'@type': 'MedicalBusiness',
-		name: 'Sarah Hitchcox Aesthetics - Farragut',
+		name: 'Sarah Hitchcox Aesthetics - Bearden (Knoxville)',
 		description:
-			'Medical spa in Farragut offering Botox, dermal fillers, laser treatments, and medical weight loss.',
-		url: 'https://knoxvillebotox.com/farragut',
-		telephone: location.phone,
+			'Medical spa in the Bearden area of Knoxville offering Botox, dermal fillers, laser treatments, and medical weight loss.',
+		url: 'https://knoxvillebotox.com/bearden',
+		telephone: '(865) 489-8008',
 		email: 'sarah@hitchcoxaesthetics.com',
 		image: 'https://knoxvillebotox.com/img/sarah.jpg',
 		priceRange: '$$',
@@ -85,10 +85,10 @@ export default function FarragutLocation() {
 			<div className="font-poppins flex w-full flex-col bg-white">
 				<Hero
 					image="/img/sarah.jpg"
-					imageAlt="Sarah Hitchcox - Farragut Med Spa"
+					imageAlt="Sarah Hitchcox - Bearden Knoxville Med Spa"
 					topText="SARAH HITCHCOX"
 					bottomText="AESTHETICS"
-					subText="Farragut Med Spa"
+					subText="Knoxville Med Spa"
 					ctaText="Book Appointment"
 					ctaHref="https://hitchcoxaesthetics.janeapp.com"
 				/>
@@ -97,21 +97,21 @@ export default function FarragutLocation() {
 					<div className="space-y-12">
 						<div className="text-center">
 							<h2 className="mb-4 text-3xl font-bold text-gray-900">
-								Knoxville Med Spa | Farragut
+								Knoxville Med Spa | Bearden
 							</h2>
 							<p className="text-lg leading-relaxed text-gray-600">
-								Located on Campbell Station Road, Sarah Hitchcox Aesthetics
-								brings premier medical spa services to the Farragut community.
-								We specialize in natural-looking results through expert Botox
-								injections, dermal fillers, and cutting-edge skin treatments.
-								Visit our Farragut location for a personalized consultation
-								tailored to your aesthetic goals.
+								Conveniently located on Kingston Pike in the Bearden area, Sarah
+								Hitchcox Aesthetics provides premier medical spa services to
+								Knoxville residents. Whether you are looking for preventative
+								Botox, volume restoration with fillers, or advanced laser skin
+								treatments, our Bearden location offers a private and luxurious
+								setting for your aesthetic journey.
 							</p>
 						</div>
 
 						<div>
 							<h2 className="text-center text-2xl font-bold text-gray-900">
-								Knoxville Med Spa Services Available in Farragut
+								Knoxville Med Spa Services
 							</h2>
 							<div className="mt-8">
 								<ServiceCardGrid services={categories} variant="thumbnail" />
@@ -120,19 +120,20 @@ export default function FarragutLocation() {
 
 						<div className="rounded-xl bg-gray-50 p-8 text-center">
 							<h3 className="mb-4 text-2xl font-semibold text-gray-900">
-								Visit Our Farragut Location
+								Visit Our Bearden Location
 							</h3>
 							<p className="mb-6 text-gray-600">
-								We are located at 102 S Campbell Station Rd, Suite 8, near the
-								heart of Farragut. Ample parking is available.
+								We are located at 5113 Kingston Pike, Suite 15, right in the
+								heart of the Bearden area in West Knoxville. Ample parking is
+								available.
 							</p>
 							<div className="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
 								<Link
-									to={`tel:${location.phoneRaw}`}
+									to="tel:8654898008"
 									reloadDocument
 									className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
 								>
-									Call {location.phone}
+									Call (865) 489-8008
 								</Link>
 								<a
 									href={location.googleMapsDirectionsUrl}
@@ -153,7 +154,7 @@ export default function FarragutLocation() {
 									allowFullScreen={false}
 									loading="lazy"
 									referrerPolicy="no-referrer-when-downgrade"
-									title="Map of Sarah Hitchcox Aesthetics Farragut"
+									title="Map of Sarah Hitchcox Aesthetics Bearden"
 									style={{ border: 0 }}
 								/>
 							</div>
@@ -163,10 +164,10 @@ export default function FarragutLocation() {
 							<p className="text-gray-600">
 								Also visit our{' '}
 								<Link
-									to="/bearden"
+									to="/farragut"
 									className="font-medium text-primary hover:underline"
 								>
-									Bearden (West Knoxville) location
+									Farragut location
 								</Link>
 								.
 							</p>

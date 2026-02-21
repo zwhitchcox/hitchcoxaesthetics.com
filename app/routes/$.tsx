@@ -10,16 +10,12 @@ import { MarkdownContent } from '#app/components/markdown-content.js'
 import { PricingSection } from '#app/components/pricing-table.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.tsx'
-import {
-	locationServices,
-	type ServicePageSection,
-} from '#app/utils/location-service-data.server.js'
+import { type ServicePageSection } from '#app/utils/location-service-data.server.js'
 import {
 	getPage,
 	getChildren,
 	getAncestors,
 	getSiblings,
-	sitePages,
 	type SitePage,
 } from '#app/utils/site-pages.server.js'
 import {
@@ -32,12 +28,17 @@ import {
 	ServiceParagraph,
 } from './_services+/__service-layout'
 
-/** Convert a base service path to a location-prefixed path */
-function mapToLocationPath(p: string, locationId: string): string {
-	const [first, ...rest] = p.split('/')
-	return rest.length
-		? `${locationId}-${first}/${rest.join('/')}`
-		: `${locationId}-${first}`
+/**
+ * Strip a location prefix from a slug.
+ * "knoxville-botox" → "botox"
+ * "farragut-filler/lip-filler" → "filler/lip-filler"
+ * "knoxville-med-spa" → null (special case, handled by redirect routes)
+ */
+function stripLocationPrefix(slug: string): { basePath: string } | null {
+	const match = slug.match(/^(knoxville|farragut)-(.+)$/)
+	if (!match) return null
+	const remainder = match[2]!
+	return { basePath: remainder }
 }
 
 type LoaderData = {
@@ -46,114 +47,37 @@ type LoaderData = {
 	ancestors: SitePage[]
 	siblings: SitePage[]
 	markdown: string
-	isLocationPage: boolean
-	baseServiceSlug?: string
 }
 
 export async function loader({ params }: LoaderFunctionArgs) {
 	const splat = params['*'] ?? ''
-	const locationMatch = splat.match(/^(knoxville|farragut)-(.+)$/)
 
-	// Case 1: Direct match in site-pages → 301 redirect to knoxville equivalent
-	// Main service pages no longer exist as standalone pages.
+	// 301 redirect: old location-prefixed service URLs → base service URLs
+	// e.g. /knoxville-botox → /botox, /farragut-filler/lip-filler → /filler/lip-filler
+	const stripped = stripLocationPrefix(splat)
+	if (stripped) {
+		// Special case: knoxville-med-spa and farragut-med-spa redirect to location pages
+		if (stripped.basePath === 'med-spa') {
+			const locId = splat.startsWith('knoxville') ? 'bearden' : 'farragut'
+			return redirect(`/${locId}`, { status: 301 })
+		}
+		return redirect(`/${stripped.basePath}`, { status: 301 })
+	}
+
+	// Direct match in site-pages → render the service page
 	const page = getPage(splat)
 	if (page && page.enabled) {
-		const knoxvillePath = mapToLocationPath(splat, 'knoxville')
-		return redirect(`/${knoxvillePath}`, { status: 301 })
-	}
-
-	// Case 2: Location-service match (e.g., "knoxville-botox")
-	if (locationServices[splat]) {
-		const locPage = locationServices[splat]
-		const baseServicePage = getPage(locPage.serviceSlug)
-		const ancestors = baseServicePage ? getAncestors(locPage.serviceSlug) : []
-		const siblings = baseServicePage ? getSiblings(locPage.serviceSlug) : []
-		const children = baseServicePage ? getChildren(locPage.serviceSlug) : []
-
-		// Look up location-specific heroImage for children/siblings from locationServices
-		const getLocHeroImage = (servicePath: string) => {
-			const locSlug = mapToLocationPath(servicePath, locPage.locationId)
-			return locationServices[locSlug]?.heroImage
-		}
-
-		const locSitePage: SitePage = {
-			path: locPage.slug,
-			name: `${locPage.locationName} ${locPage.serviceName}`,
-			tagline: locPage.tagline || `in ${locPage.locationName}, TN`,
-			title: locPage.title,
-			metaDescription: locPage.metaDescription,
-			content: '',
-			enabled: true,
-			locationId: locPage.locationId,
-			locationName: locPage.locationName,
-			shortDescription: locPage.shortDescription,
-			whyChooseTitle: locPage.whyChooseTitle,
-			whyChoose: locPage.whyChoose,
-			ctaText: locPage.ctaText,
-			heroImage: locPage.heroImage,
-			heroImages: locPage.heroImages,
-		}
-		const markdown = `## ${locPage.h1}\n\n### ${locPage.h2}\n\n${locPage.introParagraph}\n\n${locPage.bodyParagraph}`
+		const children = getChildren(splat)
+		const ancestors = getAncestors(splat)
+		const siblings = getSiblings(splat)
 
 		return json<LoaderData>({
-			page: locSitePage,
-			children: children.map(c => ({
-				...c,
-				path: mapToLocationPath(c.path, locPage.locationId),
-				heroImage: getLocHeroImage(c.path) ?? c.heroImage,
-			})),
-			ancestors: ancestors.map(a => ({
-				...a,
-				path: mapToLocationPath(a.path, locPage.locationId),
-			})),
-			siblings: siblings.map(s => ({
-				...s,
-				path: mapToLocationPath(s.path, locPage.locationId),
-				heroImage: getLocHeroImage(s.path) ?? s.heroImage,
-			})),
-			markdown,
-			isLocationPage: true,
-			baseServiceSlug: locPage.serviceSlug,
+			page,
+			children,
+			ancestors,
+			siblings,
+			markdown: page.content,
 		})
-	}
-
-	// Case 3: Location-prefixed slug maps to a base site page
-	if (locationMatch) {
-		const [, locationId, remainder] = locationMatch
-		const locationName = locationId === 'knoxville' ? 'Knoxville' : 'Farragut'
-		const basePage = Object.values(sitePages).find(p => p.path === remainder)
-		if (basePage && basePage.enabled) {
-			const ancestors = getAncestors(basePage.path)
-			const siblings = getSiblings(basePage.path)
-			const children = getChildren(basePage.path)
-
-			const locSitePage: SitePage = {
-				...basePage,
-				path: splat,
-				name: `${locationName} ${basePage.name}`,
-				locationId,
-				locationName,
-			}
-
-			return json<LoaderData>({
-				page: locSitePage,
-				children: children.map(c => ({
-					...c,
-					path: mapToLocationPath(c.path, locationId!),
-				})),
-				ancestors: ancestors.map(a => ({
-					...a,
-					path: mapToLocationPath(a.path, locationId!),
-				})),
-				siblings: siblings.map(s => ({
-					...s,
-					path: mapToLocationPath(s.path, locationId!),
-				})),
-				markdown: basePage.content,
-				isLocationPage: true,
-				baseServiceSlug: basePage.path,
-			})
-		}
 	}
 
 	throw new Response('Not found', { status: 404 })
@@ -171,15 +95,8 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 }
 
 export default function DynamicPage() {
-	const {
-		page,
-		children,
-		ancestors,
-		siblings,
-		markdown,
-		isLocationPage,
-		baseServiceSlug,
-	} = useLoaderData<LoaderData>()
+	const { page, children, ancestors, siblings, markdown } =
+		useLoaderData<LoaderData>()
 
 	// Carousel images: use heroImages (all before/after pairs) from content-loader
 	const imgs: string[] =
@@ -252,36 +169,22 @@ export default function DynamicPage() {
 		}
 	}
 
-	// Determine the location context from the page
-	const pageLocationId = page.locationId ?? 'knoxville'
-	const pageLocationName =
-		page.locationName ??
-		(pageLocationId === 'knoxville' ? 'Knoxville' : 'Farragut')
-	const otherLocationId =
-		pageLocationId === 'knoxville' ? 'farragut' : 'knoxville'
-	const otherLocationName =
-		pageLocationId === 'knoxville' ? 'Farragut' : 'Knoxville'
-
-	// Build full breadcrumb: Home -> Location Med Spa -> ancestors (reversed) -> current
+	// Breadcrumb: Home -> ancestors (reversed) -> current
 	const breadcrumbItems = [
 		{ path: '/', name: 'Home' },
-		...(isLocationPage
-			? [
-					{
-						path: `/${pageLocationId}-med-spa`,
-						name: `${pageLocationName} Med Spa`,
-					},
-				]
-			: []),
 		...[...(ancestors ?? [])].reverse().map(a => ({
 			path: `/${a.path}`,
 			name: a.name,
 		})),
 	]
 
+	const title = page.name.toLowerCase().includes('knoxville')
+		? page.name
+		: `${page.name} Knoxville`
+
 	return (
 		<ServiceLayout
-			title={page.name}
+			title={title}
 			description={page.tagline}
 			imgClassName="w-full h-full object-cover"
 			imgs={imgs}
@@ -289,14 +192,14 @@ export default function DynamicPage() {
 			<ServiceJsonLd
 				name={page.name}
 				description={page.metaDescription}
-				url={`https://hitchcoxaesthetics.com/${page.path}`}
+				url={`https://knoxvillebotox.com/${page.path}`}
 			/>
 
 			{page.faq && page.faq.length > 0 && (
 				<FAQJsonLd faq={page.faq as { question: string; answer: string }[]} />
 			)}
 
-			{/* Full Breadcrumb: Home / Category / Service / Current */}
+			{/* Breadcrumb: Home / Category / Current */}
 			<nav className="mb-6 text-sm text-gray-500">
 				{breadcrumbItems.map(item => (
 					<span key={item.path}>
@@ -312,10 +215,6 @@ export default function DynamicPage() {
 				))}
 				<span className="font-medium text-gray-800">{page.name}</span>
 			</nav>
-
-			<h1 className="mb-6 text-3xl font-bold text-gray-900 sm:text-4xl">
-				{page.name}
-			</h1>
 
 			{/* Main Content */}
 			<MarkdownContent content={markdown} />
@@ -334,14 +233,13 @@ export default function DynamicPage() {
 									to={`/${ancestor.path}`}
 									className="font-medium text-primary hover:underline"
 								>
-									{ancestor.name.toLowerCase()} treatments
+									{ancestor.name.toLowerCase()} treatments in Knoxville
 								</Link>
 								{i < (ancestors ?? []).length - 1 && ' under our '}
 							</span>
 						))}{' '}
-						at Sarah Hitchcox Aesthetics in Knoxville and Farragut, TN. Browse
-						our full range of services to find the right treatment for your
-						goals.
+						at Sarah Hitchcox Aesthetics in Knoxville, TN. Browse our full range
+						of services to find the right treatment for your goals.
 					</p>
 				</div>
 			)}
@@ -350,12 +248,12 @@ export default function DynamicPage() {
 			{page.sections?.map((section, index) => renderSection(section, index))}
 
 			{/* Pricing */}
-			<PricingSection serviceSlug={baseServiceSlug ?? page.path} />
+			<PricingSection serviceSlug={page.path} />
 
 			{/* Sub-service Grid (for pages with children) */}
 			{childCards.length > 0 && (
 				<div className="mt-12">
-					<ServiceHeader>{page.name} Treatments</ServiceHeader>
+					<ServiceHeader>{page.name} Treatments in Knoxville</ServiceHeader>
 					<div className="mt-6">
 						<ServiceCardGrid services={childCards} variant="thumbnail" />
 					</div>
@@ -365,7 +263,9 @@ export default function DynamicPage() {
 			{/* Sibling Links */}
 			{(siblings ?? []).length > 0 && (
 				<div className="mt-12 border-t border-gray-200 pt-8">
-					<ServiceHeader>Related Treatments</ServiceHeader>
+					<ServiceHeader>
+						Related Aesthetic Treatments in Knoxville
+					</ServiceHeader>
 					<div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						{(siblings ?? []).map(sibling => (
 							<Link
@@ -395,49 +295,32 @@ export default function DynamicPage() {
 				</div>
 			)}
 
-			{/* Why Choose Section (location pages) */}
-			{isLocationPage && page.whyChooseTitle && (
-				<div className="mt-12 border-t pt-8">
-					<ServiceHeader>{page.whyChooseTitle}</ServiceHeader>
-					<ServiceParagraph>{page.whyChoose || ''}</ServiceParagraph>
-				</div>
-			)}
-
-			{/* Cross-location link + location med spa link */}
-			{isLocationPage && baseServiceSlug && (
-				<div className="mt-8 rounded-lg border border-gray-100 bg-white p-6">
-					<p className="text-gray-600">
-						Also available at our{' '}
-						<Link
-							to={`/${otherLocationId}-${baseServiceSlug.split('/')[0]}${baseServiceSlug.includes('/') ? '/' + baseServiceSlug.split('/').slice(1).join('/') : ''}`}
-							className="font-medium text-primary hover:underline"
-						>
-							{otherLocationName}{' '}
-							{baseServiceSlug
-								.split('/')
-								.pop()!
-								.split('-')
-								.map(w => w.charAt(0).toUpperCase() + w.slice(1))
-								.join(' ')}{' '}
-							location
-						</Link>
-						, or{' '}
-						<Link
-							to={`/${pageLocationId}-med-spa`}
-							className="font-medium text-primary hover:underline"
-						>
-							explore all services at our {pageLocationName} med spa
-						</Link>
-						.
-					</p>
-				</div>
-			)}
+			{/* Location links */}
+			<div className="mt-8 rounded-lg border border-gray-100 bg-white p-6">
+				<p className="text-gray-600">
+					Available at both of our Knoxville area locations:{' '}
+					<Link
+						to="/bearden"
+						className="font-medium text-primary hover:underline"
+					>
+						Bearden (West Knoxville)
+					</Link>
+					{' and '}
+					<Link
+						to="/farragut"
+						className="font-medium text-primary hover:underline"
+					>
+						Farragut
+					</Link>
+					.
+				</p>
+			</div>
 
 			{/* CTA */}
-			<div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
+			<div className="mt-12 flex flex-col items-center justify-center">
 				<a
 					href="https://hitchcoxaesthetics.janeapp.com"
-					className="rounded-md bg-black px-8 py-3 font-semibold text-white transition hover:bg-gray-800"
+					className="rounded-full bg-black px-10 py-4 text-lg font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-gray-900 hover:shadow-xl"
 				>
 					{page.ctaText || 'Book Your Consultation'}
 				</a>

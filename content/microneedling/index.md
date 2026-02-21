@@ -1,14 +1,13 @@
 ---
 name: Microneedling
 tagline: for collagen renewal
-title: Microneedling | Sarah Hitchcox Aesthetics
+title: Microneedling Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Microneedling for face and hair loss at Sarah Hitchcox Aesthetics in Knoxville
-  and Farragut, TN. Stimulate collagen for smoother skin and thicker hair.
-  - microneedling/face
-  - microneedling/hair-loss
+  Microneedling for face and hair loss at Sarah Hitchcox Aesthetics in
+  Knoxville, TN. Stimulate collagen for smoother skin and thicker hair. -
+  microneedling/face - microneedling/hair-loss
 shortDescription: Collagen-boosting microneedling for skin rejuvenation and hair restoration.
-ctaText: Explore Microneedling
+ctaText: Book Microneedling Consultation
 faq:
   - question: What is microneedling?
     answer: >-
@@ -77,30 +76,26 @@ sections:
           It is generally recommended to wait 4-6 weeks between sessions to
           allow the skin to heal and regenerate.
 ---
-## Microneedling: Collagen Induction Therapy for Skin and Hair
 
-Microneedling is a versatile, minimally invasive treatment that harnesses your body's natural healing response to achieve dramatic skin rejuvenation and promote hair regrowth. Also known as collagen induction therapy, microneedling treatment creates thousands of controlled micro-channels that trigger a powerful surge of collagen and elastin production — smoothing texture, reducing scarring, and restoring a youthful, radiant glow.
+## Microneedling in Knoxville
 
-## How Microneedling Treatment Works
+Reawaken your skin's natural potential with collagen induction therapy.
+**Microneedling in Knoxville, TN** is a versatile, minimally invasive treatment
+that triggers the body's self-repair mechanisms to smooth texture, reduce
+scarring, and restore firmness. By creating thousands of microscopic channels in
+the skin, we stimulate the production of new collagen and elastin, the building
+blocks of healthy, youthful skin.
 
-During a microneedling treatment, fine sterilized needles create precise micro-injuries that activate the skin's wound-healing cascade. This natural response stimulates fresh collagen and elastin fibers, remodeling the treated tissue from within. The micro-channels also dramatically improve the absorption of topical serums and growth factors, amplifying results beyond what either treatment achieves alone.
+At Sarah Hitchcox Aesthetics, we offer this transformative procedure for both
+facial rejuvenation and hair restoration. Whether you are looking to fade acne
+scars, minimize fine lines, or combat thinning hair, our **Knoxville
+microneedling services** are tailored to your specific goals. We also offer PRP
+(Platelet-Rich Plasma) enhancements, using your body's own growth factors to
+supercharge healing and maximize results.
 
-## What Microneedling Can Treat
-
-Collagen induction therapy is effective for a wide range of concerns:
-
-- **Acne scars and surgical scars** — Breaks down scar tissue and encourages new, healthy skin
-- **Fine lines and wrinkles** — Boosts collagen to restore firmness and elasticity
-- **Enlarged pores** — Tightens pore structure for a smoother complexion
-- **Uneven skin tone and texture** — Creates a more uniform, refined surface
-- **Thinning hair and hair loss** — Stimulates dormant follicles and enhances topical treatment absorption
-
-## PRP Microneedling for Enhanced Results
-
-For patients seeking maximum skin rejuvenation, PRP microneedling combines collagen induction therapy with platelet-rich plasma drawn from your own blood. The concentrated growth factors in PRP supercharge the healing response, accelerating collagen production and delivering exceptional improvements in tone, texture, and overall skin health.
-
-## Safe for All Skin Types
-
-Microneedling treatment is safe and effective for all skin types and tones, making it an excellent alternative to more aggressive laser procedures. Most sessions take just 20-30 minutes, and results build progressively with each treatment.
-
-Pair microneedling with [injectable treatments like Botox and fillers](/injectables) for comprehensive facial rejuvenation, explore our [advanced laser skin care services](/laser-services), or discover our [medical weight loss programs](/weight-loss) for a complete aesthetic transformation. Patients seeking both wrinkle reduction and collagen renewal often combine microneedling sessions with [cosmetic injections for non-surgical facial contouring](/injectables), while those targeting pigmentation and skin tone benefit from adding [laser skin resurfacing and pigment correction](/laser-services) to their treatment plan. For patients pursuing a total wellness approach, our [GLP-1 medically supervised weight management](/weight-loss) program complements microneedling beautifully as part of an inside-out transformation.
+Microneedling serves as an excellent foundation for a holistic aesthetic plan.
+It integrates seamlessly with [laser services](/laser-services) for surface
+polishing or [injectable treatments](/injectables) for volume and wrinkle
+reduction. Additionally, if you are focusing on whole-body wellness, our
+[Knoxville weight loss programs](/weight-loss) can complement your renewed
+confidence.

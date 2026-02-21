@@ -25,7 +25,7 @@ import {
 	useSubmit,
 } from '@remix-run/react'
 import { withSentry } from '@sentry/remix'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HoneypotProvider } from 'remix-utils/honeypot/react'
 import { useHydrated } from 'remix-utils/use-hydrated'
 import { z } from 'zod'
@@ -57,19 +57,13 @@ import {
 import { prisma } from '#/app/utils/db.server.ts'
 import { getEnv } from '#/app/utils/env.server.ts'
 import { honeypot } from '#/app/utils/honeypot.server.ts'
-import { locationServices } from '#/app/utils/location-service-data.server.ts'
 import {
 	locations,
 	formatAddress,
-	getLocationForPath,
-	getPhoneForPath,
 	getLocationById,
-	DEFAULT_PHONE,
+	PHONE,
 } from '#/app/utils/locations.ts'
-import {
-	knoxvilleMenuLinks,
-	farragutMenuLinks,
-} from '#/app/utils/menu-links.server.ts'
+import { menuLinks } from '#/app/utils/menu-links.server.ts'
 import {
 	// addGTM,
 	combineHeaders,
@@ -132,13 +126,13 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 		},
 		{
 			property: 'og:image',
-			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}/img/sarah.jpg`,
+			content: `${data?.requestInfo.origin ?? 'https://knoxvillebotox.com'}/img/sarah.jpg`,
 		},
 		{ property: 'og:image:width', content: '1200' },
 		{ property: 'og:image:height', content: '630' },
 		{
 			property: 'og:url',
-			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}${data?.requestInfo.path ?? '/'}`,
+			content: `${data?.requestInfo.origin ?? 'https://knoxvillebotox.com'}${data?.requestInfo.path ?? '/'}`,
 		},
 		{ property: 'og:locale', content: 'en_US' },
 		// Twitter Card
@@ -156,7 +150,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 		},
 		{
 			name: 'twitter:image',
-			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}/img/sarah.jpg`,
+			content: `${data?.requestInfo.origin ?? 'https://knoxvillebotox.com'}/img/sarah.jpg`,
 		},
 	]
 }
@@ -205,26 +199,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	// Compute overlay header detection server-side
 	const pathname = new URL(request.url).pathname
 	const pathWithoutLeadingSlash = pathname.replace(/^\//, '')
-	const staticOverlayPages = new Set([
-		'/',
-		'/knoxville-med-spa',
-		'/farragut-med-spa',
-	])
-	const locationMatch = pathWithoutLeadingSlash.match(
-		/^(knoxville|farragut)-(.+)$/,
-	)
-	const isLocationServicePage = locationMatch
-		? isServicePage(locationMatch[2]!)
-		: false
+	const staticOverlayPages = new Set(['/', '/bearden', '/farragut'])
 	const isOverlayPage =
-		staticOverlayPages.has(pathname) ||
-		isServicePage(pathWithoutLeadingSlash) ||
-		!!locationServices[pathWithoutLeadingSlash] ||
-		isLocationServicePage
-
-	// Compute location-specific phone number for this page
-	const phoneForPage = getPhoneForPath(pathname)
-	const locationForPage = getLocationForPath(pathname)
+		staticOverlayPages.has(pathname) || isServicePage(pathWithoutLeadingSlash)
 
 	return json(
 		{
@@ -241,10 +218,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			toast,
 			honeyProps,
 			isOverlayPage,
-			knoxvilleMenuLinks,
-			farragutMenuLinks,
-			phoneForPage,
-			locationForPage: locationForPage ?? null,
+			menuLinks,
 		},
 		{
 			headers: combineHeaders(
@@ -298,7 +272,7 @@ function Document({
 	const _isHydrated = useHydrated()
 	const location = useLocation()
 	const data = useLoaderData<typeof loader>()
-	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
+	const origin = data?.requestInfo?.origin ?? 'https://knoxvillebotox.com'
 	const canonicalUrl = `${origin}${location.pathname}`
 
 	// GTM temporarily disabled
@@ -309,80 +283,41 @@ function Document({
 	// 	addGTM(ENV.GTM_ID!)
 	// }, [isHydrated])
 
-	// Build location-aware JSON-LD: single location on location pages,
-	// multi-location listing on non-location pages
-	const locId = data?.locationForPage
-	const locData = locId ? getLocationById(locId) : undefined
-
-	const localBusinessJsonLd = locData
-		? {
-				'@context': 'https://schema.org',
-				'@type': 'MedicalBusiness',
-				name: `Sarah Hitchcox Aesthetics - ${locData.name}`,
-				description: `Medical spa in ${locData.name} offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.`,
-				url: `https://hitchcoxaesthetics.com/${locData.id}-med-spa`,
-				telephone: locData.phone,
-				email: 'sarah@hitchcoxaesthetics.com',
-				image: `${origin}/img/sarah.jpg`,
-				priceRange: '$$',
-				address: {
-					'@type': 'PostalAddress',
-					streetAddress: locData.address,
-					addressLocality: locData.city,
-					addressRegion: locData.state,
-					postalCode: locData.zip,
-					addressCountry: 'US',
-				},
-				geo: {
-					'@type': 'GeoCoordinates',
-					latitude: locData.lat,
-					longitude: locData.lng,
-				},
-				sameAs: ['https://www.instagram.com/hitchcoxaesthetics/'],
-				founder: {
-					'@type': 'Person',
-					name: 'Sarah Hitchcox',
-					jobTitle: 'Registered Nurse, Aesthetic Injector',
-				},
-				medicalSpecialty: 'Dermatology',
-				areaServed: { '@type': 'City', name: locData.name },
-			}
-		: {
-				'@context': 'https://schema.org',
-				'@type': 'MedicalBusiness',
-				name: 'Sarah Hitchcox Aesthetics',
-				description:
-					'Medical spa offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss in Knoxville and Farragut, TN.',
-				url: 'https://hitchcoxaesthetics.com',
-				telephone: DEFAULT_PHONE,
-				email: 'sarah@hitchcoxaesthetics.com',
-				image: `${origin}/img/sarah.jpg`,
-				priceRange: '$$',
-				address: locations.map(loc => ({
-					'@type': 'PostalAddress',
-					streetAddress: loc.address,
-					addressLocality: loc.city,
-					addressRegion: loc.state,
-					postalCode: loc.zip,
-					addressCountry: 'US',
-				})),
-				geo: {
-					'@type': 'GeoCoordinates',
-					latitude: 35.9392,
-					longitude: -83.9913,
-				},
-				sameAs: ['https://www.instagram.com/hitchcoxaesthetics/'],
-				founder: {
-					'@type': 'Person',
-					name: 'Sarah Hitchcox',
-					jobTitle: 'Registered Nurse, Aesthetic Injector',
-				},
-				medicalSpecialty: 'Dermatology',
-				areaServed: [
-					{ '@type': 'City', name: 'Knoxville' },
-					{ '@type': 'City', name: 'Farragut' },
-				],
-			}
+	// JSON-LD: Knoxville-focused MedicalBusiness
+	const bearden = getLocationById('bearden')!
+	const localBusinessJsonLd = {
+		'@context': 'https://schema.org',
+		'@type': 'MedicalBusiness',
+		name: 'Sarah Hitchcox Aesthetics',
+		description:
+			'Medical spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
+		url: 'https://knoxvillebotox.com',
+		telephone: PHONE,
+		email: 'sarah@hitchcoxaesthetics.com',
+		image: `${origin}/img/sarah.jpg`,
+		priceRange: '$$',
+		address: {
+			'@type': 'PostalAddress',
+			streetAddress: bearden.address,
+			addressLocality: bearden.city,
+			addressRegion: bearden.state,
+			postalCode: bearden.zip,
+			addressCountry: 'US',
+		},
+		geo: {
+			'@type': 'GeoCoordinates',
+			latitude: bearden.lat,
+			longitude: bearden.lng,
+		},
+		sameAs: ['https://www.instagram.com/hitchcoxaesthetics/'],
+		founder: {
+			'@type': 'Person',
+			name: 'Sarah Hitchcox',
+			jobTitle: 'Registered Nurse, Aesthetic Injector',
+		},
+		medicalSpecialty: 'Dermatology',
+		areaServed: { '@type': 'City', name: 'Knoxville' },
+	}
 
 	return (
 		<html lang="en" className={`${theme} h-full overflow-x-hidden`}>
@@ -594,9 +529,9 @@ function Footer() {
 				<div className="grid gap-8 md:grid-cols-2">
 					{locations.map(location => (
 						<div key={location.id} className="space-y-4">
-							<Link to={`/${location.id}-med-spa`}>
+							<Link to={`/${location.id}`}>
 								<h3 className="text-xl font-semibold hover:text-primary hover:underline">
-									{location.name} Med Spa
+									{location.displayName} Location
 								</h3>
 							</Link>
 							<div className="space-y-2">
@@ -820,14 +755,7 @@ function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
 
 function useLinks() {
 	const data = useLoaderData<typeof loader>()
-	const location = useLocation()
-	return useMemo(() => {
-		// On farragut pages, show farragut menu links; otherwise default to knoxville
-		const isFarragut = location.pathname
-			.replace(/^\//, '')
-			.startsWith('farragut')
-		return isFarragut ? data.farragutMenuLinks : data.knoxvilleMenuLinks
-	}, [data.knoxvilleMenuLinks, data.farragutMenuLinks, location.pathname])
+	return data.menuLinks
 }
 
 export function ErrorBoundary() {

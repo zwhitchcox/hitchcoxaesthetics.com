@@ -1,12 +1,12 @@
 ---
 name: Lip Flip
 tagline: for a fuller upper lip
-title: Botox Lip Flip | Sarah Hitchcox Aesthetics
+title: Lip Flip Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Botox lip flip for a subtly fuller upper lip without filler in Knoxville and
-  Farragut, TN. Quick, natural results at Sarah Hitchcox Aesthetics.
+  Botox lip flip for a subtly fuller upper lip without filler in Knoxville, TN.
+  Quick, natural results at Sarah Hitchcox Aesthetics.
 shortDescription: A subtle technique that creates a fuller-looking upper lip without filler.
-ctaText: Book Lip Flip
+ctaText: Book Lip Flip Consultation
 sections:
   - type: features-grid
     title: Key Benefits of Botox Lip Flip
@@ -21,27 +21,30 @@ sections:
         description: Takes less than 10 minutes to perform.
         icon: clock
 ---
-The Botox lip flip is a subtle, non-surgical technique that enhances the upper lip without the use of dermal filler. By placing a small amount of [Botox](/botox) into the orbicularis oris muscle along the upper lip border, the muscle relaxes slightly and allows the lip to gently roll outward, revealing more of the pink vermilion. The result is fuller lips without filler — a natural-looking enhancement that adds a soft pout and improved lip shape.
 
-## How the Lip Flip Treatment Works
+## The Botox Lip Flip in Knoxville
 
-The upper lip Botox technique requires only 2-4 units of Botox, making it one of the quickest and most affordable [cosmetic injections](/injectables) available. Sarah places precise micro-injections along the upper lip border at strategic points where the orbicularis oris muscle naturally curls the lip inward. By relaxing these specific fibers, the lip flips subtly outward to create the appearance of enhanced fullness.
+The Botox lip flip is a popular, subtle alternative to fillers for patients
+wanting a fuller-looking upper lip. By placing micro-doses of Botox along the
+upper lip border, we relax the muscle just enough to flip the lip outward. This
+creates the illusion of more volume and shows more of the pink lip when you
+smile. It is a favorite at our Knoxville, TN med spa for those seeking a
+natural, understated enhancement.
 
-The lip flip procedure takes less than 5 minutes. You may notice a subtle difference within a few days, with the full effect visible at the two-week mark. Results typically last 6-8 weeks — shorter than other [Botox applications](/botox) because the lip muscles are among the most active on the face.
+## Lip Flip vs. Lip Fillers
 
-## Botox Lip Flip vs. Lip Filler: Choosing the Right Enhancement
+Unlike fillers, which add physical volume, a lip flip simply changes the shape
+and positioning of your existing lip. It is an excellent "starter" treatment for
+those curious about lip enhancement but not ready for filler. However, for
+maximum impact, many of our Knoxville patients combine a lip flip with
+[Botox](/botox) in other areas or use it to extend the longevity of their filler
+results.
 
-The lip flip is ideal for patients who want a subtle change, prefer to avoid filler, or are trying lip enhancement for the first time. While lip filler physically adds volume, the Botox lip flip simply adjusts the position of existing lip tissue for a more defined, slightly fuller appearance. Many patients choose to combine both treatments — the flip refines shape while filler adds fullness.
+## A Quick Boost for Your Smile
 
-A lip flip also works beautifully for patients who show excessive upper gum tissue when smiling, making it a natural complement to [gummy smile Botox](/botox/gummy-smile).
-
-## Combining Lip Flip With Other Botox Treatments
-
-Most patients who visit for a lip flip treatment also address other areas during the same appointment. Popular combinations include:
-
-- [Botox for frown lines](/botox/frown-lines) to smooth the glabellar region
-- [Crow's feet wrinkle treatment](/botox/crows-feet) to refresh the eye area
-- [Forehead wrinkle Botox](/botox/forehead-lines) for a smooth, relaxed forehead
-- [Non-surgical brow lift](/botox/brow-lift) to open and elevate heavy brows
-
-As part of our comprehensive [injectable treatment menu](/injectables), the Botox lip flip can be combined with any of our [Botox services](/botox) for a complete facial refresh in a single visit.
+The procedure is incredibly quick and involves minimal discomfort. It
+effectively relaxes the upper lip, which can also help smooth fine vertical
+lines (smoker's lines) around the mouth. We often combine the lip flip with
+[gummy smile correction](/botox/gummy-smile) or
+[chin dimpling treatment](/botox/chin-dimpling) to fully rejuvenate the lower
+face and perfect your smile.

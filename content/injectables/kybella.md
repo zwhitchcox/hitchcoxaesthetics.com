@@ -1,19 +1,18 @@
 ---
 name: Kybella
 tagline: for submental fat reduction
-title: Kybella | Sarah Hitchcox Aesthetics
+title: Kybella Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Kybella FDA-approved injectable to reduce double chin fat without surgery.
-  Non-surgical jawline contouring in Knoxville and Farragut, TN. Sarah Hitchcox
-  Aesthetics.
+  Non-surgical jawline contouring in Knoxville, TN. Sarah Hitchcox Aesthetics.
 shortDescription: FDA-approved injectable that permanently destroys fat cells under the chin.
-whyChooseTitle: Expert Kybella Provider in Knoxville & Farragut
+whyChooseTitle: Expert Kybella Provider in Knoxville
 whyChoose: >-
   Sarah Hitchcox Aesthetics offers expert Kybella treatments for double chin
-  reduction in Knoxville and Farragut, TN. Our precise injections target
-  stubborn submental fat that resists diet and exercise, giving you a sleeker,
-  more defined jawline.
-ctaText: Book Kybella
+  reduction in Knoxville, TN. Our precise injections target stubborn submental
+  fat that resists diet and exercise, giving you a sleeker, more defined
+  jawline.
+ctaText: Book Kybella Consultation
 faq:
   - question: What is KYBELLA made of?
     answer: >-
@@ -57,23 +56,23 @@ sections:
         description: Sculpts the jawline for a sharper appearance.
         icon: user
 ---
-## How Kybella Eliminates Double Chin Fat Without Surgery
 
-Kybella is the only FDA-approved double chin treatment that permanently destroys fat cells beneath the chin. The active ingredient — deoxycholic acid — is a naturally occurring molecule your body already uses to break down dietary fat. When injected into submental fat, Kybella disrupts fat cell membranes, and your body naturally metabolizes the destroyed cells over the following weeks. Once those fat cells are gone, they cannot store or accumulate fat again.
+## Kybella Double Chin Treatment in Knoxville
 
-As a non-surgical chin fat reduction option, Kybella is part of our [injectable treatments](/injectables) and works beautifully alongside [dermal filler for facial contouring](/filler) or [Botox injections for wrinkle smoothing](/botox) to create a comprehensive facial rejuvenation plan.
+Eliminate stubborn fat under the chin and redefine your profile with Kybella.
+This FDA-approved injectable permanently destroys fat cells in the submental
+area, addressing the "double chin" that often resists diet and exercise.
+**Kybella treatments in Knoxville** provide a non-surgical alternative to
+liposuction, offering a way to sculpt a sleeker, more youthful jawline.
 
-## What Double Chin Injections Can Achieve
+The active ingredient in Kybella is a synthetic form of deoxycholic acid, a
+molecule that naturally breaks down dietary fat. When injected, it targets fat
+storage cells, which are then processed and eliminated by the body. **Knoxville
+Kybella injections** result in gradual, natural-looking improvement over a
+series of treatments. Once the fat is gone, it does not return, providing
+lasting confidence in your profile.
 
-Kybella is specifically designed to treat moderate to severe submental fat — the stubborn pocket beneath the chin that often resists diet and exercise. Double chin injections with deoxycholic acid can:
-
-- Permanently reduce submental fat volume
-- Sharpen the jawline and improve your profile
-- Eliminate the appearance of a double chin
-- Create a slimmer, more defined neck-to-chin transition
-
-## Kybella Treatment Timeline and Recovery
-
-Most patients require 2-4 sessions of double chin treatment, spaced about 4 weeks apart. Each session takes 15-20 minutes. Swelling is the most common side effect and typically peaks at 48 hours before gradually resolving over 1-2 weeks. Some patients also experience redness, numbness, or bruising at the injection site.
-
-Results become visible as swelling subsides, with optimal chin fat reduction appearing after your final treatment session. Because Kybella permanently destroys fat cells, most patients enjoy lasting results without the need for ongoing maintenance — as long as weight remains stable. Pair Kybella with a [skin booster like SkinVive](/skinvive) for improved skin quality, or explore [wrinkle relaxers such as Jeuveau](/jeuveau) and [Dysport neuromodulator injections](/dysport) to address other areas of concern.
+Enhance your new jawline by pairing Kybella with [Jeuveau](/injectables/jeuveau)
+to smooth upper face wrinkles or [SkinVive](/injectables/skinvive) to hydrate
+and glow. Visit our [injectables overview](/injectables) to discover how we can
+help you achieve complete facial harmony.

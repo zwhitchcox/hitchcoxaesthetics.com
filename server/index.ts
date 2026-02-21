@@ -74,13 +74,17 @@ app.get('*', (req, res, next) => {
 	}
 })
 
-// redirect www.hepisontheway.com/path to hepisontheway.com/path
+// redirect old domains to knoxvillebotox.com
 app.get('*', (req, res, next) => {
+	const host = getHost(req)
 	if (
-		req.hostname === 'hitchcoxaesthetics.pharmacy' ||
-		req.hostname === 'www.hitchcoxaesthetics.pharmacy'
+		host === 'hitchcoxaesthetics.com' ||
+		host === 'www.hitchcoxaesthetics.com' ||
+		host === 'hitchcoxaesthetics.pharmacy' ||
+		host === 'www.hitchcoxaesthetics.pharmacy' ||
+		host === 'www.knoxvillebotox.com'
 	) {
-		const newUrl = `https://hitchcoxaesthetics.com${req.url}`
+		const newUrl = `https://knoxvillebotox.com${req.originalUrl}`
 		return res.redirect(301, newUrl)
 	}
 	next()
@@ -88,7 +92,7 @@ app.get('*', (req, res, next) => {
 
 // Proxy book.hitchcoxaesthetics.com to hitchcoxaesthetics.janeapp.com
 app.use((req, res, next) => {
-	if (req.hostname === 'book.hitchcoxaesthetics.com') {
+	if (getHost(req) === 'book.hitchcoxaesthetics.com') {
 		return createProxyMiddleware({
 			target: 'https://hitchcoxaesthetics.janeapp.com',
 			changeOrigin: true,

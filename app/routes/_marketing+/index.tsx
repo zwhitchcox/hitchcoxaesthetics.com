@@ -3,71 +3,55 @@ import { Link, useLoaderData, useOutletContext } from '@remix-run/react'
 import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from '#app/components/ui/tabs.js'
-import { locationServices } from '#app/utils/location-service-data.server.js'
-import { getCategoryPages } from '#app/utils/site-pages.server.js'
+import { getCategoryPages, getPage } from '#app/utils/site-pages.server.js'
 
 export const meta: MetaFunction = () => [
-	{ title: 'Sarah Hitchcox Aesthetics | Knoxville and Farragut Medical Spa' },
+	{ title: 'Sarah Hitchcox Aesthetics | Knoxville Med Spa' },
 	{
 		name: 'description',
 		content:
-			'Sarah Hitchcox Aesthetics is a premier med spa in Knoxville and Farragut, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
+			'Sarah Hitchcox Aesthetics is a premier med spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
 	},
 	{
 		property: 'og:title',
-		content: 'Sarah Hitchcox Aesthetics | Knoxville and Farragut Medical Spa',
+		content: 'Sarah Hitchcox Aesthetics | Knoxville Med Spa',
 	},
 	{
 		property: 'og:description',
 		content:
-			'Premier med spa in Knoxville and Farragut, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
+			'Premier med spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and medical weight loss.',
 	},
 ]
-
-function mapToLocationPath(p: string, locationId: string): string {
-	const [first, ...rest] = p.split('/')
-	return rest.length
-		? `${locationId}-${first}/${rest.join('/')}`
-		: `${locationId}-${first}`
-}
 
 export async function loader() {
 	const categories = getCategoryPages()
 
-	const knoxvilleCategories = categories.map(c => {
-		const locSlug = mapToLocationPath(c.path, 'knoxville')
-		const locData = locationServices[locSlug]
-		return {
-			slug: locSlug,
-			serviceName: c.name,
-			shortDescription: c.shortDescription,
-			heroImage: locData?.heroImage ?? c.heroImage,
-		}
-	})
+	const serviceCategories = categories.map(c => ({
+		slug: c.path,
+		serviceName: c.name,
+		shortDescription: c.shortDescription,
+		heroImage: c.heroImage,
+	}))
 
-	const farragutCategories = categories.map(c => {
-		const locSlug = mapToLocationPath(c.path, 'farragut')
-		const locData = locationServices[locSlug]
-		return {
-			slug: locSlug,
-			serviceName: c.name,
-			shortDescription: c.shortDescription,
-			heroImage: locData?.heroImage ?? c.heroImage,
-		}
-	})
+	const popularSlugs = ['botox', 'filler/lip-filler', 'semaglutide', 'everesse']
+	const popularServices = popularSlugs
+		.map(slug => {
+			const page = getPage(slug)
+			if (!page) return null
+			return {
+				path: page.path,
+				name: page.name,
+				shortDescription: page.shortDescription,
+				heroImage: page.heroImage,
+			}
+		})
+		.filter(Boolean)
 
-	return json({ knoxvilleCategories, farragutCategories })
+	return json({ serviceCategories, popularServices })
 }
 
 export default function Index() {
-	const { knoxvilleCategories, farragutCategories } =
-		useLoaderData<typeof loader>()
+	const { serviceCategories, popularServices } = useLoaderData<typeof loader>()
 	const _context = useOutletContext<{
 		setIsMenuOpen: (isOpen: boolean) => void
 	}>()
@@ -79,7 +63,7 @@ export default function Index() {
 				imageAlt="Sarah Hitchcox"
 				topText="SARAH HITCHCOX"
 				bottomText="AESTHETICS"
-				subText="Knoxville and Farragut Med Spa"
+				subText="Knoxville Med Spa"
 				ctaText="Med Spa Services"
 				onCtaClick={() => {
 					const element = document.getElementById('services')
@@ -111,63 +95,48 @@ export default function Index() {
 				</div>
 			</div>
 
-			{/* Services Section with Location Tab Switcher */}
-			<div id="services" className="bg-gray-50 py-20">
+			{/* Popular Services */}
+			<div className="bg-gray-50 py-20">
 				<div className="mx-auto max-w-7xl px-6">
-					<h2 className="mb-8 text-center text-3xl font-bold text-gray-900">
-						Medical Aesthetic Services
+					<h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
+						Popular Knoxville Med Spa Treatments
 					</h2>
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+						{popularServices.map(service => (
+							<Link
+								key={service!.path}
+								to={`/${service!.path}`}
+								className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white p-4 transition-all hover:shadow-md"
+							>
+								{service!.heroImage && (
+									<img
+										src={service!.heroImage}
+										alt={service!.name}
+										className="h-16 w-16 rounded-lg object-cover"
+										loading="lazy"
+									/>
+								)}
+								<div>
+									<h4 className="font-semibold text-gray-900 hover:text-primary">
+										{service!.name}
+									</h4>
+									<p className="text-sm text-gray-500">
+										{service!.shortDescription}
+									</p>
+								</div>
+							</Link>
+						))}
+					</div>
+				</div>
+			</div>
 
-					<Tabs defaultValue="knoxville" className="w-full">
-						<div className="mb-12 flex justify-center">
-							<TabsList className="grid h-14 w-full max-w-md grid-cols-2 rounded-full bg-gray-100 p-1">
-								<TabsTrigger
-									value="knoxville"
-									className="h-full rounded-full text-lg font-medium text-gray-600 transition-all data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-md"
-								>
-									Knoxville
-								</TabsTrigger>
-								<TabsTrigger
-									value="farragut"
-									className="h-full rounded-full text-lg font-medium text-gray-600 transition-all data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-md"
-								>
-									Farragut
-								</TabsTrigger>
-							</TabsList>
-						</div>
-
-						<TabsContent value="knoxville">
-							<ServiceCardGrid
-								services={knoxvilleCategories}
-								variant="thumbnail"
-							/>
-							<div className="mt-8 text-center">
-								<Link
-									to="/knoxville-med-spa"
-									className="inline-flex items-center text-primary hover:underline"
-								>
-									View all Knoxville med spa services{' '}
-									<Icon name="arrow-right" className="ml-2 h-4 w-4" />
-								</Link>
-							</div>
-						</TabsContent>
-
-						<TabsContent value="farragut">
-							<ServiceCardGrid
-								services={farragutCategories}
-								variant="thumbnail"
-							/>
-							<div className="mt-8 text-center">
-								<Link
-									to="/farragut-med-spa"
-									className="inline-flex items-center text-primary hover:underline"
-								>
-									View all Farragut med spa services{' '}
-									<Icon name="arrow-right" className="ml-2 h-4 w-4" />
-								</Link>
-							</div>
-						</TabsContent>
-					</Tabs>
+			{/* Services Section */}
+			<div id="services" className="py-20">
+				<div className="mx-auto max-w-7xl px-6">
+					<h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
+						Knoxville Medical Aesthetic Services
+					</h2>
+					<ServiceCardGrid services={serviceCategories} variant="thumbnail" />
 				</div>
 			</div>
 
@@ -175,30 +144,30 @@ export default function Index() {
 			<div className="py-20">
 				<div className="mx-auto max-w-7xl px-6">
 					<h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
-						Our Medical Spa Locations
+						Our Knoxville Area Locations
 					</h2>
 					<div className="grid gap-8 md:grid-cols-2">
 						<div className="group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gray-900 p-12 text-center text-white shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
 							<div className="absolute inset-0 z-0 bg-gray-900" />
 							<img
 								src="/img/med-spa-2.webp"
-								alt="Knoxville Med Spa Interior"
+								alt="Knoxville Bearden Med Spa Interior"
 								className="absolute inset-0 z-0 h-full w-full object-cover opacity-60 grayscale transition-all duration-700 group-hover:scale-105 group-hover:grayscale-0"
 								loading="lazy"
 							/>
 							<div className="absolute inset-0 z-10 bg-black/50 transition-opacity duration-300 group-hover:bg-black/40" />
 							<div className="relative z-20 flex flex-col items-center">
 								<h3 className="mb-4 text-3xl font-bold tracking-widest text-white shadow-black drop-shadow-md">
-									KNOXVILLE MED SPA
+									BEARDEN
 								</h3>
 								<p className="mb-8 text-lg font-medium text-white shadow-black drop-shadow-md">
 									5113 Kingston Pike
 								</p>
 								<Link
-									to="/knoxville-med-spa"
+									to="/bearden"
 									className="rounded-md bg-white px-8 py-3 text-sm font-bold text-black transition hover:bg-gray-200"
 								>
-									Knoxville Services
+									Bearden Location
 								</Link>
 							</div>
 						</div>
@@ -214,16 +183,16 @@ export default function Index() {
 							<div className="absolute inset-0 z-10 bg-black/50 transition-opacity duration-300 group-hover:bg-black/40" />
 							<div className="relative z-20 flex flex-col items-center">
 								<h3 className="mb-4 text-3xl font-bold tracking-widest text-white shadow-black drop-shadow-md">
-									FARRAGUT MED SPA
+									FARRAGUT
 								</h3>
 								<p className="mb-8 text-lg font-medium text-white shadow-black drop-shadow-md">
 									102 S Campbell Station Rd
 								</p>
 								<Link
-									to="/farragut-med-spa"
+									to="/farragut"
 									className="rounded-md bg-white px-8 py-3 text-sm font-bold text-black transition hover:bg-gray-200"
 								>
-									Farragut Services
+									Farragut Location
 								</Link>
 							</div>
 						</div>

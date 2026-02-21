@@ -1,19 +1,19 @@
 ---
 name: Semaglutide
 tagline: for sustainable weight loss
-title: Semaglutide Weight Loss Injections | Sarah Hitchcox Aesthetics
+title: Semaglutide Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Medical weight loss with semaglutide (Ozempic/Wegovy) injections in Knoxville
-  and Farragut, TN. GLP-1 therapy at about half the price. Free consultations at
-  Sarah Hitchcox Aesthetics.
+  Medical weight loss with semaglutide (Ozempic/Wegovy) injections in Knoxville,
+  TN. GLP-1 therapy at about half the price. Free consultations at Sarah
+  Hitchcox Aesthetics.
 shortDescription: >-
   GLP-1 injections for safe, medically supervised weight loss at half the
   brand-name price.
-whyChooseTitle: Expert Semaglutide Weight Loss in Knoxville & Farragut
+whyChooseTitle: Expert Semaglutide Weight Loss in Knoxville
 whyChoose: >-
   Sarah Hitchcox Aesthetics offers affordable semaglutide weight loss injections
-  in Knoxville and Farragut, TN with full medical supervision, personalized
-  dosing, and lifestyle guidance for sustainable results.
+  in Knoxville, TN with full medical supervision, personalized dosing, and
+  lifestyle guidance for sustainable results.
 ctaText: Book Semaglutide Consultation
 faq:
   - question: How does semaglutide work?
@@ -87,20 +87,26 @@ sections:
           discuss your goals, and if you are a candidate, start you on a
           personalized path to weight loss.
 ---
-## How Semaglutide Weight Loss Injections Deliver Sustainable Results
 
-Semaglutide is the active ingredient in Ozempic and Wegovy — and we offer it as a compounded medication at about half the brand-name price. As a GLP-1 receptor agonist, semaglutide is one of the most effective medical weight loss medications available today. It mimics natural hormones that regulate appetite and satiety, helping you feel fuller faster, stay satisfied longer, and naturally reduce calorie intake without the constant feeling of deprivation.
+## Semaglutide Injections in Knoxville
 
-Semaglutide weight loss is part of our medically supervised [weight loss program](/weight-loss), which also includes [tirzepatide dual-action weight loss injections](/tirzepatide) for patients who may benefit from a different mechanism of action.
+Semaglutide has emerged as a game-changer for medical weight management. As a
+GLP-1 receptor agonist, it works by mimicking a natural hormone that targets the
+areas of the brain that regulate appetite and food intake. Our **semaglutide
+program in Knoxville** offers this FDA-approved medication to help you feel
+fuller faster and stay satisfied longer, making calorie reduction manageable and
+sustainable.
 
-## How GLP-1 Weight Loss Works
+At Sarah Hitchcox Aesthetics, we prioritize your safety and results. Our
+**Knoxville semaglutide treatments** are medically supervised, ensuring that
+your dosage is optimized for your body while minimizing side effects. Patients
+often see significant weight reduction when combining this therapy with healthy
+lifestyle changes. It is an effective tool for those who have struggled with
+weight despite their best efforts with diet and exercise alone.
 
-Semaglutide targets GLP-1 receptors in the brain that control hunger and satiety signals. These weight loss injections slow gastric emptying, reduce cravings, and support blood sugar regulation — making them beneficial for patients with insulin resistance or prediabetes. Clinical trials show that many patients lose an average of 15% of their body weight with semaglutide when combined with lifestyle modifications.
-
-## What to Expect from Medical Weight Loss with Semaglutide
-
-Semaglutide is administered as a simple once-weekly subcutaneous injection. Dosing starts low and gradually increases to minimize side effects like nausea. Most patients notice reduced appetite and fewer cravings within the first few weeks, with steady weight loss continuing over months of treatment.
-
-## Free Semaglutide Weight Loss Consultation
-
-Not sure if semaglutide is right for you? We offer complimentary consultations to discuss your health history and weight loss goals. Our [medical weight loss](/weight-loss) program includes regular check-ins, dosage adjustments, and lifestyle guidance. If semaglutide is not the ideal fit, [tirzepatide GIP/GLP-1 therapy](/tirzepatide) may offer an alternative path to sustainable results. Many patients pursuing [medical weight management](/weight-loss) find that combining weight loss injections with aesthetic treatments enhances their overall transformation — our [injectable treatments](/injectables) and [laser services](/laser-services) complement your weight loss journey.
+If you are considering other options, we also offer
+[tirzepatide injections](/weight-loss/tirzepatide), a dual-action medication. We
+can help you decide which path is right for you during your consultation. Learn
+more about our comprehensive
+[medical weight loss services in Knoxville](/weight-loss) and take the first
+step toward a healthier you.

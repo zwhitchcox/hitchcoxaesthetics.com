@@ -3,11 +3,7 @@ import Logo from '#app/components/logo.js'
 import { Icon } from '#app/components/ui/icon.js'
 import Carousel from '#app/utils/carousel.js'
 import { CTA } from '#app/utils/cta.js'
-import {
-	getLocationForPath,
-	getLocationById,
-	DEFAULT_PHONE,
-} from '#app/utils/locations.js'
+import { getLocationById, PHONE } from '#app/utils/locations.js'
 import { cn, scrollToId } from '#app/utils/misc.js'
 
 /**
@@ -53,10 +49,7 @@ export function ServiceJsonLd({
 	description: string
 	url: string
 }) {
-	const location = useLocation()
-	const locId = getLocationForPath(location.pathname)
-	const locData = locId ? getLocationById(locId) : undefined
-	const phone = locData ? locData.phone : DEFAULT_PHONE
+	const bearden = getLocationById('bearden')!
 
 	const jsonLd = {
 		'@context': 'https://schema.org',
@@ -66,32 +59,19 @@ export function ServiceJsonLd({
 		url,
 		provider: {
 			'@type': 'MedicalBusiness',
-			name: locData
-				? `Sarah Hitchcox Aesthetics - ${locData.name}`
-				: 'Sarah Hitchcox Aesthetics',
-			telephone: phone,
-			url: locData
-				? `https://hitchcoxaesthetics.com/${locData.id}-med-spa`
-				: 'https://hitchcoxaesthetics.com',
-			...(locData
-				? {
-						address: {
-							'@type': 'PostalAddress',
-							streetAddress: locData.address,
-							addressLocality: locData.city,
-							addressRegion: locData.state,
-							postalCode: locData.zip,
-							addressCountry: 'US',
-						},
-					}
-				: {}),
+			name: 'Sarah Hitchcox Aesthetics',
+			telephone: PHONE,
+			url: 'https://knoxvillebotox.com',
+			address: {
+				'@type': 'PostalAddress',
+				streetAddress: bearden.address,
+				addressLocality: bearden.city,
+				addressRegion: bearden.state,
+				postalCode: bearden.zip,
+				addressCountry: 'US',
+			},
 		},
-		areaServed: locData
-			? { '@type': 'City', name: locData.name }
-			: [
-					{ '@type': 'City', name: 'Knoxville' },
-					{ '@type': 'City', name: 'Farragut' },
-				],
+		areaServed: { '@type': 'City', name: 'Knoxville' },
 	}
 
 	return (
@@ -137,7 +117,7 @@ export function ServiceFAQ({
 	faq: { question: string; answer: string }[]
 }) {
 	return (
-		<div className="mx-auto max-w-3xl divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white">
+		<div className="w-full divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white">
 			{faq.map(item => (
 				<details
 					key={item.question}
@@ -206,7 +186,7 @@ export function ServiceLayout({
 		`${title} before treatment at Sarah Hitchcox Aesthetics`,
 		`${title} after treatment at Sarah Hitchcox Aesthetics`,
 	]
-	const serviceUrl = `https://hitchcoxaesthetics.com${location.pathname}`
+	const serviceUrl = `https://knoxvillebotox.com${location.pathname}`
 	return (
 		<>
 			<ServiceJsonLd name={title} description={description} url={serviceUrl} />
@@ -232,7 +212,7 @@ export function ServiceLayout({
 									{title}
 								</h1>
 								<Logo className="my-2 h-8 w-8 animate-spin-in text-primary [animation-fill-mode:backwards] md:h-10 md:w-10 lg:h-10 lg:w-10" />
-								<h2 className="text-md flex flex-wrap justify-center px-2 text-center tracking-[.3rem] text-gray-600 sm:tracking-[.3rem] md:text-xl">
+								<div className="text-md flex flex-wrap justify-center px-2 text-center tracking-[.3rem] text-gray-600 sm:tracking-[.3rem] md:text-xl">
 									{description.includes(',')
 										? description.split(',').map((item, index) => (
 												<span key={index}>
@@ -241,7 +221,7 @@ export function ServiceLayout({
 												</span>
 											))
 										: description}
-								</h2>
+								</div>
 							</div>
 							<div className="flex flex-col items-center justify-center space-y-2">
 								<button

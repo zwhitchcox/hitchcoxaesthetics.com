@@ -1,5 +1,4 @@
 import { type LoaderFunctionArgs } from '@remix-run/node'
-import { locationServices } from '#app/utils/location-service-data.server.js'
 import { getDomainUrl } from '#app/utils/misc.tsx'
 import { sitePages } from '#app/utils/site-pages.server.js'
 
@@ -10,43 +9,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const staticPaths = [
 		'',
 		'about',
-		'knoxville-med-spa',
-		'farragut-med-spa',
-
+		'bearden',
+		'farragut',
 		'support',
 		'privacy',
 		'tos',
 	]
 
-	// Main service pages now 301 redirect to knoxville equivalents,
-	// so we only include location-prefixed pages in the sitemap.
+	// All enabled service pages (directly served, Knoxville-optimized)
 	const servicePagePaths = Object.values(sitePages)
 		.filter(p => p.enabled)
 		.map(p => p.path)
 
-	// All manually authored location-service pages (knoxville-botox, farragut-filler, etc.)
-	const locationServicePaths = Object.keys(locationServices)
-
-	// Auto-generated location-prefixed pages (Case 3 in $.tsx):
-	// For every enabled service page, generate knoxville-{path} and farragut-{path}
-	const locationPrefixes = ['knoxville', 'farragut']
-	const autoLocationPaths = servicePagePaths.flatMap(p => {
-		const [first, ...rest] = p.split('/')
-		const locPath = rest.length ? `${first}/${rest.join('/')}` : first
-		return locationPrefixes.map(loc => `${loc}-${locPath}`)
-	})
-
-	// Combine and deduplicate — exclude bare service paths (they redirect)
-	const allPaths = [
-		...new Set([...staticPaths, ...locationServicePaths, ...autoLocationPaths]),
-	]
+	const allPaths = [...new Set([...staticPaths, ...servicePagePaths])]
 
 	const urls = allPaths
 		.map(p => {
 			const loc = p ? `${siteUrl}/${p}` : siteUrl
-			// Higher priority for home, categories, and location pages
-			const priority =
-				p === '' ? '1.0' : !p.includes('/') && !p.includes('-') ? '0.9' : '0.7'
+			const priority = p === '' ? '1.0' : !p.includes('/') ? '0.9' : '0.7'
 			return `  <url>\n    <loc>${loc}</loc>\n    <priority>${priority}</priority>\n  </url>`
 		})
 		.join('\n')

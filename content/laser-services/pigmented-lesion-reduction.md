@@ -1,19 +1,19 @@
 ---
 name: Pigmented Lesion Reduction
 tagline: for sun spots and age spots
-title: Pigmented Lesion Reduction | Sarah Hitchcox Aesthetics
+title: Pigmented Lesion Reduction Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Laser pigmented lesion reduction for sun spots, age spots, and freckles on
-  face, arms, legs, chest, and back in Knoxville and Farragut, TN.
+  face, arms, legs, chest, and back in Knoxville, TN.
 shortDescription: >-
   Laser treatment to reduce sun spots, age spots, and freckles for even-toned
   skin.
-whyChooseTitle: Expert Pigmented Lesion Treatment in Knoxville & Farragut
+whyChooseTitle: Expert Pigmented Lesion Treatment in Knoxville
 whyChoose: >-
   Sarah Hitchcox Aesthetics provides advanced laser treatment for sun spots, age
-  spots, and freckles in Knoxville and Farragut, TN. Our precise laser
-  technology breaks down pigment for clearer, more even-toned skin.
-ctaText: Book Pigmented Lesion Treatment
+  spots, and freckles in Knoxville, TN. Our precise laser technology breaks down
+  pigment for clearer, more even-toned skin.
+ctaText: Book Pigmented Lesion Treatment Consultation
 sections:
   - type: features-grid
     title: Key Benefits of Pigmented Lesion Reduction
@@ -43,23 +43,28 @@ sections:
           Yes, our laser technology is FDA-cleared and safe for reducing
           pigmentation on various skin types.
 ---
-## Laser Pigmented Lesion Reduction for Sun Spots and Age Spots
 
-Pigmented lesion reduction uses targeted laser energy to break down excess melanin responsible for sun spots, age spots, freckles, and other forms of hyperpigmentation. Our precision laser delivers energy directly to the pigmented areas, shattering the melanin deposits without damaging surrounding skin. Your body then naturally clears the fragmented pigment over the following weeks, revealing clearer, more even-toned skin. This treatment is part of our advanced [laser services](/laser-services) and is safe for all skin types.
+## Pigment Correction in Knoxville
 
-## Types of Hyperpigmentation We Treat
+Sun exposure and aging can leave behind unwanted dark spots that make skin look
+uneven and aged. Our **pigmented lesion reduction in Knoxville** uses precision
+laser technology to target and break down excess melanin in sun spots, age
+spots, and freckles. This focused approach clears discoloration without harming
+the surrounding tissue, revealing a brighter, more uniform complexion on the
+face, hands, chest, or body.
 
-Pigmented lesion reduction is effective for a wide range of brown spot removal and freckle removal concerns:
+The treatment works by shattering the pigment particles, which your body then
+naturally eliminates over time. Patients typically see fading after just one
+session, with optimal clarity achieved after a short series. **Knoxville dark
+spot removal** at Sarah Hitchcox Aesthetics is a safe, effective way to reverse
+years of sun damage and restore a pristine look to your skin.
 
-- **Sun spots** — Flat, darkened patches caused by years of UV exposure
-- **Age spots (liver spots)** — Brown or tan spots common on the face, hands, and chest
-- **Freckles** — Clusters of concentrated melanin that darken with sun exposure
-- **Post-inflammatory hyperpigmentation** — Dark marks left behind after acne or injury
-
-## Treatment Areas for Sun Spot Removal
-
-We perform age spot treatment and sun spot removal across the face, arms, legs, chest, and back. Most clients see significant improvement after 3-5 sessions spaced 4 weeks apart, with each appointment taking just 20-30 minutes. Mild darkening or crusting of treated spots is normal and resolves within 1-2 weeks as the pigment lifts.
-
-## Pairing Pigment Correction with Complementary Laser Treatments
-
-For comprehensive skin improvement, combine pigmented lesion reduction with [skin revitalization for collagen stimulation and texture improvement](/skin-revitalization) or [vascular lesion reduction for spider veins and facial redness](/vascular-lesion-reduction). Patients seeking hair-free skin can add [laser hair removal](/laser-hair-removal), while those with skin laxity benefit from [Everesse non-surgical skin tightening](/everesse) to firm and lift alongside pigment correction. Our full range of [laser services](/laser-services) ensures we can address multiple skin concerns in a coordinated treatment plan.
+Clear skin pairs beautifully with other rejuvenation therapies. You can combine
+pigment correction with
+[vascular lesion reduction](/laser-services/vascular-lesion-reduction) to treat
+redness and veins simultaneously, or add
+[skin revitalization](/laser-services/skin-revitalization) for overall texture
+improvement. For those looking to tighten as well as tone,
+[Everesse skin tightening](/laser-services/everesse) is an excellent addition.
+View our full [laser services menu](/laser-services) to see how we can help you
+achieve flawless skin.

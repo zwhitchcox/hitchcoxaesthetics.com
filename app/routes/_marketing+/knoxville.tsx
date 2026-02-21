@@ -1,5 +1,5 @@
 import { redirect } from '@remix-run/node'
 
 export function loader() {
-	return redirect('/knoxville-med-spa', { status: 301 })
+	return redirect('/bearden', { status: 301 })
 }

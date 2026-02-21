@@ -1,14 +1,14 @@
 ---
 name: Dysport
 tagline: for natural wrinkle smoothing
-title: Dysport | Sarah Hitchcox Aesthetics
+title: Dysport Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Dysport injections for wrinkles and fine lines in Knoxville and Farragut, TN.
+  Dysport injections for wrinkles and fine lines in Knoxville, TN.
   Natural-looking results with a softer spread at Sarah Hitchcox Aesthetics.
 shortDescription: >-
   Softer, natural-looking wrinkle treatment that spreads evenly across larger
   areas.
-ctaText: Book Dysport
+ctaText: Book Dysport Consultation
 sections:
   - type: features-grid
     title: Key Benefits of Dysport Treatment
@@ -43,22 +43,41 @@ sections:
           report Dysport lasting slightly longer, though individual experiences
           vary.
 ---
-## How Dysport Injections Deliver Natural-Looking Wrinkle Treatment
 
-Dysport is an FDA-approved wrinkle treatment that uses abobotulinumtoxinA to smooth moderate to severe frown lines and dynamic wrinkles. As a neuromodulator, Dysport injections work similarly to [Botox](/botox) — temporarily blocking nerve signals to the muscles that cause creases — but its slightly smaller molecular size gives it unique properties that many patients and injectors prefer for certain treatment areas.
+## Dysport Treatments in Knoxville
 
-Dysport is one of several [injectable treatments](/injectables) we offer for facial rejuvenation, alongside [dermal filler for facial contouring](/filler), [SkinVive skin booster](/skinvive), and [Kybella for double chin reduction](/kybella).
+For patients seeking a softer, more natural approach to wrinkle reduction,
+Dysport is an exceptional choice. Similar to Botox, Dysport is a neuromodulator
+that relaxes facial muscles to smooth dynamic lines. However, its unique
+formulation allows it to spread more evenly, making it particularly effective
+for larger areas like the forehead. At Sarah Hitchcox Aesthetics, we offer
+Dysport in Knoxville, TN as a premium alternative for those who want a refreshed
+look that feels effortless and authentically you.
 
-## Why Forehead Dysport Produces a Softer, More Natural Result
+## Why Choose Dysport at Our Knoxville Med Spa
 
-The smaller molecular structure of abobotulinumtoxinA allows Dysport to diffuse more evenly across a treatment area. This natural-looking wrinkle relaxer is particularly effective for larger zones like the forehead, where patients want smooth, even results without harsh lines of demarcation. Many patients report that forehead Dysport produces a softer look compared to other neuromodulators, with results appearing within 2-3 days — faster than most alternatives.
+One of the key advantages of Dysport is its rapid onset; many patients begin to
+see smoothing effects in as little as two to three days. This makes it a
+favorite for those wanting quick results before an event. Additionally, its
+spreadability allows for a very smooth, "airbrushed" finish that avoids a heavy
+or stiff appearance. As a core part of our [injectables menu](/injectables),
+Dysport offers a versatile solution for treating frown lines, crow's feet, and
+forehead wrinkles.
 
-## Dysport Treatment Areas and Results
+## Dysport vs. Other Wrinkle Relaxers
 
-While Dysport is FDA-approved for glabellar lines, it is commonly used for:
+While [Botox](/botox) is often the go-to for precise targeting, Dysport’s
+diffusion properties make it ideal for patients with broader muscle movement
+patterns. During your consultation in Knoxville, we will compare these options
+to determine which aligns best with your anatomy and aesthetic goals. Both
+treatments are safe, FDA-approved, and effective at turning back the clock on
+aging skin.
 
-- Forehead lines — Even spread for a natural, smooth result
-- Crow's feet — Softens fine lines at the outer corners of the eyes
-- Frown lines — Relaxes the "11 lines" between the brows
+## Complementary Treatments for Total Rejuvenation
 
-Wrinkle treatment results typically last 3-4 months. Because Dysport is dosed differently than Botox (more units for an equivalent effect), pricing is adjusted accordingly — so the cost per treatment area is comparable. Results typically last 3-4 months, and many patients rotate between neuromodulators to find their perfect match. Sarah will evaluate your facial anatomy and discuss whether Dysport, [Jeuveau cosmetic neurotoxin](/jeuveau), or another neuromodulator is the best fit for your goals.
+To achieve comprehensive anti-aging results, we often combine Dysport with
+[dermal fillers](/filler). While Dysport relaxes the muscles that cause wrinkles
+in the upper face, fillers restore lost volume in the mid and lower face. This
+combination addresses the two main signs of facial aging—movement lines and
+volume loss—resulting in a balanced, youthful appearance for our Knoxville, TN
+patients.

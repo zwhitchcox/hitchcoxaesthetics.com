@@ -1,18 +1,17 @@
 ---
 name: SkinVive
 tagline: for skin hydration and glow
-title: SkinVive | Sarah Hitchcox Aesthetics
+title: SkinVive Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Juvederm SkinVive injectable for deep skin hydration, smoother texture, and a
-  radiant glow. FDA-approved. Available in Knoxville and Farragut, TN.
+  radiant glow. FDA-approved. Available in Knoxville, TN.
 shortDescription: Micro-droplet hyaluronic acid for deep hydration and a lasting radiant glow.
-whyChooseTitle: Premier SkinVive Provider in Knoxville & Farragut
+whyChooseTitle: Premier SkinVive Provider in Knoxville
 whyChoose: >-
   Experience SkinVive at Sarah Hitchcox Aesthetics, your trusted provider for
-  Juvederm SkinVive in Knoxville and Farragut. This innovative skin hydration
-  treatment delivers a radiant, dewy glow that topical products simply cannot
-  match.
-ctaText: Book SkinVive
+  Juvederm SkinVive in Knoxville. This innovative skin hydration treatment
+  delivers a radiant, dewy glow that topical products simply cannot match.
+ctaText: Book SkinVive Consultation
 faq:
   - question: What is Juvederm SkinVive?
     answer: >-
@@ -54,21 +53,23 @@ sections:
         description: Enjoy improved skin quality for up to 6 months.
         icon: calendar
 ---
-## How SkinVive Hyaluronic Acid Microdroplets Transform Skin Quality
 
-SkinVive is an FDA-approved skin booster that takes a fundamentally different approach from traditional [dermal filler](/filler). Instead of adding volume, this skin hydration treatment deposits hyaluronic acid microdroplets just below the skin surface, flooding the tissue with moisture from the inside out. The result is improved skin smoothness, a natural radiance, and glowing skin that topical serums simply cannot replicate.
+## SkinVive Hydration Treatments in Knoxville
 
-As part of our [injectable treatments](/injectables) menu, SkinVive is designed to enhance overall skin quality rather than target specific wrinkles or volume loss. It pairs beautifully with [Botox for fine lines and wrinkles](/botox) — Botox relaxes the muscles, while SkinVive improves the canvas itself.
+Experience a new category of injectable skincare with SkinVive by Juvéderm.
+Unlike traditional fillers that add volume, SkinVive is designed to improve skin
+smoothness and hydration from within. **SkinVive in Knoxville** delivers
+micro-droplets of hyaluronic acid directly into the dermis, boosting moisture
+retention and creating a lasting, radiant glow that topical creams cannot match.
 
-## Who Is a Candidate for This Skin Hydration Treatment?
+This treatment is perfect for anyone looking to refresh dull texture or enhance
+their skin's natural luminosity. **Knoxville SkinVive injections** improve skin
+quality on the cheeks and face, leaving you looking healthy and rested for up to
+six months. It is a subtle yet powerful way to polish your appearance without
+altering your facial structure.
 
-SkinVive is suitable for all skin tones and types. If your skin looks dull, feels dehydrated, or has lost its natural "bounce," this skin booster delivers the deep hydration and skin smoothness you are looking for. Common candidates include:
-
-- Patients seeking glowing skin without the volume changes of facial filler
-- Those with rough or uneven skin texture
-- Anyone wanting a lit-from-within radiance that makeup cannot achieve
-- Patients looking to complement [wrinkle relaxer treatments like Dysport](/dysport) or [Jeuveau neuromodulator injections](/jeuveau)
-
-## SkinVive Results and Treatment Timeline
-
-Results are noticeable immediately after treatment, with peak skin quality improvement appearing about one month later as the hyaluronic acid microdroplets fully integrate. One SkinVive session provides lasting skin hydration and radiance for up to six months. The treatment itself takes about 15-20 minutes and involves minimal downtime — most patients return to normal activities right away. For patients interested in addressing [submental fat with Kybella](/kybella) alongside their skin refresh, Sarah can create a customized treatment plan.
+SkinVive works beautifully as a finishing touch to other procedures. Combine it
+with [Jeuveau](/injectables/jeuveau) for wrinkle relaxation or
+[Kybella](/injectables/kybella) for contouring. Learn more about our full range
+of [injectable services](/injectables) to see how we can elevate your skincare
+routine.
