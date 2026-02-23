@@ -191,7 +191,7 @@ export default function DynamicPage() {
 			<ServiceJsonLd
 				name={page.name}
 				description={page.metaDescription}
-				url={`https://botoxknoxville.com/${page.path}`}
+				url={`https://botoxknoxvilletn.com/${page.path}`}
 			/>
 
 			{page.faq && page.faq.length > 0 && (

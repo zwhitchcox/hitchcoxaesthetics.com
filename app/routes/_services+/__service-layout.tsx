@@ -62,7 +62,7 @@ export function ServiceJsonLd({
 			'@type': 'MedicalBusiness',
 			name: 'Sarah Hitchcox Aesthetics',
 			telephone: PHONE,
-			url: 'https://botoxknoxville.com',
+			url: 'https://botoxknoxvilletn.com',
 			address: {
 				'@type': 'PostalAddress',
 				streetAddress: bearden.address,
@@ -179,7 +179,7 @@ export function ServiceLayout({
 	const service = location.pathname.split('/').pop()
 	// If no images passed, don't render carousel with broken URLs
 	imgs ??= []
-	const serviceUrl = `https://botoxknoxville.com${location.pathname}`
+	const serviceUrl = `https://botoxknoxvilletn.com${location.pathname}`
 	return (
 		<>
 			<ServiceJsonLd name={title} description={description} url={serviceUrl} />
