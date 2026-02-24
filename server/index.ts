@@ -74,19 +74,19 @@ app.get('*', (req, res, next) => {
 	}
 })
 
-// redirect old domains to botoxknoxvilletn.com
+// redirect alternate domains to hitchcoxaesthetics.com
 app.get('*', (req, res, next) => {
 	const host = getHost(req)
 	if (
-		host === 'hitchcoxaesthetics.com' ||
 		host === 'www.hitchcoxaesthetics.com' ||
 		host === 'hitchcoxaesthetics.pharmacy' ||
 		host === 'www.hitchcoxaesthetics.pharmacy' ||
 		host === 'botoxknoxville.com' ||
 		host === 'www.botoxknoxville.com' ||
+		host === 'botoxknoxvilletn.com' ||
 		host === 'www.botoxknoxvilletn.com'
 	) {
-		const newUrl = `https://botoxknoxvilletn.com${req.originalUrl}`
+		const newUrl = `https://hitchcoxaesthetics.com${req.originalUrl}`
 		return res.redirect(301, newUrl)
 	}
 	next()
