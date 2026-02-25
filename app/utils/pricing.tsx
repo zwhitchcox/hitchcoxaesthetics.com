@@ -10,11 +10,11 @@
 
 import React from 'react'
 
-const NewPatientSpecialPrice = () => (
+const FirstVisitSpecialPrice = () => (
 	<div className="flex flex-col items-end justify-end gap-1 sm:flex-row sm:items-center">
 		<span>$13/unit</span>
 		<span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-			New Patient Special: $12/unit
+			20% off your first visit
 		</span>
 	</div>
 )
@@ -39,7 +39,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			items: [
 				{
 					name: 'Tox (Botox, Dysport, or Jeuveau)',
-					price: <NewPatientSpecialPrice />,
+					price: <FirstVisitSpecialPrice />,
 				},
 				{ name: 'Lip Flip', price: '$129' },
 			],
@@ -74,7 +74,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			items: [
 				{
 					name: 'Botox',
-					price: <NewPatientSpecialPrice />,
+					price: <FirstVisitSpecialPrice />,
 				},
 				{ name: 'Lip Flip', price: '$129' },
 			],
@@ -86,7 +86,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			items: [
 				{
 					name: 'Dysport',
-					price: <NewPatientSpecialPrice />,
+					price: <FirstVisitSpecialPrice />,
 				},
 			],
 		},
@@ -97,7 +97,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			items: [
 				{
 					name: 'Jeuveau',
-					price: <NewPatientSpecialPrice />,
+					price: <FirstVisitSpecialPrice />,
 				},
 			],
 		},
