@@ -3,10 +3,12 @@ name: Semaglutide
 tagline: for sustainable weight loss
 title: Semaglutide Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Semaglutide weight loss injections in Knoxville, TN. Medically supervised
-  GLP-1 therapy with personalized dosing at Sarah Hitchcox Aesthetics.
+  Medical weight loss with semaglutide (Ozempic/Wegovy) injections in Knoxville,
+  TN. GLP-1 therapy at about half the price. Free consultations at Sarah
+  Hitchcox Aesthetics.
 shortDescription: >-
-  GLP-1 agonist injections for safe, medically supervised weight loss.
+  GLP-1 injections for safe, medically supervised weight loss at half the
+  brand-name price.
 whyChooseTitle: Expert Semaglutide Weight Loss in Knoxville
 whyChoose: >-
   Sarah Hitchcox Aesthetics offers affordable semaglutide weight loss injections
@@ -91,14 +93,15 @@ heroImages:
     after: /img/before-after/semaglutide-002-after.webp
 ---
 
-## Semaglutide Injections in Knoxville
+## Semaglutide (Ozempic/Wegovy) Injections in Knoxville
 
-Semaglutide has emerged as a game-changer for medical weight management. As a
-GLP-1 receptor agonist, it works by mimicking a natural hormone that targets the
-areas of the brain that regulate appetite and food intake. Our **semaglutide
-program in Knoxville** offers this FDA-approved medication to help you feel
-fuller faster and stay satisfied longer, making calorie reduction manageable and
-sustainable.
+Semaglutide — the active ingredient in Ozempic and Wegovy — has emerged as a
+game-changer for medical weight management. As a GLP-1 receptor agonist, it
+works by mimicking a natural hormone that targets the areas of the brain that
+regulate appetite and food intake. Our **semaglutide program in Knoxville**
+offers this FDA-approved medication at about half the brand-name price, helping
+you feel fuller faster and stay satisfied longer, making calorie reduction
+manageable and sustainable.
 
 At Sarah Hitchcox Aesthetics, we prioritize your safety and results. Our
 **Knoxville semaglutide treatments** are medically supervised, ensuring that
