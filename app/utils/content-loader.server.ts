@@ -56,7 +56,7 @@ type LocationFrontmatter = {
  * services with standalone URLs (e.g., /skinvive).
  *
  * For categories WITHOUT service subdirectories (like microneedling/),
- * direct .md files are sub-services with prefixed URLs (e.g., /microneedling/face).
+ * direct .md files are sub-services with prefixed URLs (e.g., /microneedling/facial).
  */
 /** Check if a directory entry is a .hero asset directory (not a content directory) */
 function isHeroDir(name: string): boolean {

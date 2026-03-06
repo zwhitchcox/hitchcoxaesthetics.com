@@ -5,7 +5,7 @@ title: Microneedling Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Microneedling for face and hair loss at Sarah Hitchcox Aesthetics in
   Knoxville, TN. Stimulate collagen for smoother skin and thicker hair. -
-  microneedling/face - microneedling/hair-loss
+  microneedling/facial - microneedling/hair-loss
 shortDescription:
   Collagen-boosting microneedling for skin rejuvenation and hair restoration.
 ctaText: Book Microneedling Consultation

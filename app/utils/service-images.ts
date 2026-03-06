@@ -99,8 +99,7 @@ const SLUG_TO_PREFIX: Record<string, string | PrefixMapping> = {
 	'filler/nasolabial-folds': { prefix: 'filler-cheek-filler', offset: 2 },
 
 	// Microneedling sub-services
-	'microneedling/face': 'microneedling',
-	'microneedling/hair-loss': { prefix: 'microneedling', offset: 1 },
+	'microneedling/facial': 'microneedling',
 
 	// Everesse sub-services (fallback to skinvive until real images exist)
 	'everesse/face': 'skinvive',

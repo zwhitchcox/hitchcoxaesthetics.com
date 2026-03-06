@@ -5,7 +5,8 @@ title: Hair Loss Microneedling Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Microneedling for hair loss prevention and regrowth in Knoxville, TN.
   Stimulate hair follicles and enhance topical treatments. Sarah Hitchcox.
-shortDescription: Stimulate hair follicles and boost regrowth with scalp microneedling.
+shortDescription:
+  Stimulate hair follicles and boost regrowth with scalp microneedling.
 ctaText: Book Hair Loss Microneedling Consultation
 faq:
   - question: What is microneedling for hair loss?
@@ -20,7 +21,8 @@ faq:
     answer: >-
       Patients might experience mild discomfort during the procedure, but
       topical numbing cream is applied beforehand to minimize any pain.
-  - question: How long does it take to see results from microneedling for hair loss?
+  - question:
+      How long does it take to see results from microneedling for hair loss?
     answer: >-
       While some improvement may be noticed within a few weeks, optimal results
       typically emerge after several sessions over a few months as hair growth
@@ -68,7 +70,8 @@ sections:
         answer: >-
           Patients might experience mild discomfort during the procedure, but
           topical numbing cream is applied beforehand to minimize any pain.
-      - question: How long does it take to see results from microneedling for hair loss?
+      - question:
+          How long does it take to see results from microneedling for hair loss?
         answer: >-
           While some improvement may be noticed within a few weeks, optimal
           results typically emerge after several sessions over a few months as
@@ -89,16 +92,8 @@ sections:
           absorption. Additionally, using a specialized serum can provide
           hydration and soothe the scalp.
 heroImages:
-  - before: /img/before-after/microneedling-001-before.webp
-    after: /img/before-after/microneedling-001-after.webp
-  - before: /img/before-after/microneedling-002-before.webp
-    after: /img/before-after/microneedling-002-after.webp
-  - before: /img/before-after/microneedling-003-before.webp
-    after: /img/before-after/microneedling-003-after.webp
-  - before: /img/before-after/microneedling-004-before.webp
-    after: /img/before-after/microneedling-004-after.webp
-  - before: /img/before-after/microneedling-005-before.webp
-    after: /img/before-after/microneedling-005-after.webp
+  - before: /img/before-after/microneedling-hair-loss-001-before.webp
+    after: /img/before-after/microneedling-hair-loss-001-after.webp
 ---
 
 ## Microneedling for Hair Loss in Knoxville
@@ -118,6 +113,6 @@ treated areas over a series of sessions.
 
 While focusing on your hair, do not forget about your skin. Many patients choose
 to treat their complexion simultaneously with
-[face microneedling](/microneedling/face). Explore our full range of
+[facial microneedling](/microneedling/facial). Explore our full range of
 [Knoxville microneedling options](/microneedling) to see how we can support your
 aesthetic goals from head to toe.

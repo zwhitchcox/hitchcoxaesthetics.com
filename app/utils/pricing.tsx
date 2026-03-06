@@ -197,7 +197,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			],
 		},
 	],
-	'microneedling/face': [
+	'microneedling/facial': [
 		{
 			title: 'Facial Microneedling Pricing',
 			items: [

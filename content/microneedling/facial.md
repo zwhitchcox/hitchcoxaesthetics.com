@@ -1,12 +1,13 @@
 ---
-name: Face Microneedling
+name: Facial Microneedling
 tagline: 'for scars, lines, and texture'
-title: Face Microneedling Knoxville | Sarah Hitchcox Aesthetics
+title: Facial Microneedling Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Face microneedling for acne scars, fine lines, wrinkles, and enlarged pores in
-  Knoxville, TN. Stimulate collagen at Sarah Hitchcox Aesthetics.
-shortDescription: 'Stimulate collagen to improve acne scars, fine lines, and skin texture.'
-ctaText: Book Face Microneedling Consultation
+  Facial microneedling for acne scars, fine lines, wrinkles, and enlarged pores
+  in Knoxville, TN. Stimulate collagen at Sarah Hitchcox Aesthetics.
+shortDescription:
+  'Stimulate collagen to improve acne scars, fine lines, and skin texture.'
+ctaText: Book Facial Microneedling Consultation
 faq:
   - question: What is microneedling?
     answer: >-
@@ -35,7 +36,7 @@ faq:
       the skin to heal and regenerate.
 sections:
   - type: features-grid
-    title: Key Benefits of Face Microneedling
+    title: Key Benefits of Facial Microneedling
     items:
       - title: Acne Scars
         description: Reduces the appearance of acne scarring.
@@ -47,7 +48,7 @@ sections:
         description: Improves overall skin tone and texture.
         icon: droplet
   - type: faq-accordion
-    title: Face Microneedling FAQs
+    title: Facial Microneedling FAQs
     items:
       - question: What is microneedling?
         answer: >-
@@ -87,10 +88,10 @@ heroImages:
     after: /img/before-after/microneedling-005-after.webp
 ---
 
-## Face Microneedling in Knoxville
+## Facial Microneedling in Knoxville
 
 Achieve smoother, firmer skin with our advanced facial microneedling treatments.
-**Face microneedling in Knoxville** is highly effective for addressing common
+**Facial microneedling in Knoxville** is highly effective for addressing common
 concerns such as acne scarring, enlarged pores, and fine lines. By creating
 controlled micro-injuries, we activate your skin's natural healing response,
 leading to the regeneration of fresh, healthy tissue. This process not only

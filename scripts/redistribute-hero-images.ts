@@ -73,7 +73,7 @@ const SLUG_TO_PREFIX: Record<string, string> = {
 	'pigmented-lesion-reduction': 'pigmented-lesion-reduction',
 	'vascular-lesion-reduction': 'vascular-lesion-reduction',
 	microneedling: 'microneedling',
-	'microneedling/face': 'microneedling',
+	'microneedling/facial': 'microneedling',
 	'microneedling/hair-loss': 'microneedling',
 	'weight-loss': 'semaglutide',
 	semaglutide: 'semaglutide',

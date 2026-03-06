@@ -40,7 +40,7 @@ Strict hierarchy rules to prevent circular logic and maintain silo structure:
    - **Must link to:** Parent mid-level page (e.g., `/botox`)
    - **Can link to:** Sibling leaf pages (e.g., `/botox/crows-feet`)
    - **Cannot link to:** Non-sibling pages (e.g., `/filler/lip-filler` or
-     `/microneedling/face`)
+     `/microneedling/facial`)
 
 ## Anchor Text
 
