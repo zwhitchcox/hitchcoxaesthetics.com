@@ -1,0 +1,46 @@
+name: 'Microneedling'
+final_url: 'https://hitchcoxaesthetics.com/microneedling'
+
+keywords:
+  - '[microneedling knoxville]'
+  - '"collagen induction therapy"'
+  - '"microneedling for hair loss"'
+  - '[prp microneedling knoxville]'
+  - '"acne scar treatment near me"'
+  - '"skin rejuvenation knoxville"'
+
+headlines: # Max 30 chars
+  # Keyword
+  - 'Microneedling Knoxville'
+  - 'Collagen Induction Care'
+  - 'PRP Skin Rejuvenation'
+  - 'Hair Loss Microneedling'
+  # Benefit
+  - 'Stimulate New Collagen'
+  - 'Smooth Out Acne Scars'
+  - 'Restore Your Glow'
+  - 'Improve Skin Texture'
+  # Trust
+  - 'Minimally Invasive'
+  - 'Safe & Effective Care'
+  - 'Top Knoxville MedSpa'
+  # CTA
+  - 'Book Microneedling Today'
+  - 'Schedule A Consult'
+  # USP
+  - "Harness Your Body's Healing"
+  - 'Turn Back The Clock'
+
+descriptions: # Max 90 chars
+  - "Trigger your body's self-repair mechanisms to smooth texture and reduce
+    acne scarring."
+  - "Reawaken your skin's natural potential with collagen induction therapy in
+    Knoxville."
+  - 'Offering versatile microneedling treatments for both facial rejuvenation
+    and hair loss.'
+  - "Enhance your results with PRP to supercharge healing and maximize your
+    skin's radiance."
+
+images:
+  - 'public/img/before-after/microneedling-001-after.webp'
+  - 'public/img/before-after/microneedling-hair-loss-001-after.webp'

@@ -1,0 +1,52 @@
+name: 'Demand Gen (Formerly Discovery) - Retargeting'
+final_url: 'https://hitchcoxaesthetics.com/booking'
+budget: 15 # Daily budget in USD
+
+# WHY THIS MATTERS IN 2026:
+# Demand Gen replaced Discovery campaigns. It places highly visual ads on YouTube Shorts,
+# Discover feed, and Gmail. It's the absolute best way to RE-ENGAGE people who visited
+# your site but didn't book an appointment (Retargeting/Remarketing).
+# The ROI on this campaign will often be your highest because you are targeting warm leads.
+
+campaign_goal: 'Website Traffic / Leads'
+
+# Audience Targeting (The Secret Sauce)
+audiences:
+  include:
+    - 'Website Visitors (Last 30 Days)'
+    - 'Website Visitors (Last 90 Days)'
+    - 'Abandoned Cart / Did Not Book Form (Create this audience in Analytics)'
+  exclude:
+    - 'Recent Converters / Current Patients (Upload customer list to exclude
+      them)'
+
+asset_group:
+  name: 'Retargeting - Come Back & Book'
+
+  headlines: # Max 30 chars (Up to 5 allowed)
+    - 'Ready For Your Glow Up?'
+    - 'Still Thinking About It?'
+    - 'Book Your Free Consult'
+    - 'Expert Knoxville MedSpa'
+    - 'Unlock Your Best Skin'
+
+  descriptions: # Max 90 chars (Up to 5 allowed)
+    - 'Take the next step in your aesthetic journey. Book your free consultation
+      today.'
+    - "We noticed you looking! Come see why we're Knoxville's top-rated medical
+      spa."
+    - 'Our schedule is filling up fast. Secure your spot for Botox, fillers, or
+      laser care.'
+    - 'Get the natural, refreshed look you deserve. Expert care by Sarah
+      Hitchcox, RN.'
+    - 'Have questions about our treatments? Book a free, no-pressure
+      consultation with us.'
+
+  images:
+    # Demand gen is visual-first.
+    # Use images that show the clinic experience, happy patients, or the clinic interior.
+    # Needs a 1.91:1 (Landscape), 1:1 (Square), and 4:5 (Portrait)
+    - 'public/img/before-after/filler-lip-filler-001-after.webp' # (Square)
+    - 'public/img/before-after/botox-forehead-lines-001-after.webp' # (Square)
+
+  call_to_action: 'Book Now'

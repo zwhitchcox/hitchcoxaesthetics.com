@@ -1,0 +1,49 @@
+name: 'Medical Weight Loss (GLP-1)'
+final_url: 'https://hitchcoxaesthetics.com/weight-loss'
+
+# NOTE: Google Ads Healthcare Policy heavily flags names like "Semaglutide" or "Tirzepatide".
+# Using "Medical Weight Loss" and "GLP-1" is safer and highly searched.
+# We include specific drug names in exact match keywords but avoid them in all headlines.
+
+keywords:
+  - '"medical weight loss knoxville"'
+  - '"glp 1 weight loss clinic"'
+  - '[weight loss injections near me]'
+  - '[semaglutide knoxville tn]'
+  - '[tirzepatide weight loss]'
+  - '"supervised weight loss program"'
+
+headlines: # Max 30 chars
+  # Keyword
+  - 'Medical Weight Loss TN'
+  - 'Knoxville Weight Clinic'
+  - 'GLP-1 Weight Loss Plan'
+  - 'Weight Loss Injections'
+  # Benefit
+  - 'Lose Stubborn Weight'
+  - 'Sustainable Results'
+  - 'Achieve Health Goals'
+  - 'Stop Constant Cravings'
+  # Trust
+  - 'Medically Supervised'
+  - 'Expert Support Team'
+  - 'Proven Clinical Plan'
+  # CTA
+  - 'Book Free Consult'
+  - 'Start Your Journey'
+  # USP
+  - 'Customized To Your Body'
+  - 'Long Term Success'
+
+descriptions: # Max 90 chars
+  - 'Transform your life with our medically supervised GLP-1 weight loss
+    injection programs.'
+  - 'Target the biological mechanisms of weight loss for proven, sustainable
+    results.'
+  - 'Customized weight loss plans including regular check-ins and expert
+    lifestyle coaching.'
+  - 'Start your journey to a healthier you. Safe, effective care tailored to
+    your unique goals.'
+
+images:
+  - 'public/img/before-after/semaglutide-001-after.webp'

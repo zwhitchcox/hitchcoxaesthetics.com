@@ -32,6 +32,7 @@ const adminMenuItems = [
 		icon: 'calendar' as const,
 	},
 	{ path: '/admin/bg', label: 'Background Jobs', icon: 'clock' as const },
+	{ path: '/admin/google-ads', label: 'Google Ads', icon: 'update' as const },
 ]
 
 export async function loader({ request }: LoaderFunctionArgs) {

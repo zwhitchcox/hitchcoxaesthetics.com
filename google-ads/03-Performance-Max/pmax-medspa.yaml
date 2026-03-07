@@ -1,0 +1,72 @@
+name: 'PMax - Local Store Visits & Leads'
+final_url: 'https://hitchcoxaesthetics.com/'
+
+# WHY THIS MATTERS IN 2026:
+# Performance Max (PMax) is Google's flagship AI campaign type. It places your ads across
+# Search, Maps, YouTube, Gmail, Discover, and the Display Network using a single campaign.
+# For local MedSpas, linking your Google Business Profile (GBP) to PMax is the ultimate hack
+# to dominate local Google Maps searches ("Botox near me" on Maps).
+
+campaign_goal: 'Local Store Visits and Promotions / Lead Generation'
+
+# Audience Signals (Crucial to feed the AI the right data)
+audience_signals:
+  custom_intent_segments:
+    - "People searching for 'botox near me'"
+    - "People searching for 'lip filler knoxville'"
+    - "People searching for 'semaglutide weight loss'"
+    - "People who visit competitors' websites (Add local competitor URLs here in
+      Google Ads)"
+  in_market_segments:
+    - 'Beauty & Personal Care > Spas & Beauty Salons'
+    - 'Beauty & Personal Care > Skin Care Products'
+  customer_match_lists:
+    - 'Upload a CSV of your past patients (Emails/Phone numbers) so Google can
+      find lookalikes.'
+
+# Asset Group: MedSpa General (You can create multiple asset groups later for specific services)
+asset_group_1:
+  name: 'MedSpa General Services'
+
+  headlines: # Max 30 chars (Up to 15 allowed)
+    - "Knoxville's Premier MedSpa"
+    - 'Expert Aesthetic Treatments'
+    - 'Botox & Dermal Fillers'
+    - 'Laser Hair Removal TN'
+    - 'GLP-1 Medical Weight Loss'
+    - 'Natural Looking Results'
+    - 'Book Your Free Consult'
+
+  long_headlines: # Max 90 chars (Up to 5 allowed)
+    - 'Achieve a refreshed, youthful look with our expert injectable treatments.'
+    - 'Discover the ultimate medical spa experience in Knoxville. Book your free
+      consult.'
+    - 'Transform your skin with advanced laser treatments and medical grade
+      skincare.'
+    - 'Lose stubborn weight safely with our medically supervised GLP-1 programs.'
+
+  descriptions: # Max 90 chars (1 short 60 char, up to 4 90 char)
+    - "Knoxville's top-rated MedSpa. Book your free consultation today." # 60 chars
+    - 'Specializing in Botox, fillers, laser treatments, and medical weight loss
+      in Knoxville, TN.'
+    - 'Led by Sarah Hitchcox, RN. Experience safe, minimally invasive aesthetic
+      care.'
+    - 'Reawaken your natural beauty. Custom treatment plans tailored to your
+      unique goals.'
+
+  images:
+    # PMax requires multiple formats. Google will automatically crop, but supplying
+    # specific 1:1, 1.91:1, and 4:5 ratios is best. Use your highest quality clinic interior,
+    # staff photos, and "After" photos here.
+    - 'public/img/before-after/botox-forehead-lines-001-after.webp'
+    - 'public/img/before-after/filler-lip-filler-001-after.webp'
+    - 'public/img/before-after/laser-hair-removal-001-after.webp'
+    - 'public/img/before-after/semaglutide-001-after.webp'
+
+  videos:
+    # If you have YouTube videos of the clinic, patient testimonials, or Sarah talking
+    # about treatments, link them here. PMax thrives on video.
+    - '[Insert YouTube URL here if you have one, or Google will auto-generate
+      one from images]'
+
+  call_to_action: 'Book Now'

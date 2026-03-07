@@ -29,6 +29,7 @@ function BeforeAfterImage({
 
 	// Auto-cycle for mobile (no hover capability)
 	const [showAfter, setShowAfter] = useState(false)
+	const [hasHovered, setHasHovered] = useState(false)
 
 	useEffect(() => {
 		if (!beforeSrc) return
@@ -51,7 +52,10 @@ function BeforeAfterImage({
 	}
 
 	return (
-		<div className={cn('relative h-full w-full overflow-hidden', className)}>
+		<div
+			className={cn('relative h-full w-full overflow-hidden', className)}
+			onMouseEnter={() => setHasHovered(true)}
+		>
 			{/* Before — visible by default; hidden on hover (desktop) or when cycling (mobile) */}
 			<img
 				src={beforeSrc}
@@ -65,17 +69,20 @@ function BeforeAfterImage({
 				decoding="async"
 			/>
 			{/* After — hidden by default; visible on hover (desktop) or when cycling (mobile) */}
-			<img
-				src={afterSrc}
-				alt={`${alt} after`}
-				className={cn(
-					'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
-					'md:opacity-0 md:group-hover:opacity-100',
-					showAfter ? 'opacity-100 md:opacity-0' : 'opacity-0',
-				)}
-				loading="lazy"
-				decoding="async"
-			/>
+			{/* Only load the after image if we're showing it or if we've been hovered (desktop eager load) */}
+			{showAfter || hasHovered || typeof window === 'undefined' ? (
+				<img
+					src={afterSrc}
+					alt={`${alt} after`}
+					className={cn(
+						'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
+						'md:opacity-0 md:group-hover:opacity-100',
+						showAfter ? 'opacity-100 md:opacity-0' : 'opacity-0',
+					)}
+					loading="lazy"
+					decoding="async"
+				/>
+			) : null}
 			{/* Label */}
 			<div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-black/50 px-2 py-0.5 backdrop-blur-[2px]">
 				<span className="text-[10px] font-medium uppercase tracking-wider text-white">

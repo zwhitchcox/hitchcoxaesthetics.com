@@ -1,0 +1,45 @@
+# Campaign Level Negative Keywords
+# Add these to prevent wasting ad spend on irrelevant search intents.
+# We want to filter out price shoppers, DIYers, job seekers, and competitor issues.
+
+negative_keywords:
+  # DIY / At Home
+  - 'at home'
+  - 'diy'
+  - 'how to do'
+  - 'do it yourself'
+
+  # Cheap / Discounts (We want high-intent, quality leads)
+  - 'cheap'
+  - 'cheapest'
+  - 'free'
+  - 'groupon'
+  - 'groupons'
+  - 'discount'
+  - 'clearance'
+
+  # Education / Jobs
+  - 'jobs'
+  - 'salary'
+  - 'training'
+  - 'classes'
+  - 'certification'
+  - 'school'
+  - 'hiring'
+  - 'courses'
+  - 'learn'
+
+  # Negative Associations
+  - 'complications'
+  - 'lawsuits'
+  - 'ruined'
+  - 'messed up'
+  - 'botched'
+  - 'lawyer'
+  - 'sue'
+
+  # General noise
+  # Only use if you have high confidence in your organic reviews showing instead
+  - 'reviews'
+  - 'youtube'
+  - 'video'

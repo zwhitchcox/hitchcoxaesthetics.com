@@ -1,0 +1,48 @@
+name: 'Laser Services (Hair Removal & Skin)'
+final_url: 'https://hitchcoxaesthetics.com/laser-services'
+
+keywords:
+  - '[laser hair removal knoxville]'
+  - '"laser skin revitalization"'
+  - '"sun spot removal knoxville"'
+  - '[everesse skin tightening]'
+  - '"laser vein treatment tn"'
+  - '"pigmentation removal"'
+  - '"permanent hair reduction"'
+
+headlines: # Max 30 chars
+  # Keyword
+  - 'Laser Hair Removal TN'
+  - 'Knoxville Laser Services'
+  - 'Everesse Skin Tightening'
+  - 'Laser Vein Treatment'
+  # Benefit
+  - 'Ditch The Razor Forever'
+  - 'Smooth & Clear Skin'
+  - 'Fade Sun & Age Spots'
+  - 'Reduce Facial Redness'
+  # Trust
+  - 'Medical Grade Lasers'
+  - 'Safe For All Skin Types'
+  - 'Advanced Laser Tech'
+  # CTA
+  - 'Book Laser Consult'
+  - 'Get Started Today'
+  # USP
+  - 'Permanent Hair Reduction'
+  - 'Zero Downtime Therapy'
+
+descriptions: # Max 90 chars
+  - 'Say goodbye to unwanted hair and hello to smooth skin with our advanced
+    laser therapy.'
+  - 'Treat fine lines, sun damage, and improve skin texture with medical-grade
+    laser care.'
+  - 'Customized laser treatments for your unique skin type. Fade spots and
+    tighten skin safely.'
+  - 'Target pigmentation, vascular lesions, and skin laxity. Enjoy clear skin
+    with no downtime.'
+
+images:
+  - 'public/img/before-after/laser-hair-removal-001-after.webp'
+  - 'public/img/before-after/skin-revitalization-001-after.webp'
+  - 'public/img/before-after/pigmented-lesion-reduction-001-after.webp'

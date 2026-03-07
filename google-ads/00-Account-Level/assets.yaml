@@ -1,0 +1,54 @@
+# Campaign Extensions (Assets)
+# Use these at the Account or Campaign Level
+
+sitelinks:
+  - link_text: 'Wrinkle Relaxers' # Max 25 chars
+    final_url: 'https://hitchcoxaesthetics.com/injectables/botox'
+    description_1: 'Smooth dynamic lines naturally.' # Max 35 chars
+    description_2: 'Botox & Dysport in Knoxville.' # Max 35 chars
+
+  - link_text: 'Dermal Fillers'
+    final_url: 'https://hitchcoxaesthetics.com/injectables/filler'
+    description_1: 'Restore volume and plump lips.'
+    description_2: 'Expert facial balancing care.'
+
+  - link_text: 'Laser Hair Removal'
+    final_url: 'https://hitchcoxaesthetics.com/laser-services'
+    description_1: 'Permanent hair reduction.'
+    description_2: 'Safe for all skin types.'
+
+  - link_text: 'Medical Weight Loss'
+    final_url: 'https://hitchcoxaesthetics.com/weight-loss'
+    description_1: 'GLP-1 agonist programs.'
+    description_2: 'Medically supervised plans.'
+
+# Callouts (Max 25 chars each)
+# Add all of these. They appear as bullet points under the main ad descriptions.
+callouts:
+  - 'Expert RN Injector'
+  - 'Free Consultations'
+  - 'Natural-Looking Results'
+  - 'Advanced MedSpa Tech'
+  - 'Minimally Invasive'
+  - 'No Downtime Needed'
+  - 'FDA-Approved Treatments'
+  - 'Medically Supervised'
+
+# Structured Snippets (Max 25 chars each)
+# Header Type: "Service catalog"
+structured_snippets:
+  - 'Botox & Dysport'
+  - 'Lip & Cheek Fillers'
+  - 'Laser Hair Removal'
+  - 'Microneedling & PRP'
+  - 'Medical Weight Loss'
+  - 'Skin Tightening'
+
+images:
+  logo: 'public/logo-lg.png'
+  ad_images:
+    - 'public/img/before-after/botox-forehead-lines-001-after.webp'
+    - 'public/img/before-after/filler-lip-filler-001-after.webp'
+    - 'public/img/before-after/laser-hair-removal-001-after.webp'
+    - 'public/img/before-after/microneedling-001-after.webp'
+    - 'public/img/before-after/semaglutide-001-after.webp'

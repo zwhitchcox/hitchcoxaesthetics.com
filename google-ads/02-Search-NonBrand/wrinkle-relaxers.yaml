@@ -1,0 +1,56 @@
+name: 'Wrinkle Relaxers (Botox/Dysport)'
+final_url: 'https://hitchcoxaesthetics.com/injectables/botox'
+
+# Structure strategy: Maximize the 15 headlines for Responsive Search Ads (RSA)
+# Mix keyword matches, benefits, CTAs, unique selling points, and trust signals
+
+keywords:
+  # High-Intent / Bottom of Funnel
+  - '[botox knoxville]'
+  - '"botox near me"'
+  - '[dysport knoxville tn]'
+  - '[preventative botox]'
+  # Solution-Aware
+  - '"wrinkle relaxer knoxville"'
+  - '"anti aging injections"'
+  - '"forehead line treatment"'
+  - '"crows feet treatment"'
+
+headlines: # Max 30 chars per line
+  # 1. Keyword-Focused (Direct Match)
+  - 'Botox In Knoxville TN'
+  - 'Knoxville Botox Expert'
+  - 'Dysport Wrinkle Relaxer'
+  - 'Expert Botox Injections'
+  # 2. Benefit-Driven
+  - 'Smooth Fine Lines Away'
+  - 'Natural Looking Results'
+  - 'Prevent New Wrinkles'
+  - 'Refresh Your Appearance'
+  # 3. Trust & Credibility
+  - 'Top Rated Knoxville MedSpa'
+  - 'Expert RN Injector'
+  - 'Safe FDA Approved Care'
+  # 4. Call-to-Action (CTA)
+  - 'Book Your Free Consult'
+  - 'Schedule Botox Today'
+  # 5. Unique Selling Proposition
+  - 'No Frozen Looks Here'
+  - 'Quick 15 Min Treatment'
+
+descriptions: # Max 90 chars per line
+  # Provide diverse angles so Google can optimize combinations
+  - 'Smooth dynamic wrinkles and prevent new lines from forming. Expert care in
+    Knoxville.'
+  - 'Discover the gold standard for non-surgical anti-aging. Book your free
+    consult today.'
+  - 'Achieve a refreshed, well-rested look. We specialize in subtle,
+    natural-looking results.'
+  - "Don't settle for a frozen look. We soften lines while keeping your natural
+    expressions."
+
+images:
+  # Using the after photos as Google strictly polices before/after composites
+  - 'public/img/before-after/botox-forehead-lines-001-after.webp'
+  - 'public/img/before-after/botox-frown-lines-001-after.webp'
+  - 'public/img/before-after/botox-crows-feet-001-after.webp'

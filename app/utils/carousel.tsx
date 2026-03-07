@@ -18,12 +18,17 @@ const ImageCarousel = ({
 	const captions = pairs.flatMap(p => [p.caption, p.caption])
 
 	const [currentIndex, setCurrentIndex] = useState(0)
+	const [hasMounted, setHasMounted] = useState(false)
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
 	// Even indices = before, odd indices = after
 	const showAfter = currentIndex % 2 === 1
 	const pairIndex = Math.floor(currentIndex / 2)
 	const currentCaption = captions[currentIndex]
+
+	useEffect(() => {
+		setHasMounted(true)
+	}, [])
 
 	const clearTimer = useCallback(() => {
 		if (timerRef.current) {
@@ -66,26 +71,35 @@ const ImageCarousel = ({
 
 	return (
 		<>
-			{images.map((image, index) => (
-				<img
-					key={index}
-					src={image}
-					alt={`Treatment result ${Math.floor(index / 2) + 1} ${index % 2 === 0 ? 'before' : 'after'}`}
-					className={`absolute left-0 top-0 w-full object-cover transition-opacity ${
-						index === currentIndex ? 'opacity-100' : 'opacity-0'
-					} ${cn(className)}`}
-					style={{
-						transitionDuration: `${transitionDuration}ms`,
-					}}
-					loading={index === 0 ? 'eager' : 'lazy'}
-					fetchPriority={index === 0 ? 'high' : 'auto'}
-					decoding={index === 0 ? 'sync' : 'async'}
-				/>
-			))}
+			{/* Eagerly load the first image for LCP in head */}
+			{images.length > 0 && (
+				<link rel="preload" as="image" href={images[0]} fetchPriority="high" />
+			)}
+			{images.map((image, index) => {
+				// Eagerly load the first pair (before and after) to ensure the initial transition is smooth.
+				// Load the rest lazily after mount or when needed.
+				const shouldLoad = index === 0 || index === 1 || hasMounted
+				return (
+					<img
+						key={index}
+						src={shouldLoad ? image : undefined}
+						alt={`Treatment result ${Math.floor(index / 2) + 1} ${index % 2 === 0 ? 'before' : 'after'}`}
+						className={`absolute left-0 top-0 w-full object-cover transition-opacity ${
+							index === currentIndex ? 'z-10 opacity-100' : 'z-0 opacity-0'
+						} ${cn(className)}`}
+						style={{
+							transitionDuration: `${transitionDuration}ms`,
+						}}
+						loading={index === 0 || index === 1 ? 'eager' : 'lazy'}
+						fetchPriority={index === 0 ? 'high' : 'auto'}
+						decoding={index === 0 || index === 1 ? 'sync' : 'async'}
+					/>
+				)
+			})}
 
 			{/* Caption — subtle white text, bottom left */}
 			{currentCaption && (
-				<div className="absolute bottom-4 left-4 z-10">
+				<div className="absolute bottom-4 left-4 z-20">
 					<span className="rounded-full bg-black/50 px-3 py-1 text-xs font-medium tracking-wide text-white/90 drop-shadow-md backdrop-blur-sm">
 						{currentCaption}
 					</span>
@@ -94,7 +108,7 @@ const ImageCarousel = ({
 
 			{/* Navigation Controls: [<] [Before/After] [>] */}
 			{images.length > 1 && (
-				<div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 p-1 backdrop-blur-sm">
+				<div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 p-1 backdrop-blur-sm">
 					{/* Previous */}
 					<button
 						onClick={goPrev}

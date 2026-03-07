@@ -1,0 +1,51 @@
+name: 'Dermal Fillers'
+final_url: 'https://hitchcoxaesthetics.com/injectables/filler'
+
+keywords:
+  # High-Intent
+  - '[lip filler knoxville]'
+  - '"cheek filler near me"'
+  - '"dermal fillers knoxville tn"'
+  - '[jawline filler]'
+  - '"under eye filler knoxville"'
+  # Solution-Aware
+  - '"facial balancing knoxville"'
+  - '"restore facial volume"'
+  - '"non surgical facelift"'
+
+headlines: # Max 30 chars
+  # Keyword-Focused
+  - 'Dermal Fillers Knoxville'
+  - 'Knoxville Lip Fillers'
+  - 'Expert Cheek Fillers'
+  - 'Jawline Contouring'
+  # Benefit-Driven
+  - 'Plump & Enhance Lips'
+  - 'Restore Lost Volume'
+  - 'Sculpt Your Features'
+  - 'Natural Facial Balancing'
+  # Trust & Credibility
+  - 'Premium HA Fillers'
+  - 'Artistic Injector RN'
+  - 'Trusted MedSpa Experts'
+  # CTA
+  - 'Book Your Filler Consult'
+  - 'Schedule Your Visit'
+  # USP
+  - 'Subtle Natural Results'
+  - 'Instant Visible Volume'
+
+descriptions: # Max 90 chars
+  - 'Immediate restoration of contour and fullness. Sculpt cheeks, jawlines, and
+    plump lips.'
+  - 'Our artistic approach ensures balanced, natural-looking results. Book your
+    free consult.'
+  - 'Experience premium HA dermal fillers customized to your unique facial bone
+    structure.'
+  - 'Turn back the clock with expert facial balancing. Enjoy long-lasting,
+    beautiful volume.'
+
+images:
+  - 'public/img/before-after/filler-lip-filler-001-after.webp'
+  - 'public/img/before-after/filler-cheek-filler-001-after.webp'
+  - 'public/img/before-after/filler-jawline-filler-001-after.webp'
