@@ -5,7 +5,8 @@ title: Brow Lift Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Non-surgical Botox brow lift in Knoxville, TN. Subtly lift and open the eye
   area at Sarah Hitchcox Aesthetics. Natural-looking results.
-shortDescription: 'Subtly lift the brow for a more open, refreshed eye area without surgery.'
+shortDescription:
+  'Subtly lift the brow for a more open, refreshed eye area without surgery.'
 ctaText: Book Brow Lift Botox Consultation
 sections:
   - type: features-grid

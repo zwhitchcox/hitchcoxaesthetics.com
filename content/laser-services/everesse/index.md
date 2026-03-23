@@ -6,7 +6,8 @@ metaDescription: >-
   Everesse non-surgical skin tightening for jawline, cheeks, and neck.
   Radiofrequency treatment with no downtime in Knoxville, TN. - everesse/face -
   everesse/neck - everesse/jawline
-shortDescription: 'Non-surgical radiofrequency skin tightening for jawline, cheeks, and neck.'
+shortDescription:
+  'Non-surgical radiofrequency skin tightening for jawline, cheeks, and neck.'
 whyChooseTitle: Expert Everesse Skin Tightening in Knoxville
 whyChoose: >-
   Sarah Hitchcox Aesthetics offers Everesse skin tightening in Knoxville, TN.

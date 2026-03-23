@@ -5,7 +5,8 @@ title: Bunny Lines Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox for bunny lines on the nose in Knoxville, TN. Smooth wrinkles that
   appear when smiling at Sarah Hitchcox Aesthetics.
-shortDescription: Smooth the diagonal wrinkles that appear on the nose when you smile.
+shortDescription:
+  Smooth the diagonal wrinkles that appear on the nose when you smile.
 ctaText: Book Bunny Lines Botox Consultation
 sections:
   - type: features-grid

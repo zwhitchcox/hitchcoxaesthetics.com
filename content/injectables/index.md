@@ -6,7 +6,8 @@ metaDescription: >-
   Explore our full range of injectable treatments including Botox, dermal
   fillers, SkinVive, and Kybella in Knoxville, TN at Sarah Hitchcox Aesthetics.
   - botox - filler - skinvive - kybella - jeuveau - dysport
-shortDescription: 'Botox, fillers, SkinVive, and Kybella to smooth, volumize, and contour.'
+shortDescription:
+  'Botox, fillers, SkinVive, and Kybella to smooth, volumize, and contour.'
 ctaText: Book Injectables Consultation
 sections:
   - type: features-grid

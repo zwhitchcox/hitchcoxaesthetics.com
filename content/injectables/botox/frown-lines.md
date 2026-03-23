@@ -5,7 +5,8 @@ title: Frown Lines Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox for frown lines and "11 lines" between the eyebrows in Knoxville, TN.
   Expert treatment at Sarah Hitchcox Aesthetics.
-shortDescription: Soften vertical "11 lines" between the eyebrows for a calmer expression.
+shortDescription:
+  Soften vertical "11 lines" between the eyebrows for a calmer expression.
 ctaText: Book Frown Line Botox Consultation
 sections:
   - type: features-grid

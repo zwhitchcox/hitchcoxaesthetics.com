@@ -5,7 +5,8 @@ title: Gummy Smile Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox for gummy smile correction in Knoxville, TN. Reduce excessive gum
   exposure for a balanced smile at Sarah Hitchcox Aesthetics.
-shortDescription: Reduce excessive gum exposure when smiling for a more balanced look.
+shortDescription:
+  Reduce excessive gum exposure when smiling for a more balanced look.
 ctaText: Book Gummy Smile Botox Consultation
 sections:
   - type: features-grid

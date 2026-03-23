@@ -5,7 +5,8 @@ title: Under-Eye Filler Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Under-eye filler to soften dark hollows and refresh tired-looking eyes in
   Knoxville, TN. Expert treatment at Sarah Hitchcox Aesthetics.
-shortDescription: 'Soften dark under-eye hollows for a brighter, more rested appearance.'
+shortDescription:
+  'Soften dark under-eye hollows for a brighter, more rested appearance.'
 ctaText: Book Under-Eye Filler Consultation
 sections:
   - type: features-grid

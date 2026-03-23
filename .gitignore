@@ -41,3 +41,5 @@ public/img/flat-for-bg-removal/
 processing-images/
 processing-images-archive/
 .visited-urls
+/candidates
+/google-ads-api

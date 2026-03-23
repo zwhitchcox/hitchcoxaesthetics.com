@@ -85,7 +85,7 @@ export default function About() {
 
 						<div className="pt-4">
 							<a
-								href="https://hitchcoxaesthetics.janeapp.com"
+								href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations"
 								className="inline-block rounded-md bg-black px-8 py-4 text-center font-semibold text-white transition duration-300 hover:bg-gray-800"
 							>
 								Book a Consultation with Sarah

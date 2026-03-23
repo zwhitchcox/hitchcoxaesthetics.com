@@ -5,7 +5,8 @@ title: Jawline Filler Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Jawline filler for a defined, sculpted jaw contour in Knoxville, TN.
   Non-surgical jawline contouring at Sarah Hitchcox Aesthetics.
-shortDescription: Define and sculpt the jawline with structural filler for a contoured profile.
+shortDescription:
+  Define and sculpt the jawline with structural filler for a contoured profile.
 ctaText: Book Jawline Filler Consultation
 sections:
   - type: features-grid

@@ -5,7 +5,8 @@ title: Botox for Crow's Feet | Knoxville | SHA
 metaDescription: >-
   Botox for crow's feet and fine lines around the eyes in Knoxville, TN.
   Diminish eye wrinkles at Sarah Hitchcox Aesthetics.
-shortDescription: 'Diminish fine lines around the eyes for a brighter, more youthful look.'
+shortDescription:
+  'Diminish fine lines around the eyes for a brighter, more youthful look.'
 ctaText: Book Crow's Feet Botox Consultation
 sections:
   - type: features-grid

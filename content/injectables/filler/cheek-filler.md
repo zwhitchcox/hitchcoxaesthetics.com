@@ -5,7 +5,8 @@ title: Cheek Filler Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Cheek filler to restore mid-face volume and create a lifted, youthful contour
   in Knoxville, TN. Sarah Hitchcox Aesthetics.
-shortDescription: 'Restore mid-face volume and lift for a youthful, contoured appearance.'
+shortDescription:
+  'Restore mid-face volume and lift for a youthful, contoured appearance.'
 ctaText: Book Cheek Filler Consultation
 sections:
   - type: features-grid

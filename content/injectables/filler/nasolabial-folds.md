@@ -5,7 +5,8 @@ title: Nasolabial Folds Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Dermal filler for nasolabial folds and smile lines in Knoxville, TN. Smooth
   deep lines at Sarah Hitchcox Aesthetics. Natural results.
-shortDescription: 'Soften deep smile lines for a smoother, more youthful expression.'
+shortDescription:
+  'Soften deep smile lines for a smoother, more youthful expression.'
 ctaText: Book Nasolabial Fold Filler Consultation
 sections:
   - type: features-grid

@@ -5,7 +5,8 @@ title: Forehead Lines Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox for forehead lines in Knoxville, TN. Smooth horizontal forehead wrinkles
   with natural-looking results at Sarah Hitchcox Aesthetics.
-shortDescription: 'Smooth horizontal forehead wrinkles for a relaxed, youthful appearance.'
+shortDescription:
+  'Smooth horizontal forehead wrinkles for a relaxed, youthful appearance.'
 ctaText: Book Forehead Botox Consultation
 sections:
   - type: features-grid

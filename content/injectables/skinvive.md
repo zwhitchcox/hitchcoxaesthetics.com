@@ -5,7 +5,8 @@ title: SkinVive Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Juvederm SkinVive injectable for deep skin hydration, smoother texture, and a
   radiant glow. FDA-approved. Available in Knoxville, TN.
-shortDescription: Micro-droplet hyaluronic acid for deep hydration and a lasting radiant glow.
+shortDescription:
+  Micro-droplet hyaluronic acid for deep hydration and a lasting radiant glow.
 whyChooseTitle: Premier SkinVive Provider in Knoxville
 whyChoose: >-
   Experience SkinVive at Sarah Hitchcox Aesthetics, your trusted provider for
@@ -38,7 +39,8 @@ faq:
       It is generally recommended to wait a minimum of 6 months between
       treatments, depending on individual skin needs and desired results.
   - question: Is Juvederm SkinVive FDA approved?
-    answer: 'Yes, Juvederm SkinVive is FDA approved for individuals 21 and older.'
+    answer:
+      'Yes, Juvederm SkinVive is FDA approved for individuals 21 and older.'
 sections:
   - type: features-grid
     title: Key Benefits of SkinVive

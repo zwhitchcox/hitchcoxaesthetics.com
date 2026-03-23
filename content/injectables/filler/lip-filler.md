@@ -5,7 +5,8 @@ title: Lip Filler Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Lip filler for natural-looking volume, shape, and definition in Knoxville, TN.
   Expert lip injections at Sarah Hitchcox Aesthetics.
-shortDescription: 'Enhance lip volume, shape, and definition with natural-looking filler.'
+shortDescription:
+  'Enhance lip volume, shape, and definition with natural-looking filler.'
 ctaText: Book Lip Filler Consultation
 sections:
   - type: features-grid

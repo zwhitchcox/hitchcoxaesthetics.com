@@ -5,7 +5,8 @@ title: Everesse Neck Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Tighten loose neck skin and improve texture with Everesse in Knoxville.
   Non-surgical neck lift using advanced radiofrequency technology.
-shortDescription: Tighten laxity and improve texture on the neck without surgery.
+shortDescription:
+  Tighten laxity and improve texture on the neck without surgery.
 whyChooseTitle: Why Choose Everesse Neck Tightening? in Knoxville
 whyChoose: >-
   Rejuvenate your neck with confidence. Everesse targets delicate neck skin

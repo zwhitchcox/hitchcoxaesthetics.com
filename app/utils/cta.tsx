@@ -71,7 +71,7 @@ export const CTA = memo(function CTA() {
 			<div className="flex w-full animate-fade-in justify-evenly px-2 text-sm sm:text-xl">
 				<a
 					className="icon-container flex w-56 items-center justify-center rounded-md bg-black px-3 py-2 text-center font-semibold text-white transition duration-300 ease-in-out hover:bg-gray-800"
-					href="https://hitchcoxaesthetics.janeapp.com/#/staff_member/1"
+					href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations"
 				>
 					<Icon
 						name="calendar"

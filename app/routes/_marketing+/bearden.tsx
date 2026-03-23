@@ -90,7 +90,7 @@ export default function BeardenLocation() {
 					bottomText="AESTHETICS"
 					subText="Knoxville Med Spa"
 					ctaText="Book Appointment"
-					ctaHref="https://hitchcoxaesthetics.janeapp.com"
+					ctaHref="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations"
 				/>
 
 				<div className="mx-auto w-full max-w-4xl px-6 py-16">

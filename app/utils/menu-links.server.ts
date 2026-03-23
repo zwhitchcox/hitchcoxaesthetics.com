@@ -52,7 +52,7 @@ export const menuLinks: MenuLink[] = [
 	},
 	...buildServiceMenuLinks(),
 	{
-		to: 'https://hitchcoxaesthetics.janeapp.com/#/staff_member/1',
+		to: 'https://www.joinblvd.com/b/sarahhitchcox/widget#/locations',
 		label: 'Pricing/Book Online',
 		hint: 'schedule your personalized treatment plan',
 	},

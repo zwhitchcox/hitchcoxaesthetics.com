@@ -18,9 +18,11 @@ sections:
           Designed from the start for cosmetic use, not repurposed from a
           medical product.
       - title: Fast Results
-        description: Many patients notice results in as little as 2-3 days after treatment.
+        description:
+          Many patients notice results in as little as 2-3 days after treatment.
       - title: Competitive Pricing
-        description: Often priced lower than Botox while delivering comparable results.
+        description:
+          Often priced lower than Botox while delivering comparable results.
 heroImages:
   - before: /img/before-after/botox-001-before.webp
     after: /img/before-after/botox-001-after.webp

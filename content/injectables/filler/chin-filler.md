@@ -5,7 +5,8 @@ title: Chin Filler Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Chin filler for profile enhancement and facial balancing in Knoxville, TN.
   Non-surgical chin augmentation at Sarah Hitchcox Aesthetics.
-shortDescription: Enhance your chin projection and profile with non-surgical filler.
+shortDescription:
+  Enhance your chin projection and profile with non-surgical filler.
 ctaText: Book Chin Filler Consultation
 sections:
   - type: features-grid

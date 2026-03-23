@@ -1,2 +1,1 @@
-make pictures webp
-gather pictures
+make pictures webp gather pictures

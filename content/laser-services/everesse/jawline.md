@@ -5,7 +5,8 @@ title: Everesse Jawline Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Sharpen your jawline and reduce jowls with Everesse skin tightening in
   Knoxville. Non-invasive contouring for a more defined profile.
-shortDescription: Sharpen your jawline and reduce jowls for a more defined profile.
+shortDescription:
+  Sharpen your jawline and reduce jowls for a more defined profile.
 whyChooseTitle: Why Choose Everesse for Jawline Contouring? in Knoxville
 whyChoose: >-
   Achieve a sculpted jawline without needles or surgery. Everesse offers a

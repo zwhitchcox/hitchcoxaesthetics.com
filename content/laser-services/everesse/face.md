@@ -5,7 +5,8 @@ title: Everesse Face Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Non-surgical face lifting with Everesse in Knoxville. Tighten cheeks, soften
   nasolabial folds, and improve skin texture with radiofrequency.
-shortDescription: Lift cheeks and smooth nasolabial folds with non-surgical radiofrequency.
+shortDescription:
+  Lift cheeks and smooth nasolabial folds with non-surgical radiofrequency.
 whyChooseTitle: Why Choose Everesse Face Tightening? in Knoxville
 whyChoose: >-
   Address facial laxity at its source. Everesse stimulates your body's natural

@@ -5,7 +5,8 @@ title: Kybella Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Kybella FDA-approved injectable to reduce double chin fat without surgery.
   Non-surgical jawline contouring in Knoxville, TN. Sarah Hitchcox Aesthetics.
-shortDescription: FDA-approved injectable that permanently destroys fat cells under the chin.
+shortDescription:
+  FDA-approved injectable that permanently destroys fat cells under the chin.
 whyChooseTitle: Expert Kybella Provider in Knoxville
 whyChoose: >-
   Sarah Hitchcox Aesthetics offers expert Kybella treatments for double chin

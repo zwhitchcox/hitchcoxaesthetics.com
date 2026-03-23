@@ -5,7 +5,8 @@ title: Vascular Lesion Reduction Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Laser vascular lesion treatment for spider veins, rosacea, and facial redness
   in Knoxville, TN at Sarah Hitchcox Aesthetics.
-shortDescription: 'Laser treatment for spider veins, rosacea, and persistent facial redness.'
+shortDescription:
+  'Laser treatment for spider veins, rosacea, and persistent facial redness.'
 whyChooseTitle: Expert Vascular Lesion Treatment in Knoxville
 whyChoose: >-
   Sarah Hitchcox Aesthetics offers advanced laser treatment for spider veins,

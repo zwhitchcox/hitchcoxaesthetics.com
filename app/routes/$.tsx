@@ -322,7 +322,7 @@ export default function DynamicPage() {
 			{/* CTA */}
 			<div className="mt-12 flex flex-col items-center justify-center">
 				<a
-					href="https://hitchcoxaesthetics.janeapp.com"
+					href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations"
 					className="rounded-full bg-black px-10 py-4 text-lg font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-gray-900 hover:shadow-xl"
 				>
 					{page.ctaText || 'Book Your Consultation'}

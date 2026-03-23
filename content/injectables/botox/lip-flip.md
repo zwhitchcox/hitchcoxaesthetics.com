@@ -5,7 +5,8 @@ title: Lip Flip Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox lip flip for a subtly fuller upper lip without filler in Knoxville, TN.
   Quick, natural results at Sarah Hitchcox Aesthetics.
-shortDescription: A subtle technique that creates a fuller-looking upper lip without filler.
+shortDescription:
+  A subtle technique that creates a fuller-looking upper lip without filler.
 ctaText: Book Lip Flip Consultation
 sections:
   - type: features-grid

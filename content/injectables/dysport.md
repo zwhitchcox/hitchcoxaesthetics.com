@@ -18,7 +18,8 @@ sections:
           Smaller molecules spread more evenly for a softer, natural-looking
           result.
       - title: Quick Onset
-        description: 'Results often visible within 2-3 days, faster than many alternatives.'
+        description:
+          'Results often visible within 2-3 days, faster than many alternatives.'
       - title: Ideal for Larger Areas
         description: >-
           The even spread makes Dysport excellent for forehead and larger

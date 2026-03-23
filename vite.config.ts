@@ -7,6 +7,11 @@ import { defineConfig } from 'vite'
 const MODE = process.env.NODE_ENV
 
 export default defineConfig({
+	server: {
+		hmr: {
+			port: process.env.HMR_PORT ? Number(process.env.HMR_PORT) : 24679,
+		},
+	},
 	build: {
 		cssMinify: MODE === 'production',
 
