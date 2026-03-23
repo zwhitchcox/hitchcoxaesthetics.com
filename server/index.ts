@@ -10,7 +10,6 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import getPort, { portNumbers } from 'get-port'
 import helmet from 'helmet'
-import { createProxyMiddleware } from 'http-proxy-middleware'
 import morgan from 'morgan'
 
 installGlobals()
