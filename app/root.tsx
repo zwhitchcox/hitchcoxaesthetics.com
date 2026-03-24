@@ -339,6 +339,32 @@ function Document({
 					type="text/javascript"
 					src="//cdn.callrail.com/companies/537900585/0c3f6789c4c11b8e98b9/12/swap.js"
 				/>
+				{/* Boulevard Self-Booking overlay */}
+				<script
+					nonce={nonce}
+					dangerouslySetInnerHTML={{
+						__html: `
+							(function (a) {
+								var b = {
+									businessId: 'f3b76135-4267-4bcb-ba3a-faa3b60f8c06',
+									gaMeasurementId: 'G-XTX2CN9CP7',
+								};
+						
+								var c = a.createElement('script');
+								var d = a.querySelector('script');
+						
+								c.src = 'https://static.joinboulevard.com/injector.min.js';
+								c.async = true;
+								c.onload = function () {
+									blvd.init(b);
+								};
+						
+								d.parentNode.insertBefore(c, d);
+							})(document);
+						`,
+					}}
+				/>
+				{/* End Boulevard Self-Booking overlay */}
 			</head>
 			<body className="bg-background text-foreground">
 				{children}
