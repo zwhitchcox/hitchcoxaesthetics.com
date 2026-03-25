@@ -21,6 +21,7 @@ const schema = z.object({
 	GA_CONVERSION_LABEL: z.string(),
 	REACT_APP_PUBLIC_POSTHOG_KEY: z.string().optional(),
 	REACT_APP_PUBLIC_POSTHOG_HOST: z.string().optional(),
+	GOOGLE_MAPS_API_KEY: z.string().optional(),
 })
 
 declare global {
@@ -65,6 +66,7 @@ export function getEnv() {
 		GA_CONVERSION_LABEL: process.env.GA_CONVERSION_LABEL,
 		REACT_APP_PUBLIC_POSTHOG_KEY: process.env.REACT_APP_PUBLIC_POSTHOG_KEY,
 		REACT_APP_PUBLIC_POSTHOG_HOST: process.env.REACT_APP_PUBLIC_POSTHOG_HOST,
+		GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY,
 	}
 }
 
