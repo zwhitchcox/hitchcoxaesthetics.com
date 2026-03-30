@@ -1,7 +1,7 @@
 import { useLocation } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
+import { BeforeAfterImage } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
-import Carousel from '#app/utils/carousel.js'
 import { CTA } from '#app/utils/cta.js'
 import { getLocationById, PHONE } from '#app/utils/locations.js'
 import { cn, scrollToId } from '#app/utils/misc.js'
@@ -164,14 +164,12 @@ export function ServiceLayout({
 	title,
 	description,
 	children,
-	imgClassName,
 	imgContainerClassName,
 	imgs,
 }: {
 	title: string
 	description: string
 	children: React.ReactNode
-	imgClassName?: string
 	imgContainerClassName?: string
 	imgs?: HeroImagePair[]
 }) {
@@ -191,7 +189,13 @@ export function ServiceLayout({
 							imgContainerClassName,
 						)}
 					>
-						<Carousel pairs={imgs} className={imgClassName} />
+						<img
+							src="/img/sarah.jpg"
+							alt="Sarah Hitchcox"
+							className="z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] animate-fade-in object-contain"
+							loading="eager"
+							fetchPriority="high"
+						/>
 					</div>
 					<div className="z-10 flex w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">
 						<div className="flex h-full w-full animate-slide-top flex-col items-center justify-center space-y-4 [animation-fill-mode:backwards] lg:space-y-8">
@@ -223,6 +227,35 @@ export function ServiceLayout({
 					</div>
 				</div>
 			</div>
+
+			{imgs && imgs.length > 0 && (
+				<div className="bg-white py-16">
+					<div className="mx-auto max-w-7xl px-6">
+						<ServiceHeader>Before & After Results</ServiceHeader>
+						<div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+							{imgs.map((pair, index) => (
+								<div
+									key={index}
+									className="overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 shadow-sm"
+								>
+									<div className="relative aspect-square">
+										<BeforeAfterImage
+											src={pair.after}
+											alt={`${title} before and after result ${index + 1}`}
+											className="h-full w-full"
+										/>
+									</div>
+									{pair.caption && (
+										<div className="p-4 text-center text-sm font-medium text-gray-700">
+											{pair.caption}
+										</div>
+									)}
+								</div>
+							))}
+						</div>
+					</div>
+				</div>
+			)}
 			<div
 				id={service!}
 				className="bg-gray-50 px-6 py-12 pb-32 sm:px-12 lg:px-24"

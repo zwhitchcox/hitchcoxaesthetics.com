@@ -14,7 +14,7 @@ export type ServiceCardData = {
  * Desktop: CSS group-hover toggles between before/after.
  * Mobile: auto-cycles between before/after every 3 seconds.
  */
-function BeforeAfterImage({
+export function BeforeAfterImage({
 	src,
 	alt,
 	className,

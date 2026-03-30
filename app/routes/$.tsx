@@ -186,12 +186,7 @@ export default function DynamicPage() {
 		: `${page.name} Knoxville`
 
 	return (
-		<ServiceLayout
-			title={title}
-			description={page.tagline}
-			imgClassName="w-full h-full object-cover"
-			imgs={imgs}
-		>
+		<ServiceLayout title={title} description={page.tagline} imgs={imgs}>
 			<ServiceJsonLd
 				name={page.name}
 				description={page.metaDescription}
