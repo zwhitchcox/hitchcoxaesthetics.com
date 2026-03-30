@@ -1065,18 +1065,23 @@ const html = `<!DOCTYPE html>
                 <div class="c-pricing-label">Transparent Pricing</div>
                 <h2 class="c-pricing-heading">No hidden fees.<br>No upselling. Just results.</h2>
                 <p style="font-size:14px;color:var(--gray-500);margin-top:-16px;margin-bottom:28px;">Know exactly what you're paying before you walk in. That's how it should be.</p>
-                <div class="c-pricing-grid">
+                <h3 style="font-family: var(--font-display); font-size: 24px; margin-bottom: 16px;">Our Services</h3>
+<div class="c-pricing-grid" style="margin-bottom: 32px;">
+
                     <div class="c-price-card c-price-card-featured">
                         <div>
                             <div class="c-price-card-name">Dysport</div>
-                            <div class="c-price-card-desc">Smooth, airbrushed wrinkle relaxer</div>
+                            </div>
+<h3 style="font-family: var(--font-display); font-size: 24px; margin-bottom: 16px;">New Patient Offers</h3>
+<div class="c-pricing-grid">
+<div class="c-price-card-desc">Smooth, airbrushed wrinkle relaxer</div>
                         </div>
                         <div class="c-price-card-right">
                             <div class="c-price-card-amount">\$13 <small>/unit</small></div>
                             <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
-                    <div class="c-price-card">
+                    <div class="c-price-card" style="border: 2px solid var(--accent); background: var(--accent-bg);">
                         <div>
                             <div class="c-price-card-name">Jeuveau</div>
                             <div class="c-price-card-desc">Purpose-built for cosmetics</div>
@@ -1088,7 +1093,7 @@ const html = `<!DOCTYPE html>
                     </div>
                     <div class="c-price-card">
                         <div>
-                            <div class="c-price-card-name">First Visit Special</div>
+                            <div class="c-price-card-name" style="color: var(--accent)">First Visit Special</div>
                             <div class="c-price-card-desc">20% off any treatment</div>
                         </div>
                         <div class="c-price-card-right">

@@ -1,4 +1,5 @@
 import { useLocation } from '@remix-run/react'
+import { BeforeAfterDisplay } from '#app/components/before-after-display.js'
 import Logo from '#app/components/logo.js'
 import { Icon } from '#app/components/ui/icon.js'
 import { CTA } from '#app/utils/cta.js'
@@ -237,29 +238,13 @@ export function ServiceLayout({
 									key={index}
 									className="flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 shadow-sm"
 								>
-									<div className="flex w-full">
-										<div className="relative w-1/2">
-											<img
-												src={pair.before}
-												alt={`${title} before result ${index + 1}`}
-												className="h-full w-full object-cover"
-												loading="lazy"
-											/>
-											<div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-1 text-xs font-medium uppercase tracking-wider text-white backdrop-blur-[2px]">
-												Before
-											</div>
-										</div>
-										<div className="relative w-1/2">
-											<img
-												src={pair.after}
-												alt={`${title} after result ${index + 1}`}
-												className="h-full w-full object-cover"
-												loading="lazy"
-											/>
-											<div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-1 text-xs font-medium uppercase tracking-wider text-white backdrop-blur-[2px]">
-												After
-											</div>
-										</div>
+									<div className="relative aspect-[4/3] w-full bg-gray-200">
+										<BeforeAfterDisplay
+											beforeImage={pair.before!}
+											afterImage={pair.after}
+											alt={`${title} result ${index + 1}`}
+											className="h-full w-full"
+										/>
 									</div>
 									{pair.caption && (
 										<div className="p-4 text-center text-sm font-medium text-gray-700">
