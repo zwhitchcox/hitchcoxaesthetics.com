@@ -328,6 +328,47 @@ function Document({
 				<meta name="viewport" content="width=device-width,initial-scale=1" />
 				<link rel="canonical" href={canonicalUrl} />
 				<Links />
+
+				{/* Google Tag Manager / Google Analytics */}
+				{env.GTM_ID || env.GA_TRACKING_ID ? (
+					<>
+						<script
+							async
+							src={`https://www.googletagmanager.com/gtag/js?id=${env.GA_TRACKING_ID || env.GTM_ID || env.GA_CONVERSION_ID}`}
+							nonce={nonce}
+						/>
+						<script
+							nonce={nonce}
+							dangerouslySetInnerHTML={{
+								__html: `
+									window.dataLayer = window.dataLayer || [];
+									function gtag(){window.dataLayer.push(arguments);}
+									window.gtag = gtag;
+
+									gtag('consent', 'default', {
+										ad_user_data: 'denied',
+										ad_personalization: 'denied',
+										ad_storage: 'denied',
+										analytics_storage: 'denied',
+									});
+									gtag('consent', 'update', {
+										ad_user_data: 'granted',
+										ad_personalization: 'granted',
+										ad_storage: 'granted',
+										analytics_storage: 'granted',
+									});
+
+									gtag('js', new Date());
+									
+									${env.GTM_ID ? `gtag('config', '${env.GTM_ID}');` : ''}
+									${env.GA_TRACKING_ID && env.GA_TRACKING_ID !== env.GTM_ID ? `gtag('config', '${env.GA_TRACKING_ID}');` : ''}
+									${env.GA_CONVERSION_ID ? `gtag('config', '${env.GA_CONVERSION_ID}');` : ''}
+								`,
+							}}
+						/>
+					</>
+				) : null}
+
 				<script
 					nonce={nonce}
 					type="application/ld+json"

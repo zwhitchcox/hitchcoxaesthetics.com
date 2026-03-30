@@ -318,31 +318,15 @@ export const scrollToId = (id: string) => {
 declare global {
 	interface Window {
 		dataLayer: any[]
+		gtag?: (...args: any[]) => void
 	}
 }
 
-export function gtag(..._args: any[]) {
+export function gtag(...args: any[]) {
 	if (typeof window === 'undefined') return
-	window.dataLayer = window.dataLayer ?? []
-	window?.dataLayer.push(arguments)
-}
-
-if (typeof ENV !== 'undefined' && ENV?.GTM_ID) {
-	gtag('js', new Date())
-	gtag('config', ENV.GTM_ID)
-	gtag({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
-	gtag('consent', 'default', {
-		ad_user_data: 'denied',
-		ad_personalization: 'denied',
-		ad_storage: 'denied',
-		analytics_storage: 'denied',
-	})
-	gtag('consent', 'update', {
-		ad_user_data: 'granted',
-		ad_personalization: 'granted',
-		ad_storage: 'granted',
-		analytics_storage: 'granted',
-	})
+	if (typeof window.gtag === 'function') {
+		window.gtag(...args)
+	}
 }
 
 export function addGTM(id: string) {
