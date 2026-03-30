@@ -1,6 +1,5 @@
 import { useLocation } from '@remix-run/react'
 import Logo from '#app/components/logo.js'
-import { BeforeAfterImage } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
 import { CTA } from '#app/utils/cta.js'
 import { getLocationById, PHONE } from '#app/utils/locations.js'
@@ -232,18 +231,35 @@ export function ServiceLayout({
 				<div className="bg-white py-16">
 					<div className="mx-auto max-w-7xl px-6">
 						<ServiceHeader>Before & After Results</ServiceHeader>
-						<div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-2">
 							{imgs.map((pair, index) => (
 								<div
 									key={index}
-									className="overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 shadow-sm"
+									className="flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 shadow-sm"
 								>
-									<div className="relative aspect-square">
-										<BeforeAfterImage
-											src={pair.after}
-											alt={`${title} before and after result ${index + 1}`}
-											className="h-full w-full"
-										/>
+									<div className="flex w-full">
+										<div className="relative w-1/2">
+											<img
+												src={pair.before}
+												alt={`${title} before result ${index + 1}`}
+												className="h-full w-full object-cover"
+												loading="lazy"
+											/>
+											<div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-1 text-xs font-medium uppercase tracking-wider text-white backdrop-blur-[2px]">
+												Before
+											</div>
+										</div>
+										<div className="relative w-1/2">
+											<img
+												src={pair.after}
+												alt={`${title} after result ${index + 1}`}
+												className="h-full w-full object-cover"
+												loading="lazy"
+											/>
+											<div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-1 text-xs font-medium uppercase tracking-wider text-white backdrop-blur-[2px]">
+												After
+											</div>
+										</div>
 									</div>
 									{pair.caption && (
 										<div className="p-4 text-center text-sm font-medium text-gray-700">
