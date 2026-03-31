@@ -14,30 +14,35 @@ export function BeforeAfterDisplay({
 	className,
 }: BeforeAfterDisplayProps) {
 	return (
-		<div className={cn('grid w-full grid-cols-2 gap-1', className)}>
+		<div
+			className={cn(
+				'grid w-full grid-cols-2 gap-[1px] overflow-hidden bg-gray-200',
+				className,
+			)}
+		>
 			{/* Before Image */}
-			<div className="relative h-full w-full overflow-hidden bg-gray-100">
+			<div className="relative w-full bg-white">
 				<img
 					src={beforeImage}
 					alt={`${alt} Before`}
-					className="block h-full w-full object-cover"
+					className="block aspect-[3/4] h-full w-full object-cover object-center"
 					loading="lazy"
 				/>
-				<div className="absolute left-3 top-3 rounded-full border border-white/20 bg-black/60 px-3 py-1 text-[10px] font-bold tracking-widest text-white shadow-sm backdrop-blur-md sm:text-xs">
-					BEFORE
+				<div className="absolute bottom-2 left-2 rounded bg-black/40 px-2 py-1 text-[9px] font-medium tracking-wide text-white/90 backdrop-blur-sm sm:bottom-3 sm:left-3 sm:text-[10px]">
+					Before
 				</div>
 			</div>
 
 			{/* After Image */}
-			<div className="relative h-full w-full overflow-hidden bg-gray-100">
+			<div className="relative w-full bg-white">
 				<img
 					src={afterImage}
 					alt={`${alt} After`}
-					className="block h-full w-full object-cover"
+					className="block aspect-[3/4] h-full w-full object-cover object-center"
 					loading="lazy"
 				/>
-				<div className="absolute right-3 top-3 rounded-full border border-gray-200 bg-white/90 px-3 py-1 text-[10px] font-bold tracking-widest text-black shadow-sm backdrop-blur-md sm:text-xs">
-					AFTER
+				<div className="absolute bottom-2 right-2 rounded bg-black/40 px-2 py-1 text-[9px] font-medium tracking-wide text-white/90 backdrop-blur-sm sm:bottom-3 sm:right-3 sm:text-[10px]">
+					After
 				</div>
 			</div>
 		</div>
