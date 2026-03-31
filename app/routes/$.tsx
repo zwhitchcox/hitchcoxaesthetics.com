@@ -49,6 +49,19 @@ type LoaderData = {
 	markdown: string
 }
 
+function getTreatmentLabel(pageName: string) {
+	switch (pageName) {
+		case 'Injectables':
+			return 'Injectable treatment'
+		case 'Laser Services':
+			return 'Laser treatment'
+		case 'Weight Loss':
+			return 'Medical weight loss'
+		default:
+			return `${pageName} treatment`
+	}
+}
+
 export async function loader({ params }: LoaderFunctionArgs) {
 	const splat = params['*'] ?? ''
 
@@ -110,6 +123,7 @@ export default function DynamicPage() {
 		.map(c => ({
 			slug: c.path,
 			serviceName: c.name,
+			treatmentLabel: getTreatmentLabel(page.name),
 			shortDescription: c.shortDescription,
 			heroImage: c.heroImage,
 		}))

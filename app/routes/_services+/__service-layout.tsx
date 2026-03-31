@@ -1,5 +1,5 @@
 import { useLocation } from '@remix-run/react'
-import { BeforeAfterDisplay } from '#app/components/before-after-display.js'
+import { BeforeAfterResults } from '#app/components/before-after-results.js'
 import Logo from '#app/components/logo.js'
 import { Icon } from '#app/components/ui/icon.js'
 import { CTA } from '#app/utils/cta.js'
@@ -232,28 +232,7 @@ export function ServiceLayout({
 				<div className="bg-white py-16">
 					<div className="mx-auto max-w-7xl px-6">
 						<ServiceHeader>Before & After Results</ServiceHeader>
-						<div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-2">
-							{imgs.map((pair, index) => (
-								<div
-									key={index}
-									className="flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 shadow-sm"
-								>
-									<div className="relative aspect-[4/3] w-full bg-gray-200">
-										<BeforeAfterDisplay
-											beforeImage={pair.before!}
-											afterImage={pair.after}
-											alt={`${title} result ${index + 1}`}
-											className="h-full w-full"
-										/>
-									</div>
-									{pair.caption && (
-										<div className="p-4 text-center text-sm font-medium text-gray-700">
-											{pair.caption}
-										</div>
-									)}
-								</div>
-							))}
-						</div>
+						<BeforeAfterResults imgs={imgs} title={title} />
 					</div>
 				</div>
 			)}

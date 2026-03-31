@@ -5,6 +5,7 @@ import { cn } from '#app/utils/misc.js'
 export type ServiceCardData = {
 	slug: string
 	serviceName: string
+	treatmentLabel?: string
 	shortDescription?: string
 	heroImage?: string
 }
@@ -130,6 +131,11 @@ export function ServiceCardGrid({
 							<h3 className="mb-2 text-xl font-bold text-gray-900 transition-colors group-hover:text-primary">
 								{service.serviceName}
 							</h3>
+							{service.treatmentLabel ? (
+								<p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+									{service.treatmentLabel}
+								</p>
+							) : null}
 							<p className="mb-4 line-clamp-3 text-sm leading-relaxed text-gray-500">
 								{service.shortDescription}
 							</p>
