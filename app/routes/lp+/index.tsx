@@ -62,6 +62,24 @@ export default function LandingPagesIndex() {
 						Lip Flip
 					</Link>
 				</li>
+				<li>
+					<Link
+						to="/lp/weight-loss-semaglutide"
+						reloadDocument
+						className="text-xl font-semibold text-blue-600 hover:underline"
+					>
+						Weight Loss - Semaglutide
+					</Link>
+				</li>
+				<li>
+					<Link
+						to="/lp/weight-loss-tirzepatide"
+						reloadDocument
+						className="text-xl font-semibold text-blue-600 hover:underline"
+					>
+						Weight Loss - Tirzepatide
+					</Link>
+				</li>
 			</ul>
 		</div>
 	)
