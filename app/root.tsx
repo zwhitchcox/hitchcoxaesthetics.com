@@ -346,7 +346,7 @@ function Document({
 							(function (a) {
 								var b = {
 									businessId: 'f3b76135-4267-4bcb-ba3a-faa3b60f8c06',
-									gaMeasurementId: 'G-XTX2CN9CP7',
+									gaMeasurementId: '${env.GA_MEASUREMENT_ID || 'G-XTX2CN9CP7'}',
 								};
 						
 								var c = a.createElement('script');
