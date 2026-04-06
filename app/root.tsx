@@ -275,13 +275,6 @@ function Document({
 	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
 	const canonicalUrl = `${origin}${location.pathname}`
 
-	useEffect(() => {
-		if (typeof window === 'undefined' || !isHydrated) {
-			return
-		}
-		addGTM(ENV.GTM_ID!)
-	}, [isHydrated])
-
 	// JSON-LD: Knoxville-focused MedicalBusiness
 	const bearden = getLocationById('bearden')!
 	const localBusinessJsonLd = {
@@ -338,6 +331,28 @@ function Document({
 					type="text/javascript"
 					src="//cdn.callrail.com/companies/537900585/0c3f6789c4c11b8e98b9/12/swap.js"
 				/>
+
+				{env.GTM_ID ? (
+					<script
+						nonce={nonce}
+						dangerouslySetInnerHTML={{
+							__html: `
+								window.dataLayer = window.dataLayer || [];
+								function gtag(){dataLayer.push(arguments);}
+								window.gtag = gtag;
+								gtag('js', new Date());
+								gtag('config', '${env.GTM_ID}');
+
+								(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+								new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+								j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+								'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+								})(window,document,'script','dataLayer','${env.GTM_ID}');
+							`,
+						}}
+					/>
+				) : null}
+
 				{/* Boulevard Self-Booking overlay */}
 				<script
 					nonce={nonce}
