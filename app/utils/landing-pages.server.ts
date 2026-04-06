@@ -87,7 +87,7 @@ const weightLossLandingPages: Record<
 		heroBadge: 'Medically supervised GLP-1 care in Knoxville',
 		heroHeadline: 'Free Semaglutide Consultation',
 		heroImageAlt: 'Sarah Hitchcox Aesthetics Knoxville Med Spa',
-		heroImageSrc: '/img/knoxville-med-spa.webp',
+		heroImageSrc: '/img/sarah.jpg',
 		heroSummary:
 			'Semaglutide can help reduce cravings, improve portion control, and create steady progress without relying on willpower alone.',
 		metaDescription:
@@ -206,7 +206,7 @@ const weightLossLandingPages: Record<
 		heroBadge: 'Advanced dual-action weight loss support in Knoxville',
 		heroHeadline: 'Free Tirzepatide Consultation',
 		heroImageAlt: 'Sarah Hitchcox Aesthetics Med Spa',
-		heroImageSrc: '/img/med-spa-2.webp',
+		heroImageSrc: '/img/sarah.jpg',
 		heroSummary:
 			'Tirzepatide combines GIP and GLP-1 support to reduce appetite, improve metabolic response, and help qualified patients pursue more substantial weight loss.',
 		metaDescription:
@@ -590,58 +590,13 @@ function buildWeightLossLandingPageHtml(config: WeightLossLandingPageConfig) {
       overflow: hidden;
       border-radius: 28px;
       min-height: 100%;
-      background: linear-gradient(180deg, #132033 0%, #0f172a 100%);
-      color: var(--white);
+      background: var(--ink);
       display: grid;
     }
     .hero-panel img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      opacity: 0.86;
-    }
-    .hero-panel-content {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 22px;
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.16) 0%, rgba(15, 23, 42, 0.78) 100%);
-    }
-    .hero-panel-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      align-items: flex-start;
-      flex-wrap: wrap;
-    }
-    .mini-badge,
-    .mini-proof {
-      padding: 10px 12px;
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.16);
-      backdrop-filter: blur(8px);
-    }
-    .mini-badge strong,
-    .mini-proof strong {
-      display: block;
-      font-size: 14px;
-    }
-    .mini-badge span,
-    .mini-proof span {
-      display: block;
-      margin-top: 4px;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.8);
-    }
-    .hero-panel-copy h2 {
-      font-size: clamp(1.8rem, 4vw, 2.8rem);
-    }
-    .hero-panel-copy p {
-      margin: 12px 0 0;
-      max-width: 26rem;
-      color: rgba(255, 255, 255, 0.82);
     }
 
     .section {
@@ -846,31 +801,6 @@ function buildWeightLossLandingPageHtml(config: WeightLossLandingPageConfig) {
     }
     .footer a { font-weight: 700; }
 
-    .sticky-bar {
-      position: fixed;
-      left: 12px;
-      right: 12px;
-      bottom: 12px;
-      z-index: 40;
-      display: flex;
-      gap: 12px;
-      padding: 12px;
-      border-radius: 999px;
-      background: rgba(16, 24, 39, 0.94);
-      box-shadow: var(--shadow);
-    }
-    .sticky-bar a {
-      flex: 1;
-      min-height: 48px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 999px;
-      font-weight: 700;
-    }
-    .sticky-book { background: var(--white); color: var(--ink); }
-    .sticky-call { background: rgba(255, 255, 255, 0.14); color: var(--white); }
-
     @media (max-width: 980px) {
       .hero-shell,
       .compare-card,
@@ -935,22 +865,6 @@ function buildWeightLossLandingPageHtml(config: WeightLossLandingPageConfig) {
 
         <div class="hero-panel">
           <img src="${config.heroImageSrc}" alt="${escapeHtml(config.heroImageAlt)}" />
-          <div class="hero-panel-content">
-            <div class="hero-panel-top">
-              <div class="mini-badge">
-                <strong>${escapeHtml(config.startingPriceLabel)}</strong>
-                <span>Free consultation to choose your best-fit medication</span>
-              </div>
-              <div class="mini-proof">
-                <strong>5.0 Google rating</strong>
-                <span>Trusted by Knoxville aesthetic and wellness clients</span>
-              </div>
-            </div>
-            <div class="hero-panel-copy">
-              <h2>${escapeHtml(config.heroHeadline)}</h2>
-              <p>${escapeHtml(config.heroSummary)}</p>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -1062,11 +976,6 @@ function buildWeightLossLandingPageHtml(config: WeightLossLandingPageConfig) {
       <div><a href="${CALL_URL}">${CALL_LABEL}</a> - <a href="mailto:${EMAIL}">${EMAIL}</a></div>
     </div>
   </footer>
-
-  <div class="sticky-bar" aria-label="Quick actions">
-    <a href="${CALL_URL}" class="sticky-call">Call now</a>
-    <a href="${BOOKING_URL}" class="sticky-book" target="_blank" rel="noopener">Book consult</a>
-  </div>
 </body>
 </html>`
 }
