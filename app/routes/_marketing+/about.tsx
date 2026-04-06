@@ -1,4 +1,5 @@
 import { type MetaFunction } from '@remix-run/node'
+import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 
 export const meta: MetaFunction = () => [
 	{
@@ -22,6 +23,8 @@ export const meta: MetaFunction = () => [
 ]
 
 export default function About() {
+	const blvdUrl = useBlvdUrl()
+
 	return (
 		<div className="font-poppins bg-white py-16 lg:py-24">
 			<div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -85,7 +88,7 @@ export default function About() {
 
 						<div className="pt-4">
 							<a
-								href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations"
+								href={blvdUrl}
 								className="inline-block rounded-md bg-black px-8 py-4 text-center font-semibold text-white transition duration-300 hover:bg-gray-800"
 							>
 								Book a Consultation with Sarah

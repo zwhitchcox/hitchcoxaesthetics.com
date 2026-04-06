@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
+import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
 import { formatAddress, locations } from '#app/utils/locations.ts'
 
-const BOOKING_URL = 'https://www.joinblvd.com/b/sarahhitchcox/widget#/locations'
+const BOOKING_URL = DEFAULT_BLVD_BOOKING_URL
 const CALL_LABEL = '(865) 426-1826'
 const CALL_URL = 'tel:8654261826'
 const EMAIL = 'sarah@hitchcoxaesthetics.com'

@@ -27,7 +27,6 @@ import {
 import { withSentry } from '@sentry/remix'
 import { useEffect, useRef, useState } from 'react'
 import { HoneypotProvider } from 'remix-utils/honeypot/react'
-import { useHydrated } from 'remix-utils/use-hydrated'
 import { z } from 'zod'
 
 import { GeneralErrorBoundary } from '#/app/components/error-boundary.tsx'
@@ -64,14 +63,7 @@ import {
 	PHONE,
 } from '#/app/utils/locations.ts'
 import { menuLinks } from '#/app/utils/menu-links.server.ts'
-import {
-	addBoulevardWidget,
-	addGTM,
-	combineHeaders,
-	getDomainUrl,
-	getUserImgSrc,
-	gtag,
-} from '#/app/utils/misc.tsx'
+import { combineHeaders, getDomainUrl, getUserImgSrc } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { useRequestInfo } from '#/app/utils/request-info.ts'
 import { isServicePage } from '#/app/utils/site-pages.server.ts'
@@ -80,6 +72,7 @@ import { makeTimings, time } from '#/app/utils/timing.server.ts'
 import { getToast } from '#/app/utils/toast.server.ts'
 import { useOptionalUser, useUser } from '#/app/utils/user.ts'
 import { CTA } from './utils/cta'
+import { BlvdProvider } from './utils/blvd-context'
 import { PhoneLink, PhoneProvider } from './utils/phone-context'
 import { PostHogProvider } from './utils/posthog'
 
@@ -271,28 +264,11 @@ function Document({
 	theme?: Theme
 	env?: Record<string, string>
 }) {
-	const isHydrated = useHydrated()
 	const location = useLocation()
 	const data = useLoaderData<typeof loader>()
 	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
 	const canonicalUrl = `${origin}${location.pathname}`
 
-	useEffect(() => {
-		if (typeof window === 'undefined' || !isHydrated) {
-			return
-		}
-
-		window.gtag = gtag
-
-		if (env.GTM_ID) {
-			addGTM(env.GTM_ID)
-		}
-
-		addBoulevardWidget({
-			businessId: 'f3b76135-4267-4bcb-ba3a-faa3b60f8c06',
-			gaMeasurementId: env.GA_MEASUREMENT_ID || 'G-XTX2CN9CP7',
-		})
-	}, [env.GA_MEASUREMENT_ID, env.GTM_ID, isHydrated])
 
 	// JSON-LD: Knoxville-focused MedicalBusiness
 	const bearden = getLocationById('bearden')!
@@ -385,16 +361,21 @@ function App() {
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
-			<PhoneProvider>
-				<div
-					className={`flex h-screen flex-col justify-between ${isMenuOpen ? 'overflow-hidden' : ''}`}
-				>
-					<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
-					<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
-					<Footer />
-					<CTA />
-				</div>
-			</PhoneProvider>
+			<BlvdProvider
+				gaMeasurementId={data.ENV.GA_MEASUREMENT_ID}
+				gtmId={data.ENV.GTM_ID}
+			>
+				<PhoneProvider>
+					<div
+						className={`flex h-screen flex-col justify-between ${isMenuOpen ? 'overflow-hidden' : ''}`}
+					>
+						<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
+						<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
+						<Footer />
+						<CTA />
+					</div>
+				</PhoneProvider>
+			</BlvdProvider>
 			<EpicToaster closeButton position="top-center" theme={theme} />
 			<EpicProgress />
 		</Document>

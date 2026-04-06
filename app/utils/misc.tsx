@@ -373,29 +373,3 @@ export function addGTM(id: string) {
 	})(window, document, 'script', 'dataLayer', id)
 }
 
-export function addBoulevardWidget(options: {
-	businessId: string
-	gaMeasurementId?: string
-}) {
-	if (typeof window === 'undefined' || typeof document === 'undefined') return
-
-	;(function (a) {
-		var b = {
-			businessId: options.businessId,
-			gaMeasurementId: options.gaMeasurementId,
-		}
-
-		var c = a.createElement('script')
-		var d = a.querySelector('script')
-
-		c.src = 'https://static.joinboulevard.com/injector.min.js'
-		c.async = true
-		c.onload = function () {
-			// @ts-expect-error
-			blvd.init(b)
-		}
-
-		// @ts-expect-error
-		d.parentNode.insertBefore(c, d)
-	})(document)
-}

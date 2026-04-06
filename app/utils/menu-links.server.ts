@@ -1,4 +1,5 @@
 import { type MenuLink } from '#/app/components/list-with-dot'
+import { DEFAULT_BLVD_BOOKING_URL } from './blvd'
 import { getCategoryPages, getChildren } from './site-pages.server.js'
 
 /**
@@ -52,7 +53,7 @@ export const menuLinks: MenuLink[] = [
 	},
 	...buildServiceMenuLinks(),
 	{
-		to: 'https://www.joinblvd.com/b/sarahhitchcox/widget#/locations',
+		to: DEFAULT_BLVD_BOOKING_URL,
 		label: 'Pricing/Book Online',
 		hint: 'schedule your personalized treatment plan',
 	},

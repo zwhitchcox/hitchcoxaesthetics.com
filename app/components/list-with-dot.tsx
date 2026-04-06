@@ -1,4 +1,6 @@
 import { NavLink, useLocation } from '@remix-run/react'
+import { isBlvdBookingUrl } from '#app/utils/blvd.ts'
+import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '#app/utils/misc.js'
 import { Icon } from './ui/icon'
@@ -33,6 +35,7 @@ export function ListWithDot({
 	)
 	const [dotPosition, setDotPosition] = useState(0)
 	const { pathname } = useLocation()
+	const blvdUrl = useBlvdUrl()
 	const [activeSubMenus, setActiveSubMenus] = useState<number[]>([])
 
 	useEffect(() => {
@@ -144,7 +147,11 @@ export function ListWithDot({
 					</button>
 				</li>
 			)}
-			{linksToRender.map((link, index) => (
+			{linksToRender.map((link, index) => {
+				const resolvedTo =
+					'to' in link && isBlvdBookingUrl(link.to) ? blvdUrl : 'to' in link ? link.to : null
+
+				return (
 				<li
 					key={'to' in link ? link.to : `submenu-${index}`}
 					onMouseEnter={() => handleMouseEnter(index)}
@@ -177,9 +184,9 @@ export function ListWithDot({
 									isActive ? 'italic text-muted-foreground' : ''
 								}`
 							}
-							to={link.to}
+							to={resolvedTo ?? '/'}
 							prefetch="intent"
-							target={link.to.startsWith('http') ? '_blank' : undefined}
+							target={resolvedTo?.startsWith('http') ? '_blank' : undefined}
 							onClick={handleLinkClick}
 						>
 							<div>{link.label}</div>
@@ -191,7 +198,8 @@ export function ListWithDot({
 						</NavLink>
 					)}
 				</li>
-			))}
+				)
+			})}
 		</ul>
 	)
 

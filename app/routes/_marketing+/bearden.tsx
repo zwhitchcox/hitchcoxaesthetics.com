@@ -1,6 +1,7 @@
 import { json, type MetaFunction } from '@remix-run/node'
 import { Link, useLoaderData } from '@remix-run/react'
 import { Hero } from '#app/components/hero.js'
+import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
 import { getLocationById } from '#app/utils/locations.js'
@@ -41,6 +42,7 @@ export async function loader() {
 export default function BeardenLocation() {
 	const { categories } = useLoaderData<typeof loader>()
 	const location = getLocationById('bearden')!
+	const blvdUrl = useBlvdUrl()
 
 	const jsonLd = {
 		'@context': 'https://schema.org',
@@ -90,7 +92,7 @@ export default function BeardenLocation() {
 					bottomText="AESTHETICS"
 					subText="Knoxville Med Spa"
 					ctaText="Book Appointment"
-					ctaHref="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations"
+					ctaHref={blvdUrl}
 				/>
 
 				<div className="mx-auto w-full max-w-4xl px-6 py-16">

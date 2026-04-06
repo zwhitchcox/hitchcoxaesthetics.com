@@ -10,6 +10,7 @@ import { MarkdownContent } from '#app/components/markdown-content.js'
 import { PricingSection } from '#app/components/pricing-table.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.tsx'
+import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 import { type ServicePageSection } from '#app/utils/location-service-data.server.js'
 import {
 	getPage,
@@ -114,6 +115,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 export default function DynamicPage() {
 	const { page, children, ancestors, siblings, markdown } =
 		useLoaderData<LoaderData>()
+	const blvdUrl = useBlvdUrl()
 
 	// Carousel images: use heroImages (before/after pairs) from frontmatter
 	const imgs = page.heroImages ?? []
@@ -331,7 +333,7 @@ export default function DynamicPage() {
 			{/* CTA */}
 			<div className="mt-12 flex flex-col items-center justify-center">
 				<a
-					href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations"
+					href={blvdUrl}
 					className="rounded-full bg-black px-10 py-4 text-lg font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-gray-900 hover:shadow-xl"
 				>
 					{page.ctaText || 'Book Your Consultation'}

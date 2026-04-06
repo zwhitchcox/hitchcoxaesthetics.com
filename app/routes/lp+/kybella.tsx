@@ -1,6 +1,8 @@
 import { json } from '@remix-run/node'
 import { getEnv } from '#app/utils/env.server.ts'
 import { useLoaderData } from '@remix-run/react'
+import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
+import { useBlvdHtml } from '#app/utils/blvd-context.tsx'
 
 export async function loader() {
 	return json({ html, ENV: getEnv() })
@@ -8,7 +10,9 @@ export async function loader() {
 
 export default function LandingPage() {
 	const { html, ENV } = useLoaderData<typeof loader>()
-	const injectedHtml = html.replace('G-XTX2CN9CP7', ENV.GA_MEASUREMENT_ID || 'G-XTX2CN9CP7')
+	const injectedHtml = useBlvdHtml(
+		html.replace('G-XTX2CN9CP7', ENV.GA_MEASUREMENT_ID || 'G-XTX2CN9CP7'),
+	)
 	return (
 		<iframe
 			srcDoc={injectedHtml}
@@ -982,7 +986,7 @@ const html = `<!DOCTYPE html>
                     <small>Aesthetics</small>
                 </div>
             </a>
-            <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="b-header-cta" target="_blank" rel="noopener">
+            <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-header-cta" target="_blank" rel="noopener">
                 Schedule Now
             </a>
         </div>
@@ -1017,7 +1021,7 @@ const html = `<!DOCTYPE html>
                         </div>
 
                         <div class="b-hero-ctas">
-                            <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="b-btn b-btn-dark" target="_blank" rel="noopener">
+                            <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-btn b-btn-dark" target="_blank" rel="noopener">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                                 Book Your Appointment
                             </a>
@@ -1080,7 +1084,7 @@ const html = `<!DOCTYPE html>
                         </div>
                         <div class="c-price-card-right">
                             <div class="c-price-card-amount">\$600 <small>/vial</small></div>
-                            <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="c-price-card-book">Book Now</a>
+                            <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
                     <div class="c-price-card" style="border: 2px solid var(--accent); background: var(--accent-bg);">
@@ -1090,7 +1094,7 @@ const html = `<!DOCTYPE html>
                         </div>
                         <div class="c-price-card-right">
                             <div class="c-price-card-amount">\$13 <small>/unit</small></div>
-                            <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="c-price-card-book">Book Now</a>
+                            <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
                     <div class="c-price-card">
@@ -1100,7 +1104,7 @@ const html = `<!DOCTYPE html>
                         </div>
                         <div class="c-price-card-right">
                             <div class="c-price-card-amount" style="color:var(--accent)">20% Off</div>
-                            <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="c-price-card-book">Book Now</a>
+                            <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
                     <div class="c-price-card">
@@ -1110,7 +1114,7 @@ const html = `<!DOCTYPE html>
                         </div>
                         <div class="c-price-card-right">
                             <div class="c-price-card-amount">Free</div>
-                            <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="c-price-card-book">Book Now</a>
+                            <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
                 </div>
@@ -1149,7 +1153,7 @@ const html = `<!DOCTYPE html>
                 </div>
 
                 <div class="b-results-cta">
-                    <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="b-link" target="_blank" rel="noopener">Book Your Consultation &rarr;</a>
+                    <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-link" target="_blank" rel="noopener">Book Your Consultation &rarr;</a>
                 </div>
             </div>
         </section>
@@ -1287,7 +1291,7 @@ const html = `<!DOCTYPE html>
                         <h2 class="b-provider-name">Sarah Hitchcox, RN</h2>
                         <p class="b-provider-cred">Registered Nurse · Aesthetic Injector · DNP Candidate</p>
                         <p class="b-provider-bio">With a background in emergency nursing, Sarah brings precision and an eye for detail to every injection. Her philosophy? Subtle enhancements that let you look like the best version of yourself — refreshed, confident, and completely natural.</p>
-                        <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="b-btn b-btn-dark" target="_blank" rel="noopener" style="display:inline-flex;">
+                        <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-btn b-btn-dark" target="_blank" rel="noopener" style="display:inline-flex;">
                             Book with Sarah
                         </a>
                     </div>
@@ -1378,7 +1382,7 @@ const html = `<!DOCTYPE html>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                                 Directions
                             </a>
-                            <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="b-loc-link" target="_blank" rel="noopener">
+                            <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-loc-link" target="_blank" rel="noopener">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                                 Book Here
                             </a>
@@ -1392,7 +1396,7 @@ const html = `<!DOCTYPE html>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                                 Directions
                             </a>
-                            <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="b-loc-link" target="_blank" rel="noopener">
+                            <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-loc-link" target="_blank" rel="noopener">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                                 Book Here
                             </a>
@@ -1424,7 +1428,7 @@ const html = `<!DOCTYPE html>
             <h2>Ready for Smoother Skin?</h2>
             <p>New clients get 20% off their first Kybella treatment. Book your appointment today.</p>
             <div class="b-final-ctas">
-                <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="b-btn-white" target="_blank" rel="noopener">
+                <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-btn-white" target="_blank" rel="noopener">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     Book Your Appointment
                 </a>
@@ -1451,7 +1455,7 @@ const html = `<!DOCTYPE html>
 
     <!-- ======== MOBILE STICKY BAR (B) ======== -->
     <div class="b-sticky">
-        <a href="https://www.joinblvd.com/b/sarahhitchcox/widget#/locations" class="b-sticky-book" target="_blank" rel="noopener">
+        <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-sticky-book" target="_blank" rel="noopener">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Book Online
         </a>
