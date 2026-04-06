@@ -65,10 +65,12 @@ import {
 } from '#/app/utils/locations.ts'
 import { menuLinks } from '#/app/utils/menu-links.server.ts'
 import {
+	addBoulevardWidget,
 	addGTM,
 	combineHeaders,
 	getDomainUrl,
 	getUserImgSrc,
+	gtag,
 } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { useRequestInfo } from '#/app/utils/request-info.ts'
@@ -275,6 +277,23 @@ function Document({
 	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
 	const canonicalUrl = `${origin}${location.pathname}`
 
+	useEffect(() => {
+		if (typeof window === 'undefined' || !isHydrated) {
+			return
+		}
+
+		window.gtag = gtag
+
+		if (env.GTM_ID) {
+			addGTM(env.GTM_ID)
+		}
+
+		addBoulevardWidget({
+			businessId: 'f3b76135-4267-4bcb-ba3a-faa3b60f8c06',
+			gaMeasurementId: env.GA_MEASUREMENT_ID || 'G-XTX2CN9CP7',
+		})
+	}, [env.GA_MEASUREMENT_ID, env.GTM_ID, isHydrated])
+
 	// JSON-LD: Knoxville-focused MedicalBusiness
 	const bearden = getLocationById('bearden')!
 	const localBusinessJsonLd = {
@@ -332,53 +351,6 @@ function Document({
 					src="//cdn.callrail.com/companies/537900585/0c3f6789c4c11b8e98b9/12/swap.js"
 				/>
 
-				{env.GTM_ID ? (
-					<script
-						nonce={nonce}
-						dangerouslySetInnerHTML={{
-							__html: `
-								window.dataLayer = window.dataLayer || [];
-								function gtag(){dataLayer.push(arguments);}
-								window.gtag = gtag;
-								gtag('js', new Date());
-								gtag('config', '${env.GTM_ID}');
-
-								(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-								new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-								j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-								'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-								})(window,document,'script','dataLayer','${env.GTM_ID}');
-							`,
-						}}
-					/>
-				) : null}
-
-				{/* Boulevard Self-Booking overlay */}
-				<script
-					nonce={nonce}
-					dangerouslySetInnerHTML={{
-						__html: `
-							(function (a) {
-								var b = {
-									businessId: 'f3b76135-4267-4bcb-ba3a-faa3b60f8c06',
-									gaMeasurementId: '${env.GA_MEASUREMENT_ID || 'G-XTX2CN9CP7'}',
-								};
-						
-								var c = a.createElement('script');
-								var d = a.querySelector('script');
-						
-								c.src = 'https://static.joinboulevard.com/injector.min.js';
-								c.async = true;
-								c.onload = function () {
-									blvd.init(b);
-								};
-						
-								d.parentNode.insertBefore(c, d);
-							})(document);
-						`,
-					}}
-				/>
-				{/* End Boulevard Self-Booking overlay */}
 			</head>
 			<body className="bg-background text-foreground">
 				{children}

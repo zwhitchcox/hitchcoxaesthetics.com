@@ -318,19 +318,27 @@ export const scrollToId = (id: string) => {
 declare global {
 	interface Window {
 		dataLayer: any[]
+		gtag?: (...args: any[]) => void
 	}
 }
 
 export function gtag(..._args: any[]) {
 	if (typeof window === 'undefined') return
 	window.dataLayer = window.dataLayer ?? []
-	window?.dataLayer.push(arguments)
+	window.dataLayer.push(arguments)
 }
 
-if (typeof ENV !== 'undefined' && ENV?.GTM_ID) {
-	gtag('js', new Date())
-	gtag('config', ENV.GTM_ID)
-	gtag({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
+if (typeof window !== 'undefined') {
+	window.dataLayer = window.dataLayer ?? []
+	window.gtag = gtag
+}
+
+if (typeof ENV !== 'undefined') {
+	if (ENV?.GA_MEASUREMENT_ID) {
+		gtag('js', new Date())
+		gtag('config', ENV.GA_MEASUREMENT_ID)
+	}
+
 	gtag('consent', 'default', {
 		ad_user_data: 'denied',
 		ad_personalization: 'denied',
@@ -346,6 +354,8 @@ if (typeof ENV !== 'undefined' && ENV?.GTM_ID) {
 }
 
 export function addGTM(id: string) {
+	if (typeof window === 'undefined' || typeof document === 'undefined') return
+
 	;(function (w, d, s, l, i) {
 		// @ts-expect-error
 		w[l] = w[l] || []
@@ -361,4 +371,31 @@ export function addGTM(id: string) {
 		// @ts-expect-error
 		f.parentNode.insertBefore(j, f)
 	})(window, document, 'script', 'dataLayer', id)
+}
+
+export function addBoulevardWidget(options: {
+	businessId: string
+	gaMeasurementId?: string
+}) {
+	if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+	;(function (a) {
+		var b = {
+			businessId: options.businessId,
+			gaMeasurementId: options.gaMeasurementId,
+		}
+
+		var c = a.createElement('script')
+		var d = a.querySelector('script')
+
+		c.src = 'https://static.joinboulevard.com/injector.min.js'
+		c.async = true
+		c.onload = function () {
+			// @ts-expect-error
+			blvd.init(b)
+		}
+
+		// @ts-expect-error
+		d.parentNode.insertBefore(c, d)
+	})(document)
 }
