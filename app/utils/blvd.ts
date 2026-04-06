@@ -17,6 +17,7 @@ export function buildBlvdUrl(options?: {
 	sessionId?: null | string
 }) {
 	const url = new URL(BLVD_WIDGET_BASE_URL)
+	url.searchParams.set('injector-version', '1.0')
 
 	if (options?.clientId) {
 		url.searchParams.set('google_client_id', options.clientId)
