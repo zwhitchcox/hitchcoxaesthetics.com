@@ -1,15 +1,17 @@
 import { json } from '@remix-run/node'
+import { getEnv } from '#app/utils/env.server.ts'
 import { useLoaderData } from '@remix-run/react'
 
 export async function loader() {
-	return json({ html })
+	return json({ html, ENV: getEnv() })
 }
 
 export default function LandingPage() {
-	const { html } = useLoaderData<typeof loader>()
+	const { html, ENV } = useLoaderData<typeof loader>()
+	const injectedHtml = html.replace('G-XTX2CN9CP7', ENV.GA_MEASUREMENT_ID || 'G-XTX2CN9CP7')
 	return (
 		<iframe
-			srcDoc={html}
+			srcDoc={injectedHtml}
 			title="Landing Page"
 			style={{
 				width: '100vw',
