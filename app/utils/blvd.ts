@@ -1,7 +1,7 @@
 export const BLVD_WIDGET_BASE_URL =
 	'https://www.joinblvd.com/b/sarahhitchcox/widget'
-export const BLVD_DEFAULT_HASH = '#/locations'
-export const DEFAULT_BLVD_BOOKING_URL = `${BLVD_WIDGET_BASE_URL}${BLVD_DEFAULT_HASH}`
+export const BLVD_DEFAULT_HASH = ''
+export const DEFAULT_BLVD_BOOKING_URL = buildBlvdUrl()
 
 const BLVD_BOOKING_URL_PATTERN =
 	/https:\/\/www\.joinblvd\.com\/b\/sarahhitchcox\/widget(?:\?[^"'`\s>]*)?(?:#\/locations)?/g
