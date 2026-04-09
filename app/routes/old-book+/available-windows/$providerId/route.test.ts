@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from 'vitest'
 import {
 	getAvailableWindows,
 	getDayOfWeek,
-} from '#/app/routes/book+/available-windows/$providerId/route.server'
+} from '#/app/routes/old-book+/available-windows/$providerId/route.server'
 import { dateToMinutes } from '#app/utils/date'
 import {
 	clearAllData,

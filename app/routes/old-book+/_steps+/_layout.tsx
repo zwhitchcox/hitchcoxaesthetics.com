@@ -4,8 +4,8 @@ import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { Outlet, redirect, useLocation } from '@remix-run/react'
 import { useEffect } from 'react'
 
-import { StepTracker } from '#/app/routes/book+/_steps+/__step-tracker'
-import { bookStepper } from '#/app/routes/book+/book.server'
+import { StepTracker } from '#/app/routes/old-book+/_steps+/__step-tracker'
+import { bookStepper } from '#/app/routes/old-book+/book.server'
 import { Card } from '#app/components/ui/card.js'
 import { AppointmentDetails } from '#app/routes/users+/$id_+/appointments/AppointmentDetails'
 import { requireFullUser } from '#app/utils/auth.server'
@@ -134,5 +134,5 @@ export default function Book() {
 }
 
 export function useBookData() {
-	return useMatchesData<typeof loader>('routes/book+/_steps+/_layout')
+	return useMatchesData<typeof loader>('routes/old-book+/_steps+/_layout')
 }

@@ -11,7 +11,6 @@ import { Button } from '#app/components/ui/button.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import {
 	type JobStatus,
-	runInvoiceDownloadJob,
 	runReviewsFetchJob,
 	getJobStatuses,
 	clearJobError,
@@ -26,8 +25,6 @@ export interface Route {
 
 // Define job descriptions
 const JOB_DESCRIPTIONS = {
-	invoiceDownload:
-		'Downloads and imports invoice data from the external system.',
 	reviewsFetch:
 		'Fetches Google reviews and stores them in the database with statistical analysis.',
 }
@@ -55,11 +52,6 @@ export async function action({ request }: Route['ActionArgs']) {
 
 	const formData = await request.formData()
 	const intent = formData.get('intent')
-
-	if (intent === 'run-invoiceDownload') {
-		runInvoiceDownloadJob().catch(console.error)
-		return json({ success: true, message: 'Invoice download job started' })
-	}
 
 	if (intent === 'run-reviewsFetch') {
 		runReviewsFetchJob().catch(console.error)

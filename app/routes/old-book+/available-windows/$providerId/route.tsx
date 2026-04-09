@@ -3,7 +3,7 @@ import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { promiseHash } from 'remix-utils/promise'
 
-import { getAvailableWindows } from '#/app/routes/book+/available-windows/$providerId/route.server'
+import { getAvailableWindows } from '#/app/routes/old-book+/available-windows/$providerId/route.server'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,

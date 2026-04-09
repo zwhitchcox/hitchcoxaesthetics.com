@@ -1,13 +1,18 @@
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
+import { type MetaFunction } from '@remix-run/node'
 import { useMemo } from 'react'
 import { z } from 'zod'
 
-import { useBookData } from '#/app/routes/book+/_steps+/_layout'
+import { useBookData } from '#/app/routes/old-book+/_steps+/_layout'
 import { combineSteps } from '#app/utils/stepper.js'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
 }
+
+export const meta: MetaFunction = () => [
+	{ name: 'robots', content: 'noindex, nofollow' },
+]
 
 export const bookSteps = [
 	{

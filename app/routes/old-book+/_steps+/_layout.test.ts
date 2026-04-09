@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { generateTimeSlots } from '#app/routes/book+/_steps+/schedule'
+import { generateTimeSlots } from '#app/routes/old-book+/_steps+/schedule'
 import { dateToMinutes } from '#app/utils/date.js'
 
 test('generateTimeSlots', () => {

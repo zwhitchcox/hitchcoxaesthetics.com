@@ -15,15 +15,6 @@ export interface JobStatus {
 
 // Global job status tracking - in a real app, this should be in a database
 let jobStatuses: Record<string, JobStatus> = {
-	invoiceDownload: {
-		id: 'invoiceDownload',
-		name: 'Invoice Download',
-		status: 'idle',
-		lastRun: null,
-		nextRun: null,
-		lastRunDuration: null,
-		lastError: null,
-	},
 	reviewsFetch: {
 		id: 'reviewsFetch',
 		name: 'Reviews Fetch',
@@ -43,68 +34,6 @@ let isInitialized = false
 
 // Helper to run shell commands
 const execAsync = promisify(exec)
-
-// Run the download invoices job
-export async function runInvoiceDownloadJob(): Promise<void> {
-	const job = jobStatuses['invoiceDownload']
-	if (!job) return
-
-	// If already running, don't start again
-	if (job.status === 'running') return
-
-	const startTime = Date.now()
-	job.status = 'running'
-	job.lastRun = new Date().toISOString()
-
-	try {
-		// Path to the download-invoices script
-		const scriptPath = path.join(
-			process.cwd(),
-			'scripts',
-			'download-invoices.js',
-		)
-
-		// Execute the download script
-		console.log('Downloading invoices...')
-		const downloadResult = await execAsync(`node ${scriptPath}`)
-
-		if (downloadResult.stderr) {
-			console.error('Invoice download error:', downloadResult.stderr)
-			job.status = 'failed'
-			job.lastError = downloadResult.stderr
-			return
-		}
-
-		console.log('Invoice download completed:', downloadResult.stdout)
-
-		// Now run the import script to process the downloaded data
-		console.log('Importing invoices...')
-		const importScriptPath = path.join(
-			process.cwd(),
-			'scripts',
-			'import-invoices.js',
-		)
-
-		const importResult = await execAsync(`node ${importScriptPath}`)
-
-		if (importResult.stderr) {
-			console.error('Invoice import error:', importResult.stderr)
-			job.status = 'failed'
-			job.lastError = `Download succeeded but import failed: ${importResult.stderr}`
-		} else {
-			console.log('Invoice import completed:', importResult.stdout)
-			job.status = 'completed'
-			job.lastError = null
-		}
-	} catch (error) {
-		console.error('Invoice processing failed:', error)
-		job.status = 'failed'
-		job.lastError = error instanceof Error ? error.message : String(error)
-	} finally {
-		job.lastRunDuration = Date.now() - startTime
-		job.nextRun = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour from now
-	}
-}
 
 // Run the fetch reviews job
 export async function runReviewsFetchJob(): Promise<void> {
@@ -155,14 +84,6 @@ export function initializeBackgroundJobs() {
 
 	console.log('Initializing background jobs...')
 
-	// Schedule the invoice download job to run every hour
-	jobIntervals.invoiceDownload = setInterval(
-		() => {
-			runInvoiceDownloadJob().catch(console.error)
-		},
-		10 * 60 * 1000,
-	) // 10 minutes
-
 	// Schedule the reviews fetch job to run daily
 	jobIntervals.reviewsFetch = setInterval(
 		() => {
@@ -170,14 +91,6 @@ export function initializeBackgroundJobs() {
 		},
 		24 * 60 * 60 * 1000,
 	) // 24 hours
-
-	// Set the next run time for invoice download
-	const invoiceDownload = jobStatuses['invoiceDownload']
-	if (invoiceDownload) {
-		invoiceDownload.nextRun = new Date(
-			Date.now() + 60 * 60 * 1000,
-		).toISOString()
-	}
 
 	// Set the next run time for reviews fetch
 	const reviewsFetch = jobStatuses['reviewsFetch']

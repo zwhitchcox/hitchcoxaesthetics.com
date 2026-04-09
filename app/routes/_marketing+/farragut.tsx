@@ -1,9 +1,9 @@
 import { json, type MetaFunction } from '@remix-run/node'
 import { Link, useLoaderData } from '@remix-run/react'
 import { Hero } from '#app/components/hero.js'
-import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
+import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 import { getLocationById } from '#app/utils/locations.js'
 import { getCategoryPages } from '#app/utils/site-pages.server.js'
 

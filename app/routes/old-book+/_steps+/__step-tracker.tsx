@@ -1,7 +1,7 @@
 import { Link, useLocation } from '@remix-run/react'
 import React from 'react'
 
-import { bookSteps, useStepStatuses } from '#/app/routes/book+/book'
+import { bookSteps, useStepStatuses } from '#/app/routes/old-book+/book'
 
 export function StepTracker() {
 	const current = useLocation()

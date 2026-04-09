@@ -1,6 +1,6 @@
 import { createCookieSessionStorage } from '@remix-run/node'
 
-import { bookSteps } from '#/app/routes/book+/book'
+import { bookSteps } from '#/app/routes/old-book+/book'
 import { createStepper } from '#app/utils/stepper.server'
 
 export const sessionStorage = createCookieSessionStorage({

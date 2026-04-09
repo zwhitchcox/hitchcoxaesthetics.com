@@ -1,8 +1,8 @@
 import { json } from '@remix-run/node'
-import { getEnv } from '#app/utils/env.server.ts'
 import { useLoaderData } from '@remix-run/react'
-import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
 import { useBlvdHtml } from '#app/utils/blvd-context.tsx'
+import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
+import { getEnv } from '#app/utils/env.server.ts'
 
 export async function loader() {
 	return json({ html, ENV: getEnv() })

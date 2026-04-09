@@ -6,10 +6,10 @@ import {
 import { Form, useFetcher, useLoaderData } from '@remix-run/react'
 import { useEffect, useState } from 'react'
 
-import { bookStepper } from '#/app/routes/book+/book.server'
+import { bookStepper } from '#/app/routes/old-book+/book.server'
 import { Button } from '#app/components/ui/button'
 import { Calendar } from '#app/components/ui/calendar'
-import { useBookData } from '#app/routes/book+/_steps+/_layout'
+import { useBookData } from '#app/routes/old-book+/_steps+/_layout'
 import { dateToMinutes } from '#app/utils/date'
 import { useSafeLayoutEffect } from '#app/utils/misc.js'
 

@@ -1,10 +1,10 @@
 require('dotenv').config()
+const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
-const yaml = require('js-yaml')
-const crypto = require('crypto')
-const sharp = require('sharp')
 const { GoogleAdsApi, enums, ResourceNames } = require('google-ads-api')
+const yaml = require('js-yaml')
+const sharp = require('sharp')
 
 const client = new GoogleAdsApi({
 	client_id: process.env.GOOGLE_ADS_CLIENT_ID || '',

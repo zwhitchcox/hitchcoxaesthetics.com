@@ -1,11 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useHydrated } from 'remix-utils/use-hydrated'
 
-import {
-	BLVD_DEFAULT_HASH,
-	buildBlvdUrl,
-	replaceBlvdBookingUrls,
-} from '#app/utils/blvd.ts'
+import { buildBlvdUrl, replaceBlvdBookingUrls } from '#app/utils/blvd.ts'
 import { addGTM, gtag } from '#app/utils/misc.tsx'
 
 type BlvdContextValue = {
@@ -79,7 +75,7 @@ export function BlvdProvider({
 
 	const value = useMemo<BlvdContextValue>(
 		() => ({
-			blvdUrl: buildBlvdUrl({ clientId, sessionId }),
+			blvdUrl: buildBlvdUrl(),
 			clientId,
 			hasTrackingParams: Boolean(clientId && sessionId),
 			sessionId,
@@ -90,22 +86,12 @@ export function BlvdProvider({
 	return <BlvdContext.Provider value={value}>{children}</BlvdContext.Provider>
 }
 
-export function useBlvdUrl(hash: string = BLVD_DEFAULT_HASH) {
-	const { clientId, sessionId } = useContext(BlvdContext)
-
-	return useMemo(
-		() =>
-			buildBlvdUrl({
-				clientId,
-				locationHash: hash,
-				sessionId,
-			}),
-		[clientId, hash, sessionId],
-	)
+export function useBlvdUrl() {
+	return useMemo(() => buildBlvdUrl(), [])
 }
 
-export function useBlvdHtml(html: string, hash: string = BLVD_DEFAULT_HASH) {
-	const blvdUrl = useBlvdUrl(hash)
+export function useBlvdHtml(html: string) {
+	const blvdUrl = useBlvdUrl()
 	return useMemo(() => replaceBlvdBookingUrls(html, blvdUrl), [blvdUrl, html])
 }
 

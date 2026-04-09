@@ -18,7 +18,7 @@ import {
 	type StepSchemasCombineObj,
 	type StepSchemasFull,
 } from '#/app/utils/stepper'
-import { redirectNextStep } from '#app/routes/book+/_steps+/__step-tracker.server.js'
+import { redirectNextStep } from '#app/routes/old-book+/_steps+/__step-tracker.server.js'
 
 export function createStepper<T extends Step[] | [Step] | Readonly<Step[]>>({
 	steps,

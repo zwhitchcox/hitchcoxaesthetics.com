@@ -1,9 +1,9 @@
 require('dotenv').config()
+const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
-const sharp = require('sharp')
-const crypto = require('crypto')
 const { GoogleAdsApi, enums } = require('google-ads-api')
+const sharp = require('sharp')
 
 const client = new GoogleAdsApi({
 	client_id: process.env.GOOGLE_ADS_CLIENT_ID || '',

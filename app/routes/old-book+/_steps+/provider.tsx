@@ -5,8 +5,8 @@ import {
 } from '@remix-run/node'
 import { Form, useActionData } from '@remix-run/react'
 
-import { useBookData } from '#/app/routes/book+/_steps+/_layout'
-import { bookStepper } from '#/app/routes/book+/book.server'
+import { useBookData } from '#/app/routes/old-book+/_steps+/_layout'
+import { bookStepper } from '#/app/routes/old-book+/book.server'
 import { ErrorList } from '#app/components/forms.js'
 import { Label } from '#app/components/ui/label'
 
