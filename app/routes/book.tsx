@@ -521,6 +521,9 @@ export default function BlvdBookRoute() {
 		setQuestionAnswers({})
 
 		try {
+			const isTelehealth = service.item.name
+				.toLowerCase()
+				.includes('telehealth')
 			const variants = await service.item.getLocationVariants()
 			const nextLocations = sortLocationsByPreference(
 				dedupeLocations(variants.map(variant => variant.location)),
@@ -528,13 +531,98 @@ export default function BlvdBookRoute() {
 			)
 			setServiceLocations(nextLocations)
 
-			if (nextLocations.length === 1) {
-				await handleSelectLocation(nextLocations[0], service)
+			if (isTelehealth && nextLocations.length > 0) {
+				await handleSelectTelehealth(nextLocations, service)
+			} else if (nextLocations.length === 1) {
+				await handleSelectLocation(nextLocations[0]!, service)
+			} else {
+				setActiveStep('location')
 			}
 		} catch (error) {
 			setStepError(getErrorMessage(error))
 		} finally {
 			setLoadingLocations(false)
+		}
+	}
+
+	async function handleSelectTelehealth(
+		locations: BlvdLocation[],
+		serviceOverride: ServiceEntry,
+	) {
+		if (!client) return
+
+		setLoadingSchedule(true)
+		setStepError(null)
+		setCheckoutSuccess(null)
+
+		const telehealthLocation = {
+			id: 'telehealth',
+			name: 'Telehealth (Virtual)',
+			address: null,
+			tz: 'America/New_York',
+		} as unknown as BlvdLocation
+
+		setSelectedLocation(telehealthLocation)
+		setActiveStep('schedule')
+		setBookableDates([])
+		setBookableTimes([])
+		setSelectedDateId(null)
+		setSelectedTimeId(null)
+
+		try {
+			const nextCarts: { location: BlvdLocation; cart: BlvdCart }[] = []
+			for (const loc of locations) {
+				let nextCart = await client.carts.create(loc)
+				const preferredStaffVariant = await getPreferredStaffVariant(
+					serviceOverride.item,
+				)
+				nextCart = await nextCart.addBookableItem(serviceOverride.item, {
+					...(preferredStaffVariant
+						? { staffVariant: preferredStaffVariant }
+						: {}),
+				})
+				nextCarts.push({ location: loc, cart: nextCart })
+			}
+
+			const dateMap = new Map<string, { dateObj: Date; locationCarts: any[] }>()
+
+			for (const { location, cart } of nextCarts) {
+				const dates = await cart.getBookableDates({
+					location,
+					timezone: location.tz ?? undefined,
+				})
+				for (const d of dates) {
+					const dateObj = toDate(d.date)
+					if (!dateObj) continue
+					const dateStr = format(dateObj, 'yyyy-MM-dd')
+					if (!dateMap.has(dateStr)) {
+						dateMap.set(dateStr, { dateObj, locationCarts: [] })
+					}
+					dateMap
+						.get(dateStr)!
+						.locationCarts.push({ location, cart, blvdDate: d })
+				}
+			}
+
+			const sortedDates = Array.from(dateMap.values()).sort(
+				(a, b) => a.dateObj.getTime() - b.dateObj.getTime(),
+			)
+
+			const mergedDates = sortedDates.map(d => ({
+				id: format(d.dateObj, 'yyyy-MM-dd'),
+				date: d.dateObj,
+				_telehealthCarts: d.locationCarts,
+			})) as unknown as BlvdBookableDate[]
+
+			setBookableDates(mergedDates)
+
+			if (mergedDates.length > 0) {
+				await handleSelectDate(mergedDates[0] as BlvdBookableDate)
+			}
+		} catch (error) {
+			setStepError(getErrorMessage(error))
+		} finally {
+			setLoadingSchedule(false)
 		}
 	}
 
@@ -588,7 +676,52 @@ export default function BlvdBookRoute() {
 		}
 	}
 
-	async function handleSelectDate(date: BlvdBookableDate) {
+	async function handleSelectDate(
+		date: BlvdBookableDate & { _telehealthCarts?: any[] },
+	) {
+		if (date._telehealthCarts) {
+			setLoadingTimes(true)
+			setStepError(null)
+			setSelectedDateId(date.id)
+			setActiveStep(null)
+			setSelectedTimeId(null)
+			setCheckoutSuccess(null)
+
+			try {
+				const allTimes = new Map<string, any>()
+				for (const locCart of date._telehealthCarts) {
+					const times = await locCart.cart.getBookableTimes(locCart.blvdDate, {
+						location: locCart.location,
+						timezone: locCart.location.tz ?? undefined,
+					})
+					for (const t of times) {
+						const timeObj = toDate(t.startTime)
+						if (!timeObj) continue
+						const timeStr = timeObj.getTime().toString()
+						if (!allTimes.has(timeStr)) {
+							allTimes.set(timeStr, {
+								id: timeStr + '-' + locCart.location.id,
+								startTime: t.startTime,
+								_locationCart: locCart,
+								_blvdTime: t,
+							})
+						}
+					}
+				}
+
+				const sortedTimes = Array.from(allTimes.values()).sort((a, b) => {
+					return toDate(a.startTime)!.getTime() - toDate(b.startTime)!.getTime()
+				})
+
+				setBookableTimes(sortedTimes as unknown as BlvdBookableTime[])
+			} catch (error) {
+				setStepError(getErrorMessage(error))
+			} finally {
+				setLoadingTimes(false)
+			}
+			return
+		}
+
 		if (!cart || !selectedLocation) return
 
 		setLoadingTimes(true)
@@ -611,7 +744,28 @@ export default function BlvdBookRoute() {
 		}
 	}
 
-	async function handleSelectTime(time: BlvdBookableTime) {
+	async function handleSelectTime(
+		time: BlvdBookableTime & { _locationCart?: any; _blvdTime?: any },
+	) {
+		if (time._locationCart) {
+			setLoadingSchedule(true)
+			setStepError(null)
+			setCheckoutSuccess(null)
+
+			try {
+				const locCart = time._locationCart
+				const nextCart = await locCart.cart.reserveBookableItems(time._blvdTime)
+				setCart(nextCart)
+				setActiveStep(null)
+				setSelectedTimeId(time.id)
+			} catch (error) {
+				setStepError(getErrorMessage(error))
+			} finally {
+				setLoadingSchedule(false)
+			}
+			return
+		}
+
 		if (!cart) return
 
 		setLoadingSchedule(true)
