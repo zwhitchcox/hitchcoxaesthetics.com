@@ -63,7 +63,11 @@ import {
 	PHONE,
 } from '#/app/utils/locations.ts'
 import { menuLinks } from '#/app/utils/menu-links.server.ts'
-import { combineHeaders, getDomainUrl, getUserImgSrc } from '#/app/utils/misc.tsx'
+import {
+	combineHeaders,
+	getDomainUrl,
+	getUserImgSrc,
+} from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { useRequestInfo } from '#/app/utils/request-info.ts'
 import { isServicePage } from '#/app/utils/site-pages.server.ts'
@@ -269,7 +273,6 @@ function Document({
 	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
 	const canonicalUrl = `${origin}${location.pathname}`
 
-
 	// JSON-LD: Knoxville-focused MedicalBusiness
 	const bearden = getLocationById('bearden')!
 	const localBusinessJsonLd = {
@@ -326,7 +329,6 @@ function Document({
 					type="text/javascript"
 					src="//cdn.callrail.com/companies/537900585/0c3f6789c4c11b8e98b9/12/swap.js"
 				/>
-
 			</head>
 			<body className="bg-background text-foreground">
 				{children}

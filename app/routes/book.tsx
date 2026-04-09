@@ -817,9 +817,9 @@ export default function BlvdBookRoute() {
 				{initializing ? (
 					<Card>
 						<CardHeader>
-							<CardTitle>Loading Boulevard Catalog</CardTitle>
+							<CardTitle>Loading...</CardTitle>
 							<CardDescription>
-								Pulling live services and locations from Boulevard.
+								Pulling live services and locations.
 							</CardDescription>
 						</CardHeader>
 					</Card>
@@ -828,7 +828,7 @@ export default function BlvdBookRoute() {
 				{initError ? (
 					<Card className="border-destructive/40">
 						<CardHeader>
-							<CardTitle>Unable To Load Boulevard</CardTitle>
+							<CardTitle>Unable To Load Services</CardTitle>
 							<CardDescription>{initError}</CardDescription>
 						</CardHeader>
 					</Card>
@@ -949,7 +949,7 @@ export default function BlvdBookRoute() {
 												No services matched that search yet.
 											</p>
 										) : (
-											<div className="grid gap-4 md:grid-cols-2">
+											<div className="grid items-start gap-4 md:grid-cols-2">
 												{filteredServices.map(service => {
 													const isSelected = selectedService?.id === service.id
 													return (
@@ -965,7 +965,7 @@ export default function BlvdBookRoute() {
 																	'border-primary bg-primary/5 shadow-sm',
 															)}
 														>
-															<div className="mb-2 flex items-start justify-between gap-4">
+															<div className="mb-2 flex w-full items-start justify-between gap-4">
 																<div>
 																	<p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
 																		{service.categoryName}
@@ -981,7 +981,7 @@ export default function BlvdBookRoute() {
 																) : null}
 															</div>
 															{service.item.description ? (
-																<p className="text-sm text-muted-foreground">
+																<p className="line-clamp-3 text-sm text-muted-foreground">
 																	{service.item.description}
 																</p>
 															) : null}

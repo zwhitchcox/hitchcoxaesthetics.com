@@ -355,7 +355,6 @@ if (typeof ENV !== 'undefined') {
 
 export function addGTM(id: string) {
 	if (typeof window === 'undefined' || typeof document === 'undefined') return
-
 	;(function (w, d, s, l, i) {
 		// @ts-expect-error
 		w[l] = w[l] || []
@@ -372,4 +371,3 @@ export function addGTM(id: string) {
 		f.parentNode.insertBefore(j, f)
 	})(window, document, 'script', 'dataLayer', id)
 }
-
