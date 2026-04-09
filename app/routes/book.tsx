@@ -27,6 +27,7 @@ import {
 	locations as siteLocations,
 } from '#app/utils/locations.ts'
 import { cn, getErrorMessage } from '#app/utils/misc.tsx'
+import { usePostHog } from '#app/utils/posthog.tsx'
 import { getAncestors, getPage } from '#app/utils/site-pages.server.ts'
 
 type SourceHint = {
@@ -309,6 +310,8 @@ export default function BlvdBookRoute() {
 	const [questionAnswers, setQuestionAnswers] = useState<
 		Record<string, unknown>
 	>({})
+	const posthog = usePostHog()
+	const pendingBookingStepsRef = useRef<Set<string>>(new Set())
 
 	useEffect(() => {
 		let cancelled = false
@@ -471,13 +474,20 @@ export default function BlvdBookRoute() {
 
 	useEffect(() => {
 		if (typeof window !== 'undefined') {
-			if ('posthog' in window) {
-				const posthog = (window as any).posthog
-				posthog.capture('booking_step_viewed', { step: currentStep })
-			}
 			window.scrollTo(0, 0)
 		}
 	}, [currentStep])
+
+	useEffect(() => {
+		pendingBookingStepsRef.current.add(currentStep)
+		if (!posthog) return
+
+		for (const step of pendingBookingStepsRef.current) {
+			posthog.capture('booking_step_viewed', { step })
+		}
+
+		pendingBookingStepsRef.current.clear()
+	}, [currentStep, posthog])
 
 	const bookableDateStrings = useMemo(() => {
 		return new Set(
@@ -884,16 +894,16 @@ export default function BlvdBookRoute() {
 				startTime: toDate(checkoutPayload.cart.startTime ?? null),
 			})
 
+			if (posthog) {
+				posthog.capture('booking_step_viewed', { step: 'success' })
+				posthog.capture('booking_completed', {
+					service: selectedService.item.name,
+					location: selectedLocation.name,
+					value: valueInDollars,
+				})
+			}
+
 			if (typeof window !== 'undefined') {
-				if ('posthog' in window) {
-					const posthog = (window as any).posthog
-					posthog.capture('booking_step_viewed', { step: 'success' })
-					posthog.capture('booking_completed', {
-						service: selectedService.item.name,
-						location: selectedLocation.name,
-						value: valueInDollars,
-					})
-				}
 				window.scrollTo({ top: 0, behavior: 'smooth' })
 			}
 		} catch (error) {
