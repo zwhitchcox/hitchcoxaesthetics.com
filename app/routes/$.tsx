@@ -70,6 +70,10 @@ export async function loader({ params }: LoaderFunctionArgs) {
 		return redirect('/microneedling/facial', { status: 301 })
 	}
 
+	if (splat === 'telehealth-weight-loss') {
+		return redirect('/medical-weight-loss-telehealth', { status: 301 })
+	}
+
 	// 301 redirect: old location-prefixed service URLs → base service URLs
 	// e.g. /knoxville-botox → /botox, /farragut-filler/lip-filler → /filler/lip-filler
 	const stripped = stripLocationPrefix(splat)

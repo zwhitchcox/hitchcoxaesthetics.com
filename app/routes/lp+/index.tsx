@@ -64,11 +64,11 @@ export default function LandingPagesIndex() {
 				</li>
 				<li>
 					<Link
-						to="/lp/telehealth-weight-loss"
+						to="/lp/medical-weight-loss-telehealth"
 						reloadDocument
 						className="text-xl font-semibold text-blue-600 hover:underline"
 					>
-						Telehealth Weight Loss
+						Medical Weight Loss (Telehealth)
 					</Link>
 				</li>
 				<li>

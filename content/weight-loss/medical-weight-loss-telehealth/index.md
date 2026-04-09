@@ -1,7 +1,7 @@
 ---
-name: Telehealth Weight Loss
-tagline: shipped directly to your door anywhere in TN
-title: Telehealth Medical Weight Loss | TN Statewide | Sarah Hitchcox Aesthetics
+name: Medical Weight Loss (Telehealth)
+tagline: virtual care with medication shipped anywhere in Tennessee
+title: Medical Weight Loss (Telehealth) | Tennessee | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Telehealth medical weight loss in Tennessee. Semaglutide starts at $150/mo and
   Tirzepatide at $250/mo. Medications shipped to your door. Book a free virtual
@@ -10,7 +10,7 @@ statewide: true
 shortDescription: >-
   Expert medical weight loss with Semaglutide or Tirzepatide, managed 100%
   virtually. Get your medication shipped directly to you anywhere in Tennessee.
-whyChooseTitle: Virtual Medical Weight Loss in Tennessee
+whyChooseTitle: Medical Weight Loss (Telehealth) in Tennessee
 whyChoose: >-
   Our telehealth program is perfect for patients across Tennessee who want the
   proven benefits of our medical weight-loss program without the commute. You
@@ -44,7 +44,7 @@ faq:
       safely and effectively.
 sections:
   - type: features-grid
-    title: Key Benefits of Telehealth Weight Loss
+    title: Key Benefits of Medical Weight Loss (Telehealth)
     items:
       - title: Convenient Care
         description:
@@ -62,7 +62,7 @@ sections:
           support.
         icon: check-circle
   - type: faq-accordion
-    title: Telehealth Weight Loss FAQs
+    title: Medical Weight Loss (Telehealth) FAQs
     items:
       - question: How does the telehealth process work?
         answer: >-
@@ -85,7 +85,7 @@ heroImages:
     after: /img/before-after/semaglutide-002-after.webp
 ---
 
-## Telehealth Medical Weight Loss in Tennessee
+## Medical Weight Loss (Telehealth) in Tennessee
 
 Our telehealth weight-loss program offers the same expert medical supervision
 and prescription options as our in-clinic visits, all from the comfort of your

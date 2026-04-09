@@ -12,7 +12,7 @@ const EMAIL = 'sarah@hitchcoxaesthetics.com'
 type WeightLossServiceSlug =
 	| 'semaglutide'
 	| 'tirzepatide'
-	| 'telehealth-weight-loss'
+	| 'medical-weight-loss-telehealth'
 
 type WeightLossLandingPageConfig = {
 	alternateHref: string
@@ -282,7 +282,7 @@ const weightLossLandingPages: Record<
 			},
 		],
 	},
-	'telehealth-weight-loss': {
+	'medical-weight-loss-telehealth': {
 		alternateHref: '/lp/semaglutide',
 		alternateLabel: 'Compare in-person options',
 		benefits: [
@@ -326,9 +326,9 @@ const weightLossLandingPages: Record<
 					'No. You get the exact same competitive pricing as our in-office patients. Semaglutide programs start at $150/month and Tirzepatide starts at $250/month.',
 			},
 		],
-		heroBadge: 'Virtual Medical Weight Loss in Tennessee',
-		heroHeadline: 'Free Telehealth Weight-Loss Consultation',
-		heroImageAlt: 'Sarah Hitchcox Aesthetics Telehealth Weight Loss',
+		heroBadge: 'Medical Weight Loss (Telehealth) in Tennessee',
+		heroHeadline: 'Free Medical Weight Loss (Telehealth) Consultation',
+		heroImageAlt: 'Sarah Hitchcox Aesthetics Medical Weight Loss Telehealth',
 		heroImageSrc: '/img/sarah.jpg',
 		heroSummary:
 			'Get expert medical weight-loss support, GLP-1 medications, and dedicated check-ins from the comfort of your home, shipped anywhere in TN.',
@@ -336,7 +336,7 @@ const weightLossLandingPages: Record<
 			'Telehealth medical weight loss in Tennessee. Semaglutide starts at $150/mo and Tirzepatide at $250/mo. Medications shipped to your door. Book a free virtual consultation.',
 		outcomeLabel: 'Shipped to your door anywhere in TN',
 		pageTitle:
-			'Telehealth Weight Loss | TN Statewide | Sarah Hitchcox Aesthetics',
+			'Medical Weight Loss (Telehealth) | Tennessee | Sarah Hitchcox Aesthetics',
 		pricingCards: [
 			{
 				title: 'Free virtual consultation',
@@ -383,8 +383,8 @@ const weightLossLandingPages: Record<
 			'Trusted by patients across Tennessee for convenient, expert care',
 		resultsIntro:
 			'Our virtual patients achieve the same incredible, steady progress as our in-office patients, all with the convenience of at-home care.',
-		serviceLabel: 'Telehealth Weight Loss',
-		slug: 'telehealth-weight-loss',
+		serviceLabel: 'Medical Weight Loss (Telehealth)',
+		slug: 'medical-weight-loss-telehealth',
 		startingPriceLabel: 'Starting at $150/month',
 		subheadline:
 			'Expert medical weight loss with Semaglutide or Tirzepatide, managed 100% virtually. Get your medication shipped directly to you anywhere in Tennessee.',
@@ -408,7 +408,7 @@ function isWeightLossServiceSlug(slug: string): slug is WeightLossServiceSlug {
 	return (
 		slug === 'semaglutide' ||
 		slug === 'tirzepatide' ||
-		slug === 'telehealth-weight-loss'
+		slug === 'medical-weight-loss-telehealth'
 	)
 }
 
