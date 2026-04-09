@@ -24,6 +24,7 @@ type Frontmatter = {
 	title: string
 	metaDescription: string
 	enabled?: boolean
+	statewide?: boolean
 	shortDescription?: string
 	whyChooseTitle?: string
 	whyChoose?: string
@@ -305,6 +306,7 @@ export function loadAllServicePages(): Record<string, SitePage> {
 			tagline: fm.tagline,
 			title: fm.title,
 			metaDescription: fm.metaDescription,
+			statewide: fm.statewide,
 			content,
 			parent,
 			children,

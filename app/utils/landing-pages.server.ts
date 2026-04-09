@@ -9,7 +9,10 @@ const CALL_LABEL = '(865) 426-1826'
 const CALL_URL = 'tel:8654261826'
 const EMAIL = 'sarah@hitchcoxaesthetics.com'
 
-type WeightLossServiceSlug = 'semaglutide' | 'tirzepatide'
+type WeightLossServiceSlug =
+	| 'semaglutide'
+	| 'tirzepatide'
+	| 'telehealth-weight-loss'
 
 type WeightLossLandingPageConfig = {
 	alternateHref: string
@@ -35,6 +38,7 @@ type WeightLossLandingPageConfig = {
 	startingPriceLabel: string
 	subheadline: string
 	twoUpImages: Array<{ after: string; before: string; label: string }>
+	isVirtual?: boolean
 }
 
 const weightLossLandingPages: Record<
@@ -278,10 +282,134 @@ const weightLossLandingPages: Record<
 			},
 		],
 	},
+	'telehealth-weight-loss': {
+		alternateHref: '/lp/semaglutide',
+		alternateLabel: 'Compare in-person options',
+		benefits: [
+			{
+				title: 'Convenient care from anywhere in TN',
+				description:
+					'Complete your consultation, follow-ups, and program management entirely over the phone or video call. No office visits required.',
+			},
+			{
+				title: 'Medication shipped directly to your door',
+				description:
+					'Once approved, your GLP-1 or GIP/GLP-1 medication (Semaglutide or Tirzepatide) and all necessary supplies are shipped directly to your home in Tennessee.',
+			},
+			{
+				title: 'Same expert medical supervision',
+				description:
+					'You get the exact same level of care, personalized dosing, and ongoing support from Sarah Hitchcox Aesthetics, just in a more convenient virtual format.',
+			},
+		],
+		comparisonCopy:
+			'Our telehealth program is perfect for patients across Tennessee who want the proven benefits of our medical weight-loss program without the commute. You receive the same medications, the same pricing, and the same dedicated support.',
+		comparisonStats: [
+			'Starts at $150/month',
+			'100% Virtual Consultations & Follow-ups',
+			'Medication shipped directly to you anywhere in TN',
+		],
+		faqs: [
+			{
+				question: 'How does the telehealth process work?',
+				answer:
+					'You book a virtual consultation, we discuss your health history and goals over the phone or via video, and if approved, your medication is prescribed and shipped directly to your door.',
+			},
+			{
+				question: 'Where can you ship the medication?',
+				answer:
+					'We can ship weight-loss medications anywhere within the state of Tennessee.',
+			},
+			{
+				question: 'Is the pricing different for telehealth?',
+				answer:
+					'No. You get the exact same competitive pricing as our in-office patients. Semaglutide programs start at $150/month and Tirzepatide starts at $250/month.',
+			},
+		],
+		heroBadge: 'Virtual Medical Weight Loss in Tennessee',
+		heroHeadline: 'Free Telehealth Weight-Loss Consultation',
+		heroImageAlt: 'Sarah Hitchcox Aesthetics Telehealth Weight Loss',
+		heroImageSrc: '/img/sarah.jpg',
+		heroSummary:
+			'Get expert medical weight-loss support, GLP-1 medications, and dedicated check-ins from the comfort of your home, shipped anywhere in TN.',
+		metaDescription:
+			'Telehealth medical weight loss in Tennessee. Semaglutide starts at $150/mo and Tirzepatide at $250/mo. Medications shipped to your door. Book a free virtual consultation.',
+		outcomeLabel: 'Shipped to your door anywhere in TN',
+		pageTitle:
+			'Telehealth Weight Loss | TN Statewide | Sarah Hitchcox Aesthetics',
+		pricingCards: [
+			{
+				title: 'Free virtual consultation',
+				price: '$0',
+				detail:
+					'Review your goals, medical history, and candidacy from anywhere in Tennessee.',
+			},
+			{
+				title: 'Semaglutide program',
+				price: 'Starting at $150/month',
+				detail:
+					'Includes your medication, shipped supplies, and virtual medical oversight.',
+			},
+			{
+				title: 'Tirzepatide program',
+				price: 'Starting at $250/month',
+				detail:
+					'Our dual-action GLP-1/GIP option, including medication shipped to you and ongoing virtual support.',
+			},
+		],
+		processSteps: [
+			{
+				title: 'Book a virtual consult',
+				detail:
+					'Schedule a time that works for you. We will discuss your health background and weight-loss goals over the phone or video.',
+			},
+			{
+				title: 'Get your custom plan',
+				detail:
+					'If you are a candidate, we will build a dosing approach and prescribe the medication that best fits your needs.',
+			},
+			{
+				title: 'Receive your medication',
+				detail:
+					'Your medication and all necessary supplies are shipped directly to your home address in Tennessee.',
+			},
+			{
+				title: 'Check in virtually',
+				detail:
+					'We track your progress and adjust your dosing over time through convenient virtual check-ins.',
+			},
+		],
+		proofLabel:
+			'Trusted by patients across Tennessee for convenient, expert care',
+		resultsIntro:
+			'Our virtual patients achieve the same incredible, steady progress as our in-office patients, all with the convenience of at-home care.',
+		serviceLabel: 'Telehealth Weight Loss',
+		slug: 'telehealth-weight-loss',
+		startingPriceLabel: 'Starting at $150/month',
+		subheadline:
+			'Expert medical weight loss with Semaglutide or Tirzepatide, managed 100% virtually. Get your medication shipped directly to you anywhere in Tennessee.',
+		twoUpImages: [
+			{
+				label: 'Patient progress example',
+				before: '/img/before-after/semaglutide-001-before.webp',
+				after: '/img/before-after/semaglutide-001-after.webp',
+			},
+			{
+				label: 'Additional transformation',
+				before: '/img/before-after/semaglutide-002-before.webp',
+				after: '/img/before-after/semaglutide-002-after.webp',
+			},
+		],
+		isVirtual: true,
+	},
 }
 
 function isWeightLossServiceSlug(slug: string): slug is WeightLossServiceSlug {
-	return slug === 'semaglutide' || slug === 'tirzepatide'
+	return (
+		slug === 'semaglutide' ||
+		slug === 'tirzepatide' ||
+		slug === 'telehealth-weight-loss'
+	)
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
@@ -941,10 +1069,14 @@ function buildWeightLossLandingPageHtml(config: WeightLossLandingPageConfig) {
             <p>If you are comparing medications or wondering what the first appointment looks like, these are the questions we hear most often.</p>
           </div>
         </div>
-        <div class="faq-wrap">${faqHtml}</div>
+		<div class="faq-wrap">${faqHtml}</div>
       </div>
     </section>
 
+	${
+		config.isVirtual
+			? ''
+			: `
     <section class="section">
       <div class="container">
         <div class="section-header">
@@ -956,6 +1088,8 @@ function buildWeightLossLandingPageHtml(config: WeightLossLandingPageConfig) {
         <div class="locations-grid">${renderLocations()}</div>
       </div>
     </section>
+`
+	}
 
     <section class="section">
       <div class="container">

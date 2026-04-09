@@ -90,9 +90,12 @@ export function useBlvdUrl() {
 	return useMemo(() => buildBlvdUrl(), [])
 }
 
-export function useBlvdHtml(html: string) {
+export function useBlvdHtml(html: string, suffix: string = '') {
 	const blvdUrl = useBlvdUrl()
-	return useMemo(() => replaceBlvdBookingUrls(html, blvdUrl), [blvdUrl, html])
+	return useMemo(
+		() => replaceBlvdBookingUrls(html, blvdUrl + suffix),
+		[blvdUrl, html, suffix],
+	)
 }
 
 export function useBlvdTracking() {

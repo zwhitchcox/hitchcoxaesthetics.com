@@ -197,9 +197,12 @@ export default function DynamicPage() {
 		})),
 	]
 
-	const title = page.name.toLowerCase().includes('knoxville')
+	const isStatewide = page.statewide === true
+	const title = isStatewide
 		? page.name
-		: `${page.name} Knoxville`
+		: page.name.toLowerCase().includes('knoxville')
+			? page.name
+			: `${page.name} Knoxville`
 
 	return (
 		<ServiceLayout title={title} description={page.tagline} imgs={imgs}>
@@ -247,13 +250,16 @@ export default function DynamicPage() {
 									to={`/${ancestor.path}`}
 									className="font-medium text-primary hover:underline"
 								>
-									{ancestor.name.toLowerCase()} treatments in Knoxville
+									{isStatewide
+										? `${ancestor.name.toLowerCase()} treatments in Tennessee`
+										: `${ancestor.name.toLowerCase()} treatments in Knoxville`}
 								</Link>
 								{i < (ancestors ?? []).length - 1 && ' under our '}
 							</span>
 						))}{' '}
-						at Sarah Hitchcox Aesthetics in Knoxville, TN. Browse our full range
-						of services to find the right treatment for your goals.
+						{isStatewide
+							? 'at Sarah Hitchcox Aesthetics. Browse our full range of services to find the right treatment for your goals anywhere in Tennessee.'
+							: 'at Sarah Hitchcox Aesthetics in Knoxville, TN. Browse our full range of services to find the right treatment for your goals.'}
 					</p>
 				</div>
 			)}
@@ -267,7 +273,11 @@ export default function DynamicPage() {
 			{/* Sub-service Grid (for pages with children) */}
 			{childCards.length > 0 && (
 				<div className="mt-12">
-					<ServiceHeader>{page.name} Treatments in Knoxville</ServiceHeader>
+					<ServiceHeader>
+						{isStatewide
+							? `${page.name} Program Options in Tennessee`
+							: `${page.name} Treatments in Knoxville`}
+					</ServiceHeader>
 					<div className="mt-6">
 						<ServiceCardGrid services={childCards} variant="thumbnail" />
 					</div>
@@ -278,7 +288,9 @@ export default function DynamicPage() {
 			{(siblings ?? []).length > 0 && (
 				<div className="mt-12 border-t border-gray-200 pt-8">
 					<ServiceHeader>
-						Related Aesthetic Treatments in Knoxville
+						{isStatewide
+							? 'Related Aesthetic Treatments in Tennessee'
+							: 'Related Aesthetic Treatments in Knoxville'}
 					</ServiceHeader>
 					<div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						{(siblings ?? []).map(sibling => (
@@ -310,25 +322,27 @@ export default function DynamicPage() {
 			)}
 
 			{/* Location links */}
-			<div className="mt-8 rounded-lg border border-gray-100 bg-white p-6">
-				<p className="text-gray-600">
-					Available at both of our Knoxville area locations:{' '}
-					<Link
-						to="/bearden"
-						className="font-medium text-primary hover:underline"
-					>
-						Bearden (West Knoxville)
-					</Link>
-					{' and '}
-					<Link
-						to="/farragut"
-						className="font-medium text-primary hover:underline"
-					>
-						Farragut
-					</Link>
-					.
-				</p>
-			</div>
+			{!isStatewide ? (
+				<div className="mt-8 rounded-lg border border-gray-100 bg-white p-6">
+					<p className="text-gray-600">
+						Available at both of our Knoxville area locations:{' '}
+						<Link
+							to="/bearden"
+							className="font-medium text-primary hover:underline"
+						>
+							Bearden (West Knoxville)
+						</Link>
+						{' and '}
+						<Link
+							to="/farragut"
+							className="font-medium text-primary hover:underline"
+						>
+							Farragut
+						</Link>
+						.
+					</p>
+				</div>
+			) : null}
 
 			{/* CTA */}
 			<div className="mt-12 flex flex-col items-center justify-center">

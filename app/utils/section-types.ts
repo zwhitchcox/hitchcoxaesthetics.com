@@ -11,6 +11,7 @@ export type SitePage = {
 	title: string
 	metaDescription: string
 	content: string
+	statewide?: boolean
 	heroImage?: string
 	/** All before/after image pairs for the carousel */
 	heroImages?: HeroImagePair[]

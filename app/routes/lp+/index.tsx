@@ -64,6 +64,15 @@ export default function LandingPagesIndex() {
 				</li>
 				<li>
 					<Link
+						to="/lp/telehealth-weight-loss"
+						reloadDocument
+						className="text-xl font-semibold text-blue-600 hover:underline"
+					>
+						Telehealth Weight Loss
+					</Link>
+				</li>
+				<li>
+					<Link
 						to="/lp/weight-loss-semaglutide"
 						reloadDocument
 						className="text-xl font-semibold text-blue-600 hover:underline"
