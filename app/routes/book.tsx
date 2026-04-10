@@ -22,6 +22,7 @@ import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { Textarea } from '#app/components/ui/textarea.tsx'
 import { getEstimatedValueForBlvdService } from '#app/utils/blvd-pricing.ts'
+import { getBookingAnalyticsEventProperties } from '#app/utils/booking-analytics.ts'
 import {
 	type Location as SiteLocation,
 	locations as siteLocations,
@@ -128,8 +129,19 @@ type BlvdCategory = {
 	name: string
 }
 
+type BlvdPaymentMethod = {
+	id: string
+	name: string
+}
+
 type BlvdCart = {
 	bookingQuestions: BlvdBookingQuestion[]
+	clientInformation?: {
+		email?: string | null
+		firstName?: string | null
+		lastName?: string | null
+		phoneNumber?: string | null
+	} | null
 	endTime?: Date | string | null
 	id: string
 	summary: {
@@ -157,6 +169,7 @@ type BlvdCart = {
 		appointments: Array<{ appointmentId: string }>
 		cart: BlvdCart
 	}>
+	getAvailablePaymentMethods(): Promise<BlvdPaymentMethod[]>
 	getAvailableCategories(): Promise<BlvdCategory[]>
 	getBookableDates(opts?: {
 		location?: BlvdLocation
@@ -167,6 +180,9 @@ type BlvdCart = {
 		opts?: { location?: BlvdLocation; timezone?: string },
 	): Promise<BlvdBookableTime[]>
 	reserveBookableItems(time: BlvdBookableTime): Promise<BlvdCart>
+	sendOwnershipCodeBySms(mobilePhone: string): Promise<string>
+	selectPaymentMethod(paymentMethod: BlvdPaymentMethod): Promise<BlvdCart>
+	takeOwnershipByCode(codeId: string, codeValue: number): Promise<BlvdCart>
 	update(opts: {
 		clientInformation?: {
 			email?: string
@@ -307,11 +323,24 @@ export default function BlvdBookRoute() {
 		notes: '',
 		phone: '',
 	})
+	const [ownershipCodeId, setOwnershipCodeId] = useState<string | null>(null)
+	const [ownershipCodeValue, setOwnershipCodeValue] = useState('')
+	const [sendingOwnershipCode, setSendingOwnershipCode] = useState(false)
+	const [verifyingOwnershipCode, setVerifyingOwnershipCode] = useState(false)
+	const [ownershipVerifiedPhone, setOwnershipVerifiedPhone] = useState<
+		string | null
+	>(null)
+	const [availablePaymentMethods, setAvailablePaymentMethods] = useState<
+		BlvdPaymentMethod[]
+	>([])
+	const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState('new')
 	const [questionAnswers, setQuestionAnswers] = useState<
 		Record<string, unknown>
 	>({})
 	const posthog = usePostHog()
+	const didCaptureBookingFunnelEnteredRef = useRef(false)
 	const pendingBookingStepsRef = useRef<Set<string>>(new Set())
+	const bookingAnalyticsPropertiesRef = useRef<Record<string, unknown>>({})
 
 	useEffect(() => {
 		let cancelled = false
@@ -424,6 +453,56 @@ export default function BlvdBookRoute() {
 		? (getSiteLocationForBlvdLocation(selectedLocation) ?? null)
 		: null
 	const requiresCard = Boolean(cart?.summary.paymentMethodRequired)
+	const hasVerifiedClient = Boolean(ownershipVerifiedPhone)
+	const selectedExistingPaymentMethod =
+		selectedPaymentMethodId === 'new'
+			? null
+			: (availablePaymentMethods.find(
+					paymentMethod => paymentMethod.id === selectedPaymentMethodId,
+				) ?? null)
+	const shouldCollectCardDetails =
+		requiresCard && !selectedExistingPaymentMethod
+	const sourceHintAnalyticsProperties = useMemo(
+		() => ({
+			book_source_hint_label: activeSourceHint?.label,
+			book_source_hint_path: activeSourceHint?.path,
+			book_source_hint_search: activeSourceHint?.search,
+			book_source_location_hint: activeSourceHint?.preferredLocationId,
+		}),
+		[
+			activeSourceHint?.label,
+			activeSourceHint?.path,
+			activeSourceHint?.preferredLocationId,
+			activeSourceHint?.search,
+		],
+	)
+	const selectionAnalyticsProperties = useMemo(
+		() =>
+			buildBookingSelectionEventProperties({
+				availablePaymentMethodCount: availablePaymentMethods.length,
+				cart,
+				hasVerifiedClient,
+				selectedExistingPaymentMethod,
+				selectedLocation,
+				selectedService,
+			}),
+		[
+			availablePaymentMethods.length,
+			cart,
+			hasVerifiedClient,
+			selectedExistingPaymentMethod,
+			selectedLocation,
+			selectedService,
+		],
+	)
+
+	useEffect(() => {
+		bookingAnalyticsPropertiesRef.current = {
+			...getBookingAnalyticsEventProperties(),
+			...sourceHintAnalyticsProperties,
+			...selectionAnalyticsProperties,
+		}
+	}, [selectionAnalyticsProperties, sourceHintAnalyticsProperties])
 
 	const filteredServices = useMemo(() => {
 		const trimmedSearch = search.trim()
@@ -483,7 +562,10 @@ export default function BlvdBookRoute() {
 		if (!posthog) return
 
 		for (const step of pendingBookingStepsRef.current) {
-			posthog.capture('booking_step_viewed', { step })
+			posthog.capture('booking_step_viewed', {
+				...bookingAnalyticsPropertiesRef.current,
+				step,
+			})
 		}
 
 		pendingBookingStepsRef.current.clear()
@@ -498,13 +580,25 @@ export default function BlvdBookRoute() {
 	}, [bookableDates])
 
 	useEffect(() => {
+		if (didCaptureBookingFunnelEnteredRef.current) return
+		if (!hasEvaluatedReferrerHint || !posthog) return
+
+		didCaptureBookingFunnelEnteredRef.current = true
+		posthog.capture('booking_funnel_entered', {
+			...bookingAnalyticsPropertiesRef.current,
+			booking_prefill_search:
+				activeSourceHint?.search || search.trim() || undefined,
+		})
+	}, [activeSourceHint?.search, hasEvaluatedReferrerHint, posthog, search])
+
+	useEffect(() => {
 		if (didHandleInitialEntryBehavior.current) return
 		if (initializing || initError || !hasEvaluatedReferrerHint) return
 
 		didHandleInitialEntryBehavior.current = true
 
 		if (typeof window !== 'undefined' && 'gtag' in window) {
-			;(window as any).gtag('event', 'cart_created', {})
+			trackGoogleEvent('cart_created')
 		}
 
 		if (selectedService) return
@@ -514,6 +608,14 @@ export default function BlvdBookRoute() {
 			searchInputRef.current?.select()
 		}, 100)
 	}, [hasEvaluatedReferrerHint, initError, initializing, selectedService])
+
+	function resetReturningClientState() {
+		setOwnershipCodeId(null)
+		setOwnershipCodeValue('')
+		setOwnershipVerifiedPhone(null)
+		setAvailablePaymentMethods([])
+		setSelectedPaymentMethodId('new')
+	}
 
 	async function handleSelectService(service: ServiceEntry) {
 		setLoadingLocations(true)
@@ -529,11 +631,11 @@ export default function BlvdBookRoute() {
 		setSelectedDateId(null)
 		setSelectedTimeId(null)
 		setQuestionAnswers({})
+		setDetailsSubmitted(false)
+		resetReturningClientState()
 
 		try {
-			const isTelehealth = service.item.name
-				.toLowerCase()
-				.includes('telehealth')
+			const isTelehealth = isTelehealthServiceName(service.item.name)
 			const variants = await service.item.getLocationVariants()
 			const nextLocations = sortLocationsByPreference(
 				dedupeLocations(variants.map(variant => variant.location)),
@@ -564,6 +666,8 @@ export default function BlvdBookRoute() {
 		setLoadingSchedule(true)
 		setStepError(null)
 		setCheckoutSuccess(null)
+		setDetailsSubmitted(false)
+		resetReturningClientState()
 
 		const telehealthLocation = {
 			id: 'telehealth',
@@ -648,6 +752,8 @@ export default function BlvdBookRoute() {
 		setCheckoutSuccess(null)
 		setSelectedLocation(location)
 		setActiveStep('location')
+		setDetailsSubmitted(false)
+		resetReturningClientState()
 		setBookableDates([])
 		setBookableTimes([])
 		setSelectedDateId(null)
@@ -694,6 +800,7 @@ export default function BlvdBookRoute() {
 			setStepError(null)
 			setSelectedDateId(date.id)
 			setActiveStep(null)
+			setDetailsSubmitted(false)
 			setSelectedTimeId(null)
 			setCheckoutSuccess(null)
 
@@ -738,6 +845,7 @@ export default function BlvdBookRoute() {
 		setStepError(null)
 		setSelectedDateId(date.id)
 		setActiveStep(null)
+		setDetailsSubmitted(false)
 		setSelectedTimeId(null)
 		setCheckoutSuccess(null)
 
@@ -761,6 +869,7 @@ export default function BlvdBookRoute() {
 			setLoadingSchedule(true)
 			setStepError(null)
 			setCheckoutSuccess(null)
+			setDetailsSubmitted(false)
 
 			try {
 				const locCart = time._locationCart
@@ -781,6 +890,7 @@ export default function BlvdBookRoute() {
 		setLoadingSchedule(true)
 		setStepError(null)
 		setCheckoutSuccess(null)
+		setDetailsSubmitted(false)
 
 		try {
 			const nextCart = await cart.reserveBookableItems(time)
@@ -802,6 +912,7 @@ export default function BlvdBookRoute() {
 		const validationError = validateClientDetails({
 			answers: questionAnswers,
 			clientForm,
+			requireClientInformation: !hasVerifiedClient,
 			questions: cart.bookingQuestions,
 		})
 		if (validationError) {
@@ -819,7 +930,7 @@ export default function BlvdBookRoute() {
 
 		if (!cart || !selectedService || !selectedLocation) return
 
-		if (requiresCard) {
+		if (shouldCollectCardDetails) {
 			const paymentError = validatePaymentDetails(clientForm)
 			if (paymentError) {
 				setStepError(paymentError)
@@ -831,15 +942,25 @@ export default function BlvdBookRoute() {
 		setStepError(null)
 
 		try {
-			let nextCart = await cart.update({
-				clientInformation: {
-					email: clientForm.email.trim(),
-					firstName: clientForm.firstName.trim(),
-					lastName: clientForm.lastName.trim(),
-					phoneNumber: normalizePhoneNumber(clientForm.phone),
-				},
-				clientMessage: clientForm.notes.trim() || undefined,
-			})
+			let nextCart = cart
+
+			if (hasVerifiedClient) {
+				if (clientForm.notes.trim()) {
+					nextCart = await nextCart.update({
+						clientMessage: clientForm.notes.trim(),
+					})
+				}
+			} else {
+				nextCart = await nextCart.update({
+					clientInformation: {
+						email: clientForm.email.trim(),
+						firstName: clientForm.firstName.trim(),
+						lastName: clientForm.lastName.trim(),
+						phoneNumber: normalizePhoneNumber(clientForm.phone),
+					},
+					clientMessage: clientForm.notes.trim() || undefined,
+				})
+			}
 
 			for (const questionId of nextCart.bookingQuestions.map(
 				question => question.id,
@@ -857,7 +978,14 @@ export default function BlvdBookRoute() {
 				)
 			}
 
-			if (nextCart.summary.paymentMethodRequired) {
+			if (
+				nextCart.summary.paymentMethodRequired &&
+				selectedExistingPaymentMethod
+			) {
+				nextCart = await nextCart.selectPaymentMethod(
+					selectedExistingPaymentMethod,
+				)
+			} else if (nextCart.summary.paymentMethodRequired) {
 				const card = parseCardDetails(clientForm)
 				nextCart = await nextCart.addCardPaymentMethod({ card })
 			}
@@ -870,7 +998,7 @@ export default function BlvdBookRoute() {
 			)
 
 			if (typeof window !== 'undefined' && 'gtag' in window) {
-				;(window as any).gtag('event', 'purchase', {
+				trackGoogleEvent('purchase', {
 					currency: 'USD',
 					value: valueInDollars,
 					items: [
@@ -895,8 +1023,19 @@ export default function BlvdBookRoute() {
 			})
 
 			if (posthog) {
-				posthog.capture('booking_step_viewed', { step: 'success' })
+				posthog.capture('booking_step_viewed', {
+					...bookingAnalyticsPropertiesRef.current,
+					step: 'success',
+				})
 				posthog.capture('booking_completed', {
+					...bookingAnalyticsPropertiesRef.current,
+					appointment_count: checkoutPayload.appointments.length,
+					booking_selected_payment_method_type: requiresCard
+						? selectedExistingPaymentMethod
+							? 'saved_card'
+							: 'new_card'
+						: 'none_required',
+					booking_value_usd: valueInDollars,
 					service: selectedService.item.name,
 					location: selectedLocation.name,
 					value: valueInDollars,
@@ -960,7 +1099,92 @@ export default function BlvdBookRoute() {
 		event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
 	) {
 		const { name, value } = event.currentTarget
+		if (name === 'phone') {
+			resetReturningClientState()
+		}
 		setClientForm(currentForm => ({ ...currentForm, [name]: value }))
+	}
+
+	async function handleSendOwnershipCode() {
+		if (!cart) return
+
+		if (!looksLikePhoneNumber(clientForm.phone)) {
+			setStepError(
+				'Enter a valid mobile phone number before requesting a verification code.',
+			)
+			return
+		}
+
+		setSendingOwnershipCode(true)
+		setStepError(null)
+
+		try {
+			const codeId = await cart.sendOwnershipCodeBySms(
+				normalizePhoneNumber(clientForm.phone),
+			)
+			setOwnershipCodeId(codeId)
+			setOwnershipCodeValue('')
+			setOwnershipVerifiedPhone(null)
+			setAvailablePaymentMethods([])
+			setSelectedPaymentMethodId('new')
+		} catch (error) {
+			setStepError(getErrorMessage(error))
+		} finally {
+			setSendingOwnershipCode(false)
+		}
+	}
+
+	async function handleVerifyOwnershipCode() {
+		if (!cart || !ownershipCodeId) return
+
+		const normalizedCode = ownershipCodeValue.replace(/\D/g, '')
+		if (normalizedCode.length !== 6) {
+			setStepError(
+				'Enter the 6-digit verification code from your text message.',
+			)
+			return
+		}
+
+		setVerifyingOwnershipCode(true)
+		setStepError(null)
+
+		try {
+			const nextCart = await cart.takeOwnershipByCode(
+				ownershipCodeId,
+				Number(normalizedCode),
+			)
+			setCart(nextCart)
+			setOwnershipVerifiedPhone(normalizePhoneNumber(clientForm.phone))
+			setOwnershipCodeValue('')
+
+			const nextClientInformation = nextCart.clientInformation
+			if (nextClientInformation) {
+				setClientForm(currentForm => ({
+					...currentForm,
+					email: currentForm.email.trim() || nextClientInformation.email || '',
+					firstName:
+						currentForm.firstName.trim() ||
+						nextClientInformation.firstName ||
+						'',
+					lastName:
+						currentForm.lastName.trim() || nextClientInformation.lastName || '',
+				}))
+			}
+
+			let nextPaymentMethods: BlvdPaymentMethod[] = []
+			try {
+				nextPaymentMethods = await nextCart.getAvailablePaymentMethods()
+			} catch {
+				// Payment methods are helpful but not required to continue.
+			}
+
+			setAvailablePaymentMethods(nextPaymentMethods)
+			setSelectedPaymentMethodId(nextPaymentMethods[0]?.id ?? 'new')
+		} catch (error) {
+			setStepError(getErrorMessage(error))
+		} finally {
+			setVerifyingOwnershipCode(false)
+		}
 	}
 
 	return (
@@ -1459,35 +1683,7 @@ export default function BlvdBookRoute() {
 												onSubmit={handleDetailsSubmit}
 											>
 												<div className="grid gap-4 md:grid-cols-2">
-													<div className="space-y-2">
-														<Label htmlFor="firstName">First name</Label>
-														<Input
-															id="firstName"
-															name="firstName"
-															value={clientForm.firstName}
-															onChange={updateClientForm}
-														/>
-													</div>
-													<div className="space-y-2">
-														<Label htmlFor="lastName">Last name</Label>
-														<Input
-															id="lastName"
-															name="lastName"
-															value={clientForm.lastName}
-															onChange={updateClientForm}
-														/>
-													</div>
-													<div className="space-y-2">
-														<Label htmlFor="email">Email</Label>
-														<Input
-															id="email"
-															name="email"
-															type="email"
-															value={clientForm.email}
-															onChange={updateClientForm}
-														/>
-													</div>
-													<div className="space-y-2">
+													<div className="space-y-2 md:col-span-2">
 														<Label htmlFor="phone">Mobile phone</Label>
 														<Input
 															id="phone"
@@ -1497,6 +1693,115 @@ export default function BlvdBookRoute() {
 															onChange={updateClientForm}
 														/>
 													</div>
+													<div className="space-y-4 rounded-xl border p-5 md:col-span-2">
+														<div className="space-y-1">
+															<h3 className="text-lg font-semibold">
+																Returning client?
+															</h3>
+															<p className="text-sm text-muted-foreground">
+																Verify the mobile number on your Boulevard
+																account to link this booking to your existing
+																patient record.
+															</p>
+														</div>
+														{hasVerifiedClient ? (
+															<div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
+																Your number is verified. We will use the
+																existing Boulevard patient record on file for
+																this booking.
+															</div>
+														) : (
+															<div className="space-y-3">
+																<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+																	<Button
+																		type="button"
+																		variant="outline"
+																		onClick={() => {
+																			void handleSendOwnershipCode()
+																		}}
+																		disabled={sendingOwnershipCode}
+																	>
+																		{sendingOwnershipCode
+																			? 'Sending Code...'
+																			: ownershipCodeId
+																				? 'Send A New Code'
+																				: 'Text Me A Code'}
+																	</Button>
+																	{ownershipCodeId ? (
+																		<p className="text-sm text-muted-foreground">
+																			Enter the 6-digit code from your text to
+																			continue as a returning client.
+																		</p>
+																	) : null}
+																</div>
+																{ownershipCodeId ? (
+																	<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+																		<Input
+																			value={ownershipCodeValue}
+																			onChange={event => {
+																				setOwnershipCodeValue(
+																					event.currentTarget.value
+																						.replace(/\D/g, '')
+																						.slice(0, 6),
+																				)
+																			}}
+																			inputMode="numeric"
+																			maxLength={6}
+																			placeholder="123456"
+																		/>
+																		<Button
+																			type="button"
+																			onClick={() => {
+																				void handleVerifyOwnershipCode()
+																			}}
+																			disabled={verifyingOwnershipCode}
+																		>
+																			{verifyingOwnershipCode
+																				? 'Verifying...'
+																				: 'Verify Code'}
+																		</Button>
+																	</div>
+																) : null}
+															</div>
+														)}
+													</div>
+													{hasVerifiedClient ? (
+														<div className="rounded-xl border p-5 text-sm text-muted-foreground md:col-span-2">
+															Your contact details are already attached through
+															the verified Boulevard record.
+														</div>
+													) : (
+														<>
+															<div className="space-y-2">
+																<Label htmlFor="firstName">First name</Label>
+																<Input
+																	id="firstName"
+																	name="firstName"
+																	value={clientForm.firstName}
+																	onChange={updateClientForm}
+																/>
+															</div>
+															<div className="space-y-2">
+																<Label htmlFor="lastName">Last name</Label>
+																<Input
+																	id="lastName"
+																	name="lastName"
+																	value={clientForm.lastName}
+																	onChange={updateClientForm}
+																/>
+															</div>
+															<div className="space-y-2 md:col-span-2">
+																<Label htmlFor="email">Email</Label>
+																<Input
+																	id="email"
+																	name="email"
+																	type="email"
+																	value={clientForm.email}
+																	onChange={updateClientForm}
+																/>
+															</div>
+														</>
+													)}
 												</div>
 
 												<div className="space-y-2">
@@ -1594,81 +1899,137 @@ export default function BlvdBookRoute() {
 																<code>{formatMoney(cart?.summary.total)}</code>.
 															</p>
 														</div>
-														<div className="grid gap-4 md:grid-cols-2">
-															<div className="space-y-2 md:col-span-2">
-																<Label htmlFor="cardName">Name on card</Label>
-																<Input
-																	id="cardName"
-																	name="cardName"
-																	value={clientForm.cardName}
-																	onChange={updateClientForm}
-																/>
-															</div>
-															<div className="space-y-2 md:col-span-2">
-																<Label htmlFor="cardNumber">Card number</Label>
-																<Input
-																	id="cardNumber"
-																	name="cardNumber"
-																	inputMode="numeric"
-																	placeholder="4242 4242 4242 4242"
-																	value={clientForm.cardNumber}
-																	onChange={updateClientForm}
-																/>
-															</div>
-															<div className="space-y-2">
-																<Label htmlFor="cardExpiry">Expiration</Label>
-																<Input
-																	id="cardExpiry"
-																	name="cardExpiry"
-																	placeholder="MM/YY"
-																	value={clientForm.cardExpiry}
-																	onChange={e => {
-																		let val = e.currentTarget.value.replace(
-																			/\D/g,
-																			'',
-																		)
-																		if (val.length >= 2) {
-																			if (
-																				clientForm.cardExpiry.length === 3 &&
-																				e.currentTarget.value.length === 2
-																			) {
-																				val = val.slice(0, 1)
-																			} else {
-																				val =
-																					val.slice(0, 2) +
-																					'/' +
-																					val.slice(2, 4)
-																			}
+														{availablePaymentMethods.length > 0 ? (
+															<div className="space-y-3">
+																<Label>Payment method</Label>
+																<div className="grid gap-3">
+																	{availablePaymentMethods.map(
+																		paymentMethod => {
+																			const isSelected =
+																				selectedPaymentMethodId ===
+																				paymentMethod.id
+																			return (
+																				<Button
+																					key={paymentMethod.id}
+																					type="button"
+																					variant={
+																						isSelected ? 'secondary' : 'outline'
+																					}
+																					onClick={() => {
+																						setSelectedPaymentMethodId(
+																							paymentMethod.id,
+																						)
+																					}}
+																				>
+																					{paymentMethod.name}
+																				</Button>
+																			)
+																		},
+																	)}
+																	<Button
+																		type="button"
+																		variant={
+																			selectedPaymentMethodId === 'new'
+																				? 'secondary'
+																				: 'outline'
 																		}
-																		setClientForm(curr => ({
-																			...curr,
-																			cardExpiry: val,
-																		}))
-																	}}
-																	maxLength={5}
-																	inputMode="numeric"
-																/>
+																		onClick={() => {
+																			setSelectedPaymentMethodId('new')
+																		}}
+																	>
+																		Use a new card
+																	</Button>
+																</div>
 															</div>
-															<div className="space-y-2">
-																<Label htmlFor="cardCvc">CVC</Label>
-																<Input
-																	id="cardCvc"
-																	name="cardCvc"
-																	inputMode="numeric"
-																	value={clientForm.cardCvc}
-																	onChange={updateClientForm}
-																/>
+														) : null}
+														{selectedExistingPaymentMethod ? (
+															<p className="text-sm text-muted-foreground">
+																We will use{' '}
+																<span className="font-medium text-foreground">
+																	{selectedExistingPaymentMethod.name}
+																</span>{' '}
+																for the required card hold.
+															</p>
+														) : null}
+														{shouldCollectCardDetails ? (
+															<div className="grid gap-4 md:grid-cols-2">
+																<div className="space-y-2 md:col-span-2">
+																	<Label htmlFor="cardName">Name on card</Label>
+																	<Input
+																		id="cardName"
+																		name="cardName"
+																		value={clientForm.cardName}
+																		onChange={updateClientForm}
+																	/>
+																</div>
+																<div className="space-y-2 md:col-span-2">
+																	<Label htmlFor="cardNumber">
+																		Card number
+																	</Label>
+																	<Input
+																		id="cardNumber"
+																		name="cardNumber"
+																		inputMode="numeric"
+																		placeholder="4242 4242 4242 4242"
+																		value={clientForm.cardNumber}
+																		onChange={updateClientForm}
+																	/>
+																</div>
+																<div className="space-y-2">
+																	<Label htmlFor="cardExpiry">Expiration</Label>
+																	<Input
+																		id="cardExpiry"
+																		name="cardExpiry"
+																		placeholder="MM/YY"
+																		value={clientForm.cardExpiry}
+																		onChange={e => {
+																			let val = e.currentTarget.value.replace(
+																				/\D/g,
+																				'',
+																			)
+																			if (val.length >= 2) {
+																				if (
+																					clientForm.cardExpiry.length === 3 &&
+																					e.currentTarget.value.length === 2
+																				) {
+																					val = val.slice(0, 1)
+																				} else {
+																					val =
+																						val.slice(0, 2) +
+																						'/' +
+																						val.slice(2, 4)
+																				}
+																			}
+																			setClientForm(curr => ({
+																				...curr,
+																				cardExpiry: val,
+																			}))
+																		}}
+																		maxLength={5}
+																		inputMode="numeric"
+																	/>
+																</div>
+																<div className="space-y-2">
+																	<Label htmlFor="cardCvc">CVC</Label>
+																	<Input
+																		id="cardCvc"
+																		name="cardCvc"
+																		inputMode="numeric"
+																		value={clientForm.cardCvc}
+																		onChange={updateClientForm}
+																	/>
+																</div>
+																<div className="space-y-2">
+																	<Label htmlFor="cardZip">Billing ZIP</Label>
+																	<Input
+																		id="cardZip"
+																		name="cardZip"
+																		value={clientForm.cardZip}
+																		onChange={updateClientForm}
+																	/>
+																</div>
 															</div>
-															<div className="space-y-2">
-																<Label htmlFor="cardZip">Billing ZIP</Label>
-																<Input
-																	id="cardZip"
-																	name="cardZip"
-																	value={clientForm.cardZip}
-																	onChange={updateClientForm}
-																/>
-															</div>
-														</div>
+														) : null}
 													</div>
 												) : null}
 
@@ -2194,6 +2555,88 @@ function formatTimeLabel(value: Date | string) {
 	return date ? format(date, 'h:mm a') : 'Unavailable'
 }
 
+function buildBookingSelectionEventProperties({
+	availablePaymentMethodCount,
+	cart,
+	hasVerifiedClient,
+	selectedExistingPaymentMethod,
+	selectedLocation,
+	selectedService,
+}: {
+	availablePaymentMethodCount: number
+	cart: BlvdCart | null
+	hasVerifiedClient: boolean
+	selectedExistingPaymentMethod: BlvdPaymentMethod | null
+	selectedLocation: BlvdLocation | null
+	selectedService: ServiceEntry | null
+}) {
+	const serviceName = selectedService?.item.name
+	const requiresCard = cart ? Boolean(cart.summary.paymentMethodRequired) : null
+	const isTelehealth = serviceName
+		? isTelehealthServiceName(serviceName)
+		: selectedLocation?.id === 'telehealth'
+			? true
+			: undefined
+
+	return {
+		booking_has_verified_client: hasVerifiedClient,
+		...(selectedService
+			? {
+					booking_service_category: selectedService.categoryName,
+					booking_service_id: selectedService.item.id,
+					booking_service_name: selectedService.item.name,
+				}
+			: {}),
+		...(selectedLocation
+			? {
+					booking_location_id: selectedLocation.id,
+					booking_location_name: selectedLocation.name,
+				}
+			: {}),
+		...(typeof isTelehealth === 'boolean'
+			? { booking_is_telehealth: isTelehealth }
+			: {}),
+		...(typeof requiresCard === 'boolean'
+			? {
+					booking_requires_card: requiresCard,
+					booking_selected_payment_method_type: requiresCard
+						? selectedExistingPaymentMethod
+							? 'saved_card'
+							: 'new_card'
+						: 'none_required',
+				}
+			: {}),
+		...(availablePaymentMethodCount > 0
+			? { booking_saved_payment_method_count: availablePaymentMethodCount }
+			: {}),
+	}
+}
+
+function isTelehealthServiceName(name: string) {
+	return name.toLowerCase().includes('telehealth')
+}
+
+function trackGoogleEvent(
+	eventName: string,
+	params: Record<string, unknown> = {},
+) {
+	if (typeof window === 'undefined' || typeof window.gtag !== 'function') return
+
+	const nextParams = { ...params }
+	if (window.ENV?.GA_MEASUREMENT_ID && nextParams.send_to == null) {
+		nextParams.send_to = window.ENV.GA_MEASUREMENT_ID
+	}
+
+	if (
+		typeof nextParams.debug_mode === 'undefined' &&
+		new URLSearchParams(window.location.search).has('gtm_debug')
+	) {
+		nextParams.debug_mode = true
+	}
+
+	window.gtag('event', eventName, nextParams)
+}
+
 function normalizePhoneNumber(value: string) {
 	const digits = value.replace(/\D/g, '')
 	if (digits.length === 10) return `+1${digits}`
@@ -2202,9 +2645,17 @@ function normalizePhoneNumber(value: string) {
 	return `+${digits}`
 }
 
+function looksLikePhoneNumber(value: string) {
+	const digits = value.replace(/\D/g, '')
+	return (
+		digits.length === 10 || (digits.length === 11 && digits.startsWith('1'))
+	)
+}
+
 function validateClientDetails({
 	answers,
 	clientForm,
+	requireClientInformation = true,
 	questions,
 }: {
 	answers: Record<string, unknown>
@@ -2214,12 +2665,16 @@ function validateClientDetails({
 		lastName: string
 		phone: string
 	}
+	requireClientInformation?: boolean
 	questions: BlvdBookingQuestion[]
 }) {
-	if (!clientForm.firstName.trim()) return 'First name is required.'
-	if (!clientForm.lastName.trim()) return 'Last name is required.'
-	if (!clientForm.email.trim()) return 'Email is required.'
 	if (!clientForm.phone.trim()) return 'Mobile phone is required.'
+
+	if (requireClientInformation) {
+		if (!clientForm.firstName.trim()) return 'First name is required.'
+		if (!clientForm.lastName.trim()) return 'Last name is required.'
+		if (!clientForm.email.trim()) return 'Email is required.'
+	}
 
 	for (const question of questions) {
 		if (!question.required) continue

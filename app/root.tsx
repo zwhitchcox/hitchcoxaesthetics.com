@@ -48,6 +48,7 @@ import { EpicToaster } from '#/app/components/ui/sonner.tsx'
 import '#/app/styles/global.css'
 import tailwindStyleSheetUrl from '#/app/styles/tailwind.css?url'
 import { getUserId, logout } from '#/app/utils/auth.server.ts'
+import { trackBookingAnalyticsPageView } from '#/app/utils/booking-analytics.ts'
 import {
 	ClientHintCheck,
 	getHints,
@@ -356,10 +357,19 @@ function Document({
 function App() {
 	const [isMenuOpen, setIsMenuOpen] = useState(false)
 	const data = useLoaderData<typeof loader>()
+	const location = useLocation()
 	const nonce = useNonce()
 	const theme = useTheme()
 
 	useToast(data.toast)
+
+	useEffect(() => {
+		trackBookingAnalyticsPageView({
+			pathname: location.pathname,
+			referrer: typeof document !== 'undefined' ? document.referrer : null,
+			search: location.search,
+		})
+	}, [location.pathname, location.search])
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
