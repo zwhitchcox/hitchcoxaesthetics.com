@@ -1287,8 +1287,8 @@ export default function BlvdBookRoute() {
 							stepAvailability={stepAvailability}
 							stepCompletion={stepCompletion}
 						/>
-						<Card className="flex w-full max-w-5xl flex-col items-center p-4 pb-6 transition-all duration-300 lg:flex-row lg:items-start lg:space-x-8">
-							<div className="w-64 flex-shrink-0">
+						<Card className="flex w-full max-w-5xl flex-col items-stretch p-4 pb-6 transition-all duration-300 lg:flex-row lg:items-start lg:space-x-8">
+							<div className="w-full max-w-xs flex-shrink-0 self-center lg:w-64 lg:self-auto">
 								<BlvdAppointmentDetails
 									appointmentDate={appointmentDate}
 									appointmentEndTime={appointmentEndTime}
@@ -1337,7 +1337,7 @@ export default function BlvdBookRoute() {
 												No services matched that search yet.
 											</p>
 										) : (
-											<div className="grid items-start gap-4 md:grid-cols-2">
+											<div className="grid w-full min-w-0 items-start gap-4 md:grid-cols-2">
 												{filteredServices.map(service => {
 													const isSelected = selectedService?.id === service.id
 													return (
@@ -1348,22 +1348,22 @@ export default function BlvdBookRoute() {
 																void handleSelectService(service)
 															}}
 															className={cn(
-																'rounded-xl border p-5 text-left transition hover:border-primary hover:shadow-md',
+																'min-w-0 rounded-xl border p-5 text-left transition hover:border-primary hover:shadow-md',
 																isSelected &&
 																	'border-primary bg-primary/5 shadow-sm',
 															)}
 														>
 															<div className="mb-2 flex w-full items-start justify-between gap-4">
-																<div>
+																<div className="min-w-0 flex-1">
 																	<p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
 																		{service.categoryName}
 																	</p>
-																	<h3 className="mt-2 text-xl font-semibold">
+																	<h3 className="mt-2 break-words text-xl font-semibold">
 																		{service.item.name}
 																	</h3>
 																</div>
 																{isSelected ? (
-																	<span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground">
+																	<span className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground">
 																		Selected
 																	</span>
 																) : null}
@@ -2194,7 +2194,7 @@ function BlvdAppointmentDetails({
 	})
 
 	return (
-		<div className={cn(`mx-4 flex w-full flex-col items-center lg:w-64`)}>
+		<div className={cn(`flex w-full flex-col items-center lg:w-64`)}>
 			<div className="mt-1 flex w-full max-w-md flex-col items-center space-y-4 rounded-lg py-2 text-lg">
 				<div className="flex shrink-0 flex-col items-center space-y-2 justify-self-start rounded-lg">
 					<img
