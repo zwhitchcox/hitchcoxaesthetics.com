@@ -1,16 +1,17 @@
 import { prisma } from '#app/utils/db.server'
-import { DayOfWeek, UserType } from '#app/utils/types'
+
+const DAYS_OF_WEEK = [
+	'Sunday',
+	'Monday',
+	'Tuesday',
+	'Wednesday',
+	'Thursday',
+	'Friday',
+	'Saturday',
+] as const
 
 const getSchedule = () => {
-	const daysOfWeek = [
-		DayOfWeek.Sunday,
-		DayOfWeek.Monday,
-		DayOfWeek.Tuesday,
-		DayOfWeek.Wednesday,
-		DayOfWeek.Thursday,
-		DayOfWeek.Friday,
-		DayOfWeek.Saturday,
-	]
+	const daysOfWeek = [...DAYS_OF_WEEK]
 
 	const startTime = new Date()
 	startTime.setHours(9, 0, 0, 0)
@@ -32,14 +33,14 @@ async function users() {
 			email: 'zwhitchcox@gmail.com',
 			phone: '18652101404',
 			name: 'Zane Hitchcox',
-			type: UserType.Client,
+			type: 'Client',
 		},
 		{
 			id: 'sarah',
 			email: 'sarahahitchcox@gmail.com',
 			phone: '18652489365',
 			name: 'Sarah Hitchcox',
-			type: UserType.Provider,
+			type: 'Provider',
 		},
 	]
 

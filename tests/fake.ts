@@ -2,7 +2,16 @@ import { faker } from '@faker-js/faker'
 import { type Prisma } from '@prisma/client'
 
 import { prisma } from '#app/utils/db.server.js'
-import { DayOfWeek, UserType } from '#app/utils/types'
+
+const DAYS_OF_WEEK = [
+	'Sunday',
+	'Monday',
+	'Tuesday',
+	'Wednesday',
+	'Thursday',
+	'Friday',
+	'Saturday',
+] as const
 
 function generateId() {
 	return Math.random().toString(36).substring(2, 9)
@@ -33,29 +42,19 @@ export async function createTestClient(
 ) {
 	return await createTestUser({
 		name: 'Test Client ' + getNextId(),
-		type: UserType.Client,
+		type: 'Client',
 		...data,
 	})
 }
 
 const getSchedule = () => {
-	const daysOfWeek = [
-		DayOfWeek.Sunday,
-		DayOfWeek.Monday,
-		DayOfWeek.Tuesday,
-		DayOfWeek.Wednesday,
-		DayOfWeek.Thursday,
-		DayOfWeek.Friday,
-		DayOfWeek.Saturday,
-	]
-
 	const startTime = new Date()
 	startTime.setHours(9, 0, 0, 0)
 	const endTime = new Date()
 	endTime.setDate(startTime.getDate() + 1)
 	endTime.setHours(21, 0, 0, 0)
 
-	return daysOfWeek.map(day => ({
+	return DAYS_OF_WEEK.map(day => ({
 		dayOfWeek: day,
 		startTime,
 		endTime,
@@ -66,7 +65,7 @@ export async function createTestProvider(
 ) {
 	return await createTestUser({
 		name: 'Test Provider ' + getNextId(),
-		type: UserType.Provider,
+		type: 'Provider',
 		schedule: { create: getSchedule() },
 		...data,
 	})
@@ -92,33 +91,6 @@ export async function createTestService(
 		update: serviceData,
 	})
 }
-
-export async function createTestAppointment(
-	data: Partial<Prisma.AppointmentCreateInput> = {},
-) {
-	const appointmentData: Prisma.AppointmentCreateInput = {
-		id: generateId(),
-		windowStart: new Date(),
-		windowEnd: new Date(),
-		service: data.service ?? {
-			connect: { id: (await createTestService()).id },
-		},
-		client: data.client ?? {
-			connect: { id: (await createTestClient()).id },
-		},
-		provider: data.provider ?? {
-			connect: { id: (await createTestProvider()).id },
-		},
-		...data,
-	}
-
-	return await prisma.appointment.upsert({
-		where: { id: appointmentData.id },
-		create: appointmentData,
-		update: appointmentData,
-	})
-}
-
 export async function createTestBlockedTime(
 	data: Partial<Prisma.BlockedTimeCreateInput> = {},
 ) {
@@ -143,6 +115,5 @@ export async function createTestBlockedTime(
 export async function clearAllData() {
 	await prisma.weeklySchedule.deleteMany()
 	await prisma.user.deleteMany()
-	await prisma.appointment.deleteMany()
 	await prisma.service.deleteMany()
 }

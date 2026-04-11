@@ -20,17 +20,7 @@ export const handle: SEOHandle = {
 const adminMenuItems = [
 	{ path: '/admin', label: 'Dashboard', icon: 'dashboard' as const },
 	{ path: '/admin/reviews', label: 'Reviews', icon: 'star' as const },
-	{ path: '/admin/analysis', label: 'Analysis', icon: 'dashboard' as const },
-	{
-		path: '/admin/retention',
-		label: 'Customer Retention',
-		icon: 'update' as const,
-	},
-	{
-		path: '/admin/appointments',
-		label: 'Appointments',
-		icon: 'calendar' as const,
-	},
+	{ path: '/admin/boulevard', label: 'Boulevard', icon: 'calendar' as const },
 	{ path: '/admin/bg', label: 'Background Jobs', icon: 'clock' as const },
 	{ path: '/admin/google-ads', label: 'Google Ads', icon: 'update' as const },
 ]

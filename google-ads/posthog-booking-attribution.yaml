@@ -1,0 +1,405 @@
+# YAML anchors keep repeated booking step definitions concise.
+
+posthog:
+  project_id: 72891
+
+project_sync:
+  prune_unconfigured_dashboards: true
+  prune_unconfigured_insights: true
+
+defaults:
+  date_range:
+    date_from: -30d
+  breakdown_limit: 25
+  insight_tags:
+    - booking
+    - attribution
+
+dashboards:
+  - name: Booking Funnel - Attribution
+    description:
+      Booking funnel and attribution reporting for the custom Boulevard flow.
+    tags:
+      - booking
+      - attribution
+    managed_tag: managed:booking-funnel-attribution
+    sync_mode: replace_managed
+    insights:
+      - kind: funnel
+        name: Entry To Completion - Source Detail
+        description: 2-step booking funnel broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        steps: &entry_to_completion_steps
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: booking_completed
+            custom_name: Booking Completed
+
+      - kind: funnel
+        name: Entry To Completion - Channel
+        description: 2-step booking funnel broken down by traffic_channel.
+        breakdown: traffic_channel
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Platform
+        description: 2-step booking funnel broken down by traffic_platform.
+        breakdown: traffic_platform
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Entry Path
+        description: 2-step booking funnel broken down by book_entry_from_path.
+        breakdown: book_entry_from_path
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Landing Path
+        description: 2-step booking funnel broken down by initial_landing_path.
+        breakdown: initial_landing_path
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Service Category
+        description:
+          2-step booking funnel broken down by booking_service_category.
+        breakdown: booking_service_category
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Entry Page Prefix Type
+        description:
+          2-step booking funnel broken down by book_entry_page_prefix_type.
+        breakdown: book_entry_page_prefix_type
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Entry Page Type
+        description: 2-step booking funnel broken down by book_entry_page_type.
+        breakdown: book_entry_page_type
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - LP Entry by Source Detail
+        description:
+          Entry-to-completion funnel for users who entered booking from an /lp
+          page, broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        properties:
+          - key: book_entry_page_prefix_type
+            type: event
+            value:
+              - lp
+            operator: exact
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Non-LP Entry by Source Detail
+        description:
+          Entry-to-completion funnel for users who entered booking from a
+          non-/lp page, broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        properties:
+          - key: book_entry_page_prefix_type
+            type: event
+            value:
+              - non_lp
+            operator: exact
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Full Booking Step Funnel - Source Detail
+        description: Full booking funnel broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        steps: &full_booking_steps
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: booking_step_viewed
+            custom_name: Booking - Services
+            properties:
+              - key: step
+                type: event
+                value:
+                  - service
+                operator: exact
+          - event: booking_step_viewed
+            custom_name: Booking - Locations
+            properties:
+              - key: step
+                type: event
+                value:
+                  - location
+                operator: exact
+          - event: booking_step_viewed
+            custom_name: Booking - Schedule
+            properties:
+              - key: step
+                type: event
+                value:
+                  - schedule
+                operator: exact
+          - event: booking_step_viewed
+            custom_name: Booking Details
+            properties:
+              - key: step
+                type: event
+                value:
+                  - details
+                operator: exact
+          - event: booking_step_viewed
+            custom_name: Booking - Credit Card/Reserve
+            properties:
+              - key: step
+                type: event
+                value:
+                  - reserve
+                operator: exact
+          - event: booking_completed
+            custom_name: Booking Completed
+
+      - kind: funnel
+        name: Full Booking Step Funnel - Service Name
+        description: Full booking funnel broken down by booking_service_name.
+        breakdown: booking_service_name
+        steps: *full_booking_steps
+
+      - kind: funnel
+        name: Full Booking Step Funnel - Service Category
+        description:
+          Full booking funnel broken down by booking_service_category.
+        breakdown: booking_service_category
+        steps: *full_booking_steps
+
+      - kind: funnel
+        name: Full Booking Step Funnel - Telehealth
+        description: Full booking funnel broken down by booking_is_telehealth.
+        breakdown: booking_is_telehealth
+        steps: *full_booking_steps
+
+      - kind: funnel
+        name: Full Booking Step Funnel - Requires Card
+        description: Full booking funnel broken down by booking_requires_card.
+        breakdown: booking_requires_card
+        steps: *full_booking_steps
+
+      - kind: funnel
+        name: Full Booking Step Funnel - Verified Client
+        description:
+          Full booking funnel broken down by booking_has_verified_client.
+        breakdown: booking_has_verified_client
+        steps: *full_booking_steps
+
+      - kind: trend
+        name: Booking Entry Trends - Source Detail
+        description: Booking funnel entries by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: booking_funnel_entered
+            custom_name: Booking Entry Trends - Source Detail
+
+      - kind: trend
+        name: Booking Entry Trends - Channel
+        description: Booking funnel entries by traffic_channel.
+        breakdown: traffic_channel
+        series:
+          - event: booking_funnel_entered
+            custom_name: Booking Entry Trends - Channel
+
+      - kind: trend
+        name: Booking Entry Trends - Landing Path
+        description: Booking funnel entries by initial_landing_path.
+        breakdown: initial_landing_path
+        series:
+          - event: booking_funnel_entered
+            custom_name: Booking Entry Trends - Landing Path
+
+      - kind: trend
+        name: Booking Completion Trends - Source Detail
+        description: Booking completions by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Source Detail
+
+      - kind: trend
+        name: Booking Completion Trends - Channel
+        description: Booking completions by traffic_channel.
+        breakdown: traffic_channel
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Channel
+
+      - kind: trend
+        name: Booking Completion Trends - Service Category
+        description: Booking completions by booking_service_category.
+        breakdown: booking_service_category
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Service Category
+
+      - kind: trend
+        name: Booking Completion Trends - Service Name
+        description: Booking completions by booking_service_name.
+        breakdown: booking_service_name
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Service Name
+
+      - kind: funnel
+        name: Pre-Book Quality Funnel - Pages Before Book
+        description:
+          2-step booking funnel broken down by pages_before_book_bucket.
+        breakdown: pages_before_book_bucket
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Pre-Book Quality Funnel - Pre-Book Duration
+        description:
+          2-step booking funnel broken down by pre_book_duration_bucket.
+        breakdown: pre_book_duration_bucket
+        steps: *entry_to_completion_steps
+
+      - kind: trend
+        name: Revenue Proxy Trend - Service Category
+        description: Estimated booking value summed by booking_service_category.
+        breakdown: booking_service_category
+        series:
+          - event: booking_completed
+            custom_name: Revenue Proxy Trend - Service Category
+            math: sum
+            math_property: booking_value_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Revenue Proxy Trend - Service Name
+        description: Estimated booking value summed by booking_service_name.
+        breakdown: booking_service_name
+        series:
+          - event: booking_completed
+            custom_name: Revenue Proxy Trend - Service Name
+            math: sum
+            math_property: booking_value_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Revenue Proxy Trend - Source Detail
+        description: Estimated booking value summed by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: booking_completed
+            custom_name: Revenue Proxy Trend - Source Detail
+            math: sum
+            math_property: booking_value_usd
+            math_property_type: event
+
+      - kind: funnel
+        name: Book CTA Click Funnel - Initial Landing Prefix Type
+        description:
+          Likelihood to click Book Online broken down by
+          initial_landing_page_prefix_type.
+        breakdown: initial_landing_page_prefix_type
+        steps:
+          - event: marketing_page_viewed
+            custom_name: Marketing Page Viewed
+          - event: book_cta_clicked
+            custom_name: Book CTA Clicked
+
+      - kind: funnel
+        name: Phone CTA Click Funnel - Initial Landing Prefix Type
+        description:
+          Likelihood to click the phone CTA broken down by
+          initial_landing_page_prefix_type.
+        breakdown: initial_landing_page_prefix_type
+        steps:
+          - event: marketing_page_viewed
+            custom_name: Marketing Page Viewed
+          - event: phone_cta_clicked
+            custom_name: Phone CTA Clicked
+
+      - kind: trend
+        name: Book CTA Clicks - Current Page Type
+        description: Book CTA clicks broken down by current_page_type.
+        breakdown: current_page_type
+        series:
+          - event: book_cta_clicked
+            custom_name: Book CTA Clicks - Current Page Type
+
+      - kind: trend
+        name: Phone CTA Clicks - Current Page Type
+        description: Phone CTA clicks broken down by current_page_type.
+        breakdown: current_page_type
+        series:
+          - event: phone_cta_clicked
+            custom_name: Phone CTA Clicks - Current Page Type
+
+      - kind: funnel
+        name: Book CTA Click Funnel - LP Landing by Source Detail
+        description:
+          Likelihood to click Book Online for users who landed on /lp pages,
+          broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        properties:
+          - key: initial_landing_page_prefix_type
+            type: event
+            value:
+              - lp
+            operator: exact
+        steps:
+          - event: marketing_page_viewed
+            custom_name: Marketing Page Viewed
+          - event: book_cta_clicked
+            custom_name: Book CTA Clicked
+
+      - kind: funnel
+        name: Book CTA Click Funnel - Non-LP Landing by Source Detail
+        description:
+          Likelihood to click Book Online for users who landed on non-/lp pages,
+          broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        properties:
+          - key: initial_landing_page_prefix_type
+            type: event
+            value:
+              - non_lp
+            operator: exact
+        steps:
+          - event: marketing_page_viewed
+            custom_name: Marketing Page Viewed
+          - event: book_cta_clicked
+            custom_name: Book CTA Clicked
+
+      - kind: funnel
+        name: Phone CTA Click Funnel - LP Landing by Source Detail
+        description:
+          Likelihood to click the phone CTA for users who landed on /lp pages,
+          broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        properties:
+          - key: initial_landing_page_prefix_type
+            type: event
+            value:
+              - lp
+            operator: exact
+        steps:
+          - event: marketing_page_viewed
+            custom_name: Marketing Page Viewed
+          - event: phone_cta_clicked
+            custom_name: Phone CTA Clicked
+
+      - kind: funnel
+        name: Phone CTA Click Funnel - Non-LP Landing by Source Detail
+        description:
+          Likelihood to click the phone CTA for users who landed on non-/lp
+          pages, broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        properties:
+          - key: initial_landing_page_prefix_type
+            type: event
+            value:
+              - non_lp
+            operator: exact
+        steps:
+          - event: marketing_page_viewed
+            custom_name: Marketing Page Viewed
+          - event: phone_cta_clicked
+            custom_name: Phone CTA Clicked

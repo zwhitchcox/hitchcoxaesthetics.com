@@ -13,6 +13,27 @@ const MARKETING_PARAM_KEYS = [
 	'fbclid',
 ] as const
 
+const SERVICE_PAGE_SEGMENTS = new Set([
+	'injectables',
+	'botox',
+	'filler',
+	'skinvive',
+	'kybella',
+	'jeuveau',
+	'dysport',
+	'laser-services',
+	'everesse',
+	'laser-hair-removal',
+	'skin-revitalization',
+	'pigmented-lesion-reduction',
+	'vascular-lesion-reduction',
+	'microneedling',
+	'weight-loss',
+	'semaglutide',
+	'tirzepatide',
+	'medical-weight-loss-telehealth',
+])
+
 type MarketingParamKey = (typeof MARKETING_PARAM_KEYS)[number]
 
 type StoredBookingAnalytics = Record<MarketingParamKey, string | null> & {
@@ -82,23 +103,28 @@ export function trackBookingAnalyticsPageView({
 export function getBookingAnalyticsEventProperties() {
 	const stored = readStoredBookingAnalytics()
 	if (!stored) return {}
-	const trafficAttribution = inferTrafficAttribution({
-		fbclid: stored.fbclid,
-		gbraid: stored.gbraid,
-		gclid: stored.gclid,
-		initialReferrer: stored.initialReferrer,
-		initialReferringDomain: stored.initialReferringDomain,
-		msclkid: stored.msclkid,
-		utm_campaign: stored.utm_campaign,
-		utm_medium: stored.utm_medium,
-		utm_source: stored.utm_source,
-		wbraid: stored.wbraid,
-	})
+	const trafficAttribution = getStoredTrafficAttribution(stored)
+	const bookEntryPathname = getPathnameFromStoredPath(stored.bookEntryFromPath)
+	const initialLandingPathname = getPathnameFromStoredPath(
+		stored.initialLandingPath,
+	)
 
 	return compactEventProperties({
 		book_entry_from_path: stored.bookEntryFromPath,
+		book_entry_page_prefix_type: bookEntryPathname
+			? getPagePrefixType(bookEntryPathname)
+			: undefined,
+		book_entry_page_type: bookEntryPathname
+			? getPageType(bookEntryPathname)
+			: undefined,
 		book_entry_path: stored.firstBookPath,
 		initial_landing_path: stored.initialLandingPath,
+		initial_landing_page_prefix_type: initialLandingPathname
+			? getPagePrefixType(initialLandingPathname)
+			: undefined,
+		initial_landing_page_type: initialLandingPathname
+			? getPageType(initialLandingPathname)
+			: undefined,
 		initial_landing_search: stored.initialLandingSearch || undefined,
 		initial_referrer: stored.initialReferrer,
 		initial_referring_domain: stored.initialReferringDomain,
@@ -124,6 +150,61 @@ export function getBookingAnalyticsEventProperties() {
 		gbraid: stored.gbraid,
 		msclkid: stored.msclkid,
 		wbraid: stored.wbraid,
+	})
+}
+
+export function getMarketingPageEventProperties({
+	pathname,
+	search,
+}: {
+	pathname: string
+	search: string
+}) {
+	const stored = readStoredBookingAnalytics()
+	const trafficAttribution = stored ? getStoredTrafficAttribution(stored) : null
+
+	return compactEventProperties({
+		current_path: pathname,
+		current_search: search || undefined,
+		current_page_prefix_type: getPagePrefixType(pathname),
+		current_page_type: getPageType(pathname),
+		book_entry_from_path: stored?.bookEntryFromPath,
+		book_entry_page_prefix_type: stored?.bookEntryFromPath
+			? getPagePrefixType(
+					getPathnameFromStoredPath(stored.bookEntryFromPath) ?? '',
+				)
+			: undefined,
+		book_entry_page_type: stored?.bookEntryFromPath
+			? getPageType(getPathnameFromStoredPath(stored.bookEntryFromPath) ?? '')
+			: undefined,
+		initial_landing_path: stored?.initialLandingPath,
+		initial_landing_page_prefix_type: stored?.initialLandingPath
+			? getPagePrefixType(
+					getPathnameFromStoredPath(stored.initialLandingPath) ?? '',
+				)
+			: undefined,
+		initial_landing_page_type: stored?.initialLandingPath
+			? getPageType(getPathnameFromStoredPath(stored.initialLandingPath) ?? '')
+			: undefined,
+		pages_before_book_bucket: getPageCountBucket(
+			stored?.preBookPageviewCount ?? null,
+		),
+		pre_book_duration_bucket: getDurationBucket(
+			stored?.preBookDurationMs ?? null,
+		),
+		traffic_channel: stored?.trafficChannel || trafficAttribution?.channel,
+		traffic_platform: trafficAttribution?.platform,
+		traffic_source_detail: trafficAttribution?.detail,
+		utm_campaign: stored?.utm_campaign,
+		utm_content: stored?.utm_content,
+		utm_medium: stored?.utm_medium,
+		utm_source: stored?.utm_source,
+		utm_term: stored?.utm_term,
+		fbclid: stored?.fbclid,
+		gclid: stored?.gclid,
+		gbraid: stored?.gbraid,
+		msclkid: stored?.msclkid,
+		wbraid: stored?.wbraid,
 	})
 }
 
@@ -329,6 +410,21 @@ function isBookPath(pathname: string) {
 	return pathname === '/book'
 }
 
+function getPagePrefixType(pathname: string) {
+	return pathname.startsWith('/lp') ? 'lp' : 'non_lp'
+}
+
+function getPageType(pathname: string) {
+	if (isBookPath(pathname)) return 'booking'
+	if (pathname === '/') return 'home'
+	if (pathname.startsWith('/lp')) return 'lp'
+
+	const firstSegment = pathname.replace(/^\/+/, '').split('/')[0] ?? ''
+	if (SERVICE_PAGE_SEGMENTS.has(firstSegment)) return 'service'
+
+	return 'other'
+}
+
 function isSearchReferrer(referrerDomain: string, referrer: string) {
 	return (
 		matchesAny(referrerDomain, [
@@ -393,6 +489,31 @@ function getReferringDomain(referrer?: string | null) {
 	} catch {
 		return null
 	}
+}
+
+function getPathnameFromStoredPath(value?: string | null) {
+	if (!value) return null
+
+	try {
+		return new URL(value, 'https://hitchcoxaesthetics.com').pathname
+	} catch {
+		return value.split('?')[0] ?? value
+	}
+}
+
+function getStoredTrafficAttribution(stored: StoredBookingAnalytics) {
+	return inferTrafficAttribution({
+		fbclid: stored.fbclid,
+		gbraid: stored.gbraid,
+		gclid: stored.gclid,
+		initialReferrer: stored.initialReferrer,
+		initialReferringDomain: stored.initialReferringDomain,
+		msclkid: stored.msclkid,
+		utm_campaign: stored.utm_campaign,
+		utm_medium: stored.utm_medium,
+		utm_source: stored.utm_source,
+		wbraid: stored.wbraid,
+	})
 }
 
 function readStoredBookingAnalytics() {

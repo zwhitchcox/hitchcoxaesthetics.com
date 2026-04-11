@@ -7,6 +7,9 @@ analytics.
 
 The site now sends these PostHog events:
 
+- `marketing_page_viewed`
+- `book_cta_clicked`
+- `phone_cta_clicked`
 - `booking_funnel_entered`
 - `booking_step_viewed`
 - `booking_completed`
@@ -49,6 +52,51 @@ Use this to answer:
 - Which channels actually create completed bookings?
 - Which entry pages push users into the booking flow?
 - Which service categories convert best after entering booking?
+
+Additional saved variants worth keeping on the dashboard:
+
+- `Entry To Completion - LP Entry by Source Detail`
+- `Entry To Completion - Non-LP Entry by Source Detail`
+
+Also save these page-type views:
+
+- `Entry To Completion - Entry Page Prefix Type`
+- `Entry To Completion - Entry Page Type`
+
+These use the derived `book_entry_page_prefix_type` and `book_entry_page_type`
+properties so the comparison is declarative instead of regex-based.
+
+### 1b. CTA Click Likelihood
+
+Type: Funnel
+
+Funnels:
+
+1. `marketing_page_viewed`
+2. `book_cta_clicked`
+
+and
+
+1. `marketing_page_viewed`
+2. `phone_cta_clicked`
+
+Save these breakdowns:
+
+- `initial_landing_page_prefix_type`
+- `current_page_type`
+
+Save these source-filtered variants:
+
+- `Book CTA Click Funnel - LP Landing by Source Detail`
+- `Book CTA Click Funnel - Non-LP Landing by Source Detail`
+- `Phone CTA Click Funnel - LP Landing by Source Detail`
+- `Phone CTA Click Funnel - Non-LP Landing by Source Detail`
+
+Use this to answer:
+
+- Are `/lp` visitors more likely to click Book Online than non-`/lp` visitors?
+- Are `/lp` visitors more likely to click the phone CTA than non-`/lp` visitors?
+- Does that relationship hold once you compare within the same traffic source?
 
 ### 2. Full Booking Step Funnel
 
@@ -301,6 +349,10 @@ utm_campaign=<campaign_name>
 
 - Local development still does not send PostHog events unless PostHog is enabled
   in `app/root.tsx`.
-- Funnel and trend insights should be built in PostHog using the events above.
-- This repo does not include PostHog credentials, so insights cannot be saved to
-  the workspace automatically from here.
+- Funnel and trend insights can now be synced from this repo with
+  `pnpm posthog:sync` and `pnpm posthog:sync:apply`.
+- The current dashboard config lives at
+  `google-ads/posthog-booking-attribution.yaml`.
+- Sync script usage and conventions live in `google-ads/POSTHOG_SYNC.md`.
+- The current YAML is also allowed to prune undeclared PostHog dashboards and
+  insights, so treat it as the source of truth before applying.

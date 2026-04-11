@@ -4,7 +4,6 @@ import { safeRedirect } from 'remix-utils/safe-redirect'
 import { prisma } from '#/app/utils/db.server.ts'
 import { combineHeaders } from '#/app/utils/misc.tsx'
 import { authSessionStorage } from '#/app/utils/session.server.ts'
-import { UserType } from './types'
 
 export const SESSION_EXPIRATION_TIME = 1000 * 60 * 60 * 24 * 30
 export const getSessionExpirationDate = () =>
@@ -66,12 +65,6 @@ export async function requireUser(request: Request) {
 	throw await logout({ request })
 }
 
-export async function requireProvider(request: Request) {
-	const user = await requireUser(request)
-	if (user.type === UserType.Provider) return user
-	throw new Response('Unauthorized', { status: 401 })
-}
-
 export async function requireUserId(
 	request: Request,
 	{ redirectTo }: { redirectTo?: string | null } = {},
@@ -82,9 +75,9 @@ export async function requireUserId(
 		redirectTo =
 			redirectTo === null
 				? null
-				: redirectTo ?? `${requestUrl.pathname}${requestUrl.search}`
+				: (redirectTo ?? `${requestUrl.pathname}${requestUrl.search}`)
 		const loginParams = redirectTo ? new URLSearchParams({ redirectTo }) : null
-		const loginRedirect = ['/login', loginParams?.toString()]
+		const loginRedirect = ['/auth', loginParams?.toString()]
 			.filter(Boolean)
 			.join('?')
 		throw redirect(loginRedirect)

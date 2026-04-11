@@ -12,10 +12,6 @@ const tabs = [
 		title: 'Account Info',
 		to: '/account/info',
 	},
-	{
-		title: 'Appointments',
-		to: '/account/appointments',
-	},
 ]
 export default function () {
 	const navigate = useNavigate()

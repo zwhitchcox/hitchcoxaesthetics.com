@@ -10,7 +10,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		const loginParams = new URLSearchParams([
 			['redirectTo', `${requestUrl.pathname}${requestUrl.search}`],
 		])
-		const redirectTo = `/login?${loginParams}`
+		const redirectTo = `/auth?${loginParams}`
 		await logout({ request, redirectTo })
 		return redirect(redirectTo)
 	}

@@ -4,6 +4,9 @@ This is the short handoff summary for paid media and SEO reporting.
 
 ## Events Available
 
+- `marketing_page_viewed`
+- `book_cta_clicked`
+- `phone_cta_clicked`
 - `booking_funnel_entered`
 - `booking_step_viewed`
 - `booking_completed`
@@ -52,8 +55,12 @@ Examples:
 ## Pre-Book Behavior Fields
 
 - `book_entry_from_path`
+- `book_entry_page_prefix_type`
+- `book_entry_page_type`
 - `book_entry_path`
 - `initial_landing_path`
+- `initial_landing_page_prefix_type`
+- `initial_landing_page_type`
 - `initial_landing_search`
 - `initial_referrer`
 - `initial_referring_domain`
@@ -172,6 +179,8 @@ utm_campaign=<campaign_name>
 
 ## Questions The Current Data Can Answer
 
+- Are `/lp` visitors more likely to click Book Online?
+- Are `/lp` visitors more likely to click the phone CTA?
 - Which source starts the booking funnel?
 - Which source completes bookings?
 - Which page sends users into `/book`?

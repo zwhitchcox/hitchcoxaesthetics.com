@@ -20,18 +20,12 @@ const adminQuickLinks = [
 		color: 'bg-yellow-100 dark:bg-yellow-950',
 	},
 	{
-		title: 'Analysis',
-		icon: 'dashboard' as const,
-		description: 'View business analytics and reports',
-		path: '/admin/analysis',
-		color: 'bg-purple-100 dark:bg-purple-950',
-	},
-	{
-		title: 'Appointments',
+		title: 'Boulevard',
 		icon: 'calendar' as const,
-		description: 'Manage upcoming appointments',
-		path: '/admin/appointments',
-		color: 'bg-green-100 dark:bg-green-950',
+		description:
+			'Inspect Boulevard attribution, appointments, and revenue data',
+		path: '/admin/boulevard',
+		color: 'bg-indigo-100 dark:bg-indigo-950',
 	},
 	{
 		title: 'Background Jobs',

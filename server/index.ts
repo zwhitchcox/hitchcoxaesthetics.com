@@ -243,7 +243,7 @@ const strongRateLimit = rateLimit({
 const generalRateLimit = rateLimit(rateLimitDefault)
 app.use((req, res, next) => {
 	const strongPaths = [
-		'/login',
+		'/auth',
 		'/signup',
 		'/verify',
 		'/admin',

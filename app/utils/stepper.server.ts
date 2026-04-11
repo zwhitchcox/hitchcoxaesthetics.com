@@ -1,4 +1,5 @@
 import { parseWithZod } from '@conform-to/zod'
+import { invariant } from '@epic-web/invariant'
 import {
 	type ActionFunctionArgs,
 	type createCookieSessionStorage,
@@ -18,7 +19,19 @@ import {
 	type StepSchemasCombineObj,
 	type StepSchemasFull,
 } from '#/app/utils/stepper'
-import { redirectNextStep } from '#app/routes/old-book+/_steps+/__step-tracker.server.js'
+
+function redirectNextStep<T extends Readonly<Step[]>>(
+	steps: T,
+	request: Request,
+	init?: ResponseInit,
+) {
+	const { search, pathname } = new URL(request.url)
+	const stepName = pathname.split('/').at(-1)
+	const nextStep = steps[steps.findIndex(step => step.name === stepName) + 1]
+	invariant(nextStep, 'No next step found')
+	const basePath = pathname.slice(0, pathname.lastIndexOf('/'))
+	return redirect(`${basePath}/${nextStep.name}${search}`, init)
+}
 
 export function createStepper<T extends Step[] | [Step] | Readonly<Step[]>>({
 	steps,

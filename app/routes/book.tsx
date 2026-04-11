@@ -138,6 +138,7 @@ type BlvdCart = {
 	bookingQuestions: BlvdBookingQuestion[]
 	clientInformation?: {
 		email?: string | null
+		externalId?: string | null
 		firstName?: string | null
 		lastName?: string | null
 		phoneNumber?: string | null
@@ -166,7 +167,11 @@ type BlvdCart = {
 		}
 	}): Promise<BlvdCart>
 	checkout(): Promise<{
-		appointments: Array<{ appointmentId: string }>
+		appointments: Array<{
+			appointmentId: string
+			clientId?: string | null
+			forCartOwner?: boolean | null
+		}>
 		cart: BlvdCart
 	}>
 	getAvailablePaymentMethods(): Promise<BlvdPaymentMethod[]>
@@ -996,6 +1001,11 @@ export default function BlvdBookRoute() {
 			const valueInDollars = getEstimatedValueForBlvdService(
 				selectedService.item.name,
 			)
+			const selectedPaymentMethodType = nextCart.summary.paymentMethodRequired
+				? selectedExistingPaymentMethod
+					? 'saved_card'
+					: 'new_card'
+				: 'none_required'
 
 			if (typeof window !== 'undefined' && 'gtag' in window) {
 				trackGoogleEvent('purchase', {
@@ -1030,17 +1040,64 @@ export default function BlvdBookRoute() {
 				posthog.capture('booking_completed', {
 					...bookingAnalyticsPropertiesRef.current,
 					appointment_count: checkoutPayload.appointments.length,
-					booking_selected_payment_method_type: requiresCard
-						? selectedExistingPaymentMethod
-							? 'saved_card'
-							: 'new_card'
-						: 'none_required',
+					booking_selected_payment_method_type: selectedPaymentMethodType,
 					booking_value_usd: valueInDollars,
 					service: selectedService.item.name,
 					location: selectedLocation.name,
 					value: valueInDollars,
 				})
 			}
+
+			queueBlvdBookingAttributionTouch({
+				appointments: checkoutPayload.appointments.map(appointment => ({
+					appointmentId: appointment.appointmentId,
+					clientId: appointment.clientId ?? undefined,
+					endTime: checkoutPayload.cart.endTime
+						? toDate(checkoutPayload.cart.endTime)?.toISOString()
+						: undefined,
+					forCartOwner: appointment.forCartOwner ?? undefined,
+					startTime: checkoutPayload.cart.startTime
+						? toDate(checkoutPayload.cart.startTime)?.toISOString()
+						: undefined,
+				})),
+				attribution: bookingAnalyticsPropertiesRef.current,
+				booking: {
+					cartId: checkoutPayload.cart.id,
+					hasVerifiedClient,
+					locationId: selectedLocation.id,
+					locationName: selectedLocation.name,
+					occurredAt: new Date().toISOString(),
+					selectedPaymentMethodType,
+					serviceCategory: selectedService.categoryName,
+					serviceId: selectedService.item.id,
+					serviceName: selectedService.item.name,
+					valueUsd: valueInDollars,
+				},
+				client: {
+					boulevardClientId:
+						checkoutPayload.appointments.find(
+							appointment => appointment.clientId,
+						)?.clientId ??
+						checkoutPayload.cart.clientInformation?.externalId ??
+						undefined,
+					email:
+						checkoutPayload.cart.clientInformation?.email ??
+						clientForm.email ??
+						undefined,
+					firstName:
+						checkoutPayload.cart.clientInformation?.firstName ??
+						clientForm.firstName ??
+						undefined,
+					lastName:
+						checkoutPayload.cart.clientInformation?.lastName ??
+						clientForm.lastName ??
+						undefined,
+					phone:
+						checkoutPayload.cart.clientInformation?.phoneNumber ??
+						clientForm.phone ??
+						undefined,
+				},
+			})
 
 			if (typeof window !== 'undefined') {
 				window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -2635,6 +2692,35 @@ function trackGoogleEvent(
 	}
 
 	window.gtag('event', eventName, nextParams)
+}
+
+async function persistBlvdBookingAttributionTouch(
+	payload: Record<string, unknown>,
+) {
+	if (typeof window === 'undefined') return
+
+	const response = await fetch('/resources/blvd-attribution', {
+		body: JSON.stringify(payload),
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		keepalive: true,
+		method: 'POST',
+	})
+
+	if (!response.ok) {
+		throw new Error('Failed to persist Boulevard attribution touch')
+	}
+}
+
+function queueBlvdBookingAttributionTouch(payload: Record<string, unknown>) {
+	try {
+		void persistBlvdBookingAttributionTouch(payload).catch(error => {
+			console.error('Failed to persist Boulevard attribution touch', error)
+		})
+	} catch (error) {
+		console.error('Failed to queue Boulevard attribution touch', error)
+	}
 }
 
 function normalizePhoneNumber(value: string) {

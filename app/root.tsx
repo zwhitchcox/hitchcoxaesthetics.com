@@ -48,7 +48,10 @@ import { EpicToaster } from '#/app/components/ui/sonner.tsx'
 import '#/app/styles/global.css'
 import tailwindStyleSheetUrl from '#/app/styles/tailwind.css?url'
 import { getUserId, logout } from '#/app/utils/auth.server.ts'
-import { trackBookingAnalyticsPageView } from '#/app/utils/booking-analytics.ts'
+import {
+	getMarketingPageEventProperties,
+	trackBookingAnalyticsPageView,
+} from '#/app/utils/booking-analytics.ts'
 import {
 	ClientHintCheck,
 	getHints,
@@ -79,7 +82,7 @@ import { useOptionalUser, useUser } from '#/app/utils/user.ts'
 import { BlvdProvider } from './utils/blvd-context'
 import { CTA } from './utils/cta'
 import { PhoneLink, PhoneProvider } from './utils/phone-context'
-import { PostHogProvider } from './utils/posthog'
+import { PostHogProvider, usePostHog } from './utils/posthog'
 
 export const links: LinksFunction = () => {
 	return [
@@ -358,6 +361,7 @@ function App() {
 	const [isMenuOpen, setIsMenuOpen] = useState(false)
 	const data = useLoaderData<typeof loader>()
 	const location = useLocation()
+	const posthog = usePostHog()
 	const nonce = useNonce()
 	const theme = useTheme()
 
@@ -370,6 +374,76 @@ function App() {
 			search: location.search,
 		})
 	}, [location.pathname, location.search])
+
+	useEffect(() => {
+		if (!posthog) return
+		if (location.pathname === '/book') return
+
+		posthog.capture(
+			'marketing_page_viewed',
+			getMarketingPageEventProperties({
+				pathname: location.pathname,
+				search: location.search,
+			}),
+		)
+	}, [location.pathname, location.search, posthog])
+
+	useEffect(() => {
+		if (
+			!posthog ||
+			typeof document === 'undefined' ||
+			typeof window === 'undefined'
+		) {
+			return
+		}
+
+		const handleClick = (event: MouseEvent) => {
+			const target = event.target
+			if (!(target instanceof Element)) return
+
+			const anchor = target.closest('a[href]')
+			if (!(anchor instanceof HTMLAnchorElement)) return
+
+			const href = anchor.getAttribute('href')?.trim()
+			if (!href) return
+
+			const baseProperties = getMarketingPageEventProperties({
+				pathname: location.pathname,
+				search: location.search,
+			})
+			const ctaText = anchor.textContent?.trim().replace(/\s+/g, ' ')
+
+			if (href.startsWith('tel:')) {
+				posthog.capture('phone_cta_clicked', {
+					...baseProperties,
+					cta_href: href,
+					cta_text: ctaText || undefined,
+					phone_number: href.replace(/^tel:/, ''),
+				})
+				return
+			}
+
+			let destination: URL
+			try {
+				destination = new URL(href, window.location.origin)
+			} catch {
+				return
+			}
+
+			if (destination.pathname !== '/book') return
+
+			posthog.capture('book_cta_clicked', {
+				...baseProperties,
+				cta_href: href,
+				cta_text: ctaText || undefined,
+				cta_destination_path: destination.pathname,
+				cta_destination_search: destination.search || undefined,
+			})
+		}
+
+		document.addEventListener('click', handleClick, true)
+		return () => document.removeEventListener('click', handleClick, true)
+	}, [location.pathname, location.search, posthog])
 
 	return (
 		<Document nonce={nonce} theme={theme} env={data.ENV}>
@@ -606,7 +680,7 @@ function AppWithProviders() {
 	return (
 		<PostHogProvider
 			apiKey={
-				ENV.MODE === 'development'
+				ENV.MODE === 'development' && ENV.ENABLE_DEV_POSTHOG !== '1'
 					? undefined
 					: ENV.REACT_APP_PUBLIC_POSTHOG_KEY
 			}

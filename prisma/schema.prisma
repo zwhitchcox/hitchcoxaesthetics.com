@@ -11,27 +11,25 @@ datasource db {
 }
 
 model User {
-  id                   String                @id @default(cuid())
-  phone                String                @unique
-  email                String?               @unique
-  name                 String?
-  type                 String                @default("client")
-  dob                  DateTime?
-  service              Service[]
-  clientAppointments   Appointment[]         @relation("ClientAppointments")
-  providerAppointments Appointment[]         @relation("ProviderAppointments")
-  blockedTime          BlockedTime[]
-  image                UserImage?
-  notes                Note[]
-  roles                Role[]
-  sessions             Session[]
-  connections          Connection[]
-  location             GoogleLocation?       @relation(fields: [locationId], references: [id])
-  locationId           String?
-  address              Address?
-  clientHistory        ClientHistoryRecord[]
-  schedule             WeeklySchedule[]
-  active               Boolean               @default(true)
+  id            String                @id @default(cuid())
+  phone         String                @unique
+  email         String?               @unique
+  name          String?
+  type          String                @default("client")
+  dob           DateTime?
+  service       Service[]
+  blockedTime   BlockedTime[]
+  image         UserImage?
+  notes         Note[]
+  roles         Role[]
+  sessions      Session[]
+  connections   Connection[]
+  location      GoogleLocation?       @relation(fields: [locationId], references: [id])
+  locationId    String?
+  address       Address?
+  clientHistory ClientHistoryRecord[]
+  schedule      WeeklySchedule[]
+  active        Boolean               @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -72,38 +70,17 @@ model NoteImage {
 }
 
 model Service {
-  id           String        @id @default(cuid())
-  title        String
-  slug         String        @unique
-  hint         String
-  body         String?
-  duration     Int // in minutes
-  provider     User[]
-  appointments Appointment[]
-  order        Float
+  id       String  @id @default(cuid())
+  title    String
+  slug     String  @unique
+  hint     String
+  body     String?
+  duration Int // in minutes
+  provider User[]
+  order    Float
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model Appointment {
-  id          String    @id @default(cuid())
-  service     Service   @relation(fields: [serviceId], references: [id])
-  start       DateTime? // actual appointment start time
-  end         DateTime? // actual appointment end time
-  windowStart DateTime // scheduled appointment start time
-  windowEnd   DateTime // scheduled appointment end time
-  notes       String?
-  status      String    @default("Active")
-
-  provider   User   @relation(name: "ProviderAppointments", fields: [providerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  providerId String
-  client     User   @relation(name: "ClientAppointments", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  clientId   String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  serviceId String
 }
 
 model UserImage {
@@ -370,38 +347,139 @@ model ReviewStats {
   @@index([locationId])
 }
 
-// New model for Patient data
-model Patient {
-  id           String        @id @default(cuid())
-  name         String
-  email        String?       @unique
-  phone        String?
-  invoiceItems InvoiceItem[]
+model BlvdClient {
+  id                String                   @id @default(cuid())
+  boulevardClientId String                   @unique
+  email             String?
+  phone             String?
+  firstName         String?
+  lastName          String?
+  latestTouchAt     DateTime?
+
+  attributionTouches       BlvdAttributionTouch[]
+  attributedRevenueItems   BlvdRevenueItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([name])
+  @@index([email])
+  @@index([phone])
 }
 
-// New model to store raw invoice data
-model InvoiceItem {
-  id        String   @id @default(cuid())
-  invoiceId String // Original invoice ID
-  date      DateTime // Invoice date in UTC (will be displayed in ET)
-  item      String // Service name
-  collected Float // Amount collected
-  category  String // Service category (laser, botox, etc.)
-  details   String? // Complete invoice data as JSON string
+model BlvdAttributionTouch {
+  id             String     @id @default(cuid())
+  blvdClientId   String
+  blvdClient     BlvdClient @relation(fields: [blvdClientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  // Replace direct patientName field with relation
-  patient   Patient? @relation(fields: [patientId], references: [id])
-  patientId String?
+  occurredAt     DateTime
+  touchType      String     @default("web_booking")
+  sourceSystem   String     @default("website")
+
+  bookingCartId              String?  @unique
+  bookingLocationId          String?
+  bookingLocationName        String?
+  bookingServiceId           String?
+  bookingServiceName         String?
+  bookingServiceCategory     String?
+  bookingSelectedPaymentType String?
+  bookingValueUsd            Float?
+  bookingHasVerifiedClient   Boolean?
+  appointmentCount           Int?
+
+  bookEntryFromPath             String?
+  bookEntryPagePrefixType       String?
+  bookEntryPageType             String?
+  initialLandingPath            String?
+  initialLandingPagePrefixType  String?
+  initialLandingPageType        String?
+  initialReferrer               String?
+  initialReferringDomain        String?
+
+  trafficChannel      String?
+  trafficPlatform     String?
+  trafficSourceDetail String?
+
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  gclid       String?
+  gbraid      String?
+  wbraid      String?
+  fbclid      String?
+  msclkid     String?
+
+  rawProperties String?
+
+  appointments  BlvdAttributedAppointment[]
+  revenueItems  BlvdRevenueItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([date])
-  @@index([category])
-  @@index([patientId])
+  @@index([blvdClientId, occurredAt])
+  @@index([trafficSourceDetail])
+  @@index([trafficChannel])
+  @@index([touchType])
+}
+
+model BlvdAttributedAppointment {
+  id                    String               @id @default(cuid())
+  boulevardAppointmentId String              @unique
+  boulevardClientId      String?
+  startTime              DateTime?
+  endTime                DateTime?
+
+  touchId String
+  touch   BlvdAttributionTouch @relation(fields: [touchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boulevardClientId])
+  @@index([startTime])
+}
+
+model BlvdRevenueItem {
+  id                    String     @id @default(cuid())
+  externalId            String     @unique
+  boulevardClientId     String?
+  boulevardAppointmentId String?
+  boulevardInvoiceId    String?
+  boulevardPaymentId    String?
+  boulevardSaleId       String?
+
+  blvdClientId String?
+  blvdClient   BlvdClient? @relation(fields: [blvdClientId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  occurredAt DateTime
+  itemName    String
+  itemType    String?
+  serviceCategory String?
+  grossAmountUsd  Float
+  netAmountUsd    Float?
+  discountAmountUsd Float?
+  gratuityAmountUsd Float?
+  currency        String   @default("USD")
+  rawPayload      String?
+
+  attributionTouchId String?
+  attributionTouch   BlvdAttributionTouch? @relation(fields: [attributionTouchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  attributionMethod  String?
+  attributedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boulevardClientId])
+  @@index([boulevardAppointmentId])
+  @@index([occurredAt])
+  @@index([attributionTouchId])
+}
+
+model BlvdSyncState {
+  key       String   @id
+  value     String?
+  updatedAt DateTime @updatedAt
 }
