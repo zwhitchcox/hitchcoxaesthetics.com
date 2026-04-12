@@ -398,6 +398,8 @@ model BlvdAttributionTouch {
   trafficChannel      String?
   trafficPlatform     String?
   trafficSourceDetail String?
+  posthogDistinctId   String?
+  posthogSessionId    String?
 
   utmSource   String?
   utmMedium   String?

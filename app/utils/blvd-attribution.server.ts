@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { prisma } from '#app/utils/db.server.ts'
+import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 
 const attributionPropertiesSchema = z
 	.object({
@@ -15,6 +16,8 @@ const attributionPropertiesSchema = z
 		traffic_channel: z.string().optional(),
 		traffic_platform: z.string().optional(),
 		traffic_source_detail: z.string().optional(),
+		posthog_distinct_id: z.string().optional(),
+		posthog_session_id: z.string().optional(),
 		utm_source: z.string().optional(),
 		utm_medium: z.string().optional(),
 		utm_campaign: z.string().optional(),
@@ -263,6 +266,12 @@ export async function recordBoulevardBookingAttributionTouch(
 		trafficSourceDetail: normalizeOptionalString(
 			parsed.attribution.traffic_source_detail,
 		),
+		posthogDistinctId: normalizeOptionalString(
+			parsed.attribution.posthog_distinct_id,
+		),
+		posthogSessionId: normalizeOptionalString(
+			parsed.attribution.posthog_session_id,
+		),
 		utmSource: normalizeOptionalString(parsed.attribution.utm_source),
 		utmMedium: normalizeOptionalString(parsed.attribution.utm_medium),
 		utmCampaign: normalizeOptionalString(parsed.attribution.utm_campaign),
@@ -317,6 +326,80 @@ export async function recordBoulevardBookingAttributionTouch(
 	}
 }
 
+async function syncBlvdRevenueItemToPostHog(
+	input: { revenueItemId: string },
+	db: DbLike,
+) {
+	const revenueItem = await db.blvdRevenueItem.findUnique({
+		where: { id: input.revenueItemId },
+		include: {
+			blvdClient: true,
+			attributionTouch: true,
+		},
+	})
+
+	if (!revenueItem) return
+
+	const touch = revenueItem.attributionTouch
+	const distinctId =
+		touch?.posthogDistinctId ??
+		revenueItem.boulevardClientId ??
+		revenueItem.blvdClient?.boulevardClientId
+
+	if (!distinctId) return
+
+	await captureServerPostHogEvent({
+		distinctId,
+		event: 'blvd_revenue_recorded',
+		insertId: `blvd-revenue:${revenueItem.externalId}:${touch?.id ?? 'unattributed'}`,
+		properties: {
+			blvd_client_id:
+				revenueItem.boulevardClientId ??
+				revenueItem.blvdClient?.boulevardClientId ??
+				null,
+			blvd_invoice_id: revenueItem.boulevardInvoiceId,
+			blvd_payment_id: revenueItem.boulevardPaymentId,
+			blvd_sale_id: revenueItem.boulevardSaleId,
+			blvd_appointment_id: revenueItem.boulevardAppointmentId,
+			external_id: revenueItem.externalId,
+			gross_amount_usd: revenueItem.grossAmountUsd,
+			net_amount_usd: revenueItem.netAmountUsd,
+			discount_amount_usd: revenueItem.discountAmountUsd,
+			gratuity_amount_usd: revenueItem.gratuityAmountUsd,
+			currency: revenueItem.currency,
+			item_name: revenueItem.itemName,
+			item_type: revenueItem.itemType,
+			service_category: revenueItem.serviceCategory,
+			attribution_method: revenueItem.attributionMethod,
+			traffic_source_detail: touch?.trafficSourceDetail,
+			traffic_channel: touch?.trafficChannel,
+			traffic_platform: touch?.trafficPlatform,
+			book_entry_page_prefix_type: touch?.bookEntryPagePrefixType,
+			book_entry_page_type: touch?.bookEntryPageType,
+			book_entry_from_path: touch?.bookEntryFromPath,
+			initial_landing_path: touch?.initialLandingPath,
+			initial_landing_page_prefix_type: touch?.initialLandingPagePrefixType,
+			initial_landing_page_type: touch?.initialLandingPageType,
+			booking_service_name: touch?.bookingServiceName,
+			booking_service_category: touch?.bookingServiceCategory,
+			booking_location_name: touch?.bookingLocationName,
+			booking_cart_id: touch?.bookingCartId,
+			utm_source: touch?.utmSource,
+			utm_medium: touch?.utmMedium,
+			utm_campaign: touch?.utmCampaign,
+			utm_term: touch?.utmTerm,
+			utm_content: touch?.utmContent,
+			gclid: touch?.gclid,
+			gbraid: touch?.gbraid,
+			wbraid: touch?.wbraid,
+			fbclid: touch?.fbclid,
+			msclkid: touch?.msclkid,
+			posthog_session_id: touch?.posthogSessionId,
+		},
+		timestamp: revenueItem.occurredAt.toISOString(),
+	})
+}
+
 export async function upsertBlvdRevenueItem(
 	input: BoulevardRevenueItemInput,
 	db: DbLike = prisma,
@@ -337,7 +420,7 @@ export async function upsertBlvdRevenueItem(
 			})
 		: null
 
-	return db.blvdRevenueItem.upsert({
+	const revenueItem = await db.blvdRevenueItem.upsert({
 		where: { externalId: parsed.externalId },
 		create: {
 			externalId: parsed.externalId,
@@ -391,4 +474,42 @@ export async function upsertBlvdRevenueItem(
 			attributedAt: attributionTouch ? new Date() : null,
 		},
 	})
+
+	await syncBlvdRevenueItemToPostHog({ revenueItemId: revenueItem.id }, db)
+
+	return revenueItem
+}
+
+export async function reconcileBlvdRevenueItemAttribution(
+	input: { revenueItemId: string },
+	db: DbLike = prisma,
+) {
+	const revenueItem = await db.blvdRevenueItem.findUnique({
+		where: { id: input.revenueItemId },
+		select: {
+			id: true,
+			boulevardClientId: true,
+			occurredAt: true,
+		},
+	})
+
+	if (!revenueItem?.boulevardClientId) return null
+
+	const touch = await resolveBlvdAttributionTouchForRevenueItem(db, {
+		boulevardClientId: revenueItem.boulevardClientId,
+		occurredAt: revenueItem.occurredAt,
+	})
+
+	const updated = await db.blvdRevenueItem.update({
+		where: { id: revenueItem.id },
+		data: {
+			attributionTouchId: touch?.id ?? null,
+			attributionMethod: touch ? 'last_touch_before_revenue' : 'unattributed',
+			attributedAt: new Date(),
+		},
+	})
+
+	await syncBlvdRevenueItemToPostHog({ revenueItemId: updated.id }, db)
+
+	return updated
 }

@@ -14,6 +14,12 @@ On successful checkout in `app/routes/book.tsx`:
    - `BlvdAttributionTouch`
    - `BlvdAttributedAppointment`
 
+If the browser session has PostHog identity available at booking time, the touch
+also stores:
+
+- `posthogDistinctId`
+- `posthogSessionId`
+
 The crucial identity is the Boulevard `clientId` returned by checkout for each
 booked appointment.
 
@@ -46,6 +52,16 @@ When a revenue item is inserted or reconciled, attribution is assigned using:
   `touch.occurredAt <= revenue.occurredAt`
 
 That is the `last_touch_before_revenue` rule.
+
+When a revenue item is inserted or reconciled, the server also emits a PostHog
+event:
+
+- `blvd_revenue_recorded`
+
+That event includes the resolved attribution properties directly on the revenue
+row, so PostHog can break revenue down by `traffic_source_detail`, LP vs non-LP,
+service category, and related booking properties without needing to re-infer the
+relationship later.
 
 ## Scripts
 

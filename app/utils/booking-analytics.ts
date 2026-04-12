@@ -139,6 +139,8 @@ export function getBookingAnalyticsEventProperties() {
 		traffic_channel: stored.trafficChannel || trafficAttribution.channel,
 		traffic_platform: trafficAttribution.platform,
 		traffic_source_detail: trafficAttribution.detail,
+		posthog_distinct_id: getPostHogDistinctId(),
+		posthog_session_id: getPostHogSessionId(),
 		unique_pages_before_book: stored.preBookUniquePageCount,
 		utm_campaign: stored.utm_campaign,
 		utm_content: stored.utm_content,
@@ -514,6 +516,43 @@ function getStoredTrafficAttribution(stored: StoredBookingAnalytics) {
 		utm_source: stored.utm_source,
 		wbraid: stored.wbraid,
 	})
+}
+
+function getPostHogDistinctId() {
+	return getStoredPostHogState()?.distinct_id
+}
+
+function getPostHogSessionId() {
+	const session = getStoredPostHogState()?.$sesid
+	return Array.isArray(session) && typeof session[1] === 'string'
+		? session[1]
+		: undefined
+}
+
+function getStoredPostHogState() {
+	if (typeof window === 'undefined') return null
+
+	for (let index = 0; index < window.localStorage.length; index++) {
+		const key = window.localStorage.key(index)
+		if (!key?.startsWith('ph_') || !key.endsWith('_posthog')) continue
+
+		const value = window.localStorage.getItem(key)
+		if (!value) continue
+
+		try {
+			const parsed = JSON.parse(value)
+			if (parsed && typeof parsed === 'object') {
+				return parsed as {
+					distinct_id?: string
+					$sesid?: unknown
+				}
+			}
+		} catch {
+			continue
+		}
+	}
+
+	return null
 }
 
 function readStoredBookingAnalytics() {

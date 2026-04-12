@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'
 
-import { resolveBlvdAttributionTouchForRevenueItem } from '#app/utils/blvd-attribution.server.ts'
+import { reconcileBlvdRevenueItemAttribution } from '#app/utils/blvd-attribution.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 
 dotenv.config()
@@ -22,20 +22,10 @@ async function main() {
 	let updated = 0
 	for (const item of revenueItems) {
 		if (!item.boulevardClientId) continue
-
-		const touch = await resolveBlvdAttributionTouchForRevenueItem(prisma, {
-			boulevardClientId: item.boulevardClientId,
-			occurredAt: item.occurredAt,
-		})
-
-		await prisma.blvdRevenueItem.update({
-			where: { id: item.id },
-			data: {
-				attributionTouchId: touch?.id ?? null,
-				attributionMethod: touch ? 'last_touch_before_revenue' : 'unattributed',
-				attributedAt: new Date(),
-			},
-		})
+		await reconcileBlvdRevenueItemAttribution(
+			{ revenueItemId: item.id },
+			prisma,
+		)
 		updated++
 	}
 

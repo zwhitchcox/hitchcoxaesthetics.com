@@ -13,6 +13,7 @@ The site now sends these PostHog events:
 - `booking_funnel_entered`
 - `booking_step_viewed`
 - `booking_completed`
+- `blvd_revenue_recorded`
 
 `booking_step_viewed` uses the `step` property with these values:
 
