@@ -21,6 +21,7 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { Textarea } from '#app/components/ui/textarea.tsx'
+import { getBlvdBookingPriceDisplay } from '#app/utils/blvd-booking-pricing.ts'
 import { getEstimatedValueForBlvdService } from '#app/utils/blvd-pricing.ts'
 import { getBookingAnalyticsEventProperties } from '#app/utils/booking-analytics.ts'
 import {
@@ -212,9 +213,17 @@ type BlvdClient = {
 
 type ServiceEntry = {
 	categoryName: string
+	categoryOrder: number
 	id: string
 	item: BlvdServiceItem
+	itemOrder: number
 	searchText: string
+}
+
+type ServiceGroup = {
+	categoryName: string
+	categoryOrder: number
+	services: ServiceEntry[]
 }
 
 type CheckoutSuccess = {
@@ -511,20 +520,49 @@ export default function BlvdBookRoute() {
 
 	const filteredServices = useMemo(() => {
 		const trimmedSearch = search.trim()
-		const nextServices = services
+		if (trimmedSearch.length === 0) {
+			return services
+		}
+
+		return services
 			.map(service => ({
 				service,
 				score: scoreService(service, trimmedSearch),
 			}))
-			.filter(result => trimmedSearch.length === 0 || result.score > 0)
+			.filter(result => result.score > 0)
 			.sort((a, b) => {
 				if (a.score !== b.score) return b.score - a.score
+				if (a.service.categoryOrder !== b.service.categoryOrder) {
+					return a.service.categoryOrder - b.service.categoryOrder
+				}
+				if (a.service.itemOrder !== b.service.itemOrder) {
+					return a.service.itemOrder - b.service.itemOrder
+				}
 				return a.service.item.name.localeCompare(b.service.item.name)
 			})
 			.map(result => result.service)
-
-		return nextServices
 	}, [search, services])
+	const groupedServices = useMemo(() => {
+		const groups = new Map<string, ServiceGroup>()
+
+		for (const service of filteredServices) {
+			const existing = groups.get(service.categoryName)
+			if (existing) {
+				existing.services.push(service)
+				continue
+			}
+
+			groups.set(service.categoryName, {
+				categoryName: service.categoryName,
+				categoryOrder: service.categoryOrder,
+				services: [service],
+			})
+		}
+
+		return [...groups.values()].sort(
+			(a, b) => a.categoryOrder - b.categoryOrder,
+		)
+	}, [filteredServices])
 
 	const derivedStep = getCurrentBlvdStep({
 		checkoutSuccess,
@@ -1394,61 +1432,77 @@ export default function BlvdBookRoute() {
 												No services matched that search yet.
 											</p>
 										) : (
-											<div className="grid w-full min-w-0 items-start gap-4 md:grid-cols-2">
-												{filteredServices.map(service => {
-													const isSelected = selectedService?.id === service.id
-													return (
-														<button
-															key={service.id}
-															type="button"
-															onClick={() => {
-																void handleSelectService(service)
-															}}
-															className={cn(
-																'min-w-0 rounded-xl border p-5 text-left transition hover:border-primary hover:shadow-md',
-																isSelected &&
-																	'border-primary bg-primary/5 shadow-sm',
-															)}
-														>
-															<div className="mb-2 flex w-full items-start justify-between gap-4">
-																<div className="min-w-0 flex-1">
-																	<p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-																		{service.categoryName}
-																	</p>
-																	<h3 className="mt-2 break-words text-xl font-semibold">
-																		{service.item.name}
-																	</h3>
-																</div>
-																{isSelected ? (
-																	<span className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground">
-																		Selected
-																	</span>
-																) : null}
-															</div>
-															{service.item.description ? (
-																<p className="line-clamp-3 text-sm text-muted-foreground">
-																	{service.item.description}
-																</p>
-															) : null}
-															<div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
-																{formatDurationRange(
-																	service.item.listDurationRange,
-																) ? (
-																	<span>
-																		{formatDurationRange(
-																			service.item.listDurationRange,
-																		)}
-																	</span>
-																) : null}
-																{getDisplayPrice(service.item.name) ? (
-																	<span>
-																		{getDisplayPrice(service.item.name)}
-																	</span>
-																) : null}
-															</div>
-														</button>
-													)
-												})}
+											<div className="space-y-8">
+												{groupedServices.map(group => (
+													<div key={group.categoryName} className="space-y-4">
+														<div className="border-b pb-3">
+															<h3 className="text-lg font-semibold tracking-wide text-foreground">
+																{group.categoryName}
+															</h3>
+														</div>
+														<div className="columns-1 gap-4 md:columns-2">
+															{group.services.map(service => {
+																const isSelected =
+																	selectedService?.id === service.id
+																const displayPrice = getDisplayPrice(
+																	service.item,
+																)
+																return (
+																	<div
+																		key={service.id}
+																		className="mb-4 break-inside-avoid"
+																	>
+																		<button
+																			type="button"
+																			onClick={() => {
+																				void handleSelectService(service)
+																			}}
+																			className={cn(
+																				'w-full min-w-0 rounded-xl border p-5 text-left transition hover:border-primary hover:shadow-md',
+																				isSelected &&
+																					'border-primary bg-primary/5 shadow-sm',
+																			)}
+																		>
+																			<div className="mb-2 flex w-full items-start justify-between gap-4">
+																				<div className="min-w-0 flex-1">
+																					<h4 className="break-words text-xl font-semibold">
+																						{service.item.name}
+																					</h4>
+																					{displayPrice ? (
+																						<p className="mt-2 text-sm font-medium text-primary">
+																							{displayPrice}
+																						</p>
+																					) : null}
+																				</div>
+																				{isSelected ? (
+																					<span className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground">
+																						Selected
+																					</span>
+																				) : null}
+																			</div>
+																			{service.item.description ? (
+																				<p className="line-clamp-4 text-sm text-muted-foreground">
+																					{service.item.description}
+																				</p>
+																			) : null}
+																			<div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
+																				{formatDurationRange(
+																					service.item.listDurationRange,
+																				) ? (
+																					<span>
+																						{formatDurationRange(
+																							service.item.listDurationRange,
+																						)}
+																					</span>
+																				) : null}
+																			</div>
+																		</button>
+																	</div>
+																)
+															})}
+														</div>
+													</div>
+												))}
 											</div>
 										)}
 									</div>
@@ -2249,6 +2303,9 @@ function BlvdAppointmentDetails({
 		minute: '2-digit',
 		hour12: true,
 	})
+	const selectedServicePrice = selectedService
+		? getDisplayPrice(selectedService.item)
+		: null
 
 	return (
 		<div className={cn(`flex w-full flex-col items-center lg:w-64`)}>
@@ -2269,9 +2326,9 @@ function BlvdAppointmentDetails({
 							<div className="text-balance break-words text-lg font-medium tracking-wide">
 								{selectedService.item.name}
 							</div>
-							{getDisplayPrice(selectedService.item.name) ? (
+							{selectedServicePrice ? (
 								<div className="mt-1 text-sm text-muted-foreground">
-									{getDisplayPrice(selectedService.item.name)}
+									{selectedServicePrice}
 								</div>
 							) : null}
 						</div>
@@ -2312,16 +2369,15 @@ function BlvdAppointmentDetails({
 						) : null}
 					</div>
 					{selectedService &&
-					(getDisplayPrice(selectedService.item.name) ||
-						cart?.summary.depositAmount) ? (
+					(selectedServicePrice || cart?.summary.depositAmount) ? (
 						<div className="mt-4 w-full rounded-xl border bg-muted/30 p-4 text-sm">
-							{getDisplayPrice(selectedService.item.name) ? (
+							{selectedServicePrice ? (
 								<div className="flex items-center justify-between gap-4">
 									<span className="font-medium text-muted-foreground">
 										Estimated total
 									</span>
 									<span className="font-semibold text-foreground">
-										{getDisplayPrice(selectedService.item.name)}
+										{selectedServicePrice}
 									</span>
 								</div>
 							) : null}
@@ -2329,7 +2385,7 @@ function BlvdAppointmentDetails({
 								<p
 									className={cn(
 										'text-left text-muted-foreground',
-										getDisplayPrice(selectedService.item.name) ? 'mt-2' : '',
+										selectedServicePrice ? 'mt-2' : '',
 									)}
 								>
 									Deposit due now: {formatMoney(cart.summary.depositAmount)}
@@ -2459,16 +2515,18 @@ function buildClientSourceHint(path: string): SourceHint | null {
 function buildServiceEntries(categories: BlvdCategory[]) {
 	const services = new Map<string, ServiceEntry>()
 
-	for (const category of categories) {
-		for (const item of category.availableItems) {
+	for (const [categoryOrder, category] of categories.entries()) {
+		for (const [itemOrder, item] of category.availableItems.entries()) {
 			if (item.__typename !== 'CartAvailableBookableItem' || item.disabled)
 				continue
 			if (services.has(item.id)) continue
 
 			services.set(item.id, {
 				categoryName: category.name,
+				categoryOrder,
 				id: item.id,
 				item,
+				itemOrder,
 				searchText: normalizeText(
 					[category.name, item.name, item.description ?? ''].join(' '),
 				),
@@ -2476,9 +2534,7 @@ function buildServiceEntries(categories: BlvdCategory[]) {
 		}
 	}
 
-	return [...services.values()].sort((a, b) =>
-		a.item.name.localeCompare(b.item.name),
-	)
+	return [...services.values()]
 }
 
 function scoreService(service: ServiceEntry, search: string) {
@@ -2586,11 +2642,12 @@ function formatMoney(value?: number | null) {
 	}).format(value / 100)
 }
 
-function getDisplayPrice(serviceName: string) {
-	const lower = serviceName.toLowerCase()
-	if (lower.includes('consultation')) return 'Free Consultation'
-	if (lower.includes('lip flip')) return '$129'
-	return null
+function getDisplayPrice(
+	item: Pick<BlvdServiceItem, 'listPriceRange' | 'name'>,
+) {
+	return getBlvdBookingPriceDisplay({
+		serviceName: item.name,
+	}).display
 }
 
 function toDate(value: Date | string | null | undefined) {

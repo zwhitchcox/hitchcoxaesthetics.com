@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { getMissingBlvdBookingPriceServiceNames } from '#app/utils/blvd-booking-pricing.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 
@@ -154,6 +155,58 @@ async function upsertBlvdClientRecord(
 			latestTouchAt: input.latestTouchAt ?? undefined,
 		},
 	})
+}
+
+export async function refreshBlvdBookingPricingAudit(db: DbLike = prisma) {
+	const [touchNames, revenueItemNames] = await Promise.all([
+		db.blvdAttributionTouch.findMany({
+			where: {
+				bookingServiceName: { not: null },
+			},
+			select: {
+				bookingServiceName: true,
+			},
+			distinct: ['bookingServiceName'],
+		}),
+		db.blvdRevenueItem.findMany({
+			select: {
+				itemName: true,
+			},
+			distinct: ['itemName'],
+		}),
+	])
+
+	const serviceNames = [
+		...touchNames.map(item => item.bookingServiceName).filter(Boolean),
+		...revenueItemNames.map(item => item.itemName).filter(Boolean),
+	] as string[]
+	const missingServiceNames =
+		getMissingBlvdBookingPriceServiceNames(serviceNames)
+
+	await Promise.all([
+		db.blvdSyncState.upsert({
+			where: { key: 'blvd_missing_booking_pricing_names' },
+			create: {
+				key: 'blvd_missing_booking_pricing_names',
+				value: JSON.stringify(missingServiceNames),
+			},
+			update: {
+				value: JSON.stringify(missingServiceNames),
+			},
+		}),
+		db.blvdSyncState.upsert({
+			where: { key: 'blvd_missing_booking_pricing_count' },
+			create: {
+				key: 'blvd_missing_booking_pricing_count',
+				value: String(missingServiceNames.length),
+			},
+			update: {
+				value: String(missingServiceNames.length),
+			},
+		}),
+	])
+
+	return missingServiceNames
 }
 
 export async function resolveBlvdAttributionTouchForRevenueItem(
@@ -319,6 +372,8 @@ export async function recordBoulevardBookingAttributionTouch(
 		})
 	}
 
+	await refreshBlvdBookingPricingAudit(db)
+
 	return {
 		blvdClientId: client.id,
 		boulevardClientId: client.boulevardClientId,
@@ -475,6 +530,7 @@ export async function upsertBlvdRevenueItem(
 		},
 	})
 
+	await refreshBlvdBookingPricingAudit(db)
 	await syncBlvdRevenueItemToPostHog({ revenueItemId: revenueItem.id }, db)
 
 	return revenueItem
@@ -509,6 +565,7 @@ export async function reconcileBlvdRevenueItemAttribution(
 		},
 	})
 
+	await refreshBlvdBookingPricingAudit(db)
 	await syncBlvdRevenueItemToPostHog({ revenueItemId: updated.id }, db)
 
 	return updated

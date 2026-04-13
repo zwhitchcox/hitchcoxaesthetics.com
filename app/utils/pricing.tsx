@@ -249,7 +249,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 					name: 'Large Area (Brazilian, Back, Abdomen, Chest, Legs, Full Arms)',
 					price: '$899/package · Touch-up: $69',
 				},
-				{ name: 'Full Legs', price: '$2,500/package · Touch-up: $150' },
+				{ name: 'Full Legs', price: '$2,500/package · Touch-up: $115' },
 			],
 			footnotes: [
 				'All areas include 6 sessions per package.',
@@ -344,7 +344,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 					name: 'Large Area (Brazilian, Back, Abdomen, Chest, Legs, Full Arms)',
 					price: '$899/package · Touch-up: $69',
 				},
-				{ name: 'Full Legs', price: '$2,500/package · Touch-up: $150' },
+				{ name: 'Full Legs', price: '$2,500/package · Touch-up: $115' },
 			],
 			footnotes: [
 				'All areas include 6 sessions per package.',

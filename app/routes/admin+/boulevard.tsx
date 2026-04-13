@@ -10,6 +10,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from '#app/components/ui/card.tsx'
+import { getMissingBlvdBookingPriceServiceNames } from '#app/utils/blvd-booking-pricing.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
 
@@ -184,6 +185,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			where: { attributionTouchId: { not: null } },
 		}),
 	])
+	const missingBookingPricingServiceNames =
+		getMissingBlvdBookingPriceServiceNames([
+			...touches
+				.map(touch => touch.bookingServiceName)
+				.filter((value): value is string => Boolean(value)),
+			...revenueItems.map(item => item.itemName),
+		])
 
 	return json({
 		clients,
@@ -191,6 +199,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		appointments,
 		revenueItems,
 		syncStates,
+		missingBookingPricingServiceNames,
 		clientCount,
 		touchCount,
 		appointmentCount,
@@ -243,9 +252,34 @@ export default function BoulevardAdminPage() {
 					description={`Total gross ${formatCurrency(data.revenueGrossUsd)} | attributed ${formatCurrency(data.attributedRevenueGrossUsd)}`}
 					value={formatCurrency(data.attributedRevenueGrossUsd)}
 				/>
+				<SummaryCard
+					title="Missing Booking Prices"
+					description="Boulevard service names found in touches or revenue without a booking price mapping."
+					value={String(data.missingBookingPricingServiceNames.length)}
+				/>
 			</div>
 
 			<div className="space-y-6">
+				<SectionCard
+					title="Booking Pricing Audit"
+					description="These Boulevard service names are missing from the booking pricing catalog and need explicit pricing copy."
+				>
+					{data.missingBookingPricingServiceNames.length === 0 ? (
+						<p className="text-sm text-muted-foreground">
+							All Boulevard service names seen in touches and revenue currently
+							have booking pricing configured.
+						</p>
+					) : (
+						<DataTable headers={['Service Name']}>
+							{data.missingBookingPricingServiceNames.map(serviceName => (
+								<tr key={serviceName} className="border-t align-top">
+									<td className="px-4 py-3">{serviceName}</td>
+								</tr>
+							))}
+						</DataTable>
+					)}
+				</SectionCard>
+
 				<SectionCard
 					title="Clients"
 					description="Every Boulevard client currently tracked in the local attribution ledger."
