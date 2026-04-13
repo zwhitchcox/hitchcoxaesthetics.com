@@ -97,6 +97,16 @@ export type BoulevardRevenueItemInput = z.infer<
 
 type DbLike = typeof prisma
 
+function getBookingClientType(hasVerifiedClient?: boolean | null) {
+	return hasVerifiedClient ? 'returning_client' : 'new_client'
+}
+
+function getBookingClientTypeSource(hasVerifiedClient?: boolean | null) {
+	return hasVerifiedClient
+		? 'boulevard_sms_ownership'
+		: 'default_unverified_booking_path'
+}
+
 function normalizeOptionalString(value?: string | null) {
 	const trimmed = value?.trim()
 	return trimmed ? trimmed : null
@@ -439,6 +449,13 @@ async function syncBlvdRevenueItemToPostHog(
 			booking_service_category: touch?.bookingServiceCategory,
 			booking_location_name: touch?.bookingLocationName,
 			booking_cart_id: touch?.bookingCartId,
+			booking_has_verified_client: touch?.bookingHasVerifiedClient,
+			booking_client_type: getBookingClientType(
+				touch?.bookingHasVerifiedClient,
+			),
+			booking_client_type_source: getBookingClientTypeSource(
+				touch?.bookingHasVerifiedClient,
+			),
 			utm_source: touch?.utmSource,
 			utm_medium: touch?.utmMedium,
 			utm_campaign: touch?.utmCampaign,

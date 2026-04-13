@@ -80,6 +80,68 @@ dashboards:
         steps: *entry_to_completion_steps
 
       - kind: funnel
+        name: Entry To Completion - Client Type
+        description: 2-step booking funnel broken down by booking_client_type.
+        breakdown: booking_client_type
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Landing Path - New Clients
+        description:
+          Landing-page conversion rate for bookings on the default unverified
+          path.
+        breakdown: initial_landing_path
+        properties:
+          - key: booking_client_type
+            type: event
+            value:
+              - new_client
+            operator: exact
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Landing Path - Returning Clients
+        description:
+          Landing-page conversion rate for bookings with Boulevard ownership
+          verification.
+        breakdown: initial_landing_path
+        properties:
+          - key: booking_client_type
+            type: event
+            value:
+              - returning_client
+            operator: exact
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Entry Path - New Clients
+        description:
+          Last-page-before-book conversion rate for bookings on the default
+          unverified path.
+        breakdown: book_entry_from_path
+        properties:
+          - key: booking_client_type
+            type: event
+            value:
+              - new_client
+            operator: exact
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Entry Path - Returning Clients
+        description:
+          Last-page-before-book conversion rate for bookings with Boulevard
+          ownership verification.
+        breakdown: book_entry_from_path
+        properties:
+          - key: booking_client_type
+            type: event
+            value:
+              - returning_client
+            operator: exact
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
         name: Entry To Completion - LP Entry by Source Detail
         description:
           Entry-to-completion funnel for users who entered booking from an /lp
@@ -189,6 +251,12 @@ dashboards:
         breakdown: booking_has_verified_client
         steps: *full_booking_steps
 
+      - kind: funnel
+        name: Full Booking Step Funnel - Client Type
+        description: Full booking funnel broken down by booking_client_type.
+        breakdown: booking_client_type
+        steps: *full_booking_steps
+
       - kind: trend
         name: Booking Entry Trends - Source Detail
         description: Booking funnel entries by traffic_source_detail.
@@ -245,6 +313,14 @@ dashboards:
           - event: booking_completed
             custom_name: Booking Completion Trends - Service Name
 
+      - kind: trend
+        name: Booking Completion Trends - Client Type
+        description: Booking completions by booking_client_type.
+        breakdown: booking_client_type
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Client Type
+
       - kind: funnel
         name: Pre-Book Quality Funnel - Pages Before Book
         description:
@@ -288,6 +364,17 @@ dashboards:
         series:
           - event: booking_completed
             custom_name: Revenue Proxy Trend - Source Detail
+            math: sum
+            math_property: booking_value_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Revenue Proxy Trend - Client Type
+        description: Estimated booking value summed by booking_client_type.
+        breakdown: booking_client_type
+        series:
+          - event: booking_completed
+            custom_name: Revenue Proxy Trend - Client Type
             math: sum
             math_property: booking_value_usd
             math_property_type: event

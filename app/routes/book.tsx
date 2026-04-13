@@ -2691,9 +2691,14 @@ function buildBookingSelectionEventProperties({
 		: selectedLocation?.id === 'telehealth'
 			? true
 			: undefined
+	const bookingClientType = getBookingClientType(hasVerifiedClient)
 
 	return {
 		booking_has_verified_client: hasVerifiedClient,
+		booking_client_type: bookingClientType,
+		booking_client_type_source: hasVerifiedClient
+			? 'boulevard_sms_ownership'
+			: 'default_unverified_booking_path',
 		...(selectedService
 			? {
 					booking_service_category: selectedService.categoryName,
@@ -2724,6 +2729,10 @@ function buildBookingSelectionEventProperties({
 			? { booking_saved_payment_method_count: availablePaymentMethodCount }
 			: {}),
 	}
+}
+
+function getBookingClientType(hasVerifiedClient: boolean) {
+	return hasVerifiedClient ? 'returning_client' : 'new_client'
 }
 
 function isTelehealthServiceName(name: string) {

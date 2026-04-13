@@ -87,6 +87,8 @@ These fields answer:
 - `booking_location_id`
 - `booking_is_telehealth`
 - `booking_requires_card`
+- `booking_client_type`
+- `booking_client_type_source`
 - `booking_has_verified_client`
 - `booking_saved_payment_method_count`
 - `booking_selected_payment_method_type`
@@ -98,7 +100,15 @@ These fields answer:
 - which service or category converted
 - whether the booking was telehealth
 - whether card requirement may have created friction
+- whether the booking should be grouped as a new or returning client
 - whether the person was a verified returning client
+
+Interpretation:
+
+- `booking_client_type = returning_client` means Boulevard SMS ownership was
+  verified
+- `booking_client_type = new_client` means the booking stayed on the default
+  unverified path
 
 ## Best Reporting Dimensions
 

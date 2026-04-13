@@ -58,6 +58,10 @@ Additional saved variants worth keeping on the dashboard:
 
 - `Entry To Completion - LP Entry by Source Detail`
 - `Entry To Completion - Non-LP Entry by Source Detail`
+- `Entry To Completion - Landing Path - New Clients`
+- `Entry To Completion - Landing Path - Returning Clients`
+- `Entry To Completion - Entry Path - New Clients`
+- `Entry To Completion - Entry Path - Returning Clients`
 
 Also save these page-type views:
 
@@ -66,6 +70,15 @@ Also save these page-type views:
 
 These use the derived `book_entry_page_prefix_type` and `book_entry_page_type`
 properties so the comparison is declarative instead of regex-based.
+
+Use client-type filtered page funnels when you want separate answers for:
+
+- pages that convert new clients well
+- pages that convert returning clients well
+
+Client-type filtering is reliable on booking and attributed revenue events. It
+does not apply cleanly to `marketing_page_viewed`, `book_cta_clicked`, or
+`phone_cta_clicked`, because client type is not known until the booking flow.
 
 ### 1b. CTA Click Likelihood
 
@@ -119,6 +132,7 @@ Breakdown options to save as separate insights:
 - `booking_service_category`
 - `booking_is_telehealth`
 - `booking_requires_card`
+- `booking_client_type`
 - `booking_has_verified_client`
 
 Use this to answer:
@@ -126,7 +140,7 @@ Use this to answer:
 - Which service types stall in scheduling?
 - Does telehealth behave differently from in-person booking?
 - Are card-required bookings dropping harder in the reserve step?
-- Do verified returning clients convert better than cold visitors?
+- Do returning clients convert better than new clients?
 
 ### 3. Booking Entry Trends
 
@@ -161,11 +175,13 @@ Breakdown options to save as separate insights:
 - `traffic_channel`
 - `booking_service_category`
 - `booking_service_name`
+- `booking_client_type`
 
 Use this to answer:
 
 - Which campaigns create actual bookings, not just starts?
 - Which service lines are producing completions?
+- Are new-client or returning-client bookings driving more completions?
 
 ### 5. Pre-Book Quality Funnel
 
@@ -203,11 +219,13 @@ Breakdown options to save as separate insights:
 - `booking_service_category`
 - `booking_service_name`
 - `traffic_source_detail`
+- `booking_client_type`
 
 Use this to answer:
 
 - Which sources drive the highest estimated booking value?
 - Which services generate the most modeled booking value?
+- Are new or returning clients driving more modeled booking value?
 
 ## Saved Breakdowns
 
@@ -224,6 +242,12 @@ insights:
 - `booking_is_telehealth`
 - `booking_requires_card`
 - `booking_has_verified_client`
+- `booking_client_type`
+
+`booking_client_type = returning_client` means the person verified Boulevard
+ownership by SMS. `booking_client_type = new_client` means the booking stayed on
+the default unverified path.
+
 - `pages_before_book_bucket`
 - `pre_book_duration_bucket`
 
