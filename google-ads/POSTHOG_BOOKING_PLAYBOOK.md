@@ -24,11 +24,17 @@ The site now sends these PostHog events:
 - `reserve`
 - `success`
 
-## Dashboard
+## Dashboards
 
-Create a PostHog dashboard called `Booking Funnel - Attribution`.
+The repo now manages these dashboards:
 
-Add these insights.
+- `Booking Overview - Source & Revenue`
+- `Booking Pages - Conversion`
+- `Booking Funnel - Diagnostics`
+- `Booking Types - Source Breakdown`
+- `Booking CTA Performance`
+
+Add these insights to the relevant dashboard.
 
 ### 1. Entry To Completion Funnel
 
@@ -202,17 +208,19 @@ Use this to answer:
 - Do fast visitors convert better than long researchers?
 - Do users who browse multiple pages convert better?
 
-### 6. Service-Level Revenue Proxy Trend
+### 6. Service-Level Revenue Trends
 
 Type: Trends
 
 Event:
 
 - `booking_completed`
+- `blvd_revenue_recorded`
 
 Display:
 
-- Use `Sum of property` on `booking_value_usd` if useful in your PostHog plan
+- For modeled booking value use `Sum of property` on `booking_value_usd`
+- For actual attributed revenue use `Sum of property` on `gross_amount_usd`
 
 Breakdown options to save as separate insights:
 
@@ -226,6 +234,8 @@ Use this to answer:
 - Which sources drive the highest estimated booking value?
 - Which services generate the most modeled booking value?
 - Are new or returning clients driving more modeled booking value?
+- Which sources are driving actual attributed Boulevard revenue?
+- Which booking types are generating revenue by source?
 
 ## Saved Breakdowns
 
@@ -364,8 +374,11 @@ utm_campaign=<campaign_name>
 
 - Which source starts the most bookings?
 - Which source completes the most bookings?
+- Which source drives the most attributed revenue?
 - Which pages push users into `/book`?
+- Which pages convert new clients versus returning clients?
 - Which service categories have the worst step drop-off?
+- Which booking types each source tends to generate?
 - Does requiring a card reduce completion rate?
 - Do returning verified clients outperform first-time users?
 - Does GBP traffic behave differently from SEO or Google Ads?

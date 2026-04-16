@@ -16,13 +16,15 @@ defaults:
     - attribution
 
 dashboards:
-  - name: Booking Funnel - Attribution
+  - name: Booking Overview - Source & Revenue
     description:
-      Booking funnel and attribution reporting for the custom Boulevard flow.
+      Source-level booking conversion and revenue reporting for the custom
+      Boulevard flow.
     tags:
       - booking
       - attribution
-    managed_tag: managed:booking-funnel-attribution
+      - revenue
+    managed_tag: managed:booking-overview-source-revenue
     sync_mode: replace_managed
     insights:
       - kind: funnel
@@ -48,6 +50,136 @@ dashboards:
         steps: *entry_to_completion_steps
 
       - kind: funnel
+        name: Entry To Completion - Client Type
+        description: 2-step booking funnel broken down by booking_client_type.
+        breakdown: booking_client_type
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - LP Entry by Source Detail
+        description:
+          Entry-to-completion funnel for users who entered booking from an /lp
+          page, broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        properties:
+          - key: book_entry_page_prefix_type
+            type: event
+            value:
+              - lp
+            operator: exact
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Entry To Completion - Non-LP Entry by Source Detail
+        description:
+          Entry-to-completion funnel for users who entered booking from a
+          non-/lp page, broken down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        properties:
+          - key: book_entry_page_prefix_type
+            type: event
+            value:
+              - non_lp
+            operator: exact
+        steps: *entry_to_completion_steps
+
+      - kind: trend
+        name: Booking Entry Trends - Source Detail
+        description: Booking funnel entries by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: booking_funnel_entered
+            custom_name: Booking Entry Trends - Source Detail
+
+      - kind: trend
+        name: Booking Entry Trends - Channel
+        description: Booking funnel entries by traffic_channel.
+        breakdown: traffic_channel
+        series:
+          - event: booking_funnel_entered
+            custom_name: Booking Entry Trends - Channel
+
+      - kind: trend
+        name: Booking Completion Trends - Source Detail
+        description: Booking completions by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Source Detail
+
+      - kind: trend
+        name: Booking Completion Trends - Channel
+        description: Booking completions by traffic_channel.
+        breakdown: traffic_channel
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Channel
+
+      - kind: trend
+        name: Booking Completion Trends - Client Type
+        description: Booking completions by booking_client_type.
+        breakdown: booking_client_type
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Client Type
+
+      - kind: trend
+        name: Revenue Proxy Trend - Source Detail
+        description: Estimated booking value summed by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: booking_completed
+            custom_name: Revenue Proxy Trend - Source Detail
+            math: sum
+            math_property: booking_value_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Revenue Proxy Trend - Client Type
+        description: Estimated booking value summed by booking_client_type.
+        breakdown: booking_client_type
+        series:
+          - event: booking_completed
+            custom_name: Revenue Proxy Trend - Client Type
+            math: sum
+            math_property: booking_value_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Attributed Revenue Trend - Source Detail
+        description:
+          Attributed Boulevard revenue summed by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue Trend - Source Detail
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Attributed Revenue Trend - Client Type
+        description: Attributed Boulevard revenue summed by booking_client_type.
+        breakdown: booking_client_type
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue Trend - Client Type
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+  - name: Booking Pages - Conversion
+    description:
+      Page-level booking conversion views for landing pages, entry pages, and
+      pre-book behavior.
+    tags:
+      - booking
+      - attribution
+      - pages
+    managed_tag: managed:booking-pages-conversion
+    sync_mode: replace_managed
+    insights:
+      - kind: funnel
         name: Entry To Completion - Entry Path
         description: 2-step booking funnel broken down by book_entry_from_path.
         breakdown: book_entry_from_path
@@ -57,13 +189,6 @@ dashboards:
         name: Entry To Completion - Landing Path
         description: 2-step booking funnel broken down by initial_landing_path.
         breakdown: initial_landing_path
-        steps: *entry_to_completion_steps
-
-      - kind: funnel
-        name: Entry To Completion - Service Category
-        description:
-          2-step booking funnel broken down by booking_service_category.
-        breakdown: booking_service_category
         steps: *entry_to_completion_steps
 
       - kind: funnel
@@ -77,12 +202,6 @@ dashboards:
         name: Entry To Completion - Entry Page Type
         description: 2-step booking funnel broken down by book_entry_page_type.
         breakdown: book_entry_page_type
-        steps: *entry_to_completion_steps
-
-      - kind: funnel
-        name: Entry To Completion - Client Type
-        description: 2-step booking funnel broken down by booking_client_type.
-        breakdown: booking_client_type
         steps: *entry_to_completion_steps
 
       - kind: funnel
@@ -141,32 +260,44 @@ dashboards:
             operator: exact
         steps: *entry_to_completion_steps
 
+      - kind: trend
+        name: Booking Entry Trends - Landing Path
+        description: Booking funnel entries by initial_landing_path.
+        breakdown: initial_landing_path
+        series:
+          - event: booking_funnel_entered
+            custom_name: Booking Entry Trends - Landing Path
+
       - kind: funnel
-        name: Entry To Completion - LP Entry by Source Detail
+        name: Pre-Book Quality Funnel - Pages Before Book
         description:
-          Entry-to-completion funnel for users who entered booking from an /lp
-          page, broken down by traffic_source_detail.
-        breakdown: traffic_source_detail
-        properties:
-          - key: book_entry_page_prefix_type
-            type: event
-            value:
-              - lp
-            operator: exact
+          2-step booking funnel broken down by pages_before_book_bucket.
+        breakdown: pages_before_book_bucket
         steps: *entry_to_completion_steps
 
       - kind: funnel
-        name: Entry To Completion - Non-LP Entry by Source Detail
+        name: Pre-Book Quality Funnel - Pre-Book Duration
         description:
-          Entry-to-completion funnel for users who entered booking from a
-          non-/lp page, broken down by traffic_source_detail.
-        breakdown: traffic_source_detail
-        properties:
-          - key: book_entry_page_prefix_type
-            type: event
-            value:
-              - non_lp
-            operator: exact
+          2-step booking funnel broken down by pre_book_duration_bucket.
+        breakdown: pre_book_duration_bucket
+        steps: *entry_to_completion_steps
+
+  - name: Booking Funnel - Diagnostics
+    description:
+      Step-by-step booking funnel diagnostics by service, friction points, and
+      client type.
+    tags:
+      - booking
+      - attribution
+      - funnel
+    managed_tag: managed:booking-funnel-diagnostics
+    sync_mode: replace_managed
+    insights:
+      - kind: funnel
+        name: Entry To Completion - Service Category
+        description:
+          2-step booking funnel broken down by booking_service_category.
+        breakdown: booking_service_category
         steps: *entry_to_completion_steps
 
       - kind: funnel
@@ -257,46 +388,18 @@ dashboards:
         breakdown: booking_client_type
         steps: *full_booking_steps
 
-      - kind: trend
-        name: Booking Entry Trends - Source Detail
-        description: Booking funnel entries by traffic_source_detail.
-        breakdown: traffic_source_detail
-        series:
-          - event: booking_funnel_entered
-            custom_name: Booking Entry Trends - Source Detail
-
-      - kind: trend
-        name: Booking Entry Trends - Channel
-        description: Booking funnel entries by traffic_channel.
-        breakdown: traffic_channel
-        series:
-          - event: booking_funnel_entered
-            custom_name: Booking Entry Trends - Channel
-
-      - kind: trend
-        name: Booking Entry Trends - Landing Path
-        description: Booking funnel entries by initial_landing_path.
-        breakdown: initial_landing_path
-        series:
-          - event: booking_funnel_entered
-            custom_name: Booking Entry Trends - Landing Path
-
-      - kind: trend
-        name: Booking Completion Trends - Source Detail
-        description: Booking completions by traffic_source_detail.
-        breakdown: traffic_source_detail
-        series:
-          - event: booking_completed
-            custom_name: Booking Completion Trends - Source Detail
-
-      - kind: trend
-        name: Booking Completion Trends - Channel
-        description: Booking completions by traffic_channel.
-        breakdown: traffic_channel
-        series:
-          - event: booking_completed
-            custom_name: Booking Completion Trends - Channel
-
+  - name: Booking Types - Source Breakdown
+    description:
+      Booking type mix by source, including both conversion counts and
+      attributed revenue amounts.
+    tags:
+      - booking
+      - attribution
+      - services
+      - revenue
+    managed_tag: managed:booking-types-source-breakdown
+    sync_mode: replace_managed
+    insights:
       - kind: trend
         name: Booking Completion Trends - Service Category
         description: Booking completions by booking_service_category.
@@ -312,28 +415,6 @@ dashboards:
         series:
           - event: booking_completed
             custom_name: Booking Completion Trends - Service Name
-
-      - kind: trend
-        name: Booking Completion Trends - Client Type
-        description: Booking completions by booking_client_type.
-        breakdown: booking_client_type
-        series:
-          - event: booking_completed
-            custom_name: Booking Completion Trends - Client Type
-
-      - kind: funnel
-        name: Pre-Book Quality Funnel - Pages Before Book
-        description:
-          2-step booking funnel broken down by pages_before_book_bucket.
-        breakdown: pages_before_book_bucket
-        steps: *entry_to_completion_steps
-
-      - kind: funnel
-        name: Pre-Book Quality Funnel - Pre-Book Duration
-        description:
-          2-step booking funnel broken down by pre_book_duration_bucket.
-        breakdown: pre_book_duration_bucket
-        steps: *entry_to_completion_steps
 
       - kind: trend
         name: Revenue Proxy Trend - Service Category
@@ -358,27 +439,255 @@ dashboards:
             math_property_type: event
 
       - kind: trend
-        name: Revenue Proxy Trend - Source Detail
-        description: Estimated booking value summed by traffic_source_detail.
-        breakdown: traffic_source_detail
+        name: Attributed Revenue Trend - Service Category
+        description:
+          Attributed Boulevard revenue summed by booking_service_category.
+        breakdown: booking_service_category
         series:
-          - event: booking_completed
-            custom_name: Revenue Proxy Trend - Source Detail
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue Trend - Service Category
             math: sum
-            math_property: booking_value_usd
+            math_property: gross_amount_usd
             math_property_type: event
 
       - kind: trend
-        name: Revenue Proxy Trend - Client Type
-        description: Estimated booking value summed by booking_client_type.
-        breakdown: booking_client_type
+        name: Attributed Revenue Trend - Service Name
+        description:
+          Attributed Boulevard revenue summed by booking_service_name.
+        breakdown: booking_service_name
         series:
-          - event: booking_completed
-            custom_name: Revenue Proxy Trend - Client Type
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue Trend - Service Name
             math: sum
-            math_property: booking_value_usd
+            math_property: gross_amount_usd
             math_property_type: event
 
+      - kind: trend
+        name: Booking Completions - Source Detail - New Patient Injectables
+        description:
+          Booking completions by traffic_source_detail for New Patient -
+          Injectables.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - New Patient - Injectables
+            operator: exact
+        series:
+          - event: booking_completed
+            custom_name:
+              Booking Completions - Source Detail - New Patient Injectables
+
+      - kind: trend
+        name: Booking Completions - Source Detail - Existing Patient Injectables
+        description:
+          Booking completions by traffic_source_detail for Existing Patient -
+          Injectables.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - Existing Patient - Injectables
+            operator: exact
+        series:
+          - event: booking_completed
+            custom_name:
+              Booking Completions - Source Detail - Existing Patient Injectables
+
+      - kind: trend
+        name: Booking Completions - Source Detail - Laser Treatments
+        description:
+          Booking completions by traffic_source_detail for Laser Treatments.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - Laser Treatments
+            operator: exact
+        series:
+          - event: booking_completed
+            custom_name: Booking Completions - Source Detail - Laser Treatments
+
+      - kind: trend
+        name: Booking Completions - Source Detail - Weight Loss and Wellness
+        description:
+          Booking completions by traffic_source_detail for Weight Loss &
+          Wellness.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - Weight Loss & Wellness
+            operator: exact
+        series:
+          - event: booking_completed
+            custom_name:
+              Booking Completions - Source Detail - Weight Loss and Wellness
+
+      - kind: trend
+        name: Booking Completions - Source Detail - Aesthetic Treatments
+        description:
+          Booking completions by traffic_source_detail for Aesthetic Treatments.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - Aesthetic Treatments
+            operator: exact
+        series:
+          - event: booking_completed
+            custom_name:
+              Booking Completions - Source Detail - Aesthetic Treatments
+
+      - kind: trend
+        name: Booking Completions - Source Detail - General Services
+        description:
+          Booking completions by traffic_source_detail for General Services.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - General Services
+            operator: exact
+        series:
+          - event: booking_completed
+            custom_name: Booking Completions - Source Detail - General Services
+
+      - kind: trend
+        name: Attributed Revenue - Source Detail - New Patient Injectables
+        description:
+          Attributed Boulevard revenue by traffic_source_detail for New Patient
+          - Injectables.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - New Patient - Injectables
+            operator: exact
+        series:
+          - event: blvd_revenue_recorded
+            custom_name:
+              Attributed Revenue - Source Detail - New Patient Injectables
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Attributed Revenue - Source Detail - Existing Patient Injectables
+        description:
+          Attributed Boulevard revenue by traffic_source_detail for Existing
+          Patient - Injectables.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - Existing Patient - Injectables
+            operator: exact
+        series:
+          - event: blvd_revenue_recorded
+            custom_name:
+              Attributed Revenue - Source Detail - Existing Patient Injectables
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Attributed Revenue - Source Detail - Laser Treatments
+        description:
+          Attributed Boulevard revenue by traffic_source_detail for Laser
+          Treatments.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - Laser Treatments
+            operator: exact
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue - Source Detail - Laser Treatments
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Attributed Revenue - Source Detail - Weight Loss and Wellness
+        description:
+          Attributed Boulevard revenue by traffic_source_detail for Weight Loss
+          & Wellness.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - Weight Loss & Wellness
+            operator: exact
+        series:
+          - event: blvd_revenue_recorded
+            custom_name:
+              Attributed Revenue - Source Detail - Weight Loss and Wellness
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Attributed Revenue - Source Detail - Aesthetic Treatments
+        description:
+          Attributed Boulevard revenue by traffic_source_detail for Aesthetic
+          Treatments.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - Aesthetic Treatments
+            operator: exact
+        series:
+          - event: blvd_revenue_recorded
+            custom_name:
+              Attributed Revenue - Source Detail - Aesthetic Treatments
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Attributed Revenue - Source Detail - General Services
+        description:
+          Attributed Boulevard revenue by traffic_source_detail for General
+          Services.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_service_category
+            type: event
+            value:
+              - General Services
+            operator: exact
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue - Source Detail - General Services
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+  - name: Booking CTA Performance
+    description:
+      CTA likelihood and click trends for booking and phone calls across landing
+      page types.
+    tags:
+      - booking
+      - attribution
+      - cta
+    managed_tag: managed:booking-cta-performance
+    sync_mode: replace_managed
+    insights:
       - kind: funnel
         name: Book CTA Click Funnel - Initial Landing Prefix Type
         description:
