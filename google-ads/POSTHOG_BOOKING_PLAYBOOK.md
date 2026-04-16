@@ -182,12 +182,14 @@ Breakdown options to save as separate insights:
 - `booking_service_category`
 - `booking_service_name`
 - `booking_client_type`
+- `booking_is_telehealth`
 
 Use this to answer:
 
 - Which campaigns create actual bookings, not just starts?
 - Which service lines are producing completions?
 - Are new-client or returning-client bookings driving more completions?
+- Do telehealth bookings behave differently from in-person bookings?
 
 ### 5. Pre-Book Quality Funnel
 
@@ -228,6 +230,7 @@ Breakdown options to save as separate insights:
 - `booking_service_name`
 - `traffic_source_detail`
 - `booking_client_type`
+- `booking_is_telehealth`
 
 Use this to answer:
 
@@ -236,6 +239,7 @@ Use this to answer:
 - Are new or returning clients driving more modeled booking value?
 - Which sources are driving actual attributed Boulevard revenue?
 - Which booking types are generating revenue by source?
+- Is telehealth generating a different revenue mix than in-person bookings?
 
 ## Saved Breakdowns
 

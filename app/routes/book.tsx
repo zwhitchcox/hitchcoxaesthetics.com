@@ -1102,6 +1102,8 @@ export default function BlvdBookRoute() {
 				booking: {
 					cartId: checkoutPayload.cart.id,
 					hasVerifiedClient,
+					isTelehealth: bookingAnalyticsPropertiesRef.current
+						.booking_is_telehealth as boolean | undefined,
 					locationId: selectedLocation.id,
 					locationName: selectedLocation.name,
 					occurredAt: new Date().toISOString(),

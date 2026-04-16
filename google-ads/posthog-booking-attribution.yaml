@@ -124,6 +124,14 @@ dashboards:
             custom_name: Booking Completion Trends - Client Type
 
       - kind: trend
+        name: Booking Completion Trends - Telehealth
+        description: Booking completions by booking_is_telehealth.
+        breakdown: booking_is_telehealth
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Telehealth
+
+      - kind: trend
         name: Revenue Proxy Trend - Source Detail
         description: Estimated booking value summed by traffic_source_detail.
         breakdown: traffic_source_detail
@@ -164,6 +172,18 @@ dashboards:
         series:
           - event: blvd_revenue_recorded
             custom_name: Attributed Revenue Trend - Client Type
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Attributed Revenue Trend - Telehealth
+        description:
+          Attributed Boulevard revenue summed by booking_is_telehealth.
+        breakdown: booking_is_telehealth
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue Trend - Telehealth
             math: sum
             math_property: gross_amount_usd
             math_property_type: event

@@ -42,6 +42,7 @@ const bookingContextSchema = z.object({
 	serviceCategory: z.string().optional(),
 	selectedPaymentMethodType: z.string().optional(),
 	valueUsd: z.number().optional(),
+	isTelehealth: z.boolean().optional(),
 	hasVerifiedClient: z.boolean().optional(),
 })
 
@@ -296,6 +297,7 @@ export async function recordBoulevardBookingAttributionTouch(
 			parsed.booking.selectedPaymentMethodType,
 		),
 		bookingValueUsd: parsed.booking.valueUsd ?? null,
+		bookingIsTelehealth: parsed.booking.isTelehealth ?? null,
 		bookingHasVerifiedClient: parsed.booking.hasVerifiedClient ?? null,
 		appointmentCount: parsed.appointments.length,
 		bookEntryFromPath: normalizeOptionalString(
@@ -449,6 +451,7 @@ async function syncBlvdRevenueItemToPostHog(
 			booking_service_category: touch?.bookingServiceCategory,
 			booking_location_name: touch?.bookingLocationName,
 			booking_cart_id: touch?.bookingCartId,
+			booking_is_telehealth: touch?.bookingIsTelehealth,
 			booking_has_verified_client: touch?.bookingHasVerifiedClient,
 			booking_client_type: getBookingClientType(
 				touch?.bookingHasVerifiedClient,

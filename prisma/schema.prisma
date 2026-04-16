@@ -383,6 +383,7 @@ model BlvdAttributionTouch {
   bookingServiceCategory     String?
   bookingSelectedPaymentType String?
   bookingValueUsd            Float?
+  bookingIsTelehealth        Boolean?
   bookingHasVerifiedClient   Boolean?
   appointmentCount           Int?
 
