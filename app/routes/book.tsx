@@ -252,6 +252,8 @@ const BLVD_BOOK_STEPS: Array<{
 	{ label: 'Reserve', name: 'reserve' },
 ]
 
+const DEFAULT_BOOKING_LOCATION_ID: SiteLocation['id'] = 'bearden'
+
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
 }
@@ -455,7 +457,9 @@ export default function BlvdBookRoute() {
 	}, [cart])
 
 	const preferredLocationId =
-		sourceHint?.preferredLocationId ?? referrerHint?.preferredLocationId ?? null
+		sourceHint?.preferredLocationId ??
+		referrerHint?.preferredLocationId ??
+		DEFAULT_BOOKING_LOCATION_ID
 	const activeSourceHint = sourceHint ?? referrerHint
 	const selectedDate =
 		bookableDates.find(date => date.id === selectedDateId) ??
