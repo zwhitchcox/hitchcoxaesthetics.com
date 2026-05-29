@@ -1,7 +1,7 @@
 import { redirect } from '@remix-run/node'
 
 export async function loader() {
-	return redirect('/lp/medical-weight-loss-telehealth', { status: 301 })
+	return redirect('/lp/weight-loss-semaglutide', { status: 301 })
 }
 
 export default function LegacyTelehealthWeightLossRoute() {

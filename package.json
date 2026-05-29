@@ -38,6 +38,7 @@
     "update-analytics": "npm run fetch-reviews",
     "blvd:import-revenue": "tsx scripts/blvd-import-revenue.ts",
     "blvd:reconcile-revenue": "tsx scripts/blvd-reconcile-revenue.ts",
+    "retell:booking:dev": "tsx scripts/retell-booking-dev.ts",
     "posthog:sync": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml",
     "posthog:sync:apply": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml --apply"
   },

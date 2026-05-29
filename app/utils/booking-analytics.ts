@@ -31,7 +31,6 @@ const SERVICE_PAGE_SEGMENTS = new Set([
 	'weight-loss',
 	'semaglutide',
 	'tirzepatide',
-	'medical-weight-loss-telehealth',
 ])
 
 type MarketingParamKey = (typeof MARKETING_PARAM_KEYS)[number]

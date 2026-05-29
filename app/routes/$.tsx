@@ -71,7 +71,11 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	}
 
 	if (splat === 'telehealth-weight-loss') {
-		return redirect('/medical-weight-loss-telehealth', { status: 301 })
+		return redirect('/weight-loss', { status: 301 })
+	}
+
+	if (splat === 'medical-weight-loss-telehealth') {
+		return redirect('/weight-loss', { status: 301 })
 	}
 
 	// 301 redirect: old location-prefixed service URLs → base service URLs

@@ -468,16 +468,16 @@ export default function BlvdBookRoute() {
 	const selectedTime =
 		bookableTimes.find(time => time.id === selectedTimeId) ?? null
 	const selectedSiteLocation = selectedLocation
-		? (getSiteLocationForBlvdLocation(selectedLocation) ?? null)
+		? getSiteLocationForBlvdLocation(selectedLocation) ?? null
 		: null
 	const requiresCard = Boolean(cart?.summary.paymentMethodRequired)
 	const hasVerifiedClient = Boolean(ownershipVerifiedPhone)
 	const selectedExistingPaymentMethod =
 		selectedPaymentMethodId === 'new'
 			? null
-			: (availablePaymentMethods.find(
+			: availablePaymentMethods.find(
 					paymentMethod => paymentMethod.id === selectedPaymentMethodId,
-				) ?? null)
+				) ?? null
 	const shouldCollectCardDetails =
 		requiresCard && !selectedExistingPaymentMethod
 	const sourceHintAnalyticsProperties = useMemo(
@@ -682,7 +682,6 @@ export default function BlvdBookRoute() {
 		resetReturningClientState()
 
 		try {
-			const isTelehealth = isTelehealthServiceName(service.item.name)
 			const variants = await service.item.getLocationVariants()
 			const nextLocations = sortLocationsByPreference(
 				dedupeLocations(variants.map(variant => variant.location)),
@@ -690,9 +689,7 @@ export default function BlvdBookRoute() {
 			)
 			setServiceLocations(nextLocations)
 
-			if (isTelehealth && nextLocations.length > 0) {
-				await handleSelectTelehealth(nextLocations, service)
-			} else if (nextLocations.length === 1) {
+			if (nextLocations.length === 1) {
 				await handleSelectLocation(nextLocations[0]!, service)
 			} else {
 				setActiveStep('location')
@@ -701,89 +698,6 @@ export default function BlvdBookRoute() {
 			setStepError(getErrorMessage(error))
 		} finally {
 			setLoadingLocations(false)
-		}
-	}
-
-	async function handleSelectTelehealth(
-		locations: BlvdLocation[],
-		serviceOverride: ServiceEntry,
-	) {
-		if (!client) return
-
-		setLoadingSchedule(true)
-		setStepError(null)
-		setCheckoutSuccess(null)
-		setDetailsSubmitted(false)
-		resetReturningClientState()
-
-		const telehealthLocation = {
-			id: 'telehealth',
-			name: 'Telehealth (Virtual)',
-			address: null,
-			tz: 'America/New_York',
-		} as unknown as BlvdLocation
-
-		setSelectedLocation(telehealthLocation)
-		setActiveStep('schedule')
-		setBookableDates([])
-		setBookableTimes([])
-		setSelectedDateId(null)
-		setSelectedTimeId(null)
-
-		try {
-			const nextCarts: { location: BlvdLocation; cart: BlvdCart }[] = []
-			for (const loc of locations) {
-				let nextCart = await client.carts.create(loc)
-				const preferredStaffVariant = await getPreferredStaffVariant(
-					serviceOverride.item,
-				)
-				nextCart = await nextCart.addBookableItem(serviceOverride.item, {
-					...(preferredStaffVariant
-						? { staffVariant: preferredStaffVariant }
-						: {}),
-				})
-				nextCarts.push({ location: loc, cart: nextCart })
-			}
-
-			const dateMap = new Map<string, { dateObj: Date; locationCarts: any[] }>()
-
-			for (const { location, cart } of nextCarts) {
-				const dates = await cart.getBookableDates({
-					location,
-					timezone: location.tz ?? undefined,
-				})
-				for (const d of dates) {
-					const dateObj = toDate(d.date)
-					if (!dateObj) continue
-					const dateStr = format(dateObj, 'yyyy-MM-dd')
-					if (!dateMap.has(dateStr)) {
-						dateMap.set(dateStr, { dateObj, locationCarts: [] })
-					}
-					dateMap
-						.get(dateStr)!
-						.locationCarts.push({ location, cart, blvdDate: d })
-				}
-			}
-
-			const sortedDates = Array.from(dateMap.values()).sort(
-				(a, b) => a.dateObj.getTime() - b.dateObj.getTime(),
-			)
-
-			const mergedDates = sortedDates.map(d => ({
-				id: format(d.dateObj, 'yyyy-MM-dd'),
-				date: d.dateObj,
-				_telehealthCarts: d.locationCarts,
-			})) as unknown as BlvdBookableDate[]
-
-			setBookableDates(mergedDates)
-
-			if (mergedDates.length > 0) {
-				await handleSelectDate(mergedDates[0] as BlvdBookableDate)
-			}
-		} catch (error) {
-			setStepError(getErrorMessage(error))
-		} finally {
-			setLoadingSchedule(false)
 		}
 	}
 
@@ -839,53 +753,7 @@ export default function BlvdBookRoute() {
 		}
 	}
 
-	async function handleSelectDate(
-		date: BlvdBookableDate & { _telehealthCarts?: any[] },
-	) {
-		if (date._telehealthCarts) {
-			setLoadingTimes(true)
-			setStepError(null)
-			setSelectedDateId(date.id)
-			setActiveStep(null)
-			setDetailsSubmitted(false)
-			setSelectedTimeId(null)
-			setCheckoutSuccess(null)
-
-			try {
-				const allTimes = new Map<string, any>()
-				for (const locCart of date._telehealthCarts) {
-					const times = await locCart.cart.getBookableTimes(locCart.blvdDate, {
-						location: locCart.location,
-						timezone: locCart.location.tz ?? undefined,
-					})
-					for (const t of times) {
-						const timeObj = toDate(t.startTime)
-						if (!timeObj) continue
-						const timeStr = timeObj.getTime().toString()
-						if (!allTimes.has(timeStr)) {
-							allTimes.set(timeStr, {
-								id: timeStr + '-' + locCart.location.id,
-								startTime: t.startTime,
-								_locationCart: locCart,
-								_blvdTime: t,
-							})
-						}
-					}
-				}
-
-				const sortedTimes = Array.from(allTimes.values()).sort((a, b) => {
-					return toDate(a.startTime)!.getTime() - toDate(b.startTime)!.getTime()
-				})
-
-				setBookableTimes(sortedTimes as unknown as BlvdBookableTime[])
-			} catch (error) {
-				setStepError(getErrorMessage(error))
-			} finally {
-				setLoadingTimes(false)
-			}
-			return
-		}
-
+	async function handleSelectDate(date: BlvdBookableDate) {
 		if (!cart || !selectedLocation) return
 
 		setLoadingTimes(true)
@@ -909,29 +777,7 @@ export default function BlvdBookRoute() {
 		}
 	}
 
-	async function handleSelectTime(
-		time: BlvdBookableTime & { _locationCart?: any; _blvdTime?: any },
-	) {
-		if (time._locationCart) {
-			setLoadingSchedule(true)
-			setStepError(null)
-			setCheckoutSuccess(null)
-			setDetailsSubmitted(false)
-
-			try {
-				const locCart = time._locationCart
-				const nextCart = await locCart.cart.reserveBookableItems(time._blvdTime)
-				setCart(nextCart)
-				setActiveStep(null)
-				setSelectedTimeId(time.id)
-			} catch (error) {
-				setStepError(getErrorMessage(error))
-			} finally {
-				setLoadingSchedule(false)
-			}
-			return
-		}
-
+	async function handleSelectTime(time: BlvdBookableTime) {
 		if (!cart) return
 
 		setLoadingSchedule(true)
@@ -1106,8 +952,6 @@ export default function BlvdBookRoute() {
 				booking: {
 					cartId: checkoutPayload.cart.id,
 					hasVerifiedClient,
-					isTelehealth: bookingAnalyticsPropertiesRef.current
-						.booking_is_telehealth as boolean | undefined,
 					locationId: selectedLocation.id,
 					locationName: selectedLocation.name,
 					occurredAt: new Date().toISOString(),
@@ -1691,7 +1535,7 @@ export default function BlvdBookRoute() {
 														className="col-span-1"
 														selected={
 															selectedDate
-																? (toDate(selectedDate.date) ?? undefined)
+																? toDate(selectedDate.date) ?? undefined
 																: undefined
 														}
 														onSelect={d => {
@@ -2525,6 +2369,13 @@ function buildServiceEntries(categories: BlvdCategory[]) {
 		for (const [itemOrder, item] of category.availableItems.entries()) {
 			if (item.__typename !== 'CartAvailableBookableItem' || item.disabled)
 				continue
+			if (
+				isUnavailableOnlineBookingServiceName(
+					[category.name, item.name, item.description ?? ''].join(' '),
+				)
+			) {
+				continue
+			}
 			if (services.has(item.id)) continue
 
 			services.set(item.id, {
@@ -2690,13 +2541,7 @@ function buildBookingSelectionEventProperties({
 	selectedLocation: BlvdLocation | null
 	selectedService: ServiceEntry | null
 }) {
-	const serviceName = selectedService?.item.name
 	const requiresCard = cart ? Boolean(cart.summary.paymentMethodRequired) : null
-	const isTelehealth = serviceName
-		? isTelehealthServiceName(serviceName)
-		: selectedLocation?.id === 'telehealth'
-			? true
-			: undefined
 	const bookingClientType = getBookingClientType(hasVerifiedClient)
 
 	return {
@@ -2718,9 +2563,6 @@ function buildBookingSelectionEventProperties({
 					booking_location_name: selectedLocation.name,
 				}
 			: {}),
-		...(typeof isTelehealth === 'boolean'
-			? { booking_is_telehealth: isTelehealth }
-			: {}),
 		...(typeof requiresCard === 'boolean'
 			? {
 					booking_requires_card: requiresCard,
@@ -2741,7 +2583,7 @@ function getBookingClientType(hasVerifiedClient: boolean) {
 	return hasVerifiedClient ? 'returning_client' : 'new_client'
 }
 
-function isTelehealthServiceName(name: string) {
+function isUnavailableOnlineBookingServiceName(name: string) {
 	return name.toLowerCase().includes('telehealth')
 }
 

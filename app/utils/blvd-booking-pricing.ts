@@ -118,12 +118,6 @@ const BOOKING_PRICE_CATALOG: Record<string, BookingPriceEntry> = {
 	'Weight Loss Consultation (In-Person)': {
 		display: 'Free Consultation · Programs start at $150/month',
 	},
-	'Weight Loss Consultation (Telehealth)': {
-		display: 'Free Consultation · Programs start at $150/month',
-	},
-	'Weight Loss Follow-Up (Telehealth)': {
-		display: 'Follow-up visit',
-	},
 	'Weight Loss Injection (In Person)': {
 		display: 'Starting at $150/month',
 	},

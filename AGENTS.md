@@ -48,3 +48,5 @@ Strict hierarchy rules to prevent circular logic and maintain silo structure:
 - **Bad:** "Click here", "Learn more"
 - **Good:** "Learn more about [Knoxville Botox treatments](/botox)", "Explore
   our [dermal filler options in Knoxville](/filler)"
+  o
+npm install @typescript/native-preview

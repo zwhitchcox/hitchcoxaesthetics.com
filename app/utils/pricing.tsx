@@ -414,16 +414,6 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			],
 		},
 	],
-	'medical-weight-loss-telehealth': [
-		{
-			title: 'Medical Weight Loss (Telehealth) Pricing',
-			items: [
-				{ name: 'Virtual Consultation', price: 'Free' },
-				{ name: 'Semaglutide (Shipped)', price: 'Starting at $150/month' },
-				{ name: 'Tirzepatide (Shipped)', price: 'Starting at $250/month' },
-			],
-		},
-	],
 }
 
 /**
