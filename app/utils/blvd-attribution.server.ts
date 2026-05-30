@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { reportCallRailBookingConversion } from '#app/utils/callrail-booking.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import { getMissingBlvdBookingPriceServiceNames } from '#app/utils/service-pricing.ts'
@@ -385,6 +386,27 @@ export async function recordBoulevardBookingAttributionTouch(
 	}
 
 	await refreshBlvdBookingPricingAudit(db)
+	await reportCallRailBookingConversion({
+		appointmentIds: parsed.appointments.map(
+			appointment => appointment.appointmentId,
+		),
+		bookingChannel:
+			typeof parsed.attribution.booking_channel === 'string'
+				? parsed.attribution.booking_channel
+				: undefined,
+		boulevardClientId: client.boulevardClientId,
+		callerPhoneNumber: parsed.client.phone,
+		cartId: parsed.booking.cartId,
+		customerName: [parsed.client.firstName, parsed.client.lastName]
+			.filter(Boolean)
+			.join(' '),
+		locationName: parsed.booking.locationName,
+		projectedRevenueUsd: parsed.booking.valueUsd ?? 0,
+		serviceName: parsed.booking.serviceName,
+		startTime: parsed.appointments[0]?.startTime,
+	}).catch(error => {
+		console.error('Failed to report Boulevard booking to CallRail', error)
+	})
 
 	return {
 		blvdClientId: client.id,

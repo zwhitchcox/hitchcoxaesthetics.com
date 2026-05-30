@@ -30,7 +30,7 @@ import { cn, getErrorMessage } from '#app/utils/misc.tsx'
 import { usePostHog } from '#app/utils/posthog.tsx'
 import {
 	getBlvdBookingPriceDisplay,
-	getEstimatedValueForBlvdService,
+	getProjectedRevenueForBlvdService,
 } from '#app/utils/service-pricing.ts'
 import { getAncestors, getPage } from '#app/utils/site-pages.server.ts'
 
@@ -888,7 +888,7 @@ export default function BlvdBookRoute() {
 			const checkoutPayload = await nextCart.checkout()
 			setCart(checkoutPayload.cart)
 
-			const valueInDollars = getEstimatedValueForBlvdService(
+			const projectedRevenueUsd = getProjectedRevenueForBlvdService(
 				selectedService.item.name,
 			)
 			const selectedPaymentMethodType = nextCart.summary.paymentMethodRequired
@@ -900,12 +900,12 @@ export default function BlvdBookRoute() {
 			if (typeof window !== 'undefined' && 'gtag' in window) {
 				trackGoogleEvent('purchase', {
 					currency: 'USD',
-					value: valueInDollars,
+					value: projectedRevenueUsd,
 					items: [
 						{
 							item_id: selectedService.item.id,
 							item_name: selectedService.item.name,
-							price: valueInDollars,
+							price: projectedRevenueUsd,
 							quantity: 1,
 						},
 					],
@@ -931,10 +931,10 @@ export default function BlvdBookRoute() {
 					...bookingAnalyticsPropertiesRef.current,
 					appointment_count: checkoutPayload.appointments.length,
 					booking_selected_payment_method_type: selectedPaymentMethodType,
-					booking_value_usd: valueInDollars,
+					booking_value_usd: projectedRevenueUsd,
 					service: selectedService.item.name,
 					location: selectedLocation.name,
-					value: valueInDollars,
+					value: projectedRevenueUsd,
 				})
 			}
 
@@ -961,7 +961,7 @@ export default function BlvdBookRoute() {
 					serviceCategory: selectedService.categoryName,
 					serviceId: selectedService.item.id,
 					serviceName: selectedService.item.name,
-					valueUsd: valueInDollars,
+					valueUsd: projectedRevenueUsd,
 				},
 				client: {
 					boulevardClientId:

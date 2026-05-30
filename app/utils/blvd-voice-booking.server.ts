@@ -7,7 +7,7 @@ import {
 	boulevardBookingAttributionInputSchema,
 	recordBoulevardBookingAttributionTouch,
 } from '#app/utils/blvd-attribution.server.ts'
-import { getEstimatedValueForBlvdService } from '#app/utils/service-pricing.ts'
+import { getProjectedRevenueForBlvdService } from '#app/utils/service-pricing.ts'
 
 type BlvdLocation = {
 	address?: {
@@ -1012,7 +1012,9 @@ export async function bookVoiceAppointment(input: VoiceBookAppointmentInput) {
 	const appointmentIds = checkout.appointments.map(
 		appointment => appointment.appointmentId,
 	)
-	const valueUsd = getEstimatedValueForBlvdService(service.item.name)
+	const projectedRevenueUsd = getProjectedRevenueForBlvdService(
+		service.item.name,
+	)
 
 	void recordBoulevardBookingAttributionTouch(
 		boulevardBookingAttributionInputSchema.parse({
@@ -1040,7 +1042,7 @@ export async function bookVoiceAppointment(input: VoiceBookAppointmentInput) {
 				serviceCategory: service.categoryName,
 				serviceId: service.item.id,
 				serviceName: service.item.name,
-				valueUsd,
+				valueUsd: projectedRevenueUsd,
 			},
 			client: {
 				boulevardClientId:
