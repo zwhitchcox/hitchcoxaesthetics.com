@@ -110,13 +110,15 @@ export async function reportCallRailBookingConversion(
 		}
 	}
 
-	const accountIds = await getCallRailAccountIds(apiKey)
+	let accountIds: string[] | null = null
+	const getAccountIds = async () =>
+		(accountIds ??= await getCallRailAccountIds(apiKey))
 	const updateBody = buildBookingCallRailUpdate(input)
 
 	if (input.callrailCallId) {
 		const callrailAccountIds = input.callrailAccountId?.trim()
 			? [input.callrailAccountId.trim()]
-			: accountIds
+			: await getAccountIds()
 		if (callrailAccountIds.length === 0) {
 			throw new Error('No CallRail account was found.')
 		}
@@ -151,7 +153,7 @@ export async function reportCallRailBookingConversion(
 		}
 	}
 
-	for (const accountId of accountIds) {
+	for (const accountId of await getAccountIds()) {
 		const call = await findCallByPhone(
 			apiKey,
 			accountId,
