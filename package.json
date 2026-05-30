@@ -41,6 +41,7 @@
     "blvd:reconcile-revenue": "tsx scripts/blvd-reconcile-revenue.ts",
     "retell:booking:dev": "tsx scripts/retell-booking-dev.ts",
     "retell:booking:deploy": "tsx scripts/retell-deploy-booking-agents.ts",
+    "retell:booking:a2a": "tsx scripts/retell-agent2agent-test.ts",
     "posthog:sync": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml",
     "posthog:sync:apply": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml --apply",
     "secrets:push": "tsx scripts/push-secrets.ts"
