@@ -1,15 +1,56 @@
 const CALLRAIL_API_BASE_URL = 'https://api.callrail.com/v3'
+const CALLRAIL_CALL_FIELDS = [
+	'id',
+	'company_id',
+	'company_name',
+	'customer_phone_number',
+	'formatted_customer_phone_number',
+	'start_time',
+	'tags',
+	'session_uuid',
+	'person_id',
+	'timeline_url',
+	'source',
+	'source_name',
+	'medium',
+	'landing_page_url',
+	'last_requested_url',
+	'referring_url',
+	'referrer_domain',
+	'utm_campaign',
+	'utm_content',
+	'utm_medium',
+	'utm_source',
+	'utm_term',
+	'gclid',
+	'fbclid',
+	'msclkid',
+	'custom',
+].join(',')
+
+const POSTHOG_SESSION_CUSTOM_KEYS = [
+	'sha_posthog_session_id',
+	'posthog_session_id',
+	'ph_session_id',
+]
+const POSTHOG_DISTINCT_CUSTOM_KEYS = [
+	'sha_posthog_distinct_id',
+	'posthog_distinct_id',
+	'ph_distinct_id',
+]
 
 type CallRailCall = {
 	customer_phone_number?: string | null
 	id?: string | null
 	start_time?: string | null
+	[key: string]: unknown
 }
 
 type ReportCallRailBookingInput = {
 	appointmentIds: string[]
 	bookingChannel?: string | null
 	boulevardClientId?: string | null
+	callrailAccountId?: string | null
 	callrailCallId?: string | null
 	callerPhoneNumber?: string | null
 	cartId?: string | null
@@ -18,6 +59,34 @@ type ReportCallRailBookingInput = {
 	projectedRevenueUsd: number
 	serviceName?: string | null
 	startTime?: string | null
+}
+
+type FindCallRailCallInput = {
+	callrailAccountId?: string | null
+	callrailCallId?: string | null
+	callerPhoneNumber?: string | null
+}
+
+export type CallRailCallAttributionResult = {
+	account_id?: string | null
+	call_id?: string | null
+	callrail_call_id?: string | null
+	callrail_landing_page_url?: string | null
+	callrail_last_requested_url?: string | null
+	callrail_medium?: string | null
+	callrail_person_id?: string | null
+	callrail_referrer_domain?: string | null
+	callrail_referring_url?: string | null
+	callrail_reported?: boolean
+	callrail_session_id?: string | null
+	callrail_source?: string | null
+	callrail_timeline_url?: string | null
+	caller_phone_number?: string | null
+	error?: string
+	matched_by?: string
+	ok: boolean
+	posthog_distinct_id?: string | null
+	posthog_session_id?: string | null
 }
 
 export async function reportCallRailBookingConversion(
@@ -45,15 +114,41 @@ export async function reportCallRailBookingConversion(
 	const updateBody = buildBookingCallRailUpdate(input)
 
 	if (input.callrailCallId) {
-		const accountId = accountIds[0]
-		if (!accountId) throw new Error('No CallRail account was found.')
-		const call = await updateCallRailCall(
-			apiKey,
-			accountId,
-			input.callrailCallId,
-			updateBody,
-		)
-		return buildReportResult({ accountId, call, matchedBy: 'callrail_call_id' })
+		const callrailAccountIds = input.callrailAccountId?.trim()
+			? [input.callrailAccountId.trim()]
+			: accountIds
+		if (callrailAccountIds.length === 0) {
+			throw new Error('No CallRail account was found.')
+		}
+		for (const accountId of callrailAccountIds) {
+			const call = await updateCallRailCall(
+				apiKey,
+				accountId,
+				input.callrailCallId,
+				updateBody,
+			).catch(error => {
+				console.error('Failed to update CallRail call by id', error)
+				return null
+			})
+			if (!call) continue
+			const detailedCall = await getCallRailCall(
+				apiKey,
+				accountId,
+				input.callrailCallId,
+			).catch(() => call)
+			return buildReportResult({
+				accountId,
+				call: detailedCall,
+				matchedBy: 'callrail_call_id',
+			})
+		}
+		if (!normalizedCallerPhone) {
+			return {
+				ok: false,
+				callrail_reported: false,
+				error: 'callrail_call_not_found',
+			}
+		}
 	}
 
 	for (const accountId of accountIds) {
@@ -70,9 +165,14 @@ export async function reportCallRailBookingConversion(
 			call.id,
 			updateBody,
 		)
+		const detailedCall = await getCallRailCall(
+			apiKey,
+			accountId,
+			call.id,
+		).catch(() => updatedCall)
 		return buildReportResult({
 			accountId,
-			call: updatedCall,
+			call: detailedCall,
 			matchedBy: 'caller_phone_number',
 		})
 	}
@@ -80,6 +180,65 @@ export async function reportCallRailBookingConversion(
 	return {
 		ok: false,
 		callrail_reported: false,
+		error: 'callrail_call_not_found',
+		caller_phone_number: normalizedCallerPhone,
+	}
+}
+
+export async function findRecentCallRailCallForCaller(
+	input: FindCallRailCallInput,
+): Promise<CallRailCallAttributionResult> {
+	const apiKey = process.env.CALLRAIL_API_KEY?.trim()
+	if (!apiKey) {
+		return {
+			ok: false,
+			error: 'missing_callrail_api_key',
+		}
+	}
+
+	const normalizedCallerPhone = normalizePhoneNumber(input.callerPhoneNumber)
+	const accountIds = input.callrailAccountId?.trim()
+		? [input.callrailAccountId.trim()]
+		: await getCallRailAccountIds(apiKey)
+
+	if (input.callrailCallId) {
+		for (const accountId of accountIds) {
+			const call = await getCallRailCall(
+				apiKey,
+				accountId,
+				input.callrailCallId,
+			).catch(error => {
+				console.error('Failed to retrieve CallRail call by id', error)
+				return null
+			})
+			if (!call?.id) continue
+			return buildAttributionResult({
+				accountId,
+				call,
+				matchedBy: 'callrail_call_id',
+			})
+		}
+	}
+
+	if (!normalizedCallerPhone) {
+		return {
+			ok: false,
+			error: 'missing_caller_phone_number',
+		}
+	}
+
+	for (const accountId of accountIds) {
+		const call = await findCallByPhone(apiKey, accountId, normalizedCallerPhone)
+		if (!call?.id) continue
+		return buildAttributionResult({
+			accountId,
+			call,
+			matchedBy: 'caller_phone_number',
+		})
+	}
+
+	return {
+		ok: false,
 		error: 'callrail_call_not_found',
 		caller_phone_number: normalizedCallerPhone,
 	}
@@ -174,8 +333,7 @@ async function findCallByPhoneInDateRange(
 	const params = new URLSearchParams({
 		call_type: 'inbound',
 		date_range: dateRange,
-		fields:
-			'id,company_id,company_name,customer_phone_number,formatted_customer_phone_number,start_time,tags',
+		fields: CALLRAIL_CALL_FIELDS,
 		order: 'desc',
 		per_page: '10',
 		search: callerPhoneNumber,
@@ -205,6 +363,20 @@ async function updateCallRailCall(
 	return callRailFetch(apiKey, `/a/${accountId}/calls/${callId}.json`, {
 		body,
 		method: 'PUT',
+	})
+}
+
+async function getCallRailCall(
+	apiKey: string,
+	accountId: string,
+	callId: string,
+) {
+	const params = new URLSearchParams({
+		fields: CALLRAIL_CALL_FIELDS,
+	})
+	return callRailFetch(apiKey, `/a/${accountId}/calls/${callId}.json`, {
+		method: 'GET',
+		params,
 	})
 }
 
@@ -256,15 +428,42 @@ function buildReportResult({
 	matchedBy: string
 }) {
 	return {
+		...buildAttributionResult({ accountId, call, matchedBy }),
+		ok: true,
+		callrail_reported: true,
+	}
+}
+
+function buildAttributionResult({
+	accountId,
+	call,
+	matchedBy,
+}: {
+	accountId: string
+	call: Record<string, unknown>
+	matchedBy: string
+}): CallRailCallAttributionResult {
+	const callId = pickOptionalString(call.id)
+	const custom = getRecord(call.custom)
+	return {
 		ok: true,
 		account_id: accountId,
-		call_id: typeof call.id === 'string' ? call.id : null,
-		caller_phone_number:
-			typeof call.customer_phone_number === 'string'
-				? call.customer_phone_number
-				: null,
-		callrail_reported: true,
+		call_id: callId,
+		callrail_call_id: callId,
+		caller_phone_number: pickOptionalString(call.customer_phone_number),
+		callrail_session_id: pickOptionalString(call.session_uuid),
+		callrail_person_id: pickOptionalString(call.person_id),
+		callrail_timeline_url: pickOptionalString(call.timeline_url),
+		callrail_source:
+			pickOptionalString(call.source) ?? pickOptionalString(call.source_name),
+		callrail_medium: pickOptionalString(call.medium),
+		callrail_landing_page_url: pickOptionalString(call.landing_page_url),
+		callrail_last_requested_url: pickOptionalString(call.last_requested_url),
+		callrail_referring_url: pickOptionalString(call.referring_url),
+		callrail_referrer_domain: pickOptionalString(call.referrer_domain),
 		matched_by: matchedBy,
+		posthog_distinct_id: pickFirstString(custom, POSTHOG_DISTINCT_CUSTOM_KEYS),
+		posthog_session_id: pickFirstString(custom, POSTHOG_SESSION_CUSTOM_KEYS),
 	}
 }
 
@@ -278,4 +477,26 @@ function normalizePhoneNumber(value?: string | null) {
 	if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
 	if (trimmed.startsWith('+')) return trimmed
 	return `+${digits}`
+}
+
+function getRecord(value: unknown) {
+	return value && typeof value === 'object'
+		? (value as Record<string, unknown>)
+		: null
+}
+
+function pickOptionalString(value: unknown) {
+	return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function pickFirstString(
+	record: Record<string, unknown> | null,
+	keys: readonly string[],
+) {
+	if (!record) return null
+	for (const key of keys) {
+		const value = pickOptionalString(record[key])
+		if (value) return value
+	}
+	return null
 }

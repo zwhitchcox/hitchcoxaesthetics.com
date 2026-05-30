@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
 import { lookupVoiceCallerStaffContext } from '#app/utils/blvd-voice-booking.server.ts'
+import {
+	findRecentCallRailCallForCaller,
+	type CallRailCallAttributionResult,
+} from '#app/utils/callrail-booking.server.ts'
+import { prisma } from '#app/utils/db.server.ts'
 import { sendEmail } from '#app/utils/email.server.ts'
 
 const optionalTrimmedString = z.preprocess(
@@ -13,6 +18,8 @@ const optionalTrimmedString = z.preprocess(
 
 export const retellStaffMessageSchema = z.object({
 	call_id: optionalTrimmedString,
+	callrail_account_id: optionalTrimmedString,
+	callrail_call_id: optionalTrimmedString,
 	callback_phone: optionalTrimmedString,
 	caller_name: optionalTrimmedString,
 	caller_phone_number: optionalTrimmedString,
@@ -55,6 +62,7 @@ type StaffMessageAppointmentDetails = {
 	state?: string | null
 }
 type EnrichedStaffMessageInput = RetellStaffMessageInput & {
+	callrail_attribution?: CallRailCallAttributionResult | null
 	client_details?: StaffMessageClientDetails | null
 	most_recent_appointment?: StaffMessageAppointmentDetails | null
 	upcoming_appointments?: StaffMessageAppointmentDetails[]
@@ -70,7 +78,25 @@ export async function sendRetellStaffMessage(input: RetellStaffMessageInput) {
 		}
 	}
 
-	const enrichedInput = await enrichStaffMessageInput(input)
+	let enrichedInput = await enrichStaffMessageInput(input)
+	enrichedInput = {
+		...enrichedInput,
+		callrail_attribution: await lookupCallRailAttribution(enrichedInput),
+	}
+	const savedOutcome = await recordRetellCallOutcome(enrichedInput).catch(
+		error => {
+			console.error('Failed to save Retell call outcome', error)
+			return null
+		},
+	)
+	if (!savedOutcome) {
+		return {
+			ok: false,
+			error: 'database_failed',
+			message:
+				'There was a problem saving this follow-up. Offer to connect the caller to Sarah.',
+		}
+	}
 	if (!process.env.RESEND_API_KEY?.trim() && process.env.MOCKS !== 'true') {
 		return {
 			ok: false,
@@ -101,9 +127,12 @@ export async function sendRetellStaffMessage(input: RetellStaffMessageInput) {
 
 	return {
 		ok: true,
+		callrail_session_id: savedOutcome.callrailSessionId,
 		client_enriched: Boolean(enrichedInput.client_details),
 		email_id: result.data.id,
 		has_most_recent_appointment: Boolean(enrichedInput.most_recent_appointment),
+		posthog_session_id: savedOutcome.posthogSessionId,
+		retell_call_outcome_id: savedOutcome.id,
 		upcoming_appointment_count:
 			enrichedInput.upcoming_appointments?.length ?? 0,
 		message:
@@ -145,6 +174,31 @@ function buildClientName(client: StaffMessageClientDetails) {
 	return fullName || null
 }
 
+function normalizeOptionalString(value?: string | null) {
+	const trimmed = value?.trim()
+	return trimmed ? trimmed : null
+}
+
+function normalizeOptionalEmail(value?: string | null) {
+	return normalizeOptionalString(value)?.toLowerCase() ?? null
+}
+
+function normalizeOptionalPhone(value?: string | null) {
+	const trimmed = normalizeOptionalString(value)
+	if (!trimmed) return null
+
+	const digits = trimmed.replace(/\D/g, '')
+	if (!digits) return null
+	if (digits.length === 10) return `+1${digits}`
+	if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+	if (trimmed.startsWith('+')) return trimmed
+	return `+${digits}`
+}
+
+function serializeRawPayload(value: unknown) {
+	return value == null ? null : JSON.stringify(value)
+}
+
 async function lookupCallerContext(callerPhone?: string | null) {
 	if (!callerPhone) return null
 	try {
@@ -181,6 +235,107 @@ async function lookupCallerContext(callerPhone?: string | null) {
 		)
 		return null
 	}
+}
+
+async function lookupCallRailAttribution(input: RetellStaffMessageInput) {
+	const callerPhoneNumber = input.caller_phone_number ?? input.callback_phone
+	if (!callerPhoneNumber && !input.callrail_call_id) return null
+
+	try {
+		const result = await findRecentCallRailCallForCaller({
+			callrailAccountId: input.callrail_account_id,
+			callrailCallId: input.callrail_call_id,
+			callerPhoneNumber,
+		})
+		return result.ok ? result : null
+	} catch (error) {
+		console.error(
+			'Failed to look up CallRail attribution for Retell call',
+			error,
+		)
+		return null
+	}
+}
+
+async function recordRetellCallOutcome(input: EnrichedStaffMessageInput) {
+	const callrail = input.callrail_attribution
+	const client = input.client_details
+	const data = {
+		retellCallId: normalizeOptionalString(input.call_id),
+		retellPublicLogUrl: normalizeOptionalString(input.retell_public_log_url),
+		notificationType: input.notification_type,
+		callerName: normalizeOptionalString(
+			input.caller_name ?? client?.name ?? buildClientName(client ?? {}),
+		),
+		callerPhone: normalizeOptionalPhone(
+			input.caller_phone_number ?? client?.phone,
+		),
+		callbackPhone: normalizeOptionalPhone(input.callback_phone),
+		boulevardClientId: normalizeOptionalString(client?.id),
+		clientName: normalizeOptionalString(client?.name),
+		clientEmail: normalizeOptionalEmail(client?.email),
+		clientPhone: normalizeOptionalPhone(client?.phone),
+		clientProfileUrl: normalizeOptionalString(client?.profile_url),
+		serviceInterest: normalizeOptionalString(input.service_interest),
+		locationInterest: normalizeOptionalString(input.location_interest),
+		preferredTime: normalizeOptionalString(input.preferred_time),
+		bookingNotCompletedReason:
+			input.notification_type === 'booking_not_completed'
+				? normalizeOptionalString(
+						input.reason ?? input.message ?? input.requested_action,
+					)
+				: null,
+		message: normalizeOptionalString(input.message),
+		requestedAction: normalizeOptionalString(input.requested_action),
+		urgency: normalizeOptionalString(input.urgency),
+		callrailAccountId: normalizeOptionalString(callrail?.account_id),
+		callrailCallId: normalizeOptionalString(
+			callrail?.callrail_call_id ?? input.callrail_call_id,
+		),
+		callrailSessionId: normalizeOptionalString(callrail?.callrail_session_id),
+		callrailPersonId: normalizeOptionalString(callrail?.callrail_person_id),
+		callrailTimelineUrl: normalizeOptionalString(
+			callrail?.callrail_timeline_url,
+		),
+		callrailSource: normalizeOptionalString(callrail?.callrail_source),
+		callrailMedium: normalizeOptionalString(callrail?.callrail_medium),
+		callrailLandingPageUrl: normalizeOptionalString(
+			callrail?.callrail_landing_page_url,
+		),
+		callrailLastRequestedUrl: normalizeOptionalString(
+			callrail?.callrail_last_requested_url,
+		),
+		posthogDistinctId: normalizeOptionalString(callrail?.posthog_distinct_id),
+		posthogSessionId: normalizeOptionalString(callrail?.posthog_session_id),
+		rawPayload: serializeRawPayload({
+			callrail,
+			input: {
+				...input,
+				callrail_attribution: undefined,
+				client_details: undefined,
+				most_recent_appointment: undefined,
+				upcoming_appointments: undefined,
+			},
+		}),
+	}
+	const select = {
+		id: true,
+		callrailSessionId: true,
+		posthogSessionId: true,
+	}
+	if (data.retellCallId) {
+		return prisma.retellCallOutcome.upsert({
+			where: { retellCallId: data.retellCallId },
+			create: data,
+			update: data,
+			select,
+		})
+	}
+
+	return prisma.retellCallOutcome.create({
+		data,
+		select,
+	})
 }
 
 function buildSubject(input: EnrichedStaffMessageInput) {
@@ -268,6 +423,20 @@ function buildRows(input: EnrichedStaffMessageInput) {
 		buildRow('Retell call', retellCallUrl),
 		buildRow('Retell public log', input.retell_public_log_url),
 		buildRow('Call ID', input.call_id),
+		buildRow(
+			'CallRail call',
+			input.callrail_attribution?.callrail_call_id,
+			input.callrail_attribution?.callrail_timeline_url,
+		),
+		buildRow(
+			'CallRail session',
+			input.callrail_attribution?.callrail_session_id,
+		),
+		buildRow('PostHog session', input.callrail_attribution?.posthog_session_id),
+		buildRow(
+			'PostHog distinct ID',
+			input.callrail_attribution?.posthog_distinct_id,
+		),
 	].filter((row): row is EmailRow => Boolean(row))
 }
 

@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'sha.booking-analytics'
+const sentCallTrackingAttributionKeys = new Set<string>()
 
 const MARKETING_PARAM_KEYS = [
 	'utm_source',
@@ -12,6 +13,27 @@ const MARKETING_PARAM_KEYS = [
 	'msclkid',
 	'fbclid',
 ] as const
+
+const CALLRAIL_SESSION_PARAM_KEYS = [
+	'callrail_session_id',
+	'callrail_session_uuid',
+	'calltrk_session_id',
+	'calltrk_session',
+	'calltrk_session_uuid',
+	'session_uuid',
+] as const
+
+const CALLRAIL_VISITOR_PARAM_KEYS = [
+	'callrail_visitor_id',
+	'callrail_uuid',
+	'callrail_person_id',
+	'calltrk_visitor_id',
+	'calltrk_uuid',
+	'person_id',
+] as const
+
+const POSTHOG_DISTINCT_COOKIE = 'sha_posthog_distinct_id'
+const POSTHOG_SESSION_COOKIE = 'sha_posthog_session_id'
 
 const SERVICE_PAGE_SEGMENTS = new Set([
 	'injectables',
@@ -37,6 +59,8 @@ type MarketingParamKey = (typeof MARKETING_PARAM_KEYS)[number]
 
 type StoredBookingAnalytics = Record<MarketingParamKey, string | null> & {
 	bookEntryFromPath: string | null
+	callrailSessionId: string | null
+	callrailVisitorId: string | null
 	firstBookEnteredAt: number | null
 	firstBookPath: string | null
 	initialLandingPath: string
@@ -70,6 +94,7 @@ export function trackBookingAnalyticsPageView({
 	const stored =
 		readStoredBookingAnalytics() ??
 		createStoredBookingAnalytics({ now, pathname, referrer, search })
+	const callrailTracking = getCallRailTrackingFromBrowser(search)
 
 	const previousPageviewCount = stored.pageviewCount
 	const previousUniquePageCount = stored.uniquePaths.length
@@ -95,14 +120,21 @@ export function trackBookingAnalyticsPageView({
 		stored.preBookUniquePageCount = previousUniquePageCount
 	}
 
+	stored.callrailSessionId =
+		callrailTracking.sessionId ?? stored.callrailSessionId
+	stored.callrailVisitorId =
+		callrailTracking.visitorId ?? stored.callrailVisitorId
 	stored.lastPath = fullPath
+	syncPostHogAttributionCookies()
 	writeStoredBookingAnalytics(stored)
 }
 
 export function getBookingAnalyticsEventProperties() {
 	const stored = readStoredBookingAnalytics()
 	if (!stored) return {}
+	syncPostHogAttributionCookies()
 	const trafficAttribution = getStoredTrafficAttribution(stored)
+	const callrailTracking = getStoredCallRailAttribution(stored)
 	const bookEntryPathname = getPathnameFromStoredPath(stored.bookEntryFromPath)
 	const initialLandingPathname = getPathnameFromStoredPath(
 		stored.initialLandingPath,
@@ -140,6 +172,8 @@ export function getBookingAnalyticsEventProperties() {
 		traffic_source_detail: trafficAttribution.detail,
 		posthog_distinct_id: getPostHogDistinctId(),
 		posthog_session_id: getPostHogSessionId(),
+		callrail_session_id: callrailTracking.sessionId,
+		callrail_visitor_id: callrailTracking.visitorId,
 		unique_pages_before_book: stored.preBookUniquePageCount,
 		utm_campaign: stored.utm_campaign,
 		utm_content: stored.utm_content,
@@ -163,6 +197,8 @@ export function getMarketingPageEventProperties({
 }) {
 	const stored = readStoredBookingAnalytics()
 	const trafficAttribution = stored ? getStoredTrafficAttribution(stored) : null
+	if (stored) syncPostHogAttributionCookies()
+	const callrailTracking = stored ? getStoredCallRailAttribution(stored) : null
 
 	return compactEventProperties({
 		current_path: pathname,
@@ -196,6 +232,8 @@ export function getMarketingPageEventProperties({
 		traffic_channel: stored?.trafficChannel || trafficAttribution?.channel,
 		traffic_platform: trafficAttribution?.platform,
 		traffic_source_detail: trafficAttribution?.detail,
+		callrail_session_id: callrailTracking?.sessionId,
+		callrail_visitor_id: callrailTracking?.visitorId,
 		utm_campaign: stored?.utm_campaign,
 		utm_content: stored?.utm_content,
 		utm_medium: stored?.utm_medium,
@@ -207,6 +245,94 @@ export function getMarketingPageEventProperties({
 		msclkid: stored?.msclkid,
 		wbraid: stored?.wbraid,
 	})
+}
+
+export function queueCallTrackingSessionAttribution({
+	pathname,
+	referrer,
+	search,
+}: {
+	pathname: string
+	referrer?: string | null
+	search: string
+}) {
+	if (typeof window === 'undefined') return
+
+	const send = () => {
+		const payload = getCallTrackingSessionAttributionPayload({
+			pathname,
+			referrer,
+			search,
+		})
+		if (!hasSessionAttribution(payload)) return false
+		const sentKey = JSON.stringify([
+			payload.current_path,
+			payload.posthog_session_id,
+			payload.posthog_distinct_id,
+			payload.callrail_session_id,
+			payload.callrail_visitor_id,
+		])
+		if (sentCallTrackingAttributionKeys.has(sentKey)) {
+			return Boolean(payload.callrail_session_id || payload.callrail_visitor_id)
+		}
+		sentCallTrackingAttributionKeys.add(sentKey)
+		void persistCallTrackingSessionAttribution(payload).catch(error => {
+			console.error('Failed to persist call tracking attribution', error)
+		})
+		return Boolean(payload.callrail_session_id || payload.callrail_visitor_id)
+	}
+
+	if (send()) return
+	window.setTimeout(send, 1500)
+	window.setTimeout(send, 5000)
+}
+
+function getCallTrackingSessionAttributionPayload({
+	pathname,
+	referrer,
+	search,
+}: {
+	pathname: string
+	referrer?: string | null
+	search: string
+}) {
+	const properties = getMarketingPageEventProperties({ pathname, search })
+	return compactEventProperties({
+		...properties,
+		current_path: pathname,
+		current_search: search || undefined,
+		initial_referrer:
+			'initial_referrer' in properties
+				? properties.initial_referrer
+				: normalizeReferrer(referrer),
+		occurred_at: new Date().toISOString(),
+	})
+}
+
+async function persistCallTrackingSessionAttribution(
+	payload: Record<string, unknown>,
+) {
+	const response = await fetch('/resources/call-tracking-attribution', {
+		body: JSON.stringify(payload),
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		keepalive: true,
+		method: 'POST',
+	})
+
+	if (!response.ok) {
+		throw new Error('Failed to persist call tracking attribution')
+	}
+}
+
+function hasSessionAttribution(payload: Record<string, unknown>) {
+	return Boolean(
+		payload.posthog_session_id ||
+			payload.posthog_distinct_id ||
+			payload.callrail_session_id ||
+			payload.callrail_visitor_id,
+	)
 }
 
 function createStoredBookingAnalytics({
@@ -224,6 +350,7 @@ function createStoredBookingAnalytics({
 	const marketingParams = Object.fromEntries(
 		MARKETING_PARAM_KEYS.map(key => [key, searchParams.get(key)]),
 	) as Record<MarketingParamKey, string | null>
+	const callrailTracking = getCallRailTrackingFromBrowser(search)
 	const initialReferrer = normalizeReferrer(referrer)
 	const trafficAttribution = inferTrafficAttribution({
 		...marketingParams,
@@ -234,6 +361,8 @@ function createStoredBookingAnalytics({
 	return {
 		...marketingParams,
 		bookEntryFromPath: null,
+		callrailSessionId: callrailTracking.sessionId,
+		callrailVisitorId: callrailTracking.visitorId,
 		firstBookEnteredAt: null,
 		firstBookPath: null,
 		initialLandingPath: pathname,
@@ -517,6 +646,15 @@ function getStoredTrafficAttribution(stored: StoredBookingAnalytics) {
 	})
 }
 
+function getStoredCallRailAttribution(stored: StoredBookingAnalytics) {
+	const liveTracking = getCallRailTrackingFromBrowser()
+	const sessionId =
+		liveTracking.sessionId ?? stored.callrailSessionId ?? undefined
+	const visitorId =
+		liveTracking.visitorId ?? stored.callrailVisitorId ?? undefined
+	return { sessionId, visitorId }
+}
+
 function getPostHogDistinctId() {
 	return getStoredPostHogState()?.distinct_id
 }
@@ -552,6 +690,110 @@ function getStoredPostHogState() {
 	}
 
 	return null
+}
+
+function syncPostHogAttributionCookies() {
+	if (typeof window === 'undefined' || typeof document === 'undefined') return
+	const distinctId = getPostHogDistinctId()
+	const sessionId = getPostHogSessionId()
+	if (distinctId)
+		writeAttributionCookie(POSTHOG_DISTINCT_COOKIE, distinctId, 15552000)
+	if (sessionId) writeAttributionCookie(POSTHOG_SESSION_COOKIE, sessionId, 1800)
+}
+
+function writeAttributionCookie(
+	name: string,
+	value: string,
+	maxAgeSeconds: number,
+) {
+	const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+	document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
+		value,
+	)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Lax${secure}`
+}
+
+function getCallRailTrackingFromBrowser(search = '') {
+	const searchParams = new URLSearchParams(search)
+	return {
+		sessionId:
+			getFirstSearchParam(searchParams, CALLRAIL_SESSION_PARAM_KEYS) ??
+			getFirstCookieValue(CALLRAIL_SESSION_PARAM_KEYS) ??
+			getFirstCallTrackingCookieValue(CALLRAIL_SESSION_PARAM_KEYS),
+		visitorId:
+			getFirstSearchParam(searchParams, CALLRAIL_VISITOR_PARAM_KEYS) ??
+			getFirstCookieValue(CALLRAIL_VISITOR_PARAM_KEYS) ??
+			getFirstCallTrackingCookieValue(CALLRAIL_VISITOR_PARAM_KEYS),
+	}
+}
+
+function getFirstSearchParam(
+	searchParams: URLSearchParams,
+	keys: readonly string[],
+) {
+	for (const key of keys) {
+		const value = searchParams.get(key)?.trim()
+		if (value) return value
+	}
+	return null
+}
+
+function getFirstCookieValue(keys: readonly string[]) {
+	const cookies = getCookies()
+	for (const key of keys) {
+		const value = cookies[key]?.trim()
+		if (value) return value
+	}
+	return null
+}
+
+function getFirstCallTrackingCookieValue(keys: readonly string[]) {
+	const cookies = getCookies()
+	for (const [name, value] of Object.entries(cookies)) {
+		if (!/(callrail|calltrk|call_trk)/i.test(name)) continue
+		const fromStructuredValue = getFirstStructuredCookieValue(value, keys)
+		if (fromStructuredValue) return fromStructuredValue
+	}
+	return null
+}
+
+function getFirstStructuredCookieValue(value: string, keys: readonly string[]) {
+	const decodedValue = decodeCookieComponent(value)
+	try {
+		const parsed = JSON.parse(decodedValue)
+		if (parsed && typeof parsed === 'object') {
+			for (const key of keys) {
+				const nestedValue = (parsed as Record<string, unknown>)[key]
+				if (typeof nestedValue === 'string' && nestedValue.trim()) {
+					return nestedValue.trim()
+				}
+			}
+		}
+	} catch {
+		// Try query-string style values next.
+	}
+	const params = new URLSearchParams(decodedValue)
+	return getFirstSearchParam(params, keys)
+}
+
+function getCookies() {
+	if (typeof document === 'undefined') return {}
+	return Object.fromEntries(
+		document.cookie.split(';').map(cookie => {
+			const [rawName = '', ...rawValue] = cookie.trim().split('=')
+			return [
+				decodeCookieComponent(rawName),
+				decodeCookieComponent(rawValue.join('=')),
+			]
+		}),
+	)
+}
+
+function decodeCookieComponent(value: string) {
+	try {
+		return decodeURIComponent(value)
+	} catch {
+		return value
+	}
 }
 
 function readStoredBookingAnalytics() {

@@ -348,16 +348,16 @@ model ReviewStats {
 }
 
 model BlvdClient {
-  id                String                   @id @default(cuid())
-  boulevardClientId String                   @unique
+  id                String    @id @default(cuid())
+  boulevardClientId String    @unique
   email             String?
   phone             String?
   firstName         String?
   lastName          String?
   latestTouchAt     DateTime?
 
-  attributionTouches       BlvdAttributionTouch[]
-  attributedRevenueItems   BlvdRevenueItem[]
+  attributionTouches     BlvdAttributionTouch[]
+  attributedRevenueItems BlvdRevenueItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -367,13 +367,13 @@ model BlvdClient {
 }
 
 model BlvdAttributionTouch {
-  id             String     @id @default(cuid())
-  blvdClientId   String
-  blvdClient     BlvdClient @relation(fields: [blvdClientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id           String     @id @default(cuid())
+  blvdClientId String
+  blvdClient   BlvdClient @relation(fields: [blvdClientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  occurredAt     DateTime
-  touchType      String     @default("web_booking")
-  sourceSystem   String     @default("website")
+  occurredAt   DateTime
+  touchType    String   @default("web_booking")
+  sourceSystem String   @default("website")
 
   bookingCartId              String?  @unique
   bookingLocationId          String?
@@ -387,20 +387,30 @@ model BlvdAttributionTouch {
   bookingHasVerifiedClient   Boolean?
   appointmentCount           Int?
 
-  bookEntryFromPath             String?
-  bookEntryPagePrefixType       String?
-  bookEntryPageType             String?
-  initialLandingPath            String?
-  initialLandingPagePrefixType  String?
-  initialLandingPageType        String?
-  initialReferrer               String?
-  initialReferringDomain        String?
+  bookEntryFromPath            String?
+  bookEntryPagePrefixType      String?
+  bookEntryPageType            String?
+  initialLandingPath           String?
+  initialLandingPagePrefixType String?
+  initialLandingPageType       String?
+  initialReferrer              String?
+  initialReferringDomain       String?
 
-  trafficChannel      String?
-  trafficPlatform     String?
-  trafficSourceDetail String?
-  posthogDistinctId   String?
-  posthogSessionId    String?
+  trafficChannel           String?
+  trafficPlatform          String?
+  trafficSourceDetail      String?
+  posthogDistinctId        String?
+  posthogSessionId         String?
+  callrailAccountId        String?
+  callrailCallId           String?
+  callrailSessionId        String?
+  callrailVisitorId        String?
+  callrailPersonId         String?
+  callrailTimelineUrl      String?
+  callrailSource           String?
+  callrailMedium           String?
+  callrailLandingPageUrl   String?
+  callrailLastRequestedUrl String?
 
   utmSource   String?
   utmMedium   String?
@@ -415,8 +425,8 @@ model BlvdAttributionTouch {
 
   rawProperties String?
 
-  appointments  BlvdAttributedAppointment[]
-  revenueItems  BlvdRevenueItem[]
+  appointments BlvdAttributedAppointment[]
+  revenueItems BlvdRevenueItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -425,11 +435,15 @@ model BlvdAttributionTouch {
   @@index([trafficSourceDetail])
   @@index([trafficChannel])
   @@index([touchType])
+  @@index([posthogSessionId])
+  @@index([callrailCallId])
+  @@index([callrailSessionId])
+  @@index([callrailVisitorId])
 }
 
 model BlvdAttributedAppointment {
-  id                    String               @id @default(cuid())
-  boulevardAppointmentId String              @unique
+  id                     String    @id @default(cuid())
+  boulevardAppointmentId String    @unique
   boulevardClientId      String?
   startTime              DateTime?
   endTime                DateTime?
@@ -445,27 +459,27 @@ model BlvdAttributedAppointment {
 }
 
 model BlvdRevenueItem {
-  id                    String     @id @default(cuid())
-  externalId            String     @unique
-  boulevardClientId     String?
+  id                     String  @id @default(cuid())
+  externalId             String  @unique
+  boulevardClientId      String?
   boulevardAppointmentId String?
-  boulevardInvoiceId    String?
-  boulevardPaymentId    String?
-  boulevardSaleId       String?
+  boulevardInvoiceId     String?
+  boulevardPaymentId     String?
+  boulevardSaleId        String?
 
   blvdClientId String?
   blvdClient   BlvdClient? @relation(fields: [blvdClientId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
-  occurredAt DateTime
-  itemName    String
-  itemType    String?
-  serviceCategory String?
-  grossAmountUsd  Float
-  netAmountUsd    Float?
+  occurredAt        DateTime
+  itemName          String
+  itemType          String?
+  serviceCategory   String?
+  grossAmountUsd    Float
+  netAmountUsd      Float?
   discountAmountUsd Float?
   gratuityAmountUsd Float?
-  currency        String   @default("USD")
-  rawPayload      String?
+  currency          String   @default("USD")
+  rawPayload        String?
 
   attributionTouchId String?
   attributionTouch   BlvdAttributionTouch? @relation(fields: [attributionTouchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -485,4 +499,105 @@ model BlvdSyncState {
   key       String   @id
   value     String?
   updatedAt DateTime @updatedAt
+}
+
+model CallTrackingSessionAttribution {
+  id String @id @default(cuid())
+
+  occurredAt    DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  pageviewCount Int      @default(1)
+
+  posthogDistinctId String?
+  posthogSessionId  String?
+  callrailSessionId String?
+  callrailVisitorId String?
+
+  currentPath                  String?
+  currentSearch                String?
+  currentPagePrefixType        String?
+  currentPageType              String?
+  bookEntryFromPath            String?
+  bookEntryPagePrefixType      String?
+  bookEntryPageType            String?
+  initialLandingPath           String?
+  initialLandingSearch         String?
+  initialLandingPagePrefixType String?
+  initialLandingPageType       String?
+  initialReferrer              String?
+  initialReferringDomain       String?
+
+  trafficChannel      String?
+  trafficPlatform     String?
+  trafficSourceDetail String?
+  utmSource           String?
+  utmMedium           String?
+  utmCampaign         String?
+  utmTerm             String?
+  utmContent          String?
+  gclid               String?
+  gbraid              String?
+  wbraid              String?
+  fbclid              String?
+  msclkid             String?
+
+  rawProperties String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([posthogSessionId])
+  @@index([posthogDistinctId])
+  @@index([callrailSessionId])
+  @@index([callrailVisitorId])
+  @@index([lastSeenAt])
+}
+
+model RetellCallOutcome {
+  id                 String  @id @default(cuid())
+  retellCallId       String? @unique
+  retellPublicLogUrl String?
+  notificationType   String
+
+  callerName        String?
+  callerPhone       String?
+  callbackPhone     String?
+  boulevardClientId String?
+  clientName        String?
+  clientEmail       String?
+  clientPhone       String?
+  clientProfileUrl  String?
+
+  serviceInterest           String?
+  locationInterest          String?
+  preferredTime             String?
+  bookingNotCompletedReason String?
+  message                   String?
+  requestedAction           String?
+  urgency                   String?
+
+  callrailAccountId        String?
+  callrailCallId           String?
+  callrailSessionId        String?
+  callrailPersonId         String?
+  callrailTimelineUrl      String?
+  callrailSource           String?
+  callrailMedium           String?
+  callrailLandingPageUrl   String?
+  callrailLastRequestedUrl String?
+  posthogDistinctId        String?
+  posthogSessionId         String?
+
+  rawPayload String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([notificationType])
+  @@index([callerPhone])
+  @@index([boulevardClientId])
+  @@index([callrailCallId])
+  @@index([callrailSessionId])
+  @@index([posthogSessionId])
+  @@index([createdAt])
 }

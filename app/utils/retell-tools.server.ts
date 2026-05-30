@@ -120,6 +120,28 @@ export function pickRetellPublicLogUrl(call: Record<string, unknown> | null) {
 	)
 }
 
+export function pickRetellCallRailCallId(call: Record<string, unknown> | null) {
+	return (
+		pickString(call, ['callrail_call_id', 'callrailCallId']) ??
+		pickString(getRecord(call?.metadata), [
+			'callrail_call_id',
+			'callrailCallId',
+		])
+	)
+}
+
+export function pickRetellCallRailAccountId(
+	call: Record<string, unknown> | null,
+) {
+	return (
+		pickString(call, ['callrail_account_id', 'callrailAccountId']) ??
+		pickString(getRecord(call?.metadata), [
+			'callrail_account_id',
+			'callrailAccountId',
+		])
+	)
+}
+
 function getRecord(value: unknown) {
 	return value && typeof value === 'object'
 		? (value as Record<string, unknown>)

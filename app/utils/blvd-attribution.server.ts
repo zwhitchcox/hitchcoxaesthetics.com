@@ -20,6 +20,16 @@ const attributionPropertiesSchema = z
 		traffic_source_detail: z.string().optional(),
 		posthog_distinct_id: z.string().optional(),
 		posthog_session_id: z.string().optional(),
+		callrail_account_id: z.string().optional(),
+		callrail_call_id: z.string().optional(),
+		callrail_session_id: z.string().optional(),
+		callrail_visitor_id: z.string().optional(),
+		callrail_person_id: z.string().optional(),
+		callrail_timeline_url: z.string().optional(),
+		callrail_source: z.string().optional(),
+		callrail_medium: z.string().optional(),
+		callrail_landing_page_url: z.string().optional(),
+		callrail_last_requested_url: z.string().optional(),
 		utm_source: z.string().optional(),
 		utm_medium: z.string().optional(),
 		utm_campaign: z.string().optional(),
@@ -338,6 +348,32 @@ export async function recordBoulevardBookingAttributionTouch(
 		posthogSessionId: normalizeOptionalString(
 			parsed.attribution.posthog_session_id,
 		),
+		callrailAccountId: normalizeOptionalString(
+			parsed.attribution.callrail_account_id,
+		),
+		callrailCallId: normalizeOptionalString(
+			parsed.attribution.callrail_call_id,
+		),
+		callrailSessionId: normalizeOptionalString(
+			parsed.attribution.callrail_session_id,
+		),
+		callrailVisitorId: normalizeOptionalString(
+			parsed.attribution.callrail_visitor_id,
+		),
+		callrailPersonId: normalizeOptionalString(
+			parsed.attribution.callrail_person_id,
+		),
+		callrailTimelineUrl: normalizeOptionalString(
+			parsed.attribution.callrail_timeline_url,
+		),
+		callrailSource: normalizeOptionalString(parsed.attribution.callrail_source),
+		callrailMedium: normalizeOptionalString(parsed.attribution.callrail_medium),
+		callrailLandingPageUrl: normalizeOptionalString(
+			parsed.attribution.callrail_landing_page_url,
+		),
+		callrailLastRequestedUrl: normalizeOptionalString(
+			parsed.attribution.callrail_last_requested_url,
+		),
 		utmSource: normalizeOptionalString(parsed.attribution.utm_source),
 		utmMedium: normalizeOptionalString(parsed.attribution.utm_medium),
 		utmCampaign: normalizeOptionalString(parsed.attribution.utm_campaign),
@@ -386,7 +422,7 @@ export async function recordBoulevardBookingAttributionTouch(
 	}
 
 	await refreshBlvdBookingPricingAudit(db)
-	await reportCallRailBookingConversion({
+	const callRailReport = await reportCallRailBookingConversion({
 		appointmentIds: parsed.appointments.map(
 			appointment => appointment.appointmentId,
 		),
@@ -395,6 +431,8 @@ export async function recordBoulevardBookingAttributionTouch(
 				? parsed.attribution.booking_channel
 				: undefined,
 		boulevardClientId: client.boulevardClientId,
+		callrailAccountId: parsed.attribution.callrail_account_id,
+		callrailCallId: parsed.attribution.callrail_call_id,
 		callerPhoneNumber: parsed.client.phone,
 		cartId: parsed.booking.cartId,
 		customerName: [parsed.client.firstName, parsed.client.lastName]
@@ -406,13 +444,61 @@ export async function recordBoulevardBookingAttributionTouch(
 		startTime: parsed.appointments[0]?.startTime,
 	}).catch(error => {
 		console.error('Failed to report Boulevard booking to CallRail', error)
+		return null
 	})
+	const callRailTouchData = callRailReport
+		? buildCallRailTouchData(callRailReport)
+		: null
+	if (callRailTouchData) {
+		await db.blvdAttributionTouch.update({
+			where: { id: touch.id },
+			data: callRailTouchData,
+		})
+	}
 
 	return {
 		blvdClientId: client.id,
 		boulevardClientId: client.boulevardClientId,
 		touchId: touch.id,
 	}
+}
+
+function buildCallRailTouchData(input: {
+	account_id?: string | null
+	callrail_call_id?: string | null
+	callrail_landing_page_url?: string | null
+	callrail_last_requested_url?: string | null
+	callrail_medium?: string | null
+	callrail_person_id?: string | null
+	callrail_session_id?: string | null
+	callrail_source?: string | null
+	callrail_timeline_url?: string | null
+	callrail_visitor_id?: string | null
+	posthog_distinct_id?: string | null
+	posthog_session_id?: string | null
+}) {
+	const data = {
+		callrailAccountId: normalizeOptionalString(input.account_id),
+		callrailCallId: normalizeOptionalString(input.callrail_call_id),
+		callrailSessionId: normalizeOptionalString(input.callrail_session_id),
+		callrailVisitorId: normalizeOptionalString(input.callrail_visitor_id),
+		callrailPersonId: normalizeOptionalString(input.callrail_person_id),
+		callrailTimelineUrl: normalizeOptionalString(input.callrail_timeline_url),
+		callrailSource: normalizeOptionalString(input.callrail_source),
+		callrailMedium: normalizeOptionalString(input.callrail_medium),
+		callrailLandingPageUrl: normalizeOptionalString(
+			input.callrail_landing_page_url,
+		),
+		callrailLastRequestedUrl: normalizeOptionalString(
+			input.callrail_last_requested_url,
+		),
+		posthogDistinctId: normalizeOptionalString(input.posthog_distinct_id),
+		posthogSessionId: normalizeOptionalString(input.posthog_session_id),
+	}
+	const compactData = Object.fromEntries(
+		Object.entries(data).filter(([, value]) => value != null),
+	)
+	return Object.keys(compactData).length > 0 ? compactData : null
 }
 
 async function syncBlvdRevenueItemToPostHog(
@@ -492,6 +578,11 @@ async function syncBlvdRevenueItemToPostHog(
 			fbclid: touch?.fbclid,
 			msclkid: touch?.msclkid,
 			posthog_session_id: touch?.posthogSessionId,
+			callrail_call_id: touch?.callrailCallId,
+			callrail_session_id: touch?.callrailSessionId,
+			callrail_timeline_url: touch?.callrailTimelineUrl,
+			callrail_source: touch?.callrailSource,
+			callrail_medium: touch?.callrailMedium,
 		},
 		timestamp: revenueItem.occurredAt.toISOString(),
 	})

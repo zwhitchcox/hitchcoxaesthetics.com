@@ -50,6 +50,7 @@ import tailwindStyleSheetUrl from '#/app/styles/tailwind.css?url'
 import { getUserId, logout } from '#/app/utils/auth.server.ts'
 import {
 	getMarketingPageEventProperties,
+	queueCallTrackingSessionAttribution,
 	trackBookingAnalyticsPageView,
 } from '#/app/utils/booking-analytics.ts'
 import {
@@ -369,6 +370,11 @@ function App() {
 
 	useEffect(() => {
 		trackBookingAnalyticsPageView({
+			pathname: location.pathname,
+			referrer: typeof document !== 'undefined' ? document.referrer : null,
+			search: location.search,
+		})
+		queueCallTrackingSessionAttribution({
 			pathname: location.pathname,
 			referrer: typeof document !== 'undefined' ? document.referrer : null,
 			search: location.search,

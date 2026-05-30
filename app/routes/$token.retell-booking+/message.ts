@@ -6,6 +6,8 @@ import {
 } from '#app/utils/retell-staff-message.server.ts'
 import {
 	parseRetellToolPayload,
+	pickRetellCallRailAccountId,
+	pickRetellCallRailCallId,
 	pickRetellCallerPhone,
 	pickRetellCallId,
 	pickRetellPublicLogUrl,
@@ -28,6 +30,14 @@ export async function action({ request }: ActionFunctionArgs) {
 				...payload.args,
 				call_id:
 					payload.args.call_id ?? pickRetellCallId(payload.call) ?? undefined,
+				callrail_account_id:
+					payload.args.callrail_account_id ??
+					pickRetellCallRailAccountId(payload.call) ??
+					undefined,
+				callrail_call_id:
+					payload.args.callrail_call_id ??
+					pickRetellCallRailCallId(payload.call) ??
+					undefined,
 				caller_phone_number:
 					payload.args.caller_phone_number ??
 					pickRetellCallerPhone(payload.call) ??
