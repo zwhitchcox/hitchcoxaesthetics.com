@@ -662,8 +662,8 @@ export async function listVoiceCallerAppointments(
 		message:
 			appointments.length > 0
 				? appointments.length === 1
-					? 'Read the single upcoming appointment, then ask whether the caller wants to reschedule it, cancel it, or leave it as is, in that order.'
-					: 'The caller has multiple upcoming appointments. Read every appointment in appointments_summary_text before asking which one they want to reschedule, cancel, or leave as is.'
+					? 'One upcoming appointment was found. Use it as the target if the caller already asked to reschedule or cancel; otherwise ask what they want to do with it.'
+					: 'Multiple upcoming appointments were found. Use appointments_summary_text to identify which appointment the caller means, then continue their requested change.'
 				: 'No upcoming appointments were found for this caller.',
 	}
 }
