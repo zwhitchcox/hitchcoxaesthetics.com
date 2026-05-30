@@ -1,11 +1,12 @@
 import { type ActionFunctionArgs } from '@remix-run/node'
 
 import {
-	bookVoiceAppointment,
-	voiceBookAppointmentSchema,
+	rescheduleVoiceAppointment,
+	voiceRescheduleAppointmentSchema,
 } from '#app/utils/blvd-voice-booking.server.ts'
 import {
-	parseRetellToolArgs,
+	parseRetellToolPayload,
+	pickRetellCallerPhone,
 	retellToolError,
 	retellToolJson,
 } from '#app/utils/retell-tools.server.ts'
@@ -16,8 +17,19 @@ export async function action({ request }: ActionFunctionArgs) {
 	}
 
 	try {
-		const input = await parseRetellToolArgs(request, voiceBookAppointmentSchema)
-		return retellToolJson(await bookVoiceAppointment(input))
+		const payload = await parseRetellToolPayload(
+			request,
+			voiceRescheduleAppointmentSchema,
+		)
+		return retellToolJson(
+			await rescheduleVoiceAppointment({
+				...payload.args,
+				caller_phone_number:
+					payload.args.caller_phone_number ??
+					pickRetellCallerPhone(payload.call) ??
+					undefined,
+			}),
+		)
 	} catch (error) {
 		return retellToolError(error)
 	}

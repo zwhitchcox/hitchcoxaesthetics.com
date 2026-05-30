@@ -10,9 +10,9 @@ import {
 	CardHeader,
 	CardTitle,
 } from '#app/components/ui/card.tsx'
-import { getMissingBlvdBookingPriceServiceNames } from '#app/utils/blvd-booking-pricing.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server.ts'
+import { getMissingBlvdBookingPriceServiceNames } from '#app/utils/service-pricing.ts'
 
 function formatDateTime(value?: Date | string | null) {
 	if (!value) return ' - '

@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-import { getMissingBlvdBookingPriceServiceNames } from '#app/utils/blvd-booking-pricing.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
+import { getMissingBlvdBookingPriceServiceNames } from '#app/utils/service-pricing.ts'
 
 const attributionPropertiesSchema = z
 	.object({

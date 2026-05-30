@@ -22,33 +22,31 @@ const resendSuccessSchema = z.object({
 })
 
 export async function sendEmail({
+	from = 'hello@hitchcoxaesthetics.com',
 	react,
 	...options
 }: {
+	from?: string
 	to: string
 	subject: string
 } & (
 	| { html: string; text: string; react?: never }
 	| { react: ReactElement; html?: never; text?: never }
 )) {
-	const from = 'hello@hitchoxaesthetics.com'
-
 	const email = {
 		from,
 		...options,
 		...(react ? await renderReactEmail(react) : null),
 	}
 
-	// feel free to remove this condition once you've set up resend
-	if (!process.env.RESEND_API_KEY && !process.env.MOCKS) {
-		console.error(`RESEND_API_KEY not set and we're not in mocks mode.`)
-		console.error(
-			`To send emails, set the RESEND_API_KEY environment variable.`,
-		)
-		console.error(`Would have sent the following email:`, JSON.stringify(email))
+	if (!process.env.RESEND_API_KEY?.trim() && process.env.MOCKS !== 'true') {
 		return {
-			status: 'success',
-			data: { id: 'mocked' },
+			status: 'error',
+			error: {
+				name: 'MissingResendApiKey',
+				message: 'RESEND_API_KEY is not set.',
+				statusCode: 500,
+			},
 		} as const
 	}
 
@@ -66,7 +64,7 @@ export async function sendEmail({
 	if (response.ok && parsedData.success) {
 		return {
 			status: 'success',
-			data: parsedData,
+			data: parsedData.data,
 		} as const
 	} else {
 		const parseResult = resendErrorSchema.safeParse(data)

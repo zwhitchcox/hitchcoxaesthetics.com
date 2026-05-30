@@ -21,6 +21,7 @@
     "script": "tsx prisma/script",
     "make-admin": "tsx prisma/make-admin.ts",
     "lint": "eslint .",
+    "deploy:production": "pnpm run typecheck && pnpm run lint && pnpm run retell:booking:deploy -- --dry-run --base-url=https://hitchcoxaesthetics.com && fly deploy && pnpm run retell:booking:deploy -- --base-url=https://hitchcoxaesthetics.com",
     "setup": "npm run build && prisma generate && prisma migrate deploy && prisma db seed && playwright install",
     "start": "cross-env NODE_ENV=production node .",
     "start:mocks": "cross-env NODE_ENV=production MOCKS=true tsx .",
@@ -39,8 +40,10 @@
     "blvd:import-revenue": "tsx scripts/blvd-import-revenue.ts",
     "blvd:reconcile-revenue": "tsx scripts/blvd-reconcile-revenue.ts",
     "retell:booking:dev": "tsx scripts/retell-booking-dev.ts",
+    "retell:booking:deploy": "tsx scripts/retell-deploy-booking-agents.ts",
     "posthog:sync": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml",
-    "posthog:sync:apply": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml --apply"
+    "posthog:sync:apply": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml --apply",
+    "secrets:push": "tsx scripts/push-secrets.ts"
   },
   "eslintIgnore": [
     "/node_modules",

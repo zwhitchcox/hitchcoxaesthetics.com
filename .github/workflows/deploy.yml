@@ -183,6 +183,35 @@ jobs:
       - name: 🎈 Setup Fly
         uses: superfly/flyctl-actions/setup-flyctl@1.5
 
+      - name: ⎔ Setup node
+        if: ${{ github.ref == 'refs/heads/master' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: setup pnpm
+        if: ${{ github.ref == 'refs/heads/master' }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: 📥 Download deps for Retell deploy
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: pnpm install
+
+      - name: ☎️ Validate Retell Production Agents
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: >
+          pnpm run retell:booking:deploy -- --dry-run
+          --base-url=https://hitchcoxaesthetics.com
+        env:
+          RETELL_API_KEY: ${{ secrets.RETELL_API_KEY }}
+          RETELL_DEPLOY_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          RETELL_DEPLOY_COMMIT_SHA: ${{ github.sha }}
+          RETELL_DEPLOY_WEBHOOK_BASE_URL: https://hitchcoxaesthetics.com
+          RETELL_TOOL_SHARED_SECRET: ${{ secrets.RETELL_TOOL_SHARED_SECRET }}
+          RETELL_TOOL_URL_TOKEN: ${{ secrets.RETELL_TOOL_URL_TOKEN }}
+
       - name: 🚀 Deploy Staging
         if: ${{ github.ref == 'refs/heads/dev' }}
         run:
@@ -198,3 +227,16 @@ jobs:
           --build-secret SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: ☎️ Deploy Retell Production Agents
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: >
+          pnpm run retell:booking:deploy --
+          --base-url=https://hitchcoxaesthetics.com
+        env:
+          RETELL_API_KEY: ${{ secrets.RETELL_API_KEY }}
+          RETELL_DEPLOY_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          RETELL_DEPLOY_COMMIT_SHA: ${{ github.sha }}
+          RETELL_DEPLOY_WEBHOOK_BASE_URL: https://hitchcoxaesthetics.com
+          RETELL_TOOL_SHARED_SECRET: ${{ secrets.RETELL_TOOL_SHARED_SECRET }}
+          RETELL_TOOL_URL_TOKEN: ${{ secrets.RETELL_TOOL_URL_TOKEN }}

@@ -2,6 +2,12 @@
 
 when committing/pushing, make sure to check the linter/tsc
 
+## Dev Server Rule
+
+- Never start, restart, stop, or detach the dev server unless the user
+  explicitly asks for it first. If work requires the dev server to be started or
+  restarted, ask the user to do it or ask for permission before taking action.
+
 ## Content Strategy
 
 - **Keywords:** Integrate "Knoxville" keywords naturally. Do not stuff.

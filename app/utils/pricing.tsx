@@ -10,9 +10,11 @@
 
 import React from 'react'
 
+import { PUBLIC_SERVICE_PRICING } from '#app/utils/service-pricing.ts'
+
 const FirstVisitSpecialPrice = () => (
 	<div className="flex flex-col items-end justify-end gap-1 sm:flex-row sm:items-center">
-		<span>$13/unit</span>
+		<span>{PUBLIC_SERVICE_PRICING.botox.display}</span>
 		<span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
 			20% off your first visit
 		</span>
@@ -41,7 +43,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 					name: 'Tox (Botox, Dysport, or Jeuveau)',
 					price: <FirstVisitSpecialPrice />,
 				},
-				{ name: 'Lip Flip', price: '$129' },
+				{ name: 'Lip Flip', price: PUBLIC_SERVICE_PRICING.lipFlip.display },
 			],
 		},
 		{
@@ -60,7 +62,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 		{
 			title: 'Other Injectables',
 			items: [
-				{ name: 'Kybella', price: '$600/vial' },
+				{ name: 'Kybella', price: PUBLIC_SERVICE_PRICING.kybella.display },
 				{ name: 'SkinVive', price: '$325/syringe' },
 				{ name: 'PRP Facial Balancing', price: '$800/treatment' },
 			],
@@ -76,7 +78,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 					name: 'Botox',
 					price: <FirstVisitSpecialPrice />,
 				},
-				{ name: 'Lip Flip', price: '$129' },
+				{ name: 'Lip Flip', price: PUBLIC_SERVICE_PRICING.lipFlip.display },
 			],
 		},
 	],
@@ -169,7 +171,9 @@ export const pricingData: Record<string, PricingCategory[]> = {
 	kybella: [
 		{
 			title: 'Kybella Pricing',
-			items: [{ name: 'Kybella', price: '$600/vial' }],
+			items: [
+				{ name: 'Kybella', price: PUBLIC_SERVICE_PRICING.kybella.display },
+			],
 		},
 	],
 
@@ -390,9 +394,18 @@ export const pricingData: Record<string, PricingCategory[]> = {
 		{
 			title: 'Weight Loss & Wellness Pricing',
 			items: [
-				{ name: 'Semaglutide', price: 'Starting at $150/month' },
-				{ name: 'Tirzepatide', price: 'Starting at $250/month' },
-				{ name: 'Lipo/B12 Injections', price: '$25/shot' },
+				{
+					name: 'Semaglutide',
+					price: PUBLIC_SERVICE_PRICING.semaglutide.display,
+				},
+				{
+					name: 'Tirzepatide',
+					price: PUBLIC_SERVICE_PRICING.tirzepatide.display,
+				},
+				{
+					name: 'Lipo/B12 Injections',
+					price: PUBLIC_SERVICE_PRICING.lipoB12.display,
+				},
 			],
 		},
 	],
@@ -400,8 +413,14 @@ export const pricingData: Record<string, PricingCategory[]> = {
 		{
 			title: 'Semaglutide Pricing',
 			items: [
-				{ name: 'Semaglutide', price: 'Starting at $150/month' },
-				{ name: 'Lipo/B12 Injections', price: '$25/shot' },
+				{
+					name: 'Semaglutide',
+					price: PUBLIC_SERVICE_PRICING.semaglutide.display,
+				},
+				{
+					name: 'Lipo/B12 Injections',
+					price: PUBLIC_SERVICE_PRICING.lipoB12.display,
+				},
 			],
 		},
 	],
@@ -409,8 +428,14 @@ export const pricingData: Record<string, PricingCategory[]> = {
 		{
 			title: 'Tirzepatide Pricing',
 			items: [
-				{ name: 'Tirzepatide', price: 'Starting at $250/month' },
-				{ name: 'Lipo/B12 Injections', price: '$25/shot' },
+				{
+					name: 'Tirzepatide',
+					price: PUBLIC_SERVICE_PRICING.tirzepatide.display,
+				},
+				{
+					name: 'Lipo/B12 Injections',
+					price: PUBLIC_SERVICE_PRICING.lipoB12.display,
+				},
 			],
 		},
 	],

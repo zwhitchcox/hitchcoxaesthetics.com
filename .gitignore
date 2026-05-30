@@ -42,3 +42,4 @@ processing-images/
 processing-images-archive/
 .visited-urls
 /candidates
+.playwright-mcp

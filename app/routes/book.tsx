@@ -5,7 +5,7 @@ import {
 	type MetaFunction,
 } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
-import { format, isValid, parseISO } from 'date-fns'
+import { format, isValid } from 'date-fns'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
@@ -21,8 +21,6 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { Textarea } from '#app/components/ui/textarea.tsx'
-import { getBlvdBookingPriceDisplay } from '#app/utils/blvd-booking-pricing.ts'
-import { getEstimatedValueForBlvdService } from '#app/utils/blvd-pricing.ts'
 import { getBookingAnalyticsEventProperties } from '#app/utils/booking-analytics.ts'
 import {
 	type Location as SiteLocation,
@@ -30,6 +28,10 @@ import {
 } from '#app/utils/locations.ts'
 import { cn, getErrorMessage } from '#app/utils/misc.tsx'
 import { usePostHog } from '#app/utils/posthog.tsx'
+import {
+	getBlvdBookingPriceDisplay,
+	getEstimatedValueForBlvdService,
+} from '#app/utils/service-pricing.ts'
 import { getAncestors, getPage } from '#app/utils/site-pages.server.ts'
 
 type SourceHint = {
@@ -462,6 +464,7 @@ export default function BlvdBookRoute() {
 		DEFAULT_BOOKING_LOCATION_ID
 	const activeSourceHint = sourceHint ?? referrerHint
 	const selectedDate =
+		bookableDates.find(date => getBookableDateKey(date) === selectedDateId) ??
 		bookableDates.find(date => date.id === selectedDateId) ??
 		bookableDates[0] ??
 		null
@@ -620,9 +623,7 @@ export default function BlvdBookRoute() {
 
 	const bookableDateStrings = useMemo(() => {
 		return new Set(
-			bookableDates.map(d =>
-				format(toDate(d.date) ?? new Date(), 'yyyy-MM-dd'),
-			),
+			bookableDates.map(d => getBookableDateKey(d)).filter(Boolean),
 		)
 	}, [bookableDates])
 
@@ -739,7 +740,7 @@ export default function BlvdBookRoute() {
 			setBookableDates(nextDates)
 
 			if (nextDates[0]) {
-				setSelectedDateId(nextDates[0].id)
+				setSelectedDateId(getBookableDateKey(nextDates[0]) ?? nextDates[0].id)
 				const nextTimes = await nextCart.getBookableTimes(nextDates[0], {
 					location,
 					timezone: location.tz ?? undefined,
@@ -758,11 +759,12 @@ export default function BlvdBookRoute() {
 
 		setLoadingTimes(true)
 		setStepError(null)
-		setSelectedDateId(date.id)
+		setSelectedDateId(getBookableDateKey(date) ?? date.id)
 		setActiveStep(null)
 		setDetailsSubmitted(false)
 		setSelectedTimeId(null)
 		setCheckoutSuccess(null)
+		setBookableTimes([])
 
 		try {
 			const nextTimes = await cart.getBookableTimes(date, {
@@ -1232,8 +1234,8 @@ export default function BlvdBookRoute() {
 							stepAvailability={stepAvailability}
 							stepCompletion={stepCompletion}
 						/>
-						<Card className="flex w-full max-w-5xl flex-col items-stretch p-4 pb-6 transition-all duration-300 lg:flex-row lg:items-start lg:space-x-8">
-							<div className="w-full max-w-xs flex-shrink-0 self-center lg:w-64 lg:self-auto">
+						<Card className="flex w-full max-w-5xl flex-col items-stretch bg-white p-4 pb-6 transition-all duration-300 lg:flex-row lg:items-start lg:space-x-8">
+							<div className="order-2 mt-6 w-full max-w-xs flex-shrink-0 self-center lg:order-1 lg:mt-0 lg:w-64 lg:self-auto">
 								<BlvdAppointmentDetails
 									appointmentDate={appointmentDate}
 									appointmentEndTime={appointmentEndTime}
@@ -1246,18 +1248,16 @@ export default function BlvdBookRoute() {
 									sourceHint={activeSourceHint}
 								/>
 							</div>
-							<div className="mt-8 w-full min-w-0 flex-1 lg:mt-0">
+							<div className="order-1 w-full min-w-0 flex-1 lg:order-2">
 								{currentStep === 'service' ? (
-									<div className="flex w-full flex-col items-center space-y-6">
+									<div className="flex w-full max-w-full flex-col items-center space-y-6 overflow-hidden">
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
 											Service
 										</h2>
-										<p className="-mt-4 mb-4 text-center text-sm text-muted-foreground">
-											Type what the client is looking for. If they came from a
-											service page, the list is already narrowed to the closest
-											matches.
+										<p className="-mt-4 mb-4 max-w-xl text-center text-sm text-muted-foreground">
+											Please select a service.
 										</p>
-										<div className="flex w-full flex-col items-center gap-3 sm:flex-row">
+										<div className="flex w-full max-w-full flex-col items-center gap-3 sm:flex-row">
 											<Input
 												ref={searchInputRef}
 												className="w-full"
@@ -1282,15 +1282,18 @@ export default function BlvdBookRoute() {
 												No services matched that search yet.
 											</p>
 										) : (
-											<div className="space-y-8">
+											<div className="w-full max-w-full space-y-8">
 												{groupedServices.map(group => (
-													<div key={group.categoryName} className="space-y-4">
+													<div
+														key={group.categoryName}
+														className="w-full space-y-4"
+													>
 														<div className="border-b pb-3">
 															<h3 className="text-lg font-semibold tracking-wide text-foreground">
 																{group.categoryName}
 															</h3>
 														</div>
-														<div className="columns-1 gap-4 md:columns-2">
+														<div className="grid w-full gap-4 md:grid-cols-2">
 															{group.services.map(service => {
 																const isSelected =
 																	selectedService?.id === service.id
@@ -1298,24 +1301,21 @@ export default function BlvdBookRoute() {
 																	service.item,
 																)
 																return (
-																	<div
-																		key={service.id}
-																		className="mb-4 break-inside-avoid"
-																	>
+																	<div key={service.id} className="min-w-0">
 																		<button
 																			type="button"
 																			onClick={() => {
 																				void handleSelectService(service)
 																			}}
 																			className={cn(
-																				'w-full min-w-0 rounded-xl border p-5 text-left transition hover:border-primary hover:shadow-md',
+																				'w-full min-w-0 rounded-xl border bg-white p-5 text-left transition hover:border-primary hover:shadow-md',
 																				isSelected &&
-																					'border-primary bg-primary/5 shadow-sm',
+																					'border-primary shadow-sm',
 																			)}
 																		>
 																			<div className="mb-2 flex w-full items-start justify-between gap-4">
 																				<div className="min-w-0 flex-1">
-																					<h4 className="break-words text-xl font-semibold">
+																					<h4 className="break-words text-lg font-semibold sm:text-xl">
 																						{service.item.name}
 																					</h4>
 																					{displayPrice ? (
@@ -1392,9 +1392,8 @@ export default function BlvdBookRoute() {
 																		void handleSelectLocation(location)
 																	}}
 																	className={cn(
-																		'rounded-xl border p-5 text-left transition hover:border-primary hover:shadow-md',
-																		isSelected &&
-																			'border-primary bg-primary/5 shadow-sm',
+																		'rounded-xl border bg-white p-5 text-left transition hover:border-primary hover:shadow-md',
+																		isSelected && 'border-primary shadow-sm',
 																	)}
 																>
 																	<div className="flex items-start justify-between gap-4">
@@ -1428,6 +1427,22 @@ export default function BlvdBookRoute() {
 															)
 														})}
 													</div>
+
+													{selectedLocation ? (
+														<div className="order-2 lg:hidden">
+															<Button
+																type="button"
+																size="lg"
+																className="w-full"
+																disabled={loadingSchedule}
+																onClick={() => setActiveStep('schedule')}
+															>
+																{loadingSchedule
+																	? 'Loading Schedule...'
+																	: 'Continue to Schedule'}
+															</Button>
+														</div>
+													) : null}
 
 													<div className="flex flex-col rounded-xl border bg-muted/20 p-4">
 														<div className="flex-1">
@@ -1485,7 +1500,7 @@ export default function BlvdBookRoute() {
 															)}
 														</div>
 														{selectedLocation ? (
-															<div className="mt-6 flex justify-end">
+															<div className="mt-6 hidden justify-end lg:flex">
 																<Button
 																	type="button"
 																	size="lg"
@@ -1654,7 +1669,7 @@ export default function BlvdBookRoute() {
 															onChange={updateClientForm}
 														/>
 													</div>
-													<div className="space-y-4 rounded-xl border p-5 md:col-span-2">
+													<div className="space-y-4 rounded-xl border bg-white p-5 md:col-span-2">
 														<div className="space-y-1">
 															<h3 className="text-lg font-semibold">
 																Returning client?
@@ -1727,7 +1742,7 @@ export default function BlvdBookRoute() {
 														)}
 													</div>
 													{hasVerifiedClient ? (
-														<div className="rounded-xl border p-5 text-sm text-muted-foreground md:col-span-2">
+														<div className="rounded-xl border bg-white p-5 text-sm text-muted-foreground md:col-span-2">
 															Your contact details are already attached through
 															the verified Boulevard record.
 														</div>
@@ -1778,7 +1793,7 @@ export default function BlvdBookRoute() {
 
 												{cart?.bookingQuestions &&
 												cart.bookingQuestions.length > 0 ? (
-													<div className="space-y-4 rounded-xl border p-5">
+													<div className="space-y-4 rounded-xl border bg-white p-5">
 														<div className="space-y-1">
 															<h3 className="text-lg font-semibold">
 																Booking Questions
@@ -1843,13 +1858,10 @@ export default function BlvdBookRoute() {
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
 											Reserve
 										</h2>
-										<p className="-mt-4 mb-4 text-center text-sm text-muted-foreground">
-											Review your appointment and secure your slot below.
-										</p>
 										<div className="w-full space-y-6">
 											<form className="space-y-8" onSubmit={handleCheckout}>
 												{requiresCard ? (
-													<div className="space-y-4 rounded-xl border p-5">
+													<div className="space-y-4 rounded-xl border bg-white p-5">
 														<div className="space-y-1">
 															<h3 className="text-lg font-semibold">
 																Card Hold
@@ -1994,8 +2006,11 @@ export default function BlvdBookRoute() {
 													</div>
 												) : null}
 
-												<div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+												<div className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-3 border-t bg-background/95 px-4 py-4 shadow-[0_-12px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:mx-0 sm:flex-row sm:items-center sm:justify-between sm:bg-transparent sm:px-0 sm:pt-6 sm:shadow-none sm:backdrop-blur-none">
 													<div className="text-sm text-muted-foreground">
+														<p className="font-semibold text-foreground">
+															Not booked yet
+														</p>
 														<p>
 															Selected time:{' '}
 															<span className="font-medium text-foreground">
@@ -2220,7 +2235,7 @@ function BlvdAppointmentDetails({
 					</div>
 					{selectedService &&
 					(selectedServicePrice || cart?.summary.depositAmount) ? (
-						<div className="mt-4 w-full rounded-xl border bg-muted/30 p-4 text-sm">
+						<div className="mt-4 w-full rounded-xl border bg-white p-4 text-sm">
 							{selectedServicePrice ? (
 								<div className="flex items-center justify-between gap-4">
 									<span className="font-medium text-muted-foreground">
@@ -2507,13 +2522,30 @@ function getDisplayPrice(
 	}).display
 }
 
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
 function toDate(value: Date | string | null | undefined) {
 	if (!value) return null
 	if (value instanceof Date) return value
 	if (typeof value !== 'string') return null
 
-	const parsed = value.length === 10 ? parseISO(value) : new Date(value)
+	const dateOnlyMatch = DATE_ONLY_PATTERN.exec(value.trim())
+	if (dateOnlyMatch) {
+		const parsed = new Date(
+			Number(dateOnlyMatch[1]),
+			Number(dateOnlyMatch[2]) - 1,
+			Number(dateOnlyMatch[3]),
+		)
+		return isValid(parsed) ? parsed : null
+	}
+
+	const parsed = new Date(value)
 	return isValid(parsed) ? parsed : null
+}
+
+function getBookableDateKey(date: BlvdBookableDate) {
+	const dateValue = toDate(date.date)
+	return dateValue ? format(dateValue, 'yyyy-MM-dd') : null
 }
 
 function formatDateLabel(value: Date | string) {
