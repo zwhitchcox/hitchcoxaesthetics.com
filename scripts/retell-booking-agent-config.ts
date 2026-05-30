@@ -266,6 +266,8 @@ export function buildUpdatedPrompt(
 		'Caller identity: Treat the caller profile returned by lookup_caller or lookup_caller_appointments as the single source of truth for name, phone, email, client type, saved card status, and other contact details. If the caller already stated their name in this call, such as "this is Zane", "my name is Zane", or gave a first and/or last name, and the returned profile name matches that stated name or first name, treat identity as already confirmed and do not ask "Am I speaking with..." again. If a returned profile has a name and the caller has not already stated or confirmed a matching name in this call, ask exactly once, "Am I speaking with [full name]?" After identity is confirmed or matched from their stated name, reuse that profile anywhere a name, phone, email, client type, or caller details are needed; do not ask for first name, last name, phone number, or email again unless a tool explicitly returns missing_client_details or the caller says the profile is wrong. If the profile is missing or the caller says it is not them, ask only for the missing details needed for the current task. For messages or follow-up, use the confirmed profile if available, ask for a name only when no profile/name is available, and ask "Can Sarah call you back at this number?" before asking for another callback number. Keep any context the caller gives and pass it to send_staff_message.'
 	const callerLookupInstruction =
 		'Caller lookup: When a caller asks to schedule, book, make an appointment, check availability, leave a message, send a message, take a message, request a callback, ask Sarah to call them back, cancel, reschedule, or view appointments, your first action must be the appropriate caller lookup tool: lookup_caller for booking, availability, messages, and callbacks, or lookup_caller_appointments for existing appointments. Run this lookup silently before saying anything else. Do not say "let me look up your profile", "let me check who I am speaking with", "one moment while I look that up", "I will grab a couple details", or any similar narration for caller lookup. For message or callback requests, do not ask "what is your name", "what name should I put on it", or "what is your phone number" until lookup_caller has returned no matched profile or the caller says the matched profile is wrong. Never ask for the caller phone number at the start of booking or message taking. Retell already sends caller ID to tools. Call lookup_caller with caller_phone_number set to null unless the caller has already volunteered a different phone number. Only ask for a phone number if lookup_caller returns new, unknown, or client_not_found and the caller says they are an existing client or says the detected profile is wrong. If lookup_caller returns client_type new or unknown, treat them as a new client unless they correct you. Pass client_type as "returning" or "new" to service and availability tools whenever you know it. If lookup_services returns both new-client and existing-client options, use the confirmed caller status from lookup_caller or lookup_caller_appointments to choose the matching service.'
+	const locationInstruction =
+		'Location handling: If lookup_caller returns most_recent_location and the caller has not chosen a different location, use that as their default booking location. Do not give office landmarks by default. If the caller asks where an office is, give the address or normal location name plus only landmark_hints.primary. If they say they do not know that landmark or ask for another reference, give one fallback landmark at a time.'
 	const dateSpeechInstruction =
 		'When speaking appointment dates, say "today" for appointments on the current date and "tomorrow" for appointments on the next date. For dates after tomorrow, say the normal date, like Monday, June 1st. When offering appointment times, read the slot.spoken_time field exactly. Do not convert start_time yourself because start_time is UTC for booking. Use start_time and time_id only when calling book_appointment. Never invent, round, interpolate, or average appointment times. Only say exact local_time/spoken_time values returned by availability tools. For spoken service names, use service.spoken_name or appointment.spoken_service_names when present. If the caller said Botox, Tox, Dysport, Jeuveau, or Xeomin, do not ask which one they mean; treat it as a Botox appointment and say "Botox appointment" to the caller. Do not say internal Boulevard labels like "Existing Client Tox", "New Client Tox", "Existing Patient", or the full parenthetical Botox/Dysport/Jeuveau/Xeomin name out loud. Use exact internal service.name and service.id only inside tool calls.'
 	const returningClientInstruction =
@@ -280,7 +282,7 @@ export function buildUpdatedPrompt(
 		'When calling block_spam_caller, pass caller_phone_number from the current call object if available. If Retell does not expose it, pass null; the tool server will also try to infer it from the call payload.'
 	const prompt = currentPrompt?.trim()
 	if (!prompt) {
-		return `${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
+		return `${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
 	}
 	if (
 		prompt.includes(brandInstruction) &&
@@ -320,6 +322,7 @@ export function buildUpdatedPrompt(
 				!line.includes('If the caller asks for a later time, afternoon time') &&
 				!line.includes('Caller lookup:') &&
 				!line.includes('Caller identity:') &&
+				!line.includes('Location handling:') &&
 				!line.includes('When a caller asks to schedule') &&
 				!line.includes('Run this lookup silently in the background') &&
 				!line.includes(
@@ -339,7 +342,7 @@ export function buildUpdatedPrompt(
 				),
 		)
 		.join('\n')
-	return `${withoutManagedLines}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
+	return `${withoutManagedLines}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
 }
 
 function buildBasePrompt(brand: RetellBookingBrandConfig) {
@@ -504,7 +507,7 @@ function buildCallerTool(publicUrl: string, toolHeaders: ToolHeaders) {
 		name: 'lookup_caller',
 		url: buildRetellToolUrl(publicUrl, 'caller'),
 		description:
-			'Look up the caller in Boulevard by caller ID before asking whether they are a new or returning client, before asking for their name, or before taking a message/callback request. Use this when the caller wants to book, asks about availability, or wants to leave a message.',
+			'Look up the caller in Boulevard by caller ID before asking whether they are a new or returning client, before asking for their name, or before taking a message/callback request. Use this when the caller wants to book, asks about availability, or wants to leave a message. For returning clients, this can return most_recent_location to use as the default location unless the caller chooses another one.',
 		headers: toolHeaders,
 		method: 'POST',
 		parameters: {

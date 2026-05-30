@@ -71,6 +71,7 @@ type BlvdAppointment = {
 	clientId?: string | null
 	endAt?: Date | string | null
 	id: string
+	location?: BlvdLocation | null
 	manageUrl?: string | null
 	reschedule(
 		bookableTime: { id: string },
@@ -559,8 +560,36 @@ export async function lookupVoiceCaller(input: VoiceCallerLookupInput) {
 		client_type: 'returning',
 		caller_phone_number: callerPhone,
 		client: serializeAdminClientProfile(client),
+		...(await lookupMostRecentCallerVisitContext(client.id)),
 		message:
 			'Boulevard matched this caller phone number. Treat the caller as a returning client and do not ask whether they are new or returning.',
+	}
+}
+
+async function lookupMostRecentCallerVisitContext(clientId: string) {
+	try {
+		const now = new Date()
+		const pastAppointments = (await listAdminClientAppointments(clientId))
+			.filter(appointment => appointment.cancelled !== true)
+			.filter(appointment => {
+				const startAt = toDate(appointment.startAt)
+				return startAt && startAt < now
+			})
+			.sort((a, b) => compareAppointments(b, a))
+		const mostRecentAppointment = pastAppointments[0] ?? null
+		const serializedAppointment = mostRecentAppointment
+			? serializeAppointment(mostRecentAppointment)
+			: null
+
+		return {
+			most_recent_location: serializedAppointment?.location ?? null,
+		}
+	} catch (error) {
+		console.error('Failed to look up caller most recent visit', error)
+		return {
+			appointment_lookup_error: 'most_recent_visit_lookup_failed',
+			most_recent_location: null,
+		}
 	}
 }
 
@@ -1279,8 +1308,12 @@ async function listAdminClientAppointments(clientId: string) {
 	const catalog = await getCatalog()
 	const appointmentGroups: AdminAppointmentNode[][] = []
 	for (const location of catalog.locations) {
+		const appointments = await listAdminLocationAppointmentsForClient(
+			location.id,
+			clientId,
+		)
 		appointmentGroups.push(
-			await listAdminLocationAppointmentsForClient(location.id, clientId),
+			appointments.map(appointment => ({ ...appointment, location })),
 		)
 	}
 	return appointmentGroups.flat().map(hydrateAdminAppointment)
@@ -2123,10 +2156,26 @@ function getLocationAliases(location: BlvdLocation) {
 	const normalizedAddress = normalizeText(address)
 
 	if (normalizedAddress.includes('kingston pike')) {
-		aliases.push('bearden', 'knoxville bearden', '5113 kingston pike')
+		aliases.push(
+			'bearden',
+			'knoxville bearden',
+			'5113 kingston pike',
+			'nama',
+			'kroger',
+			'harvest',
+		)
 	}
 	if (normalizedAddress.includes('campbell station')) {
-		aliases.push('farragut', '102 s campbell station')
+		aliases.push(
+			'farragut',
+			'102 s campbell station',
+			'old aubreys',
+			"old aubrey's",
+			'aubreys',
+			"aubrey's",
+			'starbucks',
+			'campbell station and kingston pike',
+		)
 	}
 
 	return aliases
@@ -2250,6 +2299,7 @@ function serializeLocation(location: BlvdLocation) {
 		description: getLocationDescription(location),
 		display_name: getLocationDisplayName(location),
 		id: location.id,
+		landmark_hints: getLocationLandmarkHints(location),
 		name: getLocationDisplayName(location),
 		timezone: location.tz ?? null,
 	}
@@ -2307,6 +2357,9 @@ function serializeRescheduleSlot(time: BlvdRescheduleTime) {
 
 function serializeAppointment(appointment: BlvdAppointment) {
 	const startAt = toDate(appointment.startAt)
+	const location = appointment.location
+		? serializeLocation(appointment.location)
+		: null
 	const serviceNames =
 		appointment.appointmentServices
 			?.map(item => item.service?.name)
@@ -2332,6 +2385,7 @@ function serializeAppointment(appointment: BlvdAppointment) {
 		cancellable: appointment.cancellable !== false,
 		cancelled: Boolean(appointment.cancelled),
 		end_time: toIso(appointment.endAt),
+		location,
 		local_date: startAt
 			? formatInTimeZone(startAt, BUSINESS_TIMEZONE, 'yyyy-MM-dd')
 			: null,
@@ -2606,6 +2660,28 @@ function getLocationDescription(location: BlvdLocation) {
 		return 'the Farragut location on South Campbell Station Road'
 	}
 	return formatAddress(location) || location.name
+}
+
+function getLocationLandmarkHints(location: BlvdLocation) {
+	const address = normalizeText(formatAddress(location))
+	if (address.includes('kingston pike')) {
+		return {
+			primary: 'near Nama on Kingston Pike',
+			fallbacks: [
+				'near the Kroger on Kingston Pike',
+				'near Harvest on Kingston Pike',
+			],
+		}
+	}
+	if (address.includes('campbell station')) {
+		return {
+			primary: "in the old Aubrey's off Kingston Pike",
+			fallbacks: [
+				'across the street from the Starbucks at the corner of Kingston Pike and Campbell Station',
+			],
+		}
+	}
+	return null
 }
 
 function formatDurationRange(range: BlvdServiceItem['listDurationRange']) {
