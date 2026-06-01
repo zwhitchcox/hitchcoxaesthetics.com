@@ -86,14 +86,14 @@ type RetellToolRecord = {
 }
 
 const baseClient = {
-	email: 'zwhitchcox@gmail.com',
-	first_name: 'Zane',
+	email: 'emily.carter@example.com',
+	first_name: 'Emily',
 	has_card_on_file: true,
-	id: 'blvd_client_zane',
-	last_name: 'Hitchcox',
-	name: 'Zane Hitchcox',
+	id: 'blvd_client_emily',
+	last_name: 'Carter',
+	name: 'Emily Carter',
 	phone: TEST_PHONE,
-	profile_url: 'https://dashboard.boulevard.io/clients/blvd_client_zane',
+	profile_url: 'https://dashboard.boulevard.io/clients/blvd_client_emily',
 }
 
 const beardenLocation = {
@@ -254,7 +254,7 @@ const weightLossAppointment = {
 const scenarios: Scenario[] = [
 	{
 		callerFacts: [
-			'You are Zane Hitchcox calling from the phone number on your profile.',
+			'You are Emily Carter calling from the phone number on your profile.',
 			'You are a returning client and want Botox at Bearden today.',
 			'If offered today at 2:45 PM, choose it and confirm you want to book.',
 		],
@@ -267,7 +267,7 @@ const scenarios: Scenario[] = [
 			'book_appointment',
 		],
 		firstCallerUtterance:
-			"Hi, this is Zane. I'd like to book Botox at Bearden today.",
+			"Hi, this is Emily. I'd like to book Botox at Bearden today.",
 		forbiddenAgentPatterns: [
 			{
 				message: 'Asked whether a looked-up caller is new or returning.',
@@ -319,7 +319,7 @@ const scenarios: Scenario[] = [
 	},
 	{
 		callerFacts: [
-			'You are Zane Hitchcox.',
+			'You are Emily Carter.',
 			'You only want to hear all Botox times available today at Bearden.',
 			'Do not book anything in this scenario.',
 		],
@@ -363,7 +363,7 @@ const scenarios: Scenario[] = [
 	},
 	{
 		callerFacts: [
-			'You are Zane Hitchcox.',
+			'You are Emily Carter.',
 			'You have one upcoming Botox appointment already.',
 			'You want to move that existing appointment to Thursday afternoon.',
 			'If offered Thursday at 3:30 PM, choose it and confirm.',
@@ -421,7 +421,7 @@ const scenarios: Scenario[] = [
 	},
 	{
 		callerFacts: [
-			'You are Zane Hitchcox.',
+			'You are Emily Carter.',
 			'You want to know every upcoming appointment you have.',
 			'Do not cancel or reschedule anything.',
 		],
@@ -453,7 +453,7 @@ const scenarios: Scenario[] = [
 	},
 	{
 		callerFacts: [
-			'You are Zane Hitchcox and you said your name in the first sentence.',
+			'You are Emily Carter and you said your name in the first sentence.',
 			'You want to leave Sarah a message that you are running ten minutes late.',
 			'If asked whether Sarah can call back at this number, say yes.',
 		],
@@ -461,12 +461,12 @@ const scenarios: Scenario[] = [
 			'Message taking should silently look up the caller and avoid duplicate name/phone questions.',
 		expectedToolSubsequence: ['lookup_caller', 'send_staff_message'],
 		firstCallerUtterance:
-			'This is Zane. Can you tell Sarah I am running ten minutes late?',
+			'This is Emily. Can you tell Sarah I am running ten minutes late?',
 		forbiddenAgentPatterns: [
 			{
 				message: 'Asked for a name even though profile/name already matched.',
 				pattern:
-					/(what(?:'s| is) your name|what name|first and last name|Am I speaking with Zane Hitchcox)/i,
+					/(what(?:'s| is) your name|what name|first and last name|Am I speaking with Emily Carter)/i,
 			},
 			{
 				message: 'Asked for phone number even though caller ID is enough.',
@@ -484,7 +484,7 @@ const scenarios: Scenario[] = [
 		requiredToolArgs: [
 			{
 				message: 'send_staff_message should pass the caller name from lookup.',
-				predicate: args => args.caller_name === 'Zane Hitchcox',
+				predicate: args => args.caller_name === 'Emily Carter',
 				tool: 'send_staff_message',
 			},
 			{
