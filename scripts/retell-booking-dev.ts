@@ -632,13 +632,7 @@ async function findAgentPhoneNumber(): Promise<RetellPhoneNumber | null> {
 		return configured
 	}
 
-	const phoneNumbers = (await retellFetch(
-		'/list-phone-numbers',
-		undefined,
-		'GET',
-	)) as unknown
-
-	if (!Array.isArray(phoneNumbers)) return null
+	const phoneNumbers = await listRetellPhoneNumbers()
 
 	const match = phoneNumbers.find(phoneNumber => {
 		if (!phoneNumber || typeof phoneNumber !== 'object') return false
@@ -670,6 +664,32 @@ async function findAgentPhoneNumber(): Promise<RetellPhoneNumber | null> {
 			: null
 
 	return e164 && pretty ? { e164, pretty, type } : null
+}
+
+async function listRetellPhoneNumbers() {
+	const phoneNumbers: Array<unknown> = []
+	let paginationKey: string | null = null
+	let hasMore = true
+
+	while (hasMore) {
+		const params = new URLSearchParams({ limit: '1000' })
+		if (paginationKey) params.set('pagination_key', paginationKey)
+		const payload = (await retellFetch(
+			`/v2/list-phone-numbers?${params}`,
+			undefined,
+			'GET',
+		)) as unknown
+		phoneNumbers.push(...readArray(payload, 'items'))
+		paginationKey = readString(payload, 'pagination_key')
+		hasMore =
+			Boolean(
+				payload &&
+					typeof payload === 'object' &&
+					(payload as Record<string, unknown>).has_more,
+			) && Boolean(paginationKey)
+	}
+
+	return phoneNumbers
 }
 
 async function getConfiguredPhoneNumber(): Promise<RetellPhoneNumber | null> {
