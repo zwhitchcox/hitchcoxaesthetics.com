@@ -44,6 +44,8 @@
     "retell:booking:a2a": "tsx scripts/retell-agent2agent-test.ts",
     "posthog:sync": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml",
     "posthog:sync:apply": "tsx scripts/posthog-sync.ts --config google-ads/posthog-booking-attribution.yaml --apply",
+    "posthog:callrail:sync": "tsx scripts/posthog-sync-callrail-conversions.ts",
+    "posthog:callrail:sync:apply": "tsx scripts/posthog-sync-callrail-conversions.ts --apply",
     "secrets:push": "tsx scripts/push-secrets.ts"
   },
   "eslintIgnore": [

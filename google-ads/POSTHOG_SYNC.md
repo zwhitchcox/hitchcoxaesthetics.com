@@ -22,6 +22,19 @@ The script:
 
 It is designed so PostHog setup is not trapped in manual UI steps.
 
+The booking config includes these managed dashboards:
+
+- `Booking Overview - Source & Revenue`
+- `Booking Pages - Conversion`
+- `Booking Funnel - Diagnostics`
+- `Booking Types - Source Breakdown`
+- `Booking CTA Performance`
+- `Phone Calls - Conversion Attribution`
+
+Use `Booking Funnel - Diagnostics` to check whether booking flow changes
+improve step-to-step conversion. Use `Phone Calls - Conversion Attribution` to
+compare phone-call conversions after CallRail data has been synced.
+
 ## Required Env Vars
 
 - `POSTHOG_PERSONAL_API_KEY`
@@ -46,6 +59,21 @@ Apply changes:
 ```bash
 pnpm posthog:sync:apply
 ```
+
+Dry-run CallRail phone conversion sync:
+
+```bash
+pnpm posthog:callrail:sync -- --days=7 --limit=25
+```
+
+Capture qualified CallRail phone conversions in PostHog:
+
+```bash
+pnpm posthog:callrail:sync:apply -- --days=7
+```
+
+Production also runs the CallRail conversion sync as a background job. It can be
+triggered manually from `/admin/bg`.
 
 Use a different config file:
 

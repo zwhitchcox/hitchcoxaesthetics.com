@@ -1,0 +1,611 @@
+import {
+	CALLRAIL_CALL_FIELDS,
+	callRailFetch,
+	getCallRailAccountIds,
+	type CallRailCall,
+} from '#app/utils/callrail-booking.server.ts'
+import { prisma } from '#app/utils/db.server.ts'
+import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
+
+const SYNC_STATE_KEY = 'callrail_posthog_conversion_last_sync_at'
+const DEFAULT_INITIAL_LOOKBACK_DAYS = 30
+const DEFAULT_OVERLAP_HOURS = 6
+const DEFAULT_PER_PAGE = 100
+const DEFAULT_MAX_PAGES = 20
+
+const POSTHOG_SESSION_CUSTOM_KEYS = [
+	'sha_posthog_session_id',
+	'posthog_session_id',
+	'ph_session_id',
+]
+const POSTHOG_DISTINCT_CUSTOM_KEYS = [
+	'sha_posthog_distinct_id',
+	'posthog_distinct_id',
+	'ph_distinct_id',
+]
+
+type DbLike = typeof prisma
+
+type CallRailConversionCall = CallRailCall & {
+	custom?: unknown
+	customer_name?: string | null
+	lead_status?: string | null
+	medium?: string | null
+	person_id?: string | null
+	session_uuid?: string | null
+	source?: string | null
+	source_name?: string | null
+	tags?: unknown
+	timeline_url?: string | null
+	value?: number | string | null
+	[key: string]: unknown
+}
+
+type SyncCallRailPhoneConversionsOptions = {
+	accountIds?: string[]
+	db?: DbLike
+	dryRun?: boolean
+	limit?: number
+	now?: Date
+	since?: Date
+	until?: Date
+}
+
+type MatchedAttribution = {
+	attribution_match: string
+	book_entry_from_path?: string | null
+	book_entry_page_prefix_type?: string | null
+	book_entry_page_type?: string | null
+	callrail_visitor_id?: string | null
+	current_path?: string | null
+	initial_landing_path?: string | null
+	initial_landing_page_prefix_type?: string | null
+	initial_landing_page_type?: string | null
+	initial_referrer?: string | null
+	initial_referring_domain?: string | null
+	posthog_distinct_id?: string | null
+	posthog_session_id?: string | null
+	traffic_channel?: string | null
+	traffic_platform?: string | null
+	traffic_source_detail?: string | null
+	utm_campaign?: string | null
+	utm_content?: string | null
+	utm_medium?: string | null
+	utm_source?: string | null
+	utm_term?: string | null
+}
+
+export async function syncCallRailPhoneConversionsToPostHog(
+	options: SyncCallRailPhoneConversionsOptions = {},
+) {
+	const db = options.db ?? prisma
+	const apiKey = process.env.CALLRAIL_API_KEY?.trim()
+	if (!apiKey) {
+		return {
+			ok: false,
+			error: 'missing_callrail_api_key',
+			captured: 0,
+			dry_run: Boolean(options.dryRun),
+			matched: 0,
+			scanned: 0,
+			unmatched: 0,
+		}
+	}
+	if (!options.dryRun && !process.env.REACT_APP_PUBLIC_POSTHOG_KEY?.trim()) {
+		return {
+			ok: false,
+			error: 'missing_posthog_key',
+			captured: 0,
+			dry_run: false,
+			matched: 0,
+			scanned: 0,
+			unmatched: 0,
+		}
+	}
+
+	const now = options.now ?? new Date()
+	const syncWindow = await getSyncWindow(db, options, now)
+	const accountIds =
+		options.accountIds && options.accountIds.length > 0
+			? options.accountIds
+			: await getCallRailAccountIds(apiKey)
+	const stats = {
+		account_count: accountIds.length,
+		captured: 0,
+		conversion_count: 0,
+		dry_run: Boolean(options.dryRun),
+		matched: 0,
+		scanned: 0,
+		since: syncWindow.since.toISOString(),
+		skipped: 0,
+		unmatched: 0,
+		until: syncWindow.until.toISOString(),
+	}
+
+	for (const accountId of accountIds) {
+		const calls = await listRecentCallRailCalls({
+			accountId,
+			apiKey,
+			limit: options.limit,
+			since: syncWindow.since,
+			until: syncWindow.until,
+		})
+		stats.scanned += calls.length
+
+		for (const call of calls) {
+			if (!isConversionCall(call)) {
+				stats.skipped += 1
+				continue
+			}
+
+			stats.conversion_count += 1
+			const event = await buildPhoneConversionEvent({
+				accountId,
+				call,
+				db,
+			})
+			if (event.attribution.attribution_match === 'none') {
+				stats.unmatched += 1
+			} else {
+				stats.matched += 1
+			}
+
+			if (!options.dryRun) {
+				const result = await captureServerPostHogEvent({
+					distinctId: event.distinctId,
+					event: 'phone_call_conversion',
+					insertId: `callrail-phone-conversion:${event.callId}`,
+					properties: event.properties,
+					timestamp: event.timestamp,
+				})
+				if (result?.ok) {
+					stats.captured += 1
+				} else {
+					stats.skipped += 1
+				}
+			}
+		}
+	}
+
+	if (!options.dryRun) {
+		await db.blvdSyncState.upsert({
+			where: { key: SYNC_STATE_KEY },
+			create: {
+				key: SYNC_STATE_KEY,
+				value: syncWindow.until.toISOString(),
+			},
+			update: {
+				value: syncWindow.until.toISOString(),
+			},
+		})
+	}
+
+	return {
+		ok: true,
+		...stats,
+	}
+}
+
+async function getSyncWindow(
+	db: DbLike,
+	options: SyncCallRailPhoneConversionsOptions,
+	now: Date,
+) {
+	if (options.since) {
+		return {
+			since: options.since,
+			until: options.until ?? now,
+		}
+	}
+
+	const state = await db.blvdSyncState.findUnique({
+		where: { key: SYNC_STATE_KEY },
+		select: { value: true },
+	})
+	const lastSyncedAt = state?.value ? new Date(state.value) : null
+	const fallbackSince = new Date(
+		now.getTime() - DEFAULT_INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+	)
+	const overlappedSince =
+		lastSyncedAt && !Number.isNaN(lastSyncedAt.getTime())
+			? new Date(
+					lastSyncedAt.getTime() -
+						DEFAULT_OVERLAP_HOURS * 60 * 60 * 1000,
+				)
+			: fallbackSince
+
+	return {
+		since: overlappedSince,
+		until: options.until ?? now,
+	}
+}
+
+async function listRecentCallRailCalls({
+	accountId,
+	apiKey,
+	limit,
+	since,
+	until,
+}: {
+	accountId: string
+	apiKey: string
+	limit?: number
+	since: Date
+	until: Date
+}) {
+	const calls: CallRailConversionCall[] = []
+	for (let page = 1; page <= DEFAULT_MAX_PAGES; page++) {
+		if (limit && calls.length >= limit) break
+
+		const params = new URLSearchParams({
+			call_type: 'inbound',
+			date_range: getCallRailDateRangePreset(since, until),
+			fields: CALLRAIL_CALL_FIELDS,
+			order: 'desc',
+			page: String(page),
+			per_page: String(DEFAULT_PER_PAGE),
+			sort: 'start_time',
+		})
+		const response = await callRailFetch(apiKey, `/a/${accountId}/calls.json`, {
+			method: 'GET',
+			params,
+		})
+		const pageCalls = Array.isArray(response.calls)
+			? (response.calls as CallRailConversionCall[])
+			: []
+		const filteredPageCalls = pageCalls.filter(call =>
+			isCallInWindow(call, since, until),
+		)
+		calls.push(...filteredPageCalls)
+
+		if (pageCalls.length < DEFAULT_PER_PAGE) break
+	}
+
+	return limit ? calls.slice(0, limit) : calls
+}
+
+async function buildPhoneConversionEvent({
+	accountId,
+	call,
+	db,
+}: {
+	accountId: string
+	call: CallRailConversionCall
+	db: DbLike
+}) {
+	const callId = requireString(call.id, 'CallRail call is missing id')
+	const attribution = await findMatchedAttribution({ call, db })
+	const distinctId =
+		attribution.posthog_distinct_id ??
+		attribution.posthog_session_id ??
+		`callrail:${callId}`
+	const tags = getStringArray(call.tags)
+	const valueUsd = parseMoneyValue(call.value)
+	const callStartTime = parseDateString(call.start_time)
+
+	return {
+		attribution,
+		callId,
+		distinctId,
+		properties: compactRecord({
+			...attribution,
+			account_id: accountId,
+			booking_channel: tags.some(tag => /retell/i.test(tag))
+				? 'retell_voice'
+				: 'phone_call',
+			callrail_call_id: callId,
+			callrail_company_id: pickOptionalString(call.company_id),
+			callrail_company_name: pickOptionalString(call.company_name),
+			callrail_customer_name: pickOptionalString(call.customer_name),
+			callrail_customer_phone_number: pickOptionalString(
+				call.customer_phone_number,
+			),
+			callrail_formatted_customer_phone_number: pickOptionalString(
+				call.formatted_customer_phone_number,
+			),
+			callrail_landing_page_url: pickOptionalString(call.landing_page_url),
+			callrail_last_requested_url: pickOptionalString(
+				call.last_requested_url,
+			),
+			callrail_lead_status: pickOptionalString(call.lead_status),
+			callrail_medium: pickOptionalString(call.medium),
+			callrail_person_id: pickOptionalString(call.person_id),
+			callrail_referrer_domain: pickOptionalString(call.referrer_domain),
+			callrail_referring_url: pickOptionalString(call.referring_url),
+			callrail_session_id: pickOptionalString(call.session_uuid),
+			callrail_source:
+				pickOptionalString(call.source) ?? pickOptionalString(call.source_name),
+			callrail_start_time: callStartTime?.toISOString(),
+			callrail_tags: tags,
+			callrail_timeline_url: pickOptionalString(call.timeline_url),
+			conversion_source: 'callrail',
+			currency: 'USD',
+			phone_conversion_value_usd: valueUsd,
+			value: valueUsd,
+		}),
+		timestamp: callStartTime?.toISOString(),
+	}
+}
+
+async function findMatchedAttribution({
+	call,
+	db,
+}: {
+	call: CallRailConversionCall
+	db: DbLike
+}): Promise<MatchedAttribution> {
+	const callId = pickOptionalString(call.id)
+	const sessionId = pickOptionalString(call.session_uuid)
+	const visitorId = pickOptionalString(call.person_id)
+	const custom = getRecord(call.custom)
+	const customAttribution = {
+		posthog_distinct_id: pickFirstString(custom, POSTHOG_DISTINCT_CUSTOM_KEYS),
+		posthog_session_id: pickFirstString(custom, POSTHOG_SESSION_CUSTOM_KEYS),
+	}
+
+	if (customAttribution.posthog_distinct_id || customAttribution.posthog_session_id) {
+		return {
+			...customAttribution,
+			attribution_match: 'callrail_custom_fields',
+		}
+	}
+
+	const touchOr = [
+		callId ? { callrailCallId: callId } : null,
+		sessionId ? { callrailSessionId: sessionId } : null,
+		visitorId ? { callrailVisitorId: visitorId } : null,
+	].filter(Boolean)
+	if (touchOr.length > 0) {
+		const touch = await db.blvdAttributionTouch.findFirst({
+			where: { OR: touchOr },
+			orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
+			select: {
+				bookEntryFromPath: true,
+				bookEntryPagePrefixType: true,
+				bookEntryPageType: true,
+				callrailVisitorId: true,
+				initialLandingPath: true,
+				initialLandingPagePrefixType: true,
+				initialLandingPageType: true,
+				initialReferrer: true,
+				initialReferringDomain: true,
+				posthogDistinctId: true,
+				posthogSessionId: true,
+				trafficChannel: true,
+				trafficPlatform: true,
+				trafficSourceDetail: true,
+				utmCampaign: true,
+				utmContent: true,
+				utmMedium: true,
+				utmSource: true,
+				utmTerm: true,
+			},
+		})
+		if (touch?.posthogDistinctId || touch?.posthogSessionId) {
+			return {
+				...mapTouchAttribution(touch),
+				attribution_match: 'boulevard_attribution_touch',
+			}
+		}
+	}
+
+	const outcomeOr = [
+		callId ? { callrailCallId: callId } : null,
+		sessionId ? { callrailSessionId: sessionId } : null,
+	].filter(Boolean)
+	if (outcomeOr.length > 0) {
+		const outcome = await db.retellCallOutcome.findFirst({
+			where: { OR: outcomeOr },
+			orderBy: { createdAt: 'desc' },
+			select: {
+				callrailLandingPageUrl: true,
+				callrailLastRequestedUrl: true,
+				posthogDistinctId: true,
+				posthogSessionId: true,
+			},
+		})
+		if (outcome?.posthogDistinctId || outcome?.posthogSessionId) {
+			return {
+				attribution_match: 'retell_call_outcome',
+				current_path: outcome.callrailLastRequestedUrl,
+				initial_landing_path: outcome.callrailLandingPageUrl,
+				posthog_distinct_id: outcome.posthogDistinctId,
+				posthog_session_id: outcome.posthogSessionId,
+			}
+		}
+	}
+
+	const sessionOr = [
+		sessionId ? { callrailSessionId: sessionId } : null,
+		visitorId ? { callrailVisitorId: visitorId } : null,
+	].filter(Boolean)
+	if (sessionOr.length > 0) {
+		const session = await db.callTrackingSessionAttribution.findFirst({
+			where: { OR: sessionOr },
+			orderBy: { lastSeenAt: 'desc' },
+			select: {
+				bookEntryFromPath: true,
+				bookEntryPagePrefixType: true,
+				bookEntryPageType: true,
+				callrailVisitorId: true,
+				currentPath: true,
+				initialLandingPath: true,
+				initialLandingPagePrefixType: true,
+				initialLandingPageType: true,
+				initialReferrer: true,
+				initialReferringDomain: true,
+				posthogDistinctId: true,
+				posthogSessionId: true,
+				trafficChannel: true,
+				trafficPlatform: true,
+				trafficSourceDetail: true,
+				utmCampaign: true,
+				utmContent: true,
+				utmMedium: true,
+				utmSource: true,
+				utmTerm: true,
+			},
+		})
+		if (session?.posthogDistinctId || session?.posthogSessionId) {
+			return {
+				...mapSessionAttribution(session),
+				attribution_match: 'call_tracking_session',
+			}
+		}
+	}
+
+	return { attribution_match: 'none' }
+}
+
+function mapTouchAttribution(input: {
+	bookEntryFromPath: string | null
+	bookEntryPagePrefixType: string | null
+	bookEntryPageType: string | null
+	callrailVisitorId: string | null
+	initialLandingPath: string | null
+	initialLandingPagePrefixType: string | null
+	initialLandingPageType: string | null
+	initialReferrer: string | null
+	initialReferringDomain: string | null
+	posthogDistinctId: string | null
+	posthogSessionId: string | null
+	trafficChannel: string | null
+	trafficPlatform: string | null
+	trafficSourceDetail: string | null
+	utmCampaign: string | null
+	utmContent: string | null
+	utmMedium: string | null
+	utmSource: string | null
+	utmTerm: string | null
+}): Omit<MatchedAttribution, 'attribution_match'> {
+	return {
+		book_entry_from_path: input.bookEntryFromPath,
+		book_entry_page_prefix_type: input.bookEntryPagePrefixType,
+		book_entry_page_type: input.bookEntryPageType,
+		callrail_visitor_id: input.callrailVisitorId,
+		initial_landing_path: input.initialLandingPath,
+		initial_landing_page_prefix_type: input.initialLandingPagePrefixType,
+		initial_landing_page_type: input.initialLandingPageType,
+		initial_referrer: input.initialReferrer,
+		initial_referring_domain: input.initialReferringDomain,
+		posthog_distinct_id: input.posthogDistinctId,
+		posthog_session_id: input.posthogSessionId,
+		traffic_channel: input.trafficChannel,
+		traffic_platform: input.trafficPlatform,
+		traffic_source_detail: input.trafficSourceDetail,
+		utm_campaign: input.utmCampaign,
+		utm_content: input.utmContent,
+		utm_medium: input.utmMedium,
+		utm_source: input.utmSource,
+		utm_term: input.utmTerm,
+	}
+}
+
+function mapSessionAttribution(input: {
+	bookEntryFromPath: string | null
+	bookEntryPagePrefixType: string | null
+	bookEntryPageType: string | null
+	callrailVisitorId: string | null
+	currentPath: string | null
+	initialLandingPath: string | null
+	initialLandingPagePrefixType: string | null
+	initialLandingPageType: string | null
+	initialReferrer: string | null
+	initialReferringDomain: string | null
+	posthogDistinctId: string | null
+	posthogSessionId: string | null
+	trafficChannel: string | null
+	trafficPlatform: string | null
+	trafficSourceDetail: string | null
+	utmCampaign: string | null
+	utmContent: string | null
+	utmMedium: string | null
+	utmSource: string | null
+	utmTerm: string | null
+}): Omit<MatchedAttribution, 'attribution_match'> {
+	return {
+		...mapTouchAttribution(input),
+		current_path: input.currentPath,
+	}
+}
+
+function isConversionCall(call: CallRailConversionCall) {
+	const tags = getStringArray(call.tags)
+	return (
+		pickOptionalString(call.lead_status) === 'good_lead' ||
+		tags.some(tag => tag.toLowerCase() === 'booked appointment')
+	)
+}
+
+function isCallInWindow(
+	call: CallRailConversionCall,
+	since: Date,
+	until: Date,
+) {
+	const startTime = parseDateString(call.start_time)
+	if (!startTime) return true
+	return startTime >= since && startTime <= until
+}
+
+function parseDateString(value: unknown) {
+	if (typeof value !== 'string' || !value.trim()) return null
+	const date = new Date(value)
+	return Number.isNaN(date.getTime()) ? null : date
+}
+
+function parseMoneyValue(value: unknown) {
+	if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+	if (typeof value !== 'string') return 0
+	const parsed = Number.parseFloat(value.replace(/[$,]/g, ''))
+	return Number.isFinite(parsed) ? parsed : 0
+}
+
+function getCallRailDateRangePreset(since: Date, until: Date) {
+	const days = Math.ceil(
+		Math.max(0, until.getTime() - since.getTime()) / (24 * 60 * 60 * 1000),
+	)
+	if (days <= 7) return 'last_7_days'
+	if (days <= 30) return 'last_30_days'
+	return 'all_time'
+}
+
+function getRecord(value: unknown) {
+	return value && typeof value === 'object'
+		? (value as Record<string, unknown>)
+		: null
+}
+
+function pickOptionalString(value: unknown) {
+	return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function pickFirstString(
+	record: Record<string, unknown> | null,
+	keys: readonly string[],
+) {
+	if (!record) return null
+	for (const key of keys) {
+		const value = pickOptionalString(record[key])
+		if (value) return value
+	}
+	return null
+}
+
+function getStringArray(value: unknown) {
+	if (!Array.isArray(value)) return []
+	return value
+		.map(item => (typeof item === 'string' ? item.trim() : null))
+		.filter((item): item is string => Boolean(item))
+}
+
+function compactRecord<T extends Record<string, unknown>>(record: T) {
+	return Object.fromEntries(
+		Object.entries(record).filter(([, value]) => value !== undefined),
+	) as T
+}
+
+function requireString(value: unknown, message: string) {
+	const normalized = pickOptionalString(value)
+	if (!normalized) throw new Error(message)
+	return normalized
+}

@@ -1,11 +1,14 @@
-const CALLRAIL_API_BASE_URL = 'https://api.callrail.com/v3'
-const CALLRAIL_CALL_FIELDS = [
+export const CALLRAIL_API_BASE_URL = 'https://api.callrail.com/v3'
+export const CALLRAIL_CALL_FIELDS = [
 	'id',
 	'company_id',
 	'company_name',
+	'customer_name',
 	'customer_phone_number',
 	'formatted_customer_phone_number',
 	'start_time',
+	'lead_status',
+	'value',
 	'tags',
 	'session_uuid',
 	'person_id',
@@ -39,7 +42,7 @@ const POSTHOG_DISTINCT_CUSTOM_KEYS = [
 	'ph_distinct_id',
 ]
 
-type CallRailCall = {
+export type CallRailCall = {
 	customer_phone_number?: string | null
 	id?: string | null
 	start_time?: string | null
@@ -289,7 +292,7 @@ function formatCurrencyValue(value: number) {
 	return finiteValue.toFixed(2)
 }
 
-async function getCallRailAccountIds(apiKey: string) {
+export async function getCallRailAccountIds(apiKey: string) {
 	if (process.env.CALLRAIL_ACCOUNT_ID?.trim()) {
 		return [process.env.CALLRAIL_ACCOUNT_ID.trim()]
 	}
@@ -382,7 +385,7 @@ async function getCallRailCall(
 	})
 }
 
-async function callRailFetch(
+export async function callRailFetch(
 	apiKey: string,
 	path: string,
 	{
@@ -469,7 +472,7 @@ function buildAttributionResult({
 	}
 }
 
-function normalizePhoneNumber(value?: string | null) {
+export function normalizePhoneNumber(value?: string | null) {
 	const trimmed = value?.trim()
 	if (!trimmed) return null
 

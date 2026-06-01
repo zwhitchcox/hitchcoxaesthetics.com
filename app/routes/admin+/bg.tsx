@@ -11,6 +11,7 @@ import { Button } from '#app/components/ui/button.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import {
 	type JobStatus,
+	runCallRailPostHogConversionSyncJob,
 	runReviewsFetchJob,
 	getJobStatuses,
 	clearJobError,
@@ -25,6 +26,8 @@ export interface Route {
 
 // Define job descriptions
 const JOB_DESCRIPTIONS = {
+	callRailPostHogConversionSync:
+		'Syncs qualified CallRail phone-call conversions into PostHog with web session attribution when available.',
 	reviewsFetch:
 		'Fetches Google reviews and stores them in the database with statistical analysis.',
 }
@@ -56,6 +59,14 @@ export async function action({ request }: Route['ActionArgs']) {
 	if (intent === 'run-reviewsFetch') {
 		runReviewsFetchJob().catch(console.error)
 		return json({ success: true, message: 'Reviews fetch job started' })
+	}
+
+	if (intent === 'run-callRailPostHogConversionSync') {
+		runCallRailPostHogConversionSyncJob().catch(console.error)
+		return json({
+			success: true,
+			message: 'CallRail PostHog conversion sync job started',
+		})
 	}
 
 	if (intent?.toString().startsWith('clear-error-')) {

@@ -18,7 +18,13 @@ export async function captureServerPostHogEvent({
 	timestamp?: string
 }) {
 	const apiKey = process.env.REACT_APP_PUBLIC_POSTHOG_KEY?.trim()
-	if (!apiKey) return
+	if (!apiKey) {
+		return {
+			error: 'missing_posthog_key',
+			ok: false,
+			skipped: true,
+		}
+	}
 
 	try {
 		const response = await fetch(`${getPostHogCaptureHost()}/capture/`, {
@@ -44,8 +50,17 @@ export async function captureServerPostHogEvent({
 				event,
 				status: response.status,
 			})
+			return {
+				error: `posthog_capture_failed_${response.status}`,
+				ok: false,
+			}
 		}
+		return { ok: true }
 	} catch (error) {
 		console.error('Failed to capture PostHog server event', { event, error })
+		return {
+			error: error instanceof Error ? error.message : String(error),
+			ok: false,
+		}
 	}
 }

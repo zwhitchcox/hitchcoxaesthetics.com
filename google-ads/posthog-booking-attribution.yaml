@@ -819,3 +819,77 @@ dashboards:
             custom_name: Marketing Page Viewed
           - event: phone_cta_clicked
             custom_name: Phone CTA Clicked
+
+  - name: Phone Calls - Conversion Attribution
+    description:
+      Qualified CallRail phone-call conversions synced into PostHog and matched
+      back to website sessions when possible.
+    tags:
+      - booking
+      - attribution
+      - phone
+      - callrail
+    managed_tag: managed:phone-calls-conversion-attribution
+    sync_mode: replace_managed
+    insights:
+      - kind: funnel
+        name: Phone CTA To Qualified Call - Source Detail
+        description:
+          Phone CTA click to qualified CallRail phone-call conversion, broken
+          down by traffic_source_detail.
+        breakdown: traffic_source_detail
+        steps:
+          - event: phone_cta_clicked
+            custom_name: Phone CTA Clicked
+          - event: phone_call_conversion
+            custom_name: Qualified Phone Call
+
+      - kind: funnel
+        name: Phone CTA To Qualified Call - Landing Path
+        description:
+          Phone CTA click to qualified CallRail phone-call conversion, broken
+          down by initial_landing_path.
+        breakdown: initial_landing_path
+        steps:
+          - event: phone_cta_clicked
+            custom_name: Phone CTA Clicked
+          - event: phone_call_conversion
+            custom_name: Qualified Phone Call
+
+      - kind: trend
+        name: Qualified Phone Calls - Source Detail
+        description:
+          Qualified CallRail phone-call conversions by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: phone_call_conversion
+            custom_name: Qualified Phone Calls - Source Detail
+
+      - kind: trend
+        name: Qualified Phone Calls - Channel
+        description: Qualified CallRail phone-call conversions by traffic_channel.
+        breakdown: traffic_channel
+        series:
+          - event: phone_call_conversion
+            custom_name: Qualified Phone Calls - Channel
+
+      - kind: trend
+        name: Phone Conversion Value - Source Detail
+        description:
+          CallRail phone-call conversion value summed by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: phone_call_conversion
+            custom_name: Phone Conversion Value - Source Detail
+            math: sum
+            math_property: phone_conversion_value_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Phone Conversion Match Quality
+        description:
+          Count of qualified phone-call conversions by attribution match source.
+        breakdown: attribution_match
+        series:
+          - event: phone_call_conversion
+            custom_name: Phone Conversion Match Quality

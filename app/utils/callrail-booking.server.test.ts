@@ -24,8 +24,11 @@ test('reports booked appointments as qualified CallRail leads with value', async
 		}
 
 		if (
-			href ===
-				'https://api.callrail.com/v3/a/ACC_TEST/calls/CAL_TEST.json?fields=id%2Ccompany_id%2Ccompany_name%2Ccustomer_phone_number%2Cformatted_customer_phone_number%2Cstart_time%2Ctags%2Csession_uuid%2Cperson_id%2Ctimeline_url%2Csource%2Csource_name%2Cmedium%2Clanding_page_url%2Clast_requested_url%2Creferring_url%2Creferrer_domain%2Cutm_campaign%2Cutm_content%2Cutm_medium%2Cutm_source%2Cutm_term%2Cgclid%2Cfbclid%2Cmsclkid%2Ccustom' &&
+			href.startsWith(
+				'https://api.callrail.com/v3/a/ACC_TEST/calls/CAL_TEST.json?',
+			) &&
+			href.includes('lead_status') &&
+			href.includes('value') &&
 			init?.method === 'GET'
 		) {
 			return jsonResponse({

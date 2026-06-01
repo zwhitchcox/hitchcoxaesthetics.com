@@ -2,6 +2,8 @@ import { exec } from 'node:child_process'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
+import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
+
 // Background job types and interfaces
 export interface JobStatus {
 	id: string
@@ -18,6 +20,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	reviewsFetch: {
 		id: 'reviewsFetch',
 		name: 'Reviews Fetch',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	callRailPostHogConversionSync: {
+		id: 'callRailPostHogConversionSync',
+		name: 'CallRail PostHog Conversion Sync',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -78,6 +89,38 @@ export async function runReviewsFetchJob(): Promise<void> {
 	}
 }
 
+export async function runCallRailPostHogConversionSyncJob(): Promise<void> {
+	const job = jobStatuses['callRailPostHogConversionSync']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+
+	try {
+		const result = await syncCallRailPhoneConversionsToPostHog()
+		if (!result.ok) {
+			job.status = 'failed'
+			job.lastError = result.error ?? 'Unknown CallRail/PostHog sync error'
+			return
+		}
+
+		console.log('CallRail PostHog conversion sync completed:', result)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('CallRail PostHog conversion sync failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getCallRailPostHogSyncIntervalMs(),
+		).toISOString()
+	}
+}
+
 // Initialize the background jobs scheduler
 export function initializeBackgroundJobs() {
 	if (isInitialized) return
@@ -100,8 +143,40 @@ export function initializeBackgroundJobs() {
 		).toISOString()
 	}
 
+	if (shouldAutoRunCallRailPostHogSync()) {
+		const intervalMs = getCallRailPostHogSyncIntervalMs()
+		jobIntervals.callRailPostHogConversionSync = setInterval(() => {
+			runCallRailPostHogConversionSyncJob().catch(console.error)
+		}, intervalMs)
+
+		const conversionSync = jobStatuses['callRailPostHogConversionSync']
+		if (conversionSync) {
+			conversionSync.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		}
+
+		setTimeout(() => {
+			runCallRailPostHogConversionSyncJob().catch(console.error)
+		}, 90_000)
+	}
+
 	isInitialized = true
 	console.log('Background jobs initialized')
+}
+
+function shouldAutoRunCallRailPostHogSync() {
+	return (
+		process.env.NODE_ENV === 'production' ||
+		process.env.ENABLE_DEV_BACKGROUND_JOBS === '1'
+	)
+}
+
+function getCallRailPostHogSyncIntervalMs() {
+	const minutes = Number.parseInt(
+		process.env.CALLRAIL_POSTHOG_SYNC_INTERVAL_MINUTES ?? '30',
+		10,
+	)
+	const safeMinutes = Number.isFinite(minutes) && minutes >= 5 ? minutes : 30
+	return safeMinutes * 60 * 1000
 }
 
 // Export the job statuses for the UI
