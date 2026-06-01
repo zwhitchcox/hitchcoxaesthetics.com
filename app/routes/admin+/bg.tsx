@@ -11,6 +11,7 @@ import { Button } from '#app/components/ui/button.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import {
 	type JobStatus,
+	runBlvdRealRevenueSyncJob,
 	runCallRailPostHogConversionSyncJob,
 	runReviewsFetchJob,
 	getJobStatuses,
@@ -26,6 +27,8 @@ export interface Route {
 
 // Define job descriptions
 const JOB_DESCRIPTIONS = {
+	blvdRealRevenueSync:
+		'Imports closed Boulevard order revenue into the app database, sends real revenue to PostHog, and updates attributed CallRail call values.',
 	callRailPostHogConversionSync:
 		'Syncs qualified CallRail phone-call conversions into PostHog with web session attribution when available.',
 	reviewsFetch:
@@ -66,6 +69,14 @@ export async function action({ request }: Route['ActionArgs']) {
 		return json({
 			success: true,
 			message: 'CallRail PostHog conversion sync job started',
+		})
+	}
+
+	if (intent === 'run-blvdRealRevenueSync') {
+		runBlvdRealRevenueSyncJob().catch(console.error)
+		return json({
+			success: true,
+			message: 'Boulevard real revenue sync job started',
 		})
 	}
 

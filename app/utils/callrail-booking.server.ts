@@ -64,6 +64,20 @@ type ReportCallRailBookingInput = {
 	startTime?: string | null
 }
 
+type ReportCallRailRealRevenueInput = {
+	attributionTouchId?: string | null
+	bookingCartId?: string | null
+	callrailAccountId?: string | null
+	callrailCallId: string
+	currency?: string | null
+	customerName?: string | null
+	firstRevenueAt?: string | null
+	lastRevenueAt?: string | null
+	revenueItemCount: number
+	serviceNames: string[]
+	totalGrossRevenueUsd: number
+}
+
 type FindCallRailCallInput = {
 	callrailAccountId?: string | null
 	callrailCallId?: string | null
@@ -249,6 +263,48 @@ export async function findRecentCallRailCallForCaller(
 	}
 }
 
+export async function reportCallRailRealRevenueConversion(
+	input: ReportCallRailRealRevenueInput,
+) {
+	const apiKey = process.env.CALLRAIL_API_KEY?.trim()
+	if (!apiKey) {
+		return {
+			ok: false,
+			callrail_reported: false,
+			error: 'missing_callrail_api_key',
+		}
+	}
+
+	const body = buildRealRevenueCallRailUpdate(input)
+	const accountIds = input.callrailAccountId?.trim()
+		? [input.callrailAccountId.trim()]
+		: await getCallRailAccountIds(apiKey)
+	for (const accountId of accountIds) {
+		const call = await updateCallRailCall(
+			apiKey,
+			accountId,
+			input.callrailCallId,
+			body,
+		).catch(error => {
+			console.error('Failed to update CallRail call with real revenue', error)
+			return null
+		})
+		if (!call) continue
+		return {
+			account_id: accountId,
+			callrail_call_id: input.callrailCallId,
+			callrail_reported: true,
+			ok: true,
+		}
+	}
+
+	return {
+		ok: false,
+		callrail_reported: false,
+		error: 'callrail_call_not_found',
+	}
+}
+
 function buildBookingCallRailUpdate(input: ReportCallRailBookingInput) {
 	const value = formatCurrencyValue(input.projectedRevenueUsd)
 	const bookingChannel = input.bookingChannel?.toLowerCase()
@@ -265,6 +321,40 @@ function buildBookingCallRailUpdate(input: ReportCallRailBookingInput) {
 		tags,
 		value,
 	}
+}
+
+function buildRealRevenueCallRailUpdate(input: ReportCallRailRealRevenueInput) {
+	const value = formatCurrencyValue(input.totalGrossRevenueUsd)
+	return {
+		append_tags: true,
+		customer_name: input.customerName || undefined,
+		lead_status: 'good_lead',
+		note: buildRealRevenueNote(input, value),
+		tags: ['Booked Appointment', 'Real Revenue Recorded'],
+		value,
+	}
+}
+
+function buildRealRevenueNote(
+	input: ReportCallRailRealRevenueInput,
+	value: string,
+) {
+	return [
+		'Actual Boulevard revenue recorded.',
+		`Actual revenue: $${value}`,
+		`Revenue item count: ${input.revenueItemCount}`,
+		input.serviceNames.length > 0
+			? `Service(s): ${input.serviceNames.join(', ')}`
+			: null,
+		input.firstRevenueAt ? `First revenue at: ${input.firstRevenueAt}` : null,
+		input.lastRevenueAt ? `Last revenue at: ${input.lastRevenueAt}` : null,
+		input.attributionTouchId
+			? `Attribution touch ID: ${input.attributionTouchId}`
+			: null,
+		input.bookingCartId ? `Boulevard cart ID: ${input.bookingCartId}` : null,
+	]
+		.filter(Boolean)
+		.join('\n')
 }
 
 function buildBookingNote(input: ReportCallRailBookingInput, value: string) {

@@ -2,6 +2,7 @@ import { exec } from 'node:child_process'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
+import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
 import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
 
 // Background job types and interfaces
@@ -29,6 +30,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	callRailPostHogConversionSync: {
 		id: 'callRailPostHogConversionSync',
 		name: 'CallRail PostHog Conversion Sync',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	blvdRealRevenueSync: {
+		id: 'blvdRealRevenueSync',
+		name: 'Boulevard Real Revenue Sync',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -121,6 +131,38 @@ export async function runCallRailPostHogConversionSyncJob(): Promise<void> {
 	}
 }
 
+export async function runBlvdRealRevenueSyncJob(): Promise<void> {
+	const job = jobStatuses['blvdRealRevenueSync']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+
+	try {
+		const result = await syncBoulevardRealRevenue()
+		if (!result.ok) {
+			job.status = 'failed'
+			job.lastError = result.error ?? 'Unknown Boulevard revenue sync error'
+			return
+		}
+
+		console.log('Boulevard real revenue sync completed:', result)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Boulevard real revenue sync failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getBlvdRevenueSyncIntervalMs(),
+		).toISOString()
+	}
+}
+
 // Initialize the background jobs scheduler
 export function initializeBackgroundJobs() {
 	if (isInitialized) return
@@ -159,11 +201,34 @@ export function initializeBackgroundJobs() {
 		}, 90_000)
 	}
 
+	if (shouldAutoRunBlvdRevenueSync()) {
+		const intervalMs = getBlvdRevenueSyncIntervalMs()
+		jobIntervals.blvdRealRevenueSync = setInterval(() => {
+			runBlvdRealRevenueSyncJob().catch(console.error)
+		}, intervalMs)
+
+		const revenueSync = jobStatuses['blvdRealRevenueSync']
+		if (revenueSync) {
+			revenueSync.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		}
+
+		setTimeout(() => {
+			runBlvdRealRevenueSyncJob().catch(console.error)
+		}, 120_000)
+	}
+
 	isInitialized = true
 	console.log('Background jobs initialized')
 }
 
 function shouldAutoRunCallRailPostHogSync() {
+	return (
+		process.env.NODE_ENV === 'production' ||
+		process.env.ENABLE_DEV_BACKGROUND_JOBS === '1'
+	)
+}
+
+function shouldAutoRunBlvdRevenueSync() {
 	return (
 		process.env.NODE_ENV === 'production' ||
 		process.env.ENABLE_DEV_BACKGROUND_JOBS === '1'
@@ -176,6 +241,15 @@ function getCallRailPostHogSyncIntervalMs() {
 		10,
 	)
 	const safeMinutes = Number.isFinite(minutes) && minutes >= 5 ? minutes : 30
+	return safeMinutes * 60 * 1000
+}
+
+function getBlvdRevenueSyncIntervalMs() {
+	const minutes = Number.parseInt(
+		process.env.BLVD_REVENUE_SYNC_INTERVAL_MINUTES ?? '120',
+		10,
+	)
+	const safeMinutes = Number.isFinite(minutes) && minutes >= 15 ? minutes : 120
 	return safeMinutes * 60 * 1000
 }
 

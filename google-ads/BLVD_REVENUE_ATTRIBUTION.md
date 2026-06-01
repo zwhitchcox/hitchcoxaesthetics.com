@@ -104,16 +104,39 @@ The import script expects an array matching this normalized shape:
 ]
 ```
 
-## What Still Needs Boulevard API/Export Wiring
+## Live Boulevard Revenue Sync
 
-The attribution ledger is in place, but the revenue feed still needs a Boulevard
-source.
+Closed Boulevard orders can now be imported directly from the Boulevard Admin
+API. The sync walks each Boulevard location, reads recently closed orders,
+normalizes each order line into `BlvdRevenueItem`, and lets the database
+attribution rule connect that real revenue to the most recent booking touch for
+the same Boulevard client.
 
-Any of these can feed `BlvdRevenueItem`:
+Dry run:
 
-1. Boulevard API sync script
-2. Boulevard webhook receiver
-3. Boulevard export transformed into the normalized JSON shape above
+```bash
+pnpm blvd:sync-revenue -- --days=7 --limit=25
+```
+
+Apply:
+
+```bash
+pnpm blvd:sync-revenue:apply -- --days=7
+```
+
+Production also runs `Boulevard Real Revenue Sync` as a background job. It is
+visible in `/admin/bg`.
+
+The sync updates two destinations from the database:
+
+- PostHog receives `blvd_revenue_recorded` from `upsertBlvdRevenueItem`.
+- CallRail receives the aggregate actual revenue for each attributed call, using
+  the stored `BlvdAttributionTouch -> revenueItems` relationship.
+
+This means projected booking value can be replaced by actual spend once the
+appointment closes in Boulevard. If the client books another appointment after
+the same touch, that later order is also attributed by the same
+`last_touch_before_revenue` rule unless a newer touch exists first.
 
 ## PostHog DW Fit
 

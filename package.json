@@ -39,6 +39,8 @@
     "update-analytics": "npm run fetch-reviews",
     "blvd:import-revenue": "tsx scripts/blvd-import-revenue.ts",
     "blvd:reconcile-revenue": "tsx scripts/blvd-reconcile-revenue.ts",
+    "blvd:sync-revenue": "tsx scripts/blvd-sync-revenue.ts",
+    "blvd:sync-revenue:apply": "tsx scripts/blvd-sync-revenue.ts --apply",
     "retell:booking:dev": "tsx scripts/retell-booking-dev.ts",
     "retell:booking:deploy": "tsx scripts/retell-deploy-booking-agents.ts",
     "retell:booking:a2a": "tsx scripts/retell-agent2agent-test.ts",
