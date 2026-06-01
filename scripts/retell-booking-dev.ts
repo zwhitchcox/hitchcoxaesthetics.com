@@ -161,9 +161,11 @@ async function updateRetellToolUrls(publicUrl: string) {
 		})
 
 	const updated = await retellFetch(`/update-retell-llm/${llmId}`, {
-		begin_message: agentConfig.getRetellBookingBeginMessage(agentDisplayName),
+		begin_message: null,
 		general_prompt: agentConfig.buildUpdatedPrompt(
 			readString(llm, 'general_prompt'),
+			undefined,
+			agentDisplayName,
 		),
 		general_tools: tools,
 		s2s_model: realtimeModel,
@@ -190,7 +192,6 @@ async function loadRetellAgentConfig() {
 	try {
 		const mod = (await import(configUrl.toString())) as {
 			buildUpdatedPrompt: typeof buildUpdatedPrompt
-			getRetellBookingBeginMessage: typeof getRetellBookingBeginMessage
 			upsertRetellTools: (input: {
 				publicUrl: string
 				toolHeaders: typeof toolHeaders
@@ -202,7 +203,6 @@ async function loadRetellAgentConfig() {
 		console.error('Failed to load Retell agent config module', error)
 		return {
 			buildUpdatedPrompt,
-			getRetellBookingBeginMessage,
 			upsertRetellTools: ({
 				publicUrl,
 				tools,
@@ -213,10 +213,6 @@ async function loadRetellAgentConfig() {
 			}) => upsertSpamTools(tools, publicUrl),
 		}
 	}
-}
-
-function getRetellBookingBeginMessage(displayName = 'Adrian') {
-	return `Sarah Hitchcox Aesthetics, this is ${displayName}. How can I help?`
 }
 
 function watchRetellAgentFiles(publicUrl: string) {
@@ -551,7 +547,12 @@ function buildSpamTool(publicUrl: string) {
 	}
 }
 
-function buildUpdatedPrompt(currentPrompt: string | null) {
+function buildUpdatedPrompt(
+	currentPrompt: string | null,
+	_brand?: unknown,
+	agentDisplayName = 'Adrian',
+) {
+	const openingInstruction = `Start of call: Dynamically generate the first spoken message. Your first sentence must be exactly "This is ${agentDisplayName} with Sarah Hitchcox Aesthetics. How may I help you?" Do not add anything before it.`
 	const availabilityInstruction =
 		'Availability handling: When calling lookup_appointment_availability, location_id must be a full Boulevard id returned by a tool, such as urn:blvd:Location:... Do not put Bearden, Farragut, Knoxville, or any plain location name in location_id. Put plain names only in location_query. If lookup_appointment_availability returns location_unavailable, do not tell the caller that there are no appointments. If the returned locations include the caller requested location, call lookup_appointment_availability again using that returned location id. Otherwise ask one concise location follow-up. Only say there is no availability when lookup_appointment_availability returns ok: true with an empty slots array. If slots are returned, offer two or three of those times immediately. If the caller asks for a later time, afternoon time, or a specific time like 3:30 PM, only compare slots on the requested date using available_times_by_date or slots with the matching local_date/spoken_date. Do not choose a time from another date. Do not say there are only earlier slots if a later returned slot exists on that same date.'
 	const callerLookupInstruction =
@@ -566,9 +567,10 @@ function buildUpdatedPrompt(currentPrompt: string | null) {
 		'When calling block_spam_caller, pass caller_phone_number from the current call object if available. If Retell does not expose it, pass null; the tool server will also try to infer it from the call payload.'
 	const prompt = currentPrompt?.trim()
 	if (!prompt) {
-		return `${availabilityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${spamInstruction}\n${phoneInstruction}`
+		return `${openingInstruction}\n${availabilityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${spamInstruction}\n${phoneInstruction}`
 	}
 	if (
+		prompt.includes(openingInstruction) &&
 		prompt.includes(availabilityInstruction) &&
 		prompt.includes(callerLookupInstruction) &&
 		prompt.includes(dateSpeechInstruction) &&
@@ -585,6 +587,7 @@ function buildUpdatedPrompt(currentPrompt: string | null) {
 			line =>
 				!line.includes('If the caller is clearly spam') &&
 				!line.includes('Spam handling is a hard stop.') &&
+				!line.includes('Start of call:') &&
 				!line.includes(
 					'When calling block_spam_caller, pass caller_phone_number',
 				) &&
@@ -597,7 +600,7 @@ function buildUpdatedPrompt(currentPrompt: string | null) {
 				),
 		)
 		.join('\n')
-	return `${withoutOldSpamLine}\n${availabilityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${spamInstruction}\n${phoneInstruction}`
+	return `${withoutOldSpamLine}\n${openingInstruction}\n${availabilityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${spamInstruction}\n${phoneInstruction}`
 }
 
 async function smokeTest(publicUrl: string) {

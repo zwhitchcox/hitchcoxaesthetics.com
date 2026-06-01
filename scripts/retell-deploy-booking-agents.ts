@@ -3,7 +3,6 @@ import { config as loadDotenv } from 'dotenv'
 
 import {
 	buildRetellBookingPrompt,
-	getRetellBookingBeginMessage,
 	upsertRetellTools,
 } from './retell-booking-agent-config.ts'
 import {
@@ -105,10 +104,10 @@ async function deployBrand(
 		deployMetadata,
 	)
 	const llmPayload = {
-		begin_message: getRetellBookingBeginMessage(brand.agentDisplayName, brand),
+		begin_message: null,
 		general_prompt: [
 			formatDeploymentPromptHeader(deployMetadata),
-			buildRetellBookingPrompt(brand),
+			buildRetellBookingPrompt(brand, brand.agentDisplayName),
 		]
 			.filter(Boolean)
 			.join('\n\n'),

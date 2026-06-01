@@ -19,6 +19,13 @@ export function getRetellBookingBeginMessage(
 	return `This is ${agentDisplayName} with ${brand.businessName}. How may I help you?`
 }
 
+export function getRetellBookingOpeningInstruction(
+	agentDisplayName = 'Adrian',
+	brand: RetellBookingBrandConfig = DEFAULT_RETELL_BOOKING_BRAND,
+) {
+	return `Start of call: Dynamically generate the first spoken message. Your first sentence must be exactly "${getRetellBookingBeginMessage(agentDisplayName, brand)}" Do not add anything before it.`
+}
+
 const HUMAN_TRANSFER_NUMBER = '+18652147238'
 
 export function buildRetellToolUrl(publicUrl: string, toolPath: string) {
@@ -245,13 +252,15 @@ export function upsertRetellTools({
 
 export function buildRetellBookingPrompt(
 	brand: RetellBookingBrandConfig = DEFAULT_RETELL_BOOKING_BRAND,
+	agentDisplayName = 'Adrian',
 ) {
-	return buildUpdatedPrompt(buildBasePrompt(brand), brand)
+	return buildUpdatedPrompt(buildBasePrompt(brand), brand, agentDisplayName)
 }
 
 export function buildUpdatedPrompt(
 	currentPrompt: string | null,
 	brand: RetellBookingBrandConfig = DEFAULT_RETELL_BOOKING_BRAND,
+	agentDisplayName = 'Adrian',
 ) {
 	const businessName = brand.businessName
 	const staffRecipient =
@@ -261,6 +270,10 @@ export function buildUpdatedPrompt(
 	const availabilityInstruction =
 		'Availability handling: Use lookup_appointment_availability first. It returns a compact summary like "today: none; tomorrow: 1:30 PM, 2:30 PM" for today plus the next 3 days, plus exact slot data. Tell the caller the next available appointment first, then offer one or two nearby choices only if helpful. If you offer only some returned times for a date, explicitly say there are other times that day. If the caller asks what times are available, what availability you have, or asks for all options on a specific day, read all returned times for that date when there are six or fewer. If there are more than six returned times, read the first six and say there are more later that day. If the caller asks for a specific day, time window, closest time, exact time, or recurring constraint like Thursdays around 6 PM, call lookup_appointment_day_availability for the relevant date and pass preferred_time when they gave one. If a tool returns matched_requested_slot, say that requested time is available and use that exact slot if the caller confirms. Once the caller selects one of the returned slots, do not switch back to first_available_slot or next_available_slot; book or reschedule the exact selected slot. Only use exact local_time/spoken_time values returned by tools; never invent, round, interpolate, or choose a time from another date. If the requested date has no slots, ask whether they want another day or location.'
 	const brandInstruction = buildBrandInstruction(brand)
+	const openingInstruction = getRetellBookingOpeningInstruction(
+		agentDisplayName,
+		brand,
+	)
 	const pricingInstruction = `Pricing guidance: Use this as the source of truth for estimated caller-facing prices: ${getRetellPricingSummary({ serviceFocus: brand.serviceFocus })} Say pricing is an estimate or starting point when appropriate, and do not invent exact totals.`
 	const identityInstruction =
 		'Caller identity: Treat the caller profile returned by lookup_caller or lookup_caller_appointments as the single source of truth for name, phone, email, client type, saved card status, and other contact details. If the caller already stated their name in this call, such as "this is Zane", "my name is Zane", or gave a first and/or last name, and the returned profile name matches that stated name or first name, treat identity as already confirmed and do not ask "Am I speaking with..." again. If a returned profile has a name and the caller has not already stated or confirmed a matching name in this call, ask exactly once, "Am I speaking with [full name]?" After identity is confirmed or matched from their stated name, reuse that profile anywhere a name, phone, email, client type, or caller details are needed; do not ask for first name, last name, phone number, or email again unless a tool explicitly returns missing_client_details or the caller says the profile is wrong. If the profile is missing or the caller says it is not them, ask only for the missing details needed for the current task. For messages or follow-up, use the confirmed profile if available, ask for a name only when no profile/name is available, and ask "Can Sarah call you back at this number?" before asking for another callback number. Keep any context the caller gives and pass it to send_staff_message.'
@@ -282,9 +295,10 @@ export function buildUpdatedPrompt(
 		'When calling block_spam_caller, pass caller_phone_number from the current call object if available. If Retell does not expose it, pass null; the tool server will also try to infer it from the call payload.'
 	const prompt = currentPrompt?.trim()
 	if (!prompt) {
-		return `${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
+		return `${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
 	}
 	if (
+		prompt.includes(openingInstruction) &&
 		prompt.includes(brandInstruction) &&
 		prompt.includes(pricingInstruction) &&
 		prompt.includes(availabilityInstruction) &&
@@ -308,6 +322,7 @@ export function buildUpdatedPrompt(
 				!line.includes('If the caller is clearly spam') &&
 				!line.includes('Spam handling is a hard stop.') &&
 				!line.includes('Brand identity:') &&
+				!line.includes('Start of call:') &&
 				!line.includes('Pricing guidance:') &&
 				!line.includes(
 					'When calling block_spam_caller, pass caller_phone_number',
@@ -342,7 +357,7 @@ export function buildUpdatedPrompt(
 				),
 		)
 		.join('\n')
-	return `${withoutManagedLines}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
+	return `${withoutManagedLines}\n${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
 }
 
 function buildBasePrompt(brand: RetellBookingBrandConfig) {

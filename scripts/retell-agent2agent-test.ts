@@ -680,7 +680,7 @@ async function runScenario({
 	const agentMessages: ChatCompletionMessageParam[] = [
 		{
 			content: [
-				buildRetellBookingPrompt(brand),
+				buildRetellBookingPrompt(brand, brand.agentDisplayName),
 				'',
 				'Manual agent-to-agent test harness:',
 				`- Current local date is ${TEST_LOCAL_DATE} in ${TEST_TIME_ZONE}.`,

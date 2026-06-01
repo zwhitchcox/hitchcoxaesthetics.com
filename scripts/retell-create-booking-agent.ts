@@ -3,7 +3,6 @@ import { config as loadDotenv } from 'dotenv'
 import {
 	buildRetellToolUrl,
 	buildRetellBookingPrompt,
-	getRetellBookingBeginMessage,
 	upsertRetellTools,
 } from './retell-booking-agent-config.ts'
 
@@ -361,8 +360,8 @@ const tools = [
 ]
 
 const llm = await retellFetch('/create-retell-llm', {
-	begin_message: getRetellBookingBeginMessage(agentDisplayName),
-	general_prompt: buildRetellBookingPrompt(),
+	begin_message: null,
+	general_prompt: buildRetellBookingPrompt(undefined, agentDisplayName),
 	general_tools: upsertRetellTools({
 		publicUrl: normalizedBaseUrl,
 		toolHeaders,
