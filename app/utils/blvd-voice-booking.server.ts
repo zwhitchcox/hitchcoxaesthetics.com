@@ -234,6 +234,15 @@ type ServiceEntry = {
 	searchText: string
 }
 
+export type VoiceServiceSearchEntry = {
+	categoryName: string
+	categoryOrder?: number
+	description?: string | null
+	id?: string
+	itemOrder?: number
+	name: string
+}
+
 const optionalTrimmedString = z.preprocess(
 	value => (value === null ? undefined : value),
 	z.string().trim().optional(),
@@ -1766,14 +1775,17 @@ function preferServicesForClientType(
 
 	if (!wantsExisting && !wantsNew) return services
 
-	const preferred = services.filter(service => {
+	const filtered = services.filter(service => {
 		const text = normalizeText(`${service.categoryName} ${service.item.name}`)
-		return wantsExisting
-			? text.includes('existing')
-			: text.includes('new') || text.includes('first')
+		const isExistingSpecific =
+			text.includes('existing') || text.includes('returning')
+		const isNewSpecific = text.includes('new') || text.includes('first')
+		if (wantsExisting) return !isNewSpecific
+		if (wantsNew) return !isExistingSpecific
+		return true
 	})
 
-	return preferred.length > 0 ? preferred : services
+	return filtered.length > 0 ? filtered : services
 }
 
 function resolveLocation(
@@ -2019,17 +2031,78 @@ function rankServices(services: ServiceEntry[], search: string) {
 		.map(result => result.service)
 }
 
+export function rankVoiceServiceSearchEntries(
+	entries: VoiceServiceSearchEntry[],
+	search: string,
+	clientType?: string | null,
+) {
+	const services = entries.map((entry, index): ServiceEntry => {
+		const categoryOrder = entry.categoryOrder ?? index
+		const itemOrder = entry.itemOrder ?? index
+		const item = {
+			__typename: 'CartAvailableBookableItem',
+			description: entry.description ?? null,
+			disabled: false,
+			id: entry.id ?? `test-service-${index}`,
+			name: entry.name,
+			getLocationVariants: async () => [],
+			getStaffVariants: async () => [],
+		} satisfies BlvdServiceItem
+
+		return {
+			categoryName: entry.categoryName,
+			categoryOrder,
+			id: item.id,
+			item,
+			itemOrder,
+			searchText: normalizeText(
+				[
+					entry.categoryName,
+					entry.name,
+					entry.description ?? '',
+					...getServiceAliases(
+						entry.categoryName,
+						entry.name,
+						entry.description,
+					),
+				].join(' '),
+			),
+		}
+	})
+
+	return preferServicesForClientType(rankServices(services, search), clientType).map(
+		service => ({
+			category: service.categoryName,
+			id: service.id,
+			name: service.item.name,
+			score: scoreService(service, search),
+		}),
+	)
+}
+
 function scoreService(service: ServiceEntry, search: string) {
 	const normalizedSearch = normalizeText(search)
 	const expandedSearch = expandServiceSearch(search)
 	const searchTokens = tokenize(expandedSearch)
 	const normalizedName = normalizeText(service.item.name)
+	const normalizedServiceText = normalizeText(
+		[
+			service.categoryName,
+			service.item.name,
+			service.item.description ?? '',
+		].join(' '),
+	)
 	let score = 0
 
 	if (normalizedName === normalizedSearch) score += 150
 	if (normalizedName.startsWith(normalizedSearch)) score += 80
 	if (service.searchText.includes(normalizedSearch)) score += 60
 	if (service.searchText.includes(normalizeText(expandedSearch))) score += 45
+	if (isWeightLossQuery(normalizedSearch)) {
+		if (isWeightLossConsultationService(normalizedServiceText)) score += 120
+		else if (isWeightLossService(normalizedServiceText)) score += 40
+		else if (normalizedServiceText.includes('hair loss')) score -= 50
+	}
 
 	for (const token of searchTokens) {
 		if (normalizedName.includes(token)) {
@@ -2056,6 +2129,23 @@ function expandServiceSearch(search: string) {
 			'dysport',
 			'jeuveau',
 			'xeomin',
+		]) {
+			aliases.add(token)
+		}
+	}
+
+	if (isWeightLossQuery(normalized)) {
+		for (const token of [
+			'weight loss',
+			'medical weight loss',
+			'weight loss consultation',
+			'weight loss appointment',
+			'glp',
+			'glp 1',
+			'glp one',
+			'semaglutide',
+			'tirzepatide',
+			'wellness',
 		]) {
 			aliases.add(token)
 		}
@@ -2096,6 +2186,22 @@ function getServiceAliases(
 		}
 	}
 
+	if (isWeightLossService(text)) {
+		aliases.push(
+			'weight loss',
+			'medical weight loss',
+			'weight loss consultation',
+			'weight loss appointment',
+			'glp',
+			'glp 1',
+			'glp one',
+			'glp-1',
+			'semaglutide',
+			'tirzepatide',
+			'wellness',
+		)
+	}
+
 	return aliases
 }
 
@@ -2121,6 +2227,35 @@ function isToxService(normalizedServiceText: string) {
 		'xeomin',
 		'neurotoxin',
 	].some(term => ` ${normalizedServiceText} `.includes(term))
+}
+
+function isWeightLossQuery(normalizedSearch: string) {
+	return [
+		'weight loss',
+		'glp',
+		'glp 1',
+		'glp one',
+		'semaglutide',
+		'tirzepatide',
+	].some(term => normalizedSearch.includes(term))
+}
+
+function isWeightLossService(normalizedServiceText: string) {
+	return [
+		'weight loss',
+		'weight management',
+		'glp',
+		'glp 1',
+		'semaglutide',
+		'tirzepatide',
+	].some(term => normalizedServiceText.includes(term))
+}
+
+function isWeightLossConsultationService(normalizedServiceText: string) {
+	return (
+		isWeightLossService(normalizedServiceText) &&
+		normalizedServiceText.includes('consultation')
+	)
 }
 
 function rankLocations(locations: BlvdLocation[], search: string) {
@@ -2504,6 +2639,15 @@ function getSpokenServiceName(serviceName: string, categoryName = '') {
 		normalized.includes('xeomin')
 	) {
 		return 'Botox appointment'
+	}
+	if (
+		normalized.includes('weight loss') &&
+		normalized.includes('consultation')
+	) {
+		return 'weight loss consultation'
+	}
+	if (normalized.includes('weight loss') && normalized.includes('injection')) {
+		return 'weight loss injection'
 	}
 	return serviceName
 		.replace(/\bnew client\b/gi, '')
