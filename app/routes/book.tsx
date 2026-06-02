@@ -825,6 +825,11 @@ export default function BlvdBookRoute() {
 
 		if (!cart || !selectedService || !selectedLocation) return
 
+		if (!selectedTime) {
+			setStepError('Please choose an appointment time before booking.')
+			return
+		}
+
 		if (shouldCollectCardDetails) {
 			const paymentError = validatePaymentDetails(clientForm)
 			if (paymentError) {
@@ -884,6 +889,9 @@ export default function BlvdBookRoute() {
 				const card = parseCardDetails(clientForm)
 				nextCart = await nextCart.addCardPaymentMethod({ card })
 			}
+
+			nextCart = await ensureCartHasSelectedTime(nextCart, selectedTime)
+			setCart(nextCart)
 
 			const checkoutPayload = await nextCart.checkout()
 			setCart(checkoutPayload.cart)
@@ -2556,6 +2564,23 @@ function formatDateLabel(value: Date | string) {
 function formatTimeLabel(value: Date | string) {
 	const date = toDate(value)
 	return date ? format(date, 'h:mm a') : 'Unavailable'
+}
+
+function cartHasSelectedTime(cart: BlvdCart, selectedTime: BlvdBookableTime) {
+	const cartStartTime = toDate(cart.startTime)
+	const selectedStartTime = toDate(selectedTime.startTime)
+
+	if (!cartStartTime || !selectedStartTime) return false
+
+	return Math.abs(cartStartTime.getTime() - selectedStartTime.getTime()) < 60_000
+}
+
+async function ensureCartHasSelectedTime(
+	cart: BlvdCart,
+	selectedTime: BlvdBookableTime,
+) {
+	if (cartHasSelectedTime(cart, selectedTime)) return cart
+	return cart.reserveBookableItems(selectedTime)
 }
 
 function buildBookingSelectionEventProperties({
