@@ -321,6 +321,42 @@ dashboards:
         steps: *entry_to_completion_steps
 
       - kind: funnel
+        name: Book Rate - Calendar Day
+        description:
+          Percentage of booking starts that completed, broken down by the local
+          calendar day the booking flow started.
+        breakdown: booking_entered_date
+        breakdown_limit: 14
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Book Rate - Time of Day
+        description:
+          Percentage of booking starts that completed, broken down by the local
+          hour the booking flow started.
+        breakdown: booking_entered_hour_bucket
+        breakdown_limit: 24
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Book Rate - Day of Week
+        description:
+          Percentage of booking starts that completed, broken down by the local
+          day of week the booking flow started.
+        breakdown: booking_entered_day_of_week
+        breakdown_limit: 7
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
+        name: Book Rate - Initial Landing Page
+        description:
+          Percentage of booking starts that completed, broken down by the first
+          landing page in the session.
+        breakdown: initial_landing_path
+        breakdown_limit: 25
+        steps: *entry_to_completion_steps
+
+      - kind: funnel
         name: Full Booking Step Funnel - Source Detail
         description: Full booking funnel broken down by traffic_source_detail.
         breakdown: traffic_source_detail

@@ -34,6 +34,7 @@ const CALLRAIL_VISITOR_PARAM_KEYS = [
 
 const POSTHOG_DISTINCT_COOKIE = 'sha_posthog_distinct_id'
 const POSTHOG_SESSION_COOKIE = 'sha_posthog_session_id'
+const BOOKING_ANALYTICS_TIME_ZONE = 'America/New_York'
 
 const SERVICE_PAGE_SEGMENTS = new Set([
 	'injectables',
@@ -141,6 +142,10 @@ export function getBookingAnalyticsEventProperties() {
 	)
 
 	return compactEventProperties({
+		...getBookingTemporalEventProperties(
+			stored.firstBookEnteredAt,
+			'booking_entered',
+		),
 		book_entry_from_path: stored.bookEntryFromPath,
 		book_entry_page_prefix_type: bookEntryPathname
 			? getPagePrefixType(bookEntryPathname)
@@ -186,6 +191,45 @@ export function getBookingAnalyticsEventProperties() {
 		msclkid: stored.msclkid,
 		wbraid: stored.wbraid,
 	})
+}
+
+export function getBookingTemporalEventProperties(
+	timestamp: number | Date | null | undefined,
+	prefix: string,
+) {
+	const date =
+		timestamp instanceof Date
+			? timestamp
+			: typeof timestamp === 'number'
+				? new Date(timestamp)
+				: null
+	if (!date || Number.isNaN(date.getTime())) return {}
+
+	const parts = new Intl.DateTimeFormat('en-US', {
+		day: '2-digit',
+		hour: '2-digit',
+		hourCycle: 'h23',
+		month: '2-digit',
+		timeZone: BOOKING_ANALYTICS_TIME_ZONE,
+		weekday: 'long',
+		year: 'numeric',
+	}).formatToParts(date)
+	const partMap = Object.fromEntries(parts.map(part => [part.type, part.value]))
+	const year = partMap.year
+	const month = partMap.month
+	const day = partMap.day
+	const weekday = partMap.weekday
+	const hour = Number(partMap.hour)
+
+	if (!year || !month || !day || !weekday || !Number.isFinite(hour)) return {}
+
+	return {
+		[`${prefix}_date`]: `${year}-${month}-${day}`,
+		[`${prefix}_day_of_week`]: formatDayOfWeekBucket(weekday),
+		[`${prefix}_hour`]: `${hour.toString().padStart(2, '0')}:00`,
+		[`${prefix}_hour_bucket`]: formatHourBucket(hour),
+		[`${prefix}_time_zone`]: BOOKING_ANALYTICS_TIME_ZONE,
+	}
 }
 
 export function getMarketingPageEventProperties({
@@ -553,6 +597,35 @@ function getPageType(pathname: string) {
 	if (SERVICE_PAGE_SEGMENTS.has(firstSegment)) return 'service'
 
 	return 'other'
+}
+
+function formatDayOfWeekBucket(weekday: string) {
+	const days = [
+		'Sunday',
+		'Monday',
+		'Tuesday',
+		'Wednesday',
+		'Thursday',
+		'Friday',
+		'Saturday',
+	]
+	const index = days.indexOf(weekday)
+	if (index === -1) return weekday
+	return `${index} - ${weekday}`
+}
+
+function formatHourBucket(hour: number) {
+	const normalizedHour = ((Math.floor(hour) % 24) + 24) % 24
+	return `${normalizedHour.toString().padStart(2, '0')} - ${formatHourLabel(
+		normalizedHour,
+	)}`
+}
+
+function formatHourLabel(hour: number) {
+	if (hour === 0) return '12 AM'
+	if (hour < 12) return `${hour} AM`
+	if (hour === 12) return '12 PM'
+	return `${hour - 12} PM`
 }
 
 function isSearchReferrer(referrerDomain: string, referrer: string) {
