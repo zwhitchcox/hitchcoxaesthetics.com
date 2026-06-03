@@ -358,13 +358,14 @@ dashboards:
 
       - kind: funnel
         name: Full Booking Step Funnel - Source Detail
-        description: Full booking funnel broken down by traffic_source_detail.
+        description:
+          Full booking step funnel broken down by traffic_source_detail. Starts
+          at the first visible booking step; use Entry To Completion cards for
+          total booking starts.
         breakdown: traffic_source_detail
         steps: &full_booking_steps
-          - event: booking_funnel_entered
-            custom_name: Booking Funnel Entered
           - event: booking_step_viewed
-            custom_name: Booking - Services
+            custom_name: Booking - Service
             properties:
               - key: step
                 type: event

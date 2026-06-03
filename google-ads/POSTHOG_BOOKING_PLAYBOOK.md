@@ -122,6 +122,10 @@ Use this to answer:
 
 Type: Funnel
 
+This funnel starts at the first visible booking step. Use the two-step
+`Entry To Completion` funnels when you want total booking starts to completed
+bookings.
+
 Steps:
 
 1. `booking_step_viewed` where `step = service`
