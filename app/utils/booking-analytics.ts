@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'sha.booking-analytics'
+const SITE_ENTERED_EVENT_STORAGE_KEY = 'sha.site-entered-event-v1'
 const sentCallTrackingAttributionKeys = new Set<string>()
 
 const MARKETING_PARAM_KEYS = [
@@ -289,6 +290,20 @@ export function getMarketingPageEventProperties({
 		msclkid: stored?.msclkid,
 		wbraid: stored?.wbraid,
 	})
+}
+
+export function claimSiteEnteredEvent() {
+	if (typeof window === 'undefined') return false
+
+	try {
+		if (window.sessionStorage.getItem(SITE_ENTERED_EVENT_STORAGE_KEY)) {
+			return false
+		}
+		window.sessionStorage.setItem(SITE_ENTERED_EVENT_STORAGE_KEY, '1')
+		return true
+	} catch {
+		return true
+	}
 }
 
 export function queueCallTrackingSessionAttribution({

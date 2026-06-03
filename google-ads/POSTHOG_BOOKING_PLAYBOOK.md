@@ -8,11 +8,13 @@ analytics.
 The site now sends these PostHog events:
 
 - `marketing_page_viewed`
+- `site_entered`
 - `book_cta_clicked`
 - `phone_cta_clicked`
 - `booking_funnel_entered`
 - `booking_step_viewed`
 - `booking_completed`
+- `booking_conversion_completed`
 - `blvd_revenue_recorded`
 
 `booking_step_viewed` uses the `step` property with these values:
@@ -59,6 +61,31 @@ Use this to answer:
 - Which channels actually create completed bookings?
 - Which entry pages push users into the booking flow?
 - Which service categories convert best after entering booking?
+
+### Site-To-Conversion Funnels
+
+Use these when the denominator should be site entrants instead of people who
+already entered the booking flow.
+
+Website booking:
+
+1. `site_entered`
+2. `booking_funnel_entered`
+3. `booking_completed`
+
+Phone booking:
+
+1. `site_entered`
+2. `phone_call_conversion`
+
+Combined booking:
+
+1. `site_entered`
+2. `booking_conversion_completed`
+
+`booking_conversion_completed` is the normalized conversion event. Website
+checkout emits it alongside `booking_completed`; the CallRail sync emits it
+alongside `phone_call_conversion`.
 
 Additional saved variants worth keeping on the dashboard:
 

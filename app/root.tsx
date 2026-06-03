@@ -49,6 +49,7 @@ import '#/app/styles/global.css'
 import tailwindStyleSheetUrl from '#/app/styles/tailwind.css?url'
 import { getUserId, logout } from '#/app/utils/auth.server.ts'
 import {
+	claimSiteEnteredEvent,
 	getMarketingPageEventProperties,
 	queueCallTrackingSessionAttribution,
 	trackBookingAnalyticsPageView,
@@ -380,6 +381,19 @@ function App() {
 			search: location.search,
 		})
 	}, [location.pathname, location.search])
+
+	useEffect(() => {
+		if (!posthog) return
+		if (!claimSiteEnteredEvent()) return
+
+		posthog.capture(
+			'site_entered',
+			getMarketingPageEventProperties({
+				pathname: location.pathname,
+				search: location.search,
+			}),
+		)
+	}, [location.pathname, location.search, posthog])
 
 	useEffect(() => {
 		if (!posthog) return

@@ -113,9 +113,14 @@ test('syncs qualified CallRail phone conversions into PostHog with matched attri
 		unmatched: 0,
 	})
 
-	const posthogCall = fetchMock.mock.calls.find(
+	const posthogCalls = fetchMock.mock.calls.filter(
 		([url]) => String(url) === 'https://us.i.posthog.com/capture/',
 	)
+	expect(posthogCalls).toHaveLength(2)
+	const posthogCall = posthogCalls.find(call => {
+		const body = JSON.parse(call[1]?.body as string) as { event?: string }
+		return body.event === 'phone_call_conversion'
+	})
 	expect(posthogCall).toBeTruthy()
 	const posthogBody = JSON.parse(posthogCall?.[1]?.body as string)
 	expect(posthogBody).toMatchObject({
@@ -126,6 +131,27 @@ test('syncs qualified CallRail phone conversions into PostHog with matched attri
 			attribution_match: 'boulevard_attribution_touch',
 			booking_channel: 'retell_voice',
 			callrail_call_id: 'CAL_GOOD',
+			phone_conversion_value_usd: 600,
+			traffic_source_detail: 'google_ads',
+		},
+		timestamp: '2026-06-01T14:00:00.000Z',
+	})
+	const combinedCall = posthogCalls.find(call => {
+		const body = JSON.parse(call[1]?.body as string) as { event?: string }
+		return body.event === 'booking_conversion_completed'
+	})
+	expect(combinedCall).toBeTruthy()
+	const combinedBody = JSON.parse(combinedCall?.[1]?.body as string)
+	expect(combinedBody).toMatchObject({
+		distinct_id: 'ph_distinct_1',
+		event: 'booking_conversion_completed',
+		properties: {
+			$insert_id: 'booking-conversion:phone:CAL_GOOD',
+			attribution_match: 'boulevard_attribution_touch',
+			booking_channel: 'retell_voice',
+			booking_value_usd: 600,
+			callrail_call_id: 'CAL_GOOD',
+			conversion_channel: 'phone',
 			phone_conversion_value_usd: 600,
 			traffic_source_detail: 'google_ads',
 		},

@@ -38,6 +38,32 @@ dashboards:
             custom_name: Booking Completed
 
       - kind: funnel
+        name: Site To Combined Booking Conversion - Source Detail
+        description:
+          Site entry to any completed booking conversion, including website
+          checkout and qualified phone-call conversions.
+        breakdown: traffic_source_detail
+        steps: &site_to_combined_booking_steps
+          - event: site_entered
+            custom_name: Site Entered
+          - event: booking_conversion_completed
+            custom_name: Booking Conversion Completed
+
+      - kind: funnel
+        name: Site To Website Booking - Source Detail
+        description:
+          Site entry to website booking checkout completion, broken down by
+          traffic_source_detail.
+        breakdown: traffic_source_detail
+        steps: &site_to_website_booking_steps
+          - event: site_entered
+            custom_name: Site Entered
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: booking_completed
+            custom_name: Website Booking Completed
+
+      - kind: funnel
         name: Entry To Completion - Channel
         description: 2-step booking funnel broken down by traffic_channel.
         breakdown: traffic_channel
@@ -106,6 +132,15 @@ dashboards:
         series:
           - event: booking_completed
             custom_name: Booking Completion Trends - Source Detail
+
+      - kind: trend
+        name: Combined Booking Conversion Trends - Source Detail
+        description:
+          Website and phone booking conversions by traffic_source_detail.
+        breakdown: traffic_source_detail
+        series:
+          - event: booking_conversion_completed
+            custom_name: Combined Booking Conversion Trends - Source Detail
 
       - kind: trend
         name: Booking Completion Trends - Channel
@@ -752,8 +787,8 @@ dashboards:
           initial_landing_page_prefix_type.
         breakdown: initial_landing_page_prefix_type
         steps:
-          - event: marketing_page_viewed
-            custom_name: Marketing Page Viewed
+          - event: site_entered
+            custom_name: Site Entered
           - event: book_cta_clicked
             custom_name: Book CTA Clicked
 
@@ -764,8 +799,8 @@ dashboards:
           initial_landing_page_prefix_type.
         breakdown: initial_landing_page_prefix_type
         steps:
-          - event: marketing_page_viewed
-            custom_name: Marketing Page Viewed
+          - event: site_entered
+            custom_name: Site Entered
           - event: phone_cta_clicked
             custom_name: Phone CTA Clicked
 
@@ -798,8 +833,8 @@ dashboards:
               - lp
             operator: exact
         steps:
-          - event: marketing_page_viewed
-            custom_name: Marketing Page Viewed
+          - event: site_entered
+            custom_name: Site Entered
           - event: book_cta_clicked
             custom_name: Book CTA Clicked
 
@@ -816,8 +851,8 @@ dashboards:
               - non_lp
             operator: exact
         steps:
-          - event: marketing_page_viewed
-            custom_name: Marketing Page Viewed
+          - event: site_entered
+            custom_name: Site Entered
           - event: book_cta_clicked
             custom_name: Book CTA Clicked
 
@@ -834,8 +869,8 @@ dashboards:
               - lp
             operator: exact
         steps:
-          - event: marketing_page_viewed
-            custom_name: Marketing Page Viewed
+          - event: site_entered
+            custom_name: Site Entered
           - event: phone_cta_clicked
             custom_name: Phone CTA Clicked
 
@@ -852,8 +887,8 @@ dashboards:
               - non_lp
             operator: exact
         steps:
-          - event: marketing_page_viewed
-            custom_name: Marketing Page Viewed
+          - event: site_entered
+            custom_name: Site Entered
           - event: phone_cta_clicked
             custom_name: Phone CTA Clicked
 
@@ -869,6 +904,19 @@ dashboards:
     managed_tag: managed:phone-calls-conversion-attribution
     sync_mode: replace_managed
     insights:
+      - kind: funnel
+        name: Site To Phone Conversion - Source Detail
+        description:
+          Site entry to qualified CallRail phone-call conversion, broken down by
+          traffic_source_detail. This does not require a phone CTA click because
+          calls can happen out of band after seeing a tracking number.
+        breakdown: traffic_source_detail
+        steps: &site_to_phone_conversion_steps
+          - event: site_entered
+            custom_name: Site Entered
+          - event: phone_call_conversion
+            custom_name: Qualified Phone Call
+
       - kind: funnel
         name: Phone CTA To Qualified Call - Source Detail
         description:

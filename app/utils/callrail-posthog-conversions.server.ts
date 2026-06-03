@@ -160,6 +160,18 @@ export async function syncCallRailPhoneConversionsToPostHog(
 				})
 				if (result?.ok) {
 					stats.captured += 1
+					await captureServerPostHogEvent({
+						distinctId: event.distinctId,
+						event: 'booking_conversion_completed',
+						insertId: `booking-conversion:phone:${event.callId}`,
+						properties: {
+							...event.properties,
+							booking_value_usd:
+								event.properties.phone_conversion_value_usd,
+							conversion_channel: 'phone',
+						},
+						timestamp: event.timestamp,
+					})
 				} else {
 					stats.skipped += 1
 				}

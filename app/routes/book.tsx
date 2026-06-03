@@ -944,6 +944,20 @@ export default function BlvdBookRoute() {
 					location: selectedLocation.name,
 					value: projectedRevenueUsd,
 				})
+				posthog.capture('booking_conversion_completed', {
+					...bookingAnalyticsPropertiesRef.current,
+					$insert_id: `booking-conversion:website:${checkoutPayload.cart.id}`,
+					appointment_count: checkoutPayload.appointments.length,
+					booking_channel: 'website_booking',
+					booking_selected_payment_method_type: selectedPaymentMethodType,
+					booking_value_usd: projectedRevenueUsd,
+					conversion_channel: 'website',
+					conversion_source: 'website_booking',
+					currency: 'USD',
+					location: selectedLocation.name,
+					service: selectedService.item.name,
+					value: projectedRevenueUsd,
+				})
 			}
 
 			queueBlvdBookingAttributionTouch({
