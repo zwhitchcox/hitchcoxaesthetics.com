@@ -319,6 +319,9 @@ export default function BlvdBookRoute() {
 	const [submittingBooking, setSubmittingBooking] = useState(false)
 	const [detailsSubmitted, setDetailsSubmitted] = useState(false)
 	const [stepError, setStepError] = useState<string | null>(null)
+	const [ownershipStepError, setOwnershipStepError] = useState<string | null>(
+		null,
+	)
 	const [checkoutSuccess, setCheckoutSuccess] =
 		useState<CheckoutSuccess | null>(null)
 	const [referrerHint, setReferrerHint] = useState<SourceHint | null>(null)
@@ -348,6 +351,7 @@ export default function BlvdBookRoute() {
 	const [ownershipVerifiedPhone, setOwnershipVerifiedPhone] = useState<
 		string | null
 	>(null)
+	const [verifiedExistingClient, setVerifiedExistingClient] = useState(false)
 	const [availablePaymentMethods, setAvailablePaymentMethods] = useState<
 		BlvdPaymentMethod[]
 	>([])
@@ -359,6 +363,7 @@ export default function BlvdBookRoute() {
 	const didCaptureBookingFunnelEnteredRef = useRef(false)
 	const pendingBookingStepsRef = useRef<Set<string>>(new Set())
 	const bookingAnalyticsPropertiesRef = useRef<Record<string, unknown>>({})
+	const lastBookingIntentKeyRef = useRef<string | null>(null)
 
 	useEffect(() => {
 		let cancelled = false
@@ -474,7 +479,26 @@ export default function BlvdBookRoute() {
 		? getSiteLocationForBlvdLocation(selectedLocation) ?? null
 		: null
 	const requiresCard = Boolean(cart?.summary.paymentMethodRequired)
-	const hasVerifiedClient = Boolean(ownershipVerifiedPhone)
+	const hasVerifiedMobile = Boolean(ownershipVerifiedPhone)
+	const hasCompletedOwnershipVerification = Boolean(
+		hasVerifiedMobile && ownershipCodeId,
+	)
+	const hasVerifiedClient = Boolean(
+		hasVerifiedMobile &&
+			(hasCompletedOwnershipVerification ||
+				verifiedExistingClient ||
+				hasAttachedBlvdClient(cart?.clientInformation)),
+	)
+	const shouldCollectClientInformation = hasVerifiedMobile && !hasVerifiedClient
+	const canRequestOwnershipCode =
+		!hasVerifiedMobile && looksLikePhoneNumber(clientForm.phone)
+	const canShowOwnershipCodeEntry = Boolean(
+		ownershipCodeId && canRequestOwnershipCode,
+	)
+	const patientName = formatClientName({
+		firstName: cart?.clientInformation?.firstName ?? clientForm.firstName,
+		lastName: cart?.clientInformation?.lastName ?? clientForm.lastName,
+	})
 	const selectedExistingPaymentMethod =
 		selectedPaymentMethodId === 'new'
 			? null
@@ -661,13 +685,16 @@ export default function BlvdBookRoute() {
 		setOwnershipCodeId(null)
 		setOwnershipCodeValue('')
 		setOwnershipVerifiedPhone(null)
+		setVerifiedExistingClient(false)
 		setAvailablePaymentMethods([])
 		setSelectedPaymentMethodId('new')
+		setOwnershipStepError(null)
 	}
 
 	async function handleSelectService(service: ServiceEntry) {
 		setLoadingLocations(true)
 		setStepError(null)
+		setOwnershipStepError(null)
 		setCheckoutSuccess(null)
 		setSelectedService(service)
 		setActiveStep(null)
@@ -711,6 +738,7 @@ export default function BlvdBookRoute() {
 
 		setLoadingSchedule(true)
 		setStepError(null)
+		setOwnershipStepError(null)
 		setCheckoutSuccess(null)
 		setSelectedLocation(location)
 		setActiveStep('location')
@@ -759,6 +787,7 @@ export default function BlvdBookRoute() {
 
 		setLoadingTimes(true)
 		setStepError(null)
+		setOwnershipStepError(null)
 		setSelectedDateId(getBookableDateKey(date) ?? date.id)
 		setActiveStep(null)
 		setDetailsSubmitted(false)
@@ -784,6 +813,7 @@ export default function BlvdBookRoute() {
 
 		setLoadingSchedule(true)
 		setStepError(null)
+		setOwnershipStepError(null)
 		setCheckoutSuccess(null)
 		setDetailsSubmitted(false)
 
@@ -792,6 +822,12 @@ export default function BlvdBookRoute() {
 			setCart(nextCart)
 			setActiveStep(null)
 			setSelectedTimeId(time.id)
+			queueCurrentBlvdBookingIntent({
+				cartOverride: nextCart,
+				selectedTimeOverride: time,
+				status: 'time_selected',
+				step: 'details',
+			})
 		} catch (error) {
 			setStepError(getErrorMessage(error))
 		} finally {
@@ -807,17 +843,28 @@ export default function BlvdBookRoute() {
 		const validationError = validateClientDetails({
 			answers: questionAnswers,
 			clientForm,
-			requireClientInformation: !hasVerifiedClient,
+			hasVerifiedMobile,
+			requireClientInformation: shouldCollectClientInformation,
 			questions: cart.bookingQuestions,
 		})
 		if (validationError) {
-			setStepError(validationError)
+			if (isMobileVerificationValidationError(validationError)) {
+				setOwnershipStepError(validationError)
+				setStepError(null)
+			} else {
+				setStepError(validationError)
+			}
 			return
 		}
 
 		setStepError(null)
+		setOwnershipStepError(null)
 		setDetailsSubmitted(true)
 		setActiveStep('reserve')
+		queueCurrentBlvdBookingIntent({
+			status: 'reserve_started',
+			step: 'reserve',
+		})
 	}
 
 	async function handleCheckout(event: React.FormEvent<HTMLFormElement>) {
@@ -1010,6 +1057,14 @@ export default function BlvdBookRoute() {
 						undefined,
 				},
 			})
+			queueCurrentBlvdBookingIntent({
+				appointmentIds: checkoutPayload.appointments.map(
+					appointment => appointment.appointmentId,
+				),
+				cartOverride: checkoutPayload.cart,
+				status: 'completed',
+				step: 'success',
+			})
 
 			if (typeof window !== 'undefined') {
 				window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1078,14 +1133,16 @@ export default function BlvdBookRoute() {
 		if (!cart) return
 
 		if (!looksLikePhoneNumber(clientForm.phone)) {
-			setStepError(
+			setOwnershipStepError(
 				'Enter a valid mobile phone number before requesting a verification code.',
 			)
+			setStepError(null)
 			return
 		}
 
 		setSendingOwnershipCode(true)
 		setStepError(null)
+		setOwnershipStepError(null)
 
 		try {
 			const codeId = await cart.sendOwnershipCodeBySms(
@@ -1094,10 +1151,11 @@ export default function BlvdBookRoute() {
 			setOwnershipCodeId(codeId)
 			setOwnershipCodeValue('')
 			setOwnershipVerifiedPhone(null)
+			setVerifiedExistingClient(false)
 			setAvailablePaymentMethods([])
 			setSelectedPaymentMethodId('new')
 		} catch (error) {
-			setStepError(getErrorMessage(error))
+			setOwnershipStepError(getErrorMessage(error))
 		} finally {
 			setSendingOwnershipCode(false)
 		}
@@ -1108,14 +1166,16 @@ export default function BlvdBookRoute() {
 
 		const normalizedCode = ownershipCodeValue.replace(/\D/g, '')
 		if (normalizedCode.length !== 6) {
-			setStepError(
+			setOwnershipStepError(
 				'Enter the 6-digit verification code from your text message.',
 			)
+			setStepError(null)
 			return
 		}
 
 		setVerifyingOwnershipCode(true)
 		setStepError(null)
+		setOwnershipStepError(null)
 
 		try {
 			const nextCart = await cart.takeOwnershipByCode(
@@ -1124,6 +1184,7 @@ export default function BlvdBookRoute() {
 			)
 			setCart(nextCart)
 			setOwnershipVerifiedPhone(normalizePhoneNumber(clientForm.phone))
+			setVerifiedExistingClient(true)
 			setOwnershipCodeValue('')
 
 			const nextClientInformation = nextCart.clientInformation
@@ -1149,11 +1210,119 @@ export default function BlvdBookRoute() {
 
 			setAvailablePaymentMethods(nextPaymentMethods)
 			setSelectedPaymentMethodId(nextPaymentMethods[0]?.id ?? 'new')
+			queueCurrentBlvdBookingIntent({
+				cartOverride: nextCart,
+				hasVerifiedMobileOverride: true,
+				selectedPaymentMethodIdOverride: nextPaymentMethods[0]?.id ?? 'new',
+				status: 'mobile_verified',
+				step: 'details',
+			})
+
+			if (allRequiredBookingQuestionsAnswered(nextCart, questionAnswers)) {
+				setDetailsSubmitted(true)
+				setActiveStep('reserve')
+				queueCurrentBlvdBookingIntent({
+					cartOverride: nextCart,
+					hasVerifiedMobileOverride: true,
+					selectedPaymentMethodIdOverride: nextPaymentMethods[0]?.id ?? 'new',
+					status: 'reserve_started',
+					step: 'reserve',
+				})
+			}
 		} catch (error) {
-			setStepError(getErrorMessage(error))
+			setOwnershipStepError(getErrorMessage(error))
 		} finally {
 			setVerifyingOwnershipCode(false)
 		}
+	}
+
+	function queueCurrentBlvdBookingIntent({
+		appointmentIds,
+		cartOverride,
+		hasVerifiedMobileOverride,
+		selectedPaymentMethodIdOverride,
+		selectedTimeOverride,
+		status,
+		step,
+	}: {
+		appointmentIds?: string[]
+		cartOverride?: BlvdCart | null
+		hasVerifiedMobileOverride?: boolean
+		selectedPaymentMethodIdOverride?: string
+		selectedTimeOverride?: BlvdBookableTime | null
+		status: string
+		step: string
+	}) {
+		const intentCart = cartOverride ?? cart
+		if (!intentCart || !selectedService || !selectedLocation) return
+
+		const intentSelectedTime = selectedTimeOverride ?? selectedTime
+		const intentHasVerifiedMobile =
+			hasVerifiedMobileOverride ?? Boolean(ownershipVerifiedPhone)
+		const intentSelectedPaymentMethodId =
+			selectedPaymentMethodIdOverride ?? selectedPaymentMethodId
+		const intentSelectedExistingPaymentMethod =
+			intentSelectedPaymentMethodId === 'new'
+				? null
+				: availablePaymentMethods.find(
+						paymentMethod => paymentMethod.id === intentSelectedPaymentMethodId,
+					) ?? null
+		const intentHasVerifiedClient = Boolean(
+			intentHasVerifiedMobile &&
+				(hasVerifiedClient ||
+					Boolean(hasVerifiedMobileOverride) ||
+					hasAttachedBlvdClient(intentCart.clientInformation)),
+		)
+		const intentStartTime =
+			toDate(intentSelectedTime?.startTime ?? null) ??
+			toDate(intentCart.startTime ?? null)
+		const intentEndTime =
+			toDate(intentCart.endTime ?? null)
+		const intentPaymentMethodType = intentCart.summary.paymentMethodRequired
+			? intentSelectedExistingPaymentMethod
+				? 'saved_card'
+				: 'new_card'
+			: 'none_required'
+		const clientInformation = intentCart.clientInformation
+		const payload = {
+			attribution: bookingAnalyticsPropertiesRef.current,
+			booking: {
+				appointmentCount: appointmentIds?.length,
+				appointmentIds,
+				cartId: intentCart.id,
+				hasVerifiedClient: intentHasVerifiedClient,
+				hasVerifiedMobile: intentHasVerifiedMobile,
+				locationId: selectedLocation.id,
+				locationName: selectedLocation.name,
+				requiresCard: Boolean(intentCart.summary.paymentMethodRequired),
+				selectedEndTime: intentEndTime?.toISOString(),
+				selectedPaymentMethodType: intentPaymentMethodType,
+				selectedStartTime: intentStartTime?.toISOString(),
+				serviceCategory: selectedService.categoryName,
+				serviceId: selectedService.item.id,
+				serviceName: selectedService.item.name,
+				valueUsd: getProjectedRevenueForBlvdService(selectedService.item.name),
+			},
+			client: {
+				boulevardClientId: clientInformation?.externalId ?? undefined,
+				email: clientInformation?.email ?? clientForm.email ?? undefined,
+				firstName:
+					clientInformation?.firstName ?? clientForm.firstName ?? undefined,
+				lastName: clientInformation?.lastName ?? clientForm.lastName ?? undefined,
+				phone:
+					clientInformation?.phoneNumber ??
+					ownershipVerifiedPhone ??
+					clientForm.phone ??
+					undefined,
+			},
+			occurred_at: new Date().toISOString(),
+			status,
+			step,
+		}
+		const dedupeKey = JSON.stringify({ ...payload, occurred_at: undefined })
+		if (lastBookingIntentKeyRef.current === dedupeKey) return
+		lastBookingIntentKeyRef.current = dedupeKey
+		queueBlvdBookingIntent(payload)
 	}
 
 	return (
@@ -1279,7 +1448,7 @@ export default function BlvdBookRoute() {
 										<p className="-mt-4 mb-4 max-w-xl text-center text-sm text-muted-foreground">
 											Please select a service.
 										</p>
-										<div className="flex w-full max-w-full flex-col items-center gap-3 sm:flex-row">
+										<div className="flex w-full max-w-full flex-col items-center gap-3 px-1 py-1 sm:flex-row">
 											<Input
 												ref={searchInputRef}
 												className="w-full"
@@ -1673,7 +1842,7 @@ export default function BlvdBookRoute() {
 											{selectedTime
 												? formatTimeLabel(selectedTime.startTime)
 												: ''}
-											. Fill out the client details and card hold below.
+											. Verify your mobile number to continue.
 										</p>
 										<div className="w-full space-y-6">
 											<form
@@ -1694,22 +1863,20 @@ export default function BlvdBookRoute() {
 													<div className="space-y-4 rounded-xl border bg-white p-5 md:col-span-2">
 														<div className="space-y-1">
 															<h3 className="text-lg font-semibold">
-																Returning client?
+																Verify your mobile number
 															</h3>
-															<p className="text-sm text-muted-foreground">
-																Verify the mobile number on your Boulevard
-																account to link this booking to your existing
-																patient record.
-															</p>
 														</div>
-														{hasVerifiedClient ? (
+														{hasVerifiedMobile ? (
 															<div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
-																Your number is verified. We will use the
-																existing Boulevard patient record on file for
-																this booking.
+																Mobile number verified.
 															</div>
 														) : (
 															<div className="space-y-3">
+																{ownershipStepError ? (
+																	<div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+																		{ownershipStepError}
+																	</div>
+																) : null}
 																<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
 																	<Button
 																		type="button"
@@ -1717,7 +1884,10 @@ export default function BlvdBookRoute() {
 																		onClick={() => {
 																			void handleSendOwnershipCode()
 																		}}
-																		disabled={sendingOwnershipCode}
+																		disabled={
+																			sendingOwnershipCode ||
+																			!canRequestOwnershipCode
+																		}
 																	>
 																		{sendingOwnershipCode
 																			? 'Sending Code...'
@@ -1725,16 +1895,16 @@ export default function BlvdBookRoute() {
 																				? 'Send A New Code'
 																				: 'Text Me A Code'}
 																	</Button>
-																	{ownershipCodeId ? (
+																	{canShowOwnershipCodeEntry ? (
 																		<p className="text-sm text-muted-foreground">
-																			Enter the 6-digit code from your text to
-																			continue as a returning client.
+																			Enter the code from your text.
 																		</p>
 																	) : null}
 																</div>
-																{ownershipCodeId ? (
-																	<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+																{canShowOwnershipCodeEntry ? (
+																	<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
 																		<Input
+																			className="placeholder:text-muted-foreground/45"
 																			value={ownershipCodeValue}
 																			onChange={event => {
 																				setOwnershipCodeValue(
@@ -1749,6 +1919,7 @@ export default function BlvdBookRoute() {
 																		/>
 																		<Button
 																			type="button"
+																			className="w-full whitespace-nowrap sm:w-auto"
 																			onClick={() => {
 																				void handleVerifyOwnershipCode()
 																			}}
@@ -1768,7 +1939,7 @@ export default function BlvdBookRoute() {
 															Your contact details are already attached through
 															the verified Boulevard record.
 														</div>
-													) : (
+													) : shouldCollectClientInformation ? (
 														<>
 															<div className="space-y-2">
 																<Label htmlFor="firstName">First name</Label>
@@ -1799,18 +1970,7 @@ export default function BlvdBookRoute() {
 																/>
 															</div>
 														</>
-													)}
-												</div>
-
-												<div className="space-y-2">
-													<Label htmlFor="notes">Optional note</Label>
-													<Textarea
-														id="notes"
-														name="notes"
-														placeholder="Anything Sarah should know before the visit"
-														value={clientForm.notes}
-														onChange={updateClientForm}
-													/>
+													) : null}
 												</div>
 
 												{cart?.bookingQuestions &&
@@ -1882,6 +2042,17 @@ export default function BlvdBookRoute() {
 										</h2>
 										<div className="w-full space-y-6">
 											<form className="space-y-8" onSubmit={handleCheckout}>
+												<div className="space-y-2">
+													<Label htmlFor="notes">Optional note</Label>
+													<Textarea
+														id="notes"
+														name="notes"
+														placeholder="Anything Sarah should know before the visit"
+														value={clientForm.notes}
+														onChange={updateClientForm}
+													/>
+												</div>
+
 												{requiresCard ? (
 													<div className="space-y-4 rounded-xl border bg-white p-5">
 														<div className="space-y-1">
@@ -2028,11 +2199,16 @@ export default function BlvdBookRoute() {
 													</div>
 												) : null}
 
-												<div className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-3 border-t bg-background/95 px-4 py-4 shadow-[0_-12px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:mx-0 sm:flex-row sm:items-center sm:justify-between sm:bg-transparent sm:px-0 sm:pt-6 sm:shadow-none sm:backdrop-blur-none">
+												<div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
 													<div className="text-sm text-muted-foreground">
-														<p className="font-semibold text-foreground">
-															Not booked yet
-														</p>
+														{patientName ? (
+															<p>
+																Patient:{' '}
+																<span className="font-medium text-foreground">
+																	{patientName}
+																</span>
+															</p>
+														) : null}
 														<p>
 															Selected time:{' '}
 															<span className="font-medium text-foreground">
@@ -2708,6 +2884,33 @@ function queueBlvdBookingAttributionTouch(payload: Record<string, unknown>) {
 	}
 }
 
+async function persistBlvdBookingIntent(payload: Record<string, unknown>) {
+	if (typeof window === 'undefined') return
+
+	const response = await fetch('/resources/blvd-booking-intent', {
+		body: JSON.stringify(payload),
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		keepalive: true,
+		method: 'POST',
+	})
+
+	if (!response.ok) {
+		throw new Error('Failed to persist Boulevard booking intent')
+	}
+}
+
+function queueBlvdBookingIntent(payload: Record<string, unknown>) {
+	try {
+		void persistBlvdBookingIntent(payload).catch(error => {
+			console.error('Failed to persist Boulevard booking intent', error)
+		})
+	} catch (error) {
+		console.error('Failed to queue Boulevard booking intent', error)
+	}
+}
+
 function normalizePhoneNumber(value: string) {
 	const digits = value.replace(/\D/g, '')
 	if (digits.length === 10) return `+1${digits}`
@@ -2726,6 +2929,7 @@ function looksLikePhoneNumber(value: string) {
 function validateClientDetails({
 	answers,
 	clientForm,
+	hasVerifiedMobile,
 	requireClientInformation = true,
 	questions,
 }: {
@@ -2736,10 +2940,14 @@ function validateClientDetails({
 		lastName: string
 		phone: string
 	}
+	hasVerifiedMobile: boolean
 	requireClientInformation?: boolean
 	questions: BlvdBookingQuestion[]
 }) {
 	if (!clientForm.phone.trim()) return 'Mobile phone is required.'
+	if (!hasVerifiedMobile) {
+		return 'Verify your mobile number before continuing.'
+	}
 
 	if (requireClientInformation) {
 		if (!clientForm.firstName.trim()) return 'First name is required.'
@@ -2755,6 +2963,47 @@ function validateClientDetails({
 	}
 
 	return null
+}
+
+function isMobileVerificationValidationError(error: string) {
+	return (
+		error === 'Mobile phone is required.' ||
+		error === 'Verify your mobile number before continuing.'
+	)
+}
+
+function formatClientName({
+	firstName,
+	lastName,
+}: {
+	firstName?: string | null
+	lastName?: string | null
+}) {
+	return [firstName, lastName]
+		.map(part => part?.trim())
+		.filter(Boolean)
+		.join(' ')
+}
+
+function allRequiredBookingQuestionsAnswered(
+	cart: Pick<BlvdCart, 'bookingQuestions'>,
+	answers: Record<string, unknown>,
+) {
+	return cart.bookingQuestions.every(
+		question =>
+			!question.required || hasBookingQuestionAnswer(answers[question.id]),
+	)
+}
+
+function hasAttachedBlvdClient(
+	clientInformation: BlvdCart['clientInformation'] | undefined,
+) {
+	return Boolean(
+		clientInformation?.externalId?.trim() ||
+			(clientInformation?.email?.trim() &&
+				clientInformation.firstName?.trim() &&
+				clientInformation.lastName?.trim()),
+	)
 }
 
 function validatePaymentDetails(clientForm: {

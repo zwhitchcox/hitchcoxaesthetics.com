@@ -126,11 +126,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 	const [
 		clients,
+		bookingIntents,
 		touches,
 		appointments,
 		revenueItems,
 		syncStates,
 		clientCount,
+		bookingIntentCount,
 		touchCount,
 		appointmentCount,
 		revenueCount,
@@ -147,6 +149,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				},
 			},
 			orderBy: [{ latestTouchAt: 'desc' }, { createdAt: 'desc' }],
+		}),
+		prisma.blvdBookingIntent.findMany({
+			orderBy: [{ lastSeenAt: 'desc' }, { createdAt: 'desc' }],
 		}),
 		prisma.blvdAttributionTouch.findMany({
 			include: {
@@ -174,6 +179,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		}),
 		prisma.blvdSyncState.findMany({ orderBy: { key: 'asc' } }),
 		prisma.blvdClient.count(),
+		prisma.blvdBookingIntent.count(),
 		prisma.blvdAttributionTouch.count(),
 		prisma.blvdAttributedAppointment.count(),
 		prisma.blvdRevenueItem.count(),
@@ -195,12 +201,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 	return json({
 		clients,
+		bookingIntents,
 		touches,
 		appointments,
 		revenueItems,
 		syncStates,
 		missingBookingPricingServiceNames,
 		clientCount,
+		bookingIntentCount,
 		touchCount,
 		appointmentCount,
 		revenueCount,
@@ -226,11 +234,16 @@ export default function BoulevardAdminPage() {
 				</p>
 			</div>
 
-			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
 				<SummaryCard
 					title="Clients"
 					description="Distinct Boulevard clients tracked for attribution."
 					value={String(data.clientCount)}
+				/>
+				<SummaryCard
+					title="Booking Intents"
+					description="Partial website booking attempts saved before checkout."
+					value={String(data.bookingIntentCount)}
 				/>
 				<SummaryCard
 					title="Touches"
@@ -315,6 +328,73 @@ export default function BoulevardAdminPage() {
 								</td>
 								<td className="px-4 py-3">
 									{formatDateTime(client.latestTouchAt)}
+								</td>
+							</tr>
+						))}
+					</DataTable>
+				</SectionCard>
+
+				<SectionCard
+					title="Booking Intents"
+					description="Partial website booking attempts saved before checkout, including verified client details when available."
+				>
+					<DataTable
+						headers={[
+							'Last Seen',
+							'Status',
+							'Client',
+							'Service',
+							'Location',
+							'Selected Time',
+							'Source',
+							'Cart',
+						]}
+					>
+						{data.bookingIntents.map(intent => (
+							<tr key={intent.id} className="border-t align-top">
+								<td className="whitespace-nowrap px-4 py-3">
+									{formatDateTime(intent.lastSeenAt)}
+								</td>
+								<td className="px-4 py-3">
+									<div>{compactText(intent.status)}</div>
+									<div className="text-xs text-muted-foreground">
+										{compactText(intent.step)}
+									</div>
+								</td>
+								<td className="px-4 py-3">
+									<div>
+										{[intent.clientFirstName, intent.clientLastName]
+											.filter(Boolean)
+											.join(' ') || ' - '}
+									</div>
+									<div className="text-xs text-muted-foreground">
+										{compactText(intent.clientPhone)}
+									</div>
+									<div className="text-xs text-muted-foreground">
+										{compactText(intent.clientEmail)}
+									</div>
+								</td>
+								<td className="px-4 py-3">
+									<div>{compactText(intent.bookingServiceName)}</div>
+									<div className="text-xs text-muted-foreground">
+										{compactText(intent.bookingServiceCategory)}
+									</div>
+								</td>
+								<td className="px-4 py-3">
+									{compactText(intent.bookingLocationName)}
+								</td>
+								<td className="whitespace-nowrap px-4 py-3">
+									{formatDateTime(intent.selectedStartTime)}
+								</td>
+								<td className="px-4 py-3">
+									<div>{compactText(intent.trafficSourceDetail)}</div>
+									<div className="text-xs text-muted-foreground">
+										{compactText(intent.trafficChannel)} /{' '}
+										{compactText(intent.trafficPlatform)}
+									</div>
+								</td>
+								<td className="px-4 py-3 font-mono text-xs">
+									{compactText(intent.bookingCartId)}
 								</td>
 							</tr>
 						))}

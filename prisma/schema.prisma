@@ -441,6 +441,89 @@ model BlvdAttributionTouch {
   @@index([callrailVisitorId])
 }
 
+model BlvdBookingIntent {
+  id String @id @default(cuid())
+
+  occurredAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  status     String   @default("in_progress")
+  step       String?
+
+  bookingCartId              String? @unique
+  bookingLocationId          String?
+  bookingLocationName        String?
+  bookingServiceId           String?
+  bookingServiceName         String?
+  bookingServiceCategory     String?
+  bookingSelectedPaymentType String?
+  bookingValueUsd            Float?
+  bookingRequiresCard        Boolean?
+  bookingHasVerifiedMobile   Boolean?
+  bookingHasVerifiedClient   Boolean?
+  appointmentCount           Int?
+  appointmentIds             String?
+  selectedStartTime          DateTime?
+  selectedEndTime            DateTime?
+
+  boulevardClientId String?
+  clientEmail       String?
+  clientPhone       String?
+  clientFirstName   String?
+  clientLastName    String?
+
+  bookEntryFromPath            String?
+  bookEntryPagePrefixType      String?
+  bookEntryPageType            String?
+  initialLandingPath           String?
+  initialLandingPagePrefixType String?
+  initialLandingPageType       String?
+  initialReferrer              String?
+  initialReferringDomain       String?
+
+  trafficChannel           String?
+  trafficPlatform          String?
+  trafficSourceDetail      String?
+  posthogDistinctId        String?
+  posthogSessionId         String?
+  callrailAccountId        String?
+  callrailCallId           String?
+  callrailSessionId        String?
+  callrailVisitorId        String?
+  callrailPersonId         String?
+  callrailTimelineUrl      String?
+  callrailSource           String?
+  callrailMedium           String?
+  callrailLandingPageUrl   String?
+  callrailLastRequestedUrl String?
+
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  gclid       String?
+  gbraid      String?
+  wbraid      String?
+  fbclid      String?
+  msclkid     String?
+
+  rawProperties String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([step])
+  @@index([lastSeenAt])
+  @@index([boulevardClientId])
+  @@index([clientPhone])
+  @@index([posthogSessionId])
+  @@index([posthogDistinctId])
+  @@index([callrailCallId])
+  @@index([callrailSessionId])
+  @@index([callrailVisitorId])
+}
+
 model BlvdAttributedAppointment {
   id                     String    @id @default(cuid())
   boulevardAppointmentId String    @unique
