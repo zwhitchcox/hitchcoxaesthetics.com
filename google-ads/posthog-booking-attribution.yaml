@@ -432,7 +432,7 @@ dashboards:
                   - details
                 operator: exact
           - event: booking_step_viewed
-            custom_name: Booking - Credit Card/Reserve
+            custom_name: Booking - Reserve
             properties:
               - key: step
                 type: event

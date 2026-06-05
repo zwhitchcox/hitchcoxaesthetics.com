@@ -1,4 +1,16 @@
-import { getRetellPricingSummary } from '../app/utils/service-pricing.ts'
+import { type getRetellPricingSummary as getRetellPricingSummaryType } from '../app/utils/service-pricing.ts'
+
+const servicePricingImportUrl = new URL(
+	'../app/utils/service-pricing.ts',
+	import.meta.url,
+)
+servicePricingImportUrl.searchParams.set('updatedAt', String(Date.now()))
+
+const { getRetellPricingSummary } = (await import(
+	/* @vite-ignore */ servicePricingImportUrl.href
+)) as {
+	getRetellPricingSummary: typeof getRetellPricingSummaryType
+}
 
 type ToolHeaders = Record<string, string> | undefined
 
@@ -221,7 +233,7 @@ export function upsertRetellTools({
 			return {
 				...record,
 				description:
-					'End the call after the appointment is booked, the caller is done, or immediately after block_spam_caller returns.',
+					'End the call only after the appointment is booked, immediately after block_spam_caller returns, or after the caller clearly says goodbye or says they need no more help. Do not end the call after an incomplete or ambiguous phrase like "okay", "that is", or "I will think about it"; ask one brief follow-up instead.',
 			}
 		}
 		return record
@@ -244,7 +256,7 @@ export function upsertRetellTools({
 			type: 'end_call',
 			name: 'end_call',
 			description:
-				'End the call after the appointment is booked, the caller is done, or immediately after block_spam_caller returns.',
+				'End the call only after the appointment is booked, immediately after block_spam_caller returns, or after the caller clearly says goodbye or says they need no more help. Do not end the call after an incomplete or ambiguous phrase like "okay", "that is", or "I will think about it"; ask one brief follow-up instead.',
 		})
 	}
 	return nextTools
@@ -290,12 +302,14 @@ export function buildUpdatedPrompt(
 	const staffMessageInstruction = `Staff message email: If the caller needs something you cannot complete, prefer taking a message for ${staffRecipient} instead of transferring. For direct message or callback requests, first call lookup_caller silently, then follow Caller identity. If lookup_caller returns a name and the caller has not already stated a matching name in this call, ask exactly once, "Am I speaking with [full name]?" before asking for any missing message details. If the caller already stated a matching name, do not confirm their name again. Do not ask for a caller name when a profile/name is available. If callback is needed and the caller phone is known, ask "Can ${staffRecipient} call you back at this number?" and only ask for a different callback number if they say no. If no profile/name is available after lookup_caller, ask for their name. Collect a brief message and any relevant context, then call send_staff_message with notification_type "left_message" or "needs_follow_up". If send_staff_message returns ok false, say there was a problem sending the message and offer to connect them to ${staffRecipient}. If the caller started booking, asked about availability, pricing, services, or showed interest but chooses not to book, call send_staff_message before ending the call with notification_type "booking_not_completed". Include the service, location, preferred date/time if known, the reason they did not book, and a short message in the caller’s own words; this endpoint saves that reason to the database. Do not look up appointments just to send a staff message; the send_staff_message endpoint automatically enriches from caller ID with client details, upcoming appointments, most recent appointment, Boulevard links, and a Retell call link when available. Do not send this for spam calls or successfully completed bookings. If the caller insists on speaking to someone live instead of leaving a message, call transfer_to_human.`
 	const transferInstruction =
 		'Human transfer: If the caller asks to speak to a human, person, staff member, team member, front desk, receptionist, office, Sarah, or says they do not want the AI to continue, briefly say "Sure, I can connect you now." Then immediately call transfer_to_human and stop talking while the transfer runs. Do not explain the transfer, do not give a handoff summary, and do not say you cannot transfer.'
+	const closingInstruction =
+		'Closing calls: Do not call end_call just because a caller says "okay", "thanks", "that is", pauses, trails off, or says they need to look into pricing. For pricing or service questions, answer the question, then ask one concise follow-up like "Would you like me to check availability?" or "Would you like Sarah to follow up?" Only call end_call after the caller clearly says goodbye, says they do not need anything else, or after block_spam_caller returns. If someone asked about pricing, services, availability, or booking but does not book, call send_staff_message with notification_type "booking_not_completed" before ending when appropriate.'
 	const spamInstruction = `Spam handling is a hard stop. If the caller is trying to sell ${businessName} anything, asks whether the business is interested in buying anything, offers a long-distance plan, phone plan, warranty, extended warranty, insurance, marketing, SEO, ads, financing, merchant services, staffing, supplies, or any unrelated product or service, immediately call block_spam_caller with a short reason. Also do this if they say they are spam or a spammer, are a robocall, are telemarketing, are abusive, are prank-calling, or explicitly ask to be blocked. Do not clarify first. After block_spam_caller returns, immediately call end_call regardless of whether CallRail marked the call. Do not continue the conversation, do not ask appointment questions, and do not try to book.`
 	const phoneInstruction =
 		'When calling block_spam_caller, pass caller_phone_number from the current call object if available. If Retell does not expose it, pass null; the tool server will also try to infer it from the call payload.'
 	const prompt = currentPrompt?.trim()
 	if (!prompt) {
-		return `${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
+		return `${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${closingInstruction}\n${spamInstruction}\n${phoneInstruction}`
 	}
 	if (
 		prompt.includes(openingInstruction) &&
@@ -309,6 +323,7 @@ export function buildUpdatedPrompt(
 		prompt.includes(appointmentManagementInstruction) &&
 		prompt.includes(staffMessageInstruction) &&
 		prompt.includes(transferInstruction) &&
+		prompt.includes(closingInstruction) &&
 		prompt.includes(spamInstruction) &&
 		prompt.includes(phoneInstruction)
 	) {
@@ -352,12 +367,13 @@ export function buildUpdatedPrompt(
 				!line.includes('Appointment changes:') &&
 				!line.includes('Staff message email:') &&
 				!line.includes('Human transfer:') &&
+				!line.includes('Closing calls:') &&
 				!line.includes(
 					'Before booking, confirm the service, location, appointment date and time, first and last name',
 				),
 		)
 		.join('\n')
-	return `${withoutManagedLines}\n${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${spamInstruction}\n${phoneInstruction}`
+	return `${withoutManagedLines}\n${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${closingInstruction}\n${spamInstruction}\n${phoneInstruction}`
 }
 
 function buildBasePrompt(brand: RetellBookingBrandConfig) {

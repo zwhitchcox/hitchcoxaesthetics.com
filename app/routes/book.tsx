@@ -27,6 +27,10 @@ import {
 	locations as siteLocations,
 } from '#app/utils/locations.ts'
 import { cn, getErrorMessage } from '#app/utils/misc.tsx'
+import {
+	buildBookingPostHogIdentity,
+	type BookingPostHogIdentityInput,
+} from '#app/utils/posthog-booking-identity.ts'
 import { usePostHog } from '#app/utils/posthog.tsx'
 import {
 	getBlvdBookingPriceDisplay,
@@ -364,6 +368,7 @@ export default function BlvdBookRoute() {
 	const pendingBookingStepsRef = useRef<Set<string>>(new Set())
 	const bookingAnalyticsPropertiesRef = useRef<Record<string, unknown>>({})
 	const lastBookingIntentKeyRef = useRef<string | null>(null)
+	const lastPostHogIdentityKeyRef = useRef<string | null>(null)
 
 	useEffect(() => {
 		let cancelled = false
@@ -548,6 +553,19 @@ export default function BlvdBookRoute() {
 			...selectionAnalyticsProperties,
 		}
 	}, [selectionAnalyticsProperties, sourceHintAnalyticsProperties])
+
+	function identifyBookingPerson(input: BookingPostHogIdentityInput) {
+		if (!posthog) return
+
+		const identity = buildBookingPostHogIdentity(input)
+		if (!identity) return
+
+		const identityKey = JSON.stringify(identity)
+		if (lastPostHogIdentityKeyRef.current === identityKey) return
+		lastPostHogIdentityKeyRef.current = identityKey
+
+		posthog.identify(identity.distinctId, identity.properties)
+	}
 
 	const filteredServices = useMemo(() => {
 		const trimmedSearch = search.trim()
@@ -859,6 +877,16 @@ export default function BlvdBookRoute() {
 
 		setStepError(null)
 		setOwnershipStepError(null)
+		identifyBookingPerson({
+			boulevardClientId: cart.clientInformation?.externalId,
+			email: cart.clientInformation?.email ?? clientForm.email,
+			firstName: cart.clientInformation?.firstName ?? clientForm.firstName,
+			lastName: cart.clientInformation?.lastName ?? clientForm.lastName,
+			phone:
+				cart.clientInformation?.phoneNumber ??
+				ownershipVerifiedPhone ??
+				clientForm.phone,
+		})
 		setDetailsSubmitted(true)
 		setActiveStep('reserve')
 		queueCurrentBlvdBookingIntent({
@@ -942,6 +970,23 @@ export default function BlvdBookRoute() {
 
 			const checkoutPayload = await nextCart.checkout()
 			setCart(checkoutPayload.cart)
+			identifyBookingPerson({
+				boulevardClientId:
+					checkoutPayload.appointments.find(appointment => appointment.clientId)
+						?.clientId ?? checkoutPayload.cart.clientInformation?.externalId,
+				email:
+					checkoutPayload.cart.clientInformation?.email ?? clientForm.email,
+				firstName:
+					checkoutPayload.cart.clientInformation?.firstName ??
+					clientForm.firstName,
+				lastName:
+					checkoutPayload.cart.clientInformation?.lastName ??
+					clientForm.lastName,
+				phone:
+					checkoutPayload.cart.clientInformation?.phoneNumber ??
+					ownershipVerifiedPhone ??
+					clientForm.phone,
+			})
 
 			const projectedRevenueUsd = getProjectedRevenueForBlvdService(
 				selectedService.item.name,
@@ -1182,6 +1227,16 @@ export default function BlvdBookRoute() {
 				ownershipCodeId,
 				Number(normalizedCode),
 			)
+			identifyBookingPerson({
+				boulevardClientId: nextCart.clientInformation?.externalId,
+				email: nextCart.clientInformation?.email ?? clientForm.email,
+				firstName:
+					nextCart.clientInformation?.firstName ?? clientForm.firstName,
+				lastName: nextCart.clientInformation?.lastName ?? clientForm.lastName,
+				phone:
+					nextCart.clientInformation?.phoneNumber ??
+					normalizePhoneNumber(clientForm.phone),
+			})
 			setCart(nextCart)
 			setOwnershipVerifiedPhone(normalizePhoneNumber(clientForm.phone))
 			setVerifiedExistingClient(true)
@@ -1276,8 +1331,7 @@ export default function BlvdBookRoute() {
 		const intentStartTime =
 			toDate(intentSelectedTime?.startTime ?? null) ??
 			toDate(intentCart.startTime ?? null)
-		const intentEndTime =
-			toDate(intentCart.endTime ?? null)
+		const intentEndTime = toDate(intentCart.endTime ?? null)
 		const intentPaymentMethodType = intentCart.summary.paymentMethodRequired
 			? intentSelectedExistingPaymentMethod
 				? 'saved_card'
@@ -1308,7 +1362,8 @@ export default function BlvdBookRoute() {
 				email: clientInformation?.email ?? clientForm.email ?? undefined,
 				firstName:
 					clientInformation?.firstName ?? clientForm.firstName ?? undefined,
-				lastName: clientInformation?.lastName ?? clientForm.lastName ?? undefined,
+				lastName:
+					clientInformation?.lastName ?? clientForm.lastName ?? undefined,
 				phone:
 					clientInformation?.phoneNumber ??
 					ownershipVerifiedPhone ??
@@ -2762,7 +2817,9 @@ function cartHasSelectedTime(cart: BlvdCart, selectedTime: BlvdBookableTime) {
 
 	if (!cartStartTime || !selectedStartTime) return false
 
-	return Math.abs(cartStartTime.getTime() - selectedStartTime.getTime()) < 60_000
+	return (
+		Math.abs(cartStartTime.getTime() - selectedStartTime.getTime()) < 60_000
+	)
 }
 
 async function ensureCartHasSelectedTime(

@@ -36,6 +36,7 @@ const retellAgentWatchFiles = [
 	'scripts/retell-booking-agent-config.ts',
 	'scripts/retell-booking-dev.ts',
 	'scripts/retell-create-booking-agent.ts',
+	'app/utils/service-pricing.ts',
 	'app/routes/$token.retell-booking+/caller.ts',
 	'app/routes/$token.retell-booking+/services.ts',
 	'app/routes/$token.retell-booking+/availability.ts',
@@ -312,7 +313,7 @@ function upsertSpamTools(tools: Array<unknown>, publicUrl: string) {
 			return {
 				...record,
 				description:
-					'End the call after the appointment is booked, the caller is done, or immediately after block_spam_caller returns.',
+					'End the call only after the appointment is booked, immediately after block_spam_caller returns, or after the caller clearly says goodbye or says they need no more help. Do not end the call after an incomplete or ambiguous phrase like "okay", "that is", or "I will think about it"; ask one brief follow-up instead.',
 			}
 		}
 		return record
@@ -326,7 +327,7 @@ function upsertSpamTools(tools: Array<unknown>, publicUrl: string) {
 			type: 'end_call',
 			name: 'end_call',
 			description:
-				'End the call after the appointment is booked, the caller is done, or immediately after block_spam_caller returns.',
+				'End the call only after the appointment is booked, immediately after block_spam_caller returns, or after the caller clearly says goodbye or says they need no more help. Do not end the call after an incomplete or ambiguous phrase like "okay", "that is", or "I will think about it"; ask one brief follow-up instead.',
 		})
 	}
 	return nextTools
@@ -561,13 +562,15 @@ function buildUpdatedPrompt(
 		'When speaking appointment dates, say "today" for appointments on the current date and "tomorrow" for appointments on the next date. For dates after tomorrow, say the normal date, like Monday, June 1st. When offering appointment times, read the slot.spoken_time field exactly. Do not convert start_time yourself because start_time is UTC for booking. Use start_time and time_id only when calling book_appointment. Never invent, round, interpolate, or average appointment times. Only say exact local_time/spoken_time values returned by lookup_appointment_availability. When offering appointment times, say the exact matched service name once, such as "for Existing Client Tox" or "for New Client Tox", so callers know which service availability you checked.'
 	const returningClientInstruction =
 		'Returning-client booking: After the caller chooses a time, call book_appointment with caller_phone_number from the current call object if available, and set client to null. Do this before asking for email or name. If book_appointment returns client_verification_required, ask for the SMS code and call book_appointment again with the same appointment plus ownership_code_id and ownership_code_value. Only ask for first name, last name, email, and phone if book_appointment returns missing_client_details. If a saved payment method is available, book_appointment will use it; only collect card details if the tool returns missing_card.'
+	const closingInstruction =
+		'Closing calls: Do not call end_call just because a caller says "okay", "thanks", "that is", pauses, trails off, or says they need to look into pricing. For pricing or service questions, answer the question, then ask one concise follow-up like "Would you like me to check availability?" or "Would you like Sarah to follow up?" Only call end_call after the caller clearly says goodbye, says they do not need anything else, or after block_spam_caller returns.'
 	const spamInstruction =
 		'Spam handling is a hard stop. If the caller is trying to sell Sarah Hitchcox Aesthetics anything, asks whether the business is interested in buying anything, offers a long-distance plan, phone plan, warranty, extended warranty, insurance, marketing, SEO, ads, financing, merchant services, staffing, supplies, or any unrelated product or service, immediately call block_spam_caller with a short reason. Also do this if they say they are spam or a spammer, are a robocall, are telemarketing, are abusive, are prank-calling, or explicitly ask to be blocked. Do not clarify first. After block_spam_caller returns, immediately call end_call regardless of whether CallRail marked the call. Do not continue the conversation, do not ask appointment questions, and do not try to book.'
 	const phoneInstruction =
 		'When calling block_spam_caller, pass caller_phone_number from the current call object if available. If Retell does not expose it, pass null; the tool server will also try to infer it from the call payload.'
 	const prompt = currentPrompt?.trim()
 	if (!prompt) {
-		return `${openingInstruction}\n${availabilityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${spamInstruction}\n${phoneInstruction}`
+		return `${openingInstruction}\n${availabilityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${closingInstruction}\n${spamInstruction}\n${phoneInstruction}`
 	}
 	if (
 		prompt.includes(openingInstruction) &&
@@ -575,6 +578,7 @@ function buildUpdatedPrompt(
 		prompt.includes(callerLookupInstruction) &&
 		prompt.includes(dateSpeechInstruction) &&
 		prompt.includes(returningClientInstruction) &&
+		prompt.includes(closingInstruction) &&
 		prompt.includes(spamInstruction) &&
 		prompt.includes(phoneInstruction)
 	) {
@@ -595,12 +599,13 @@ function buildUpdatedPrompt(
 				!line.includes('Caller lookup:') &&
 				!line.includes('When speaking appointment dates, say "today"') &&
 				!line.includes('Returning-client booking:') &&
+				!line.includes('Closing calls:') &&
 				!line.includes(
 					'Before booking, confirm the service, location, appointment date and time, first and last name',
 				),
 		)
 		.join('\n')
-	return `${withoutOldSpamLine}\n${openingInstruction}\n${availabilityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${spamInstruction}\n${phoneInstruction}`
+	return `${withoutOldSpamLine}\n${openingInstruction}\n${availabilityInstruction}\n${callerLookupInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${closingInstruction}\n${spamInstruction}\n${phoneInstruction}`
 }
 
 async function smokeTest(publicUrl: string) {

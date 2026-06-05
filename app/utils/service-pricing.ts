@@ -2,6 +2,7 @@ export type PublicPricingKey =
 	| 'botox'
 	| 'filler'
 	| 'kybella'
+	| 'laserHairRemoval'
 	| 'lipFlip'
 	| 'lipoB12'
 	| 'semaglutide'
@@ -40,6 +41,11 @@ export const PUBLIC_SERVICE_PRICING: Record<
 		display: '$600/vial',
 		spoken: 'Kybella is $600 per vial.',
 	},
+	laserHairRemoval: {
+		display: 'Packages start at $599',
+		spoken:
+			'Laser hair removal packages start at $599 for small areas, $799 for medium areas, and $899 for large areas including Brazilian. Full legs are $2,500. Package pricing includes 6 sessions; touch-ups start at $49.',
+	},
 	lipFlip: {
 		display: '$129',
 		spoken: 'A lip flip is $129.',
@@ -67,6 +73,7 @@ export const PROJECTED_CUSTOMER_VALUE_USD: Record<PublicPricingKey, number> = {
 	botox: 600,
 	filler: 750,
 	kybella: 800,
+	laserHairRemoval: 600,
 	lipFlip: 150,
 	lipoB12: 0,
 	semaglutide: 600,
@@ -118,7 +125,7 @@ export const BLVD_SERVICE_PRICING: Record<string, BlvdPricingEntry> = {
 		display: 'Free Consultation · $799/6 sessions',
 	},
 	'Laser Hair Reduction - Small Area': {
-		display: 'Free Consultation · $499/6 sessions',
+		display: 'Free Consultation · $599/6 sessions',
 	},
 	'Lip Flip': {
 		display: PUBLIC_SERVICE_PRICING.lipFlip.display,
@@ -318,6 +325,7 @@ export function getRetellPricingSummary({
 				: [
 						PUBLIC_SERVICE_PRICING.botox,
 						PUBLIC_SERVICE_PRICING.filler,
+						PUBLIC_SERVICE_PRICING.laserHairRemoval,
 						PUBLIC_SERVICE_PRICING.lipFlip,
 						PUBLIC_SERVICE_PRICING.semaglutide,
 						PUBLIC_SERVICE_PRICING.tirzepatide,
