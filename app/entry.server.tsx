@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { PassThrough } from 'stream'
 import {
 	type ActionFunctionArgs,
@@ -16,6 +17,7 @@ import { getInstanceInfo } from '#/app/utils/litefs.server.ts'
 import { NonceProvider } from '#/app/utils/nonce-provider.ts'
 import { makeTimings } from '#/app/utils/timing.server.ts'
 import { initializeBackgroundJobs } from '#app/utils/background-jobs.server'
+import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 
 const ABORT_DELAY = 5000
 
@@ -104,7 +106,61 @@ export function handleError(
 	} else {
 		Sentry.captureException(error)
 	}
+
+	if (isBookingErrorRequest(request)) {
+		void captureServerPostHogEvent({
+			distinctId: `booking-server-error:${hashValue(
+				request.headers.get('x-request-id') ?? request.url,
+			)}`,
+			event: 'booking_error',
+			insertId: `booking-server-error:${Date.now()}:${Math.random()
+				.toString(36)
+				.slice(2)}`,
+			properties: {
+				booking_error_action: 'server_route_error',
+				booking_error_area: 'runtime',
+				booking_error_message: redactServerErrorText(getServerErrorMessage(error)),
+				booking_error_name: error instanceof Error ? error.name : undefined,
+				booking_error_source: 'server_global',
+				booking_error_url: redactServerErrorText(request.url),
+				booking_request_method: request.method,
+				booking_step: 'unknown',
+			},
+		})
+	}
 }
 
 // Initialize background jobs after server has started
 initializeBackgroundJobs()
+
+function isBookingErrorRequest(request: Request) {
+	const url = new URL(request.url)
+	return (
+		url.pathname === '/book' ||
+		url.pathname.startsWith('/book/') ||
+		url.pathname.startsWith('/resources/booking-') ||
+		url.pathname.startsWith('/resources/blvd-booking')
+	)
+}
+
+function getServerErrorMessage(error: unknown) {
+	if (error instanceof Error) return error.message
+	if (typeof error === 'string') return error
+	try {
+		return JSON.stringify(error)
+	} catch {
+		return 'Unknown server error'
+	}
+}
+
+function redactServerErrorText(value: string) {
+	return value
+		.replace(/\+?1?\d[\d\s().-]{8,}\d/g, '[phone]')
+		.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
+		.replace(/\s+/g, ' ')
+		.slice(0, 1000)
+}
+
+function hashValue(value: string) {
+	return createHash('sha256').update(value).digest('hex').slice(0, 16)
+}

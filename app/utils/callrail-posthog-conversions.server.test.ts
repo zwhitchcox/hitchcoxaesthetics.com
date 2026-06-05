@@ -1,10 +1,175 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
-import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
+import {
+	captureCallRailPhoneConversionToPostHog,
+	syncCallRailPhoneConversionsToPostHog,
+} from '#app/utils/callrail-posthog-conversions.server.ts'
 
 afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
+})
+
+test('captures a Retell booking conversion against the matched CallRail web session', async () => {
+	vi.stubEnv('REACT_APP_PUBLIC_POSTHOG_KEY', 'test-posthog-key')
+
+	const jsonResponse = (body: unknown, init?: ResponseInit) =>
+		new Response(JSON.stringify(body), {
+			...init,
+			headers: { 'Content-Type': 'application/json', ...init?.headers },
+		})
+	const fetchMock = vi.fn(async (url: string | URL, _init?: RequestInit) => {
+		if (String(url) === 'https://us.i.posthog.com/capture/') {
+			return jsonResponse({ status: 1 })
+		}
+
+		return jsonResponse(
+			{ error: `Unexpected request: ${String(url)}` },
+			{ status: 500 },
+		)
+	})
+	vi.stubGlobal('fetch', fetchMock)
+
+	const db = {
+		blvdAttributionTouch: {
+			findFirst: vi.fn(async () => null),
+		},
+		callTrackingSessionAttribution: {
+			findFirst: vi.fn(async () => ({
+				bookEntryFromPath: '/botox',
+				bookEntryPagePrefixType: 'non_lp',
+				bookEntryPageType: 'service',
+				callrailVisitorId: 'PER_1',
+				currentPath: '/book',
+				initialLandingPath: '/botox',
+				initialLandingPagePrefixType: 'non_lp',
+				initialLandingPageType: 'service',
+				initialReferrer: null,
+				initialReferringDomain: null,
+				posthogDistinctId: 'ph_distinct_from_web',
+				posthogSessionId: 'ph_session_from_web',
+				trafficChannel: 'paid_search',
+				trafficPlatform: 'google',
+				trafficSourceDetail: 'google_ads',
+				utmCampaign: null,
+				utmContent: null,
+				utmMedium: 'cpc',
+				utmSource: 'google',
+				utmTerm: null,
+			})),
+		},
+		retellCallOutcome: {
+			findFirst: vi.fn(async () => null),
+		},
+	}
+
+	const result = await captureCallRailPhoneConversionToPostHog({
+		accountId: 'ACC_TEST',
+		call: {
+			id: 'CAL_RETELL',
+			customer_phone_number: '+18652329501',
+			lead_status: 'good_lead',
+			person_id: 'PER_1',
+			session_uuid: 'SESSION_1',
+			start_time: '2026-06-05T14:01:10.000Z',
+			tags: ['Booked Appointment', 'Retell Booking'],
+			value: 600,
+		},
+		db: db as never,
+		extraProperties: {
+			booking_service_name: 'New Client Tox (Botox/Dysport/Jeuveau/Xeomin)',
+		},
+	})
+
+	expect(result).toMatchObject({
+		captured: 1,
+		matched: 1,
+		ok: true,
+		unmatched: 0,
+	})
+	expect(db.callTrackingSessionAttribution.findFirst).toHaveBeenCalledWith(
+		expect.objectContaining({
+			where: {
+				OR: [
+					{ callrailSessionId: 'SESSION_1' },
+					{ callrailVisitorId: 'PER_1' },
+				],
+			},
+		}),
+	)
+
+	const posthogCalls = fetchMock.mock.calls.filter(
+		([url]) => String(url) === 'https://us.i.posthog.com/capture/',
+	)
+	expect(posthogCalls).toHaveLength(2)
+	const conversionBody = JSON.parse(posthogCalls[0][1]?.body as string)
+	expect(conversionBody).toMatchObject({
+		distinct_id: 'ph_distinct_from_web',
+		event: 'phone_call_conversion',
+		properties: {
+			$insert_id: 'callrail-phone-conversion:CAL_RETELL',
+			attribution_match: 'call_tracking_session',
+			booking_channel: 'retell_voice',
+			booking_service_name: 'New Client Tox (Botox/Dysport/Jeuveau/Xeomin)',
+			callrail_call_id: 'CAL_RETELL',
+			callrail_session_id: 'SESSION_1',
+			current_path: '/book',
+			traffic_source_detail: 'google_ads',
+		},
+	})
+	const completedBody = JSON.parse(posthogCalls[1][1]?.body as string)
+	expect(completedBody).toMatchObject({
+		distinct_id: 'ph_distinct_from_web',
+		event: 'booking_conversion_completed',
+		properties: {
+			$insert_id: 'booking-conversion:phone:CAL_RETELL',
+			booking_channel: 'retell_voice',
+			booking_value_usd: 600,
+			conversion_channel: 'phone',
+		},
+	})
+})
+
+test('skips excluded CallRail phone conversions', async () => {
+	vi.stubEnv('REACT_APP_PUBLIC_POSTHOG_KEY', 'test-posthog-key')
+
+	const fetchMock = vi.fn(
+		async () => new Response(JSON.stringify({ status: 1 })),
+	)
+	vi.stubGlobal('fetch', fetchMock)
+
+	const db = {
+		blvdAttributionTouch: {
+			findFirst: vi.fn(async () => null),
+		},
+		callTrackingSessionAttribution: {
+			findFirst: vi.fn(async () => null),
+		},
+		retellCallOutcome: {
+			findFirst: vi.fn(async () => null),
+		},
+	}
+
+	const result = await captureCallRailPhoneConversionToPostHog({
+		accountId: 'ACC_TEST',
+		call: {
+			id: 'CAL_INTERNAL',
+			customer_phone_number: '(865) 210-1404',
+			lead_status: 'good_lead',
+			start_time: '2026-06-05T14:01:10.000Z',
+			tags: ['Booked Appointment', 'Retell Booking'],
+			value: 600,
+		},
+		db: db as never,
+	})
+
+	expect(result).toMatchObject({
+		captured: 0,
+		ok: true,
+		skip_reason: 'excluded_booking_phone',
+		skipped: true,
+	})
+	expect(fetchMock).not.toHaveBeenCalled()
 })
 
 test('syncs qualified CallRail phone conversions into PostHog with matched attribution', async () => {
@@ -19,9 +184,7 @@ test('syncs qualified CallRail phone conversions into PostHog with matched attri
 	const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
 		const href = String(url)
 		if (
-			href.startsWith(
-				'https://api.callrail.com/v3/a/ACC_TEST/calls.json?',
-			) &&
+			href.startsWith('https://api.callrail.com/v3/a/ACC_TEST/calls.json?') &&
 			init?.method === 'GET'
 		) {
 			return jsonResponse({

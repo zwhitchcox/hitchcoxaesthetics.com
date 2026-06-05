@@ -1,6 +1,8 @@
 import { z } from 'zod'
 
+import { isExcludedBookingAnalyticsIdentity } from '#app/utils/analytics-exclusions.ts'
 import { reportCallRailBookingConversion } from '#app/utils/callrail-booking.server.ts'
+import { captureCallRailPhoneConversionToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import { getMissingBlvdBookingPriceServiceNames } from '#app/utils/service-pricing.ts'
@@ -422,30 +424,36 @@ export async function recordBoulevardBookingAttributionTouch(
 	}
 
 	await refreshBlvdBookingPricingAudit(db)
-	const callRailReport = await reportCallRailBookingConversion({
-		appointmentIds: parsed.appointments.map(
-			appointment => appointment.appointmentId,
-		),
-		bookingChannel:
-			typeof parsed.attribution.booking_channel === 'string'
-				? parsed.attribution.booking_channel
-				: undefined,
-		boulevardClientId: client.boulevardClientId,
-		callrailAccountId: parsed.attribution.callrail_account_id,
-		callrailCallId: parsed.attribution.callrail_call_id,
-		callerPhoneNumber: parsed.client.phone,
-		cartId: parsed.booking.cartId,
-		customerName: [parsed.client.firstName, parsed.client.lastName]
-			.filter(Boolean)
-			.join(' '),
-		locationName: parsed.booking.locationName,
-		projectedRevenueUsd: parsed.booking.valueUsd ?? 0,
-		serviceName: parsed.booking.serviceName,
-		startTime: parsed.appointments[0]?.startTime,
-	}).catch(error => {
-		console.error('Failed to report Boulevard booking to CallRail', error)
-		return null
+	const excludeBookingAnalytics = isExcludedBookingAnalyticsIdentity({
+		email: parsed.client.email,
+		phone: parsed.client.phone,
 	})
+	const callRailReport = excludeBookingAnalytics
+		? null
+		: await reportCallRailBookingConversion({
+				appointmentIds: parsed.appointments.map(
+					appointment => appointment.appointmentId,
+				),
+				bookingChannel:
+					typeof parsed.attribution.booking_channel === 'string'
+						? parsed.attribution.booking_channel
+						: undefined,
+				boulevardClientId: client.boulevardClientId,
+				callrailAccountId: parsed.attribution.callrail_account_id,
+				callrailCallId: parsed.attribution.callrail_call_id,
+				callerPhoneNumber: parsed.client.phone,
+				cartId: parsed.booking.cartId,
+				customerName: [parsed.client.firstName, parsed.client.lastName]
+					.filter(Boolean)
+					.join(' '),
+				locationName: parsed.booking.locationName,
+				projectedRevenueUsd: parsed.booking.valueUsd ?? 0,
+				serviceName: parsed.booking.serviceName,
+				startTime: parsed.appointments[0]?.startTime,
+			}).catch(error => {
+				console.error('Failed to report Boulevard booking to CallRail', error)
+				return null
+			})
 	const callRailTouchData = callRailReport
 		? buildCallRailTouchData(callRailReport)
 		: null
@@ -453,6 +461,21 @@ export async function recordBoulevardBookingAttributionTouch(
 		await db.blvdAttributionTouch.update({
 			where: { id: touch.id },
 			data: callRailTouchData,
+		})
+	}
+	if (callRailReport?.callrail_reported) {
+		await captureCallRailBookingConversionToPostHog({
+			callRailReport,
+			db,
+			parsed,
+		}).catch(error => {
+			console.error(
+				'Failed to capture CallRail booking conversion in PostHog',
+				{
+					error,
+					callrailCallId: callRailReport.callrail_call_id,
+				},
+			)
 		})
 	}
 
@@ -501,6 +524,77 @@ function buildCallRailTouchData(input: {
 	return Object.keys(compactData).length > 0 ? compactData : null
 }
 
+async function captureCallRailBookingConversionToPostHog({
+	callRailReport,
+	db,
+	parsed,
+}: {
+	callRailReport: {
+		account_id?: string | null
+		callrail_call_id?: string | null
+		callrail_landing_page_url?: string | null
+		callrail_last_requested_url?: string | null
+		callrail_medium?: string | null
+		callrail_person_id?: string | null
+		callrail_session_id?: string | null
+		callrail_source?: string | null
+		callrail_timeline_url?: string | null
+		caller_phone_number?: string | null
+		posthog_distinct_id?: string | null
+		posthog_session_id?: string | null
+	}
+	db: DbLike
+	parsed: BoulevardBookingAttributionInput
+}) {
+	if (!callRailReport.account_id || !callRailReport.callrail_call_id) return
+
+	const occurredAt = parsed.booking.occurredAt ?? new Date().toISOString()
+	const valueUsd = parsed.booking.valueUsd ?? 0
+	const customerName = [parsed.client.firstName, parsed.client.lastName]
+		.filter(Boolean)
+		.join(' ')
+
+	await captureCallRailPhoneConversionToPostHog({
+		accountId: callRailReport.account_id,
+		call: {
+			id: callRailReport.callrail_call_id,
+			customer_name: customerName || null,
+			customer_phone_number:
+				callRailReport.caller_phone_number ?? parsed.client.phone,
+			custom: {
+				posthog_distinct_id: callRailReport.posthog_distinct_id,
+				posthog_session_id: callRailReport.posthog_session_id,
+			},
+			landing_page_url: callRailReport.callrail_landing_page_url,
+			last_requested_url: callRailReport.callrail_last_requested_url,
+			lead_status: 'good_lead',
+			medium: callRailReport.callrail_medium,
+			person_id: callRailReport.callrail_person_id,
+			session_uuid: callRailReport.callrail_session_id,
+			source: callRailReport.callrail_source,
+			start_time: occurredAt,
+			tags: ['Booked Appointment', 'Retell Booking'],
+			timeline_url: callRailReport.callrail_timeline_url,
+			value: valueUsd,
+		},
+		db,
+		extraProperties: {
+			appointment_count: parsed.appointments.length,
+			appointment_ids: parsed.appointments.map(
+				appointment => appointment.appointmentId,
+			),
+			blvd_client_id: parsed.client.boulevardClientId,
+			booking_cart_id: parsed.booking.cartId,
+			booking_location_name: parsed.booking.locationName,
+			booking_service_category: parsed.booking.serviceCategory,
+			booking_service_id: parsed.booking.serviceId,
+			booking_service_name: parsed.booking.serviceName,
+			customer_name: customerName || undefined,
+		},
+		timestamp: occurredAt,
+	})
+}
+
 async function syncBlvdRevenueItemToPostHog(
 	input: { revenueItemId: string },
 	db: DbLike,
@@ -522,6 +616,14 @@ async function syncBlvdRevenueItemToPostHog(
 		revenueItem.blvdClient?.boulevardClientId
 
 	if (!distinctId) return
+	if (
+		isExcludedBookingAnalyticsIdentity({
+			emails: [revenueItem.blvdClient?.email],
+			phones: [revenueItem.blvdClient?.phone],
+		})
+	) {
+		return
+	}
 
 	await captureServerPostHogEvent({
 		distinctId,

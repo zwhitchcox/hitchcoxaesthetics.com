@@ -76,10 +76,24 @@ dashboards:
         steps: *entry_to_completion_steps
 
       - kind: funnel
-        name: Entry To Completion - Client Type
-        description: 2-step booking funnel broken down by booking_client_type.
+        name: Client History To Completion - Client Type
+        description:
+          Client-history selection to completed booking, broken down by
+          booking_client_type.
         breakdown: booking_client_type
-        steps: *entry_to_completion_steps
+        steps: &client_history_to_completion_steps
+          - event: booking_client_history_selected
+            custom_name: Client History Selected
+          - event: booking_completed
+            custom_name: Booking Completed
+
+      - kind: funnel
+        name: Client History To Completion - Selection
+        description:
+          Client-history selection to completed booking, broken down by the
+          answer to "Have you been with us before?"
+        breakdown: booking_client_history_selection
+        steps: *client_history_to_completion_steps
 
       - kind: funnel
         name: Entry To Completion - LP Entry by Source Detail
@@ -157,6 +171,15 @@ dashboards:
         series:
           - event: booking_completed
             custom_name: Booking Completion Trends - Client Type
+
+      - kind: trend
+        name: Booking Completion Trends - Client History Selection
+        description:
+          Booking completions by the answer to "Have you been with us before?"
+        breakdown: booking_client_history_selection
+        series:
+          - event: booking_completed
+            custom_name: Booking Completion Trends - Client History Selection
 
       - kind: trend
         name: Booking Completion Trends - Telehealth
@@ -260,10 +283,10 @@ dashboards:
         steps: *entry_to_completion_steps
 
       - kind: funnel
-        name: Entry To Completion - Landing Path - New Clients
+        name: Client History To Completion - Landing Path - New Clients
         description:
-          Landing-page conversion rate for bookings on the default unverified
-          path.
+          Landing-page conversion rate for patients who selected that they have
+          not been with us before.
         breakdown: initial_landing_path
         properties:
           - key: booking_client_type
@@ -271,13 +294,13 @@ dashboards:
             value:
               - new_client
             operator: exact
-        steps: *entry_to_completion_steps
+        steps: *client_history_to_completion_steps
 
       - kind: funnel
-        name: Entry To Completion - Landing Path - Returning Clients
+        name: Client History To Completion - Landing Path - Returning Clients
         description:
-          Landing-page conversion rate for bookings with Boulevard ownership
-          verification.
+          Landing-page conversion rate for patients who selected that they have
+          been with us before or verified an existing Boulevard profile.
         breakdown: initial_landing_path
         properties:
           - key: booking_client_type
@@ -285,13 +308,13 @@ dashboards:
             value:
               - returning_client
             operator: exact
-        steps: *entry_to_completion_steps
+        steps: *client_history_to_completion_steps
 
       - kind: funnel
-        name: Entry To Completion - Entry Path - New Clients
+        name: Client History To Completion - Entry Path - New Clients
         description:
-          Last-page-before-book conversion rate for bookings on the default
-          unverified path.
+          Last-page-before-book conversion rate for patients who selected that
+          they have not been with us before.
         breakdown: book_entry_from_path
         properties:
           - key: booking_client_type
@@ -299,13 +322,14 @@ dashboards:
             value:
               - new_client
             operator: exact
-        steps: *entry_to_completion_steps
+        steps: *client_history_to_completion_steps
 
       - kind: funnel
-        name: Entry To Completion - Entry Path - Returning Clients
+        name: Client History To Completion - Entry Path - Returning Clients
         description:
-          Last-page-before-book conversion rate for bookings with Boulevard
-          ownership verification.
+          Last-page-before-book conversion rate for patients who selected that
+          they have been with us before or verified an existing Boulevard
+          profile.
         breakdown: book_entry_from_path
         properties:
           - key: booking_client_type
@@ -313,7 +337,7 @@ dashboards:
             value:
               - returning_client
             operator: exact
-        steps: *entry_to_completion_steps
+        steps: *client_history_to_completion_steps
 
       - kind: trend
         name: Booking Entry Trends - Landing Path
@@ -480,6 +504,14 @@ dashboards:
         breakdown: booking_client_type
         steps: *full_booking_steps
 
+      - kind: funnel
+        name: Full Booking Step Funnel - Client History Selection
+        description:
+          Full booking funnel broken down by the answer to "Have you been with
+          us before?"
+        breakdown: booking_client_history_selection
+        steps: *full_booking_steps
+
   - name: Booking Types - Source Breakdown
     description:
       Booking type mix by source, including both conversion counts and
@@ -507,6 +539,39 @@ dashboards:
         series:
           - event: booking_completed
             custom_name: Booking Completion Trends - Service Name
+
+      - kind: trend
+        name: Booking Completions - Source Detail - New Clients
+        description:
+          Website booking completions by traffic_source_detail for patients who
+          selected that they have not been with us before.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_client_type
+            type: event
+            value:
+              - new_client
+            operator: exact
+        series:
+          - event: booking_completed
+            custom_name: Booking Completions - Source Detail - New Clients
+
+      - kind: trend
+        name: Booking Completions - Source Detail - Returning Clients
+        description:
+          Website booking completions by traffic_source_detail for patients who
+          selected that they have been with us before or verified an existing
+          Boulevard profile.
+        breakdown: traffic_source_detail
+        properties:
+          - key: booking_client_type
+            type: event
+            value:
+              - returning_client
+            operator: exact
+        series:
+          - event: booking_completed
+            custom_name: Booking Completions - Source Detail - Returning Clients
 
       - kind: trend
         name: Revenue Proxy Trend - Service Category
@@ -952,7 +1017,8 @@ dashboards:
 
       - kind: trend
         name: Qualified Phone Calls - Channel
-        description: Qualified CallRail phone-call conversions by traffic_channel.
+        description:
+          Qualified CallRail phone-call conversions by traffic_channel.
         breakdown: traffic_channel
         series:
           - event: phone_call_conversion

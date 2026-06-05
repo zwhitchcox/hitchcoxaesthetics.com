@@ -1,4 +1,8 @@
 import {
+	getBookingAnalyticsExclusionReason,
+	isExcludedBookingAnalyticsIdentity,
+} from '#app/utils/analytics-exclusions.ts'
+import {
 	CALLRAIL_CALL_FIELDS,
 	callRailFetch,
 	getCallRailAccountIds,
@@ -51,6 +55,15 @@ type SyncCallRailPhoneConversionsOptions = {
 	until?: Date
 }
 
+type CaptureCallRailPhoneConversionOptions = {
+	accountId: string
+	call: CallRailConversionCall
+	db?: DbLike
+	dryRun?: boolean
+	extraProperties?: Record<string, unknown>
+	timestamp?: string
+}
+
 type MatchedAttribution = {
 	attribution_match: string
 	book_entry_from_path?: string | null
@@ -73,6 +86,124 @@ type MatchedAttribution = {
 	utm_medium?: string | null
 	utm_source?: string | null
 	utm_term?: string | null
+}
+
+export async function captureCallRailPhoneConversionToPostHog({
+	accountId,
+	call,
+	db = prisma,
+	dryRun = false,
+	extraProperties,
+	timestamp,
+}: CaptureCallRailPhoneConversionOptions) {
+	const event = await buildPhoneConversionEvent({
+		accountId,
+		call,
+		db,
+		extraProperties,
+		timestamp,
+	})
+
+	const stats = {
+		callId: event.callId,
+		captured: 0,
+		matched: event.attribution.attribution_match === 'none' ? 0 : 1,
+		unmatched: event.attribution.attribution_match === 'none' ? 1 : 0,
+	}
+	const eventProperties: Record<string, unknown> = event.properties
+	const exclusionReason =
+		getBookingAnalyticsExclusionReason({
+			emails: [
+				eventProperties.$email,
+				eventProperties.booking_client_email,
+				eventProperties.blvd_client_email,
+				eventProperties.client_email,
+				eventProperties.customer_email,
+				eventProperties.email,
+			],
+			phones: [
+				call.customer_phone_number,
+				call.formatted_customer_phone_number,
+				eventProperties.booking_client_phone,
+				eventProperties.booking_phone,
+				eventProperties.callrail_customer_phone_number,
+				eventProperties.callrail_formatted_customer_phone_number,
+				eventProperties.caller_phone_number,
+				eventProperties.client_phone,
+				eventProperties.customer_phone,
+				eventProperties.customer_phone_number,
+				eventProperties.mobile_phone,
+				eventProperties.phone,
+			],
+		}) ??
+		(isExcludedBookingAnalyticsIdentity({
+			phone: event.distinctId.startsWith('phone:')
+				? event.distinctId.slice('phone:'.length)
+				: null,
+		})
+			? 'excluded_booking_phone'
+			: null)
+
+	if (exclusionReason) {
+		return {
+			ok: true,
+			dry_run: dryRun,
+			skipped: true,
+			skip_reason: exclusionReason,
+			...stats,
+			attribution: event.attribution,
+			distinctId: event.distinctId,
+		}
+	}
+
+	if (dryRun) {
+		return {
+			ok: true,
+			dry_run: true,
+			...stats,
+			attribution: event.attribution,
+			distinctId: event.distinctId,
+		}
+	}
+
+	const result = await captureServerPostHogEvent({
+		distinctId: event.distinctId,
+		event: 'phone_call_conversion',
+		insertId: `callrail-phone-conversion:${event.callId}`,
+		properties: event.properties,
+		timestamp: event.timestamp,
+	})
+	if (!result?.ok) {
+		return {
+			ok: false,
+			dry_run: false,
+			error: result?.error ?? 'posthog_capture_failed',
+			...stats,
+			attribution: event.attribution,
+			distinctId: event.distinctId,
+		}
+	}
+
+	await captureServerPostHogEvent({
+		distinctId: event.distinctId,
+		event: 'booking_conversion_completed',
+		insertId: `booking-conversion:phone:${event.callId}`,
+		properties: {
+			...event.properties,
+			booking_value_usd: event.properties.phone_conversion_value_usd,
+			conversion_channel: 'phone',
+		},
+		timestamp: event.timestamp,
+	})
+
+	return {
+		ok: true,
+		dry_run: false,
+		...stats,
+		captured: 1,
+		attribution: event.attribution,
+		distinctId: event.distinctId,
+	}
 }
 
 export async function syncCallRailPhoneConversionsToPostHog(
@@ -139,43 +270,17 @@ export async function syncCallRailPhoneConversionsToPostHog(
 			}
 
 			stats.conversion_count += 1
-			const event = await buildPhoneConversionEvent({
+			const result = await captureCallRailPhoneConversionToPostHog({
 				accountId,
 				call,
 				db,
+				dryRun: options.dryRun,
 			})
-			if (event.attribution.attribution_match === 'none') {
-				stats.unmatched += 1
-			} else {
-				stats.matched += 1
-			}
-
-			if (!options.dryRun) {
-				const result = await captureServerPostHogEvent({
-					distinctId: event.distinctId,
-					event: 'phone_call_conversion',
-					insertId: `callrail-phone-conversion:${event.callId}`,
-					properties: event.properties,
-					timestamp: event.timestamp,
-				})
-				if (result?.ok) {
-					stats.captured += 1
-					await captureServerPostHogEvent({
-						distinctId: event.distinctId,
-						event: 'booking_conversion_completed',
-						insertId: `booking-conversion:phone:${event.callId}`,
-						properties: {
-							...event.properties,
-							booking_value_usd:
-								event.properties.phone_conversion_value_usd,
-							conversion_channel: 'phone',
-						},
-						timestamp: event.timestamp,
-					})
-				} else {
-					stats.skipped += 1
-				}
-			}
+			stats.matched += result.matched
+			stats.unmatched += result.unmatched
+			if ('skipped' in result && result.skipped) stats.skipped += 1
+			if (!options.dryRun && result.ok) stats.captured += result.captured
+			if (!options.dryRun && !result.ok) stats.skipped += 1
 		}
 	}
 
@@ -221,8 +326,7 @@ async function getSyncWindow(
 	const overlappedSince =
 		lastSyncedAt && !Number.isNaN(lastSyncedAt.getTime())
 			? new Date(
-					lastSyncedAt.getTime() -
-						DEFAULT_OVERLAP_HOURS * 60 * 60 * 1000,
+					lastSyncedAt.getTime() - DEFAULT_OVERLAP_HOURS * 60 * 60 * 1000,
 				)
 			: fallbackSince
 
@@ -280,10 +384,14 @@ async function buildPhoneConversionEvent({
 	accountId,
 	call,
 	db,
+	extraProperties,
+	timestamp,
 }: {
 	accountId: string
 	call: CallRailConversionCall
 	db: DbLike
+	extraProperties?: Record<string, unknown>
+	timestamp?: string
 }) {
 	const callId = requireString(call.id, 'CallRail call is missing id')
 	const attribution = await findMatchedAttribution({ call, db })
@@ -316,9 +424,7 @@ async function buildPhoneConversionEvent({
 				call.formatted_customer_phone_number,
 			),
 			callrail_landing_page_url: pickOptionalString(call.landing_page_url),
-			callrail_last_requested_url: pickOptionalString(
-				call.last_requested_url,
-			),
+			callrail_last_requested_url: pickOptionalString(call.last_requested_url),
 			callrail_lead_status: pickOptionalString(call.lead_status),
 			callrail_medium: pickOptionalString(call.medium),
 			callrail_person_id: pickOptionalString(call.person_id),
@@ -334,8 +440,9 @@ async function buildPhoneConversionEvent({
 			currency: 'USD',
 			phone_conversion_value_usd: valueUsd,
 			value: valueUsd,
+			...extraProperties,
 		}),
-		timestamp: callStartTime?.toISOString(),
+		timestamp: timestamp ?? callStartTime?.toISOString(),
 	}
 }
 
@@ -355,7 +462,10 @@ async function findMatchedAttribution({
 		posthog_session_id: pickFirstString(custom, POSTHOG_SESSION_CUSTOM_KEYS),
 	}
 
-	if (customAttribution.posthog_distinct_id || customAttribution.posthog_session_id) {
+	if (
+		customAttribution.posthog_distinct_id ||
+		customAttribution.posthog_session_id
+	) {
 		return {
 			...customAttribution,
 			attribution_match: 'callrail_custom_fields',
