@@ -127,6 +127,12 @@ export const BLVD_SERVICE_PRICING: Record<string, BlvdPricingEntry> = {
 	'Laser Hair Reduction - Small Area': {
 		display: 'Free Consultation · $599/6 sessions',
 	},
+	'Laser Hair Reduction': {
+		display: `Free Consultation · ${PUBLIC_SERVICE_PRICING.laserHairRemoval.display}`,
+	},
+	'Laser Services': {
+		display: `Free Consultation · ${PUBLIC_SERVICE_PRICING.laserHairRemoval.display}`,
+	},
 	'Lip Flip': {
 		display: PUBLIC_SERVICE_PRICING.lipFlip.display,
 	},
@@ -138,6 +144,9 @@ export const BLVD_SERVICE_PRICING: Record<string, BlvdPricingEntry> = {
 	},
 	'Microneedling w/ PRP': {
 		display: 'Free Consultation · $599/treatment or $1,550 for 3',
+	},
+	Microneedling: {
+		display: 'Free Consultation · Starts at $375/treatment',
 	},
 	'New Client Filler': {
 		display: `Free Consultation · ${PUBLIC_SERVICE_PRICING.filler.display}`,
@@ -172,6 +181,9 @@ export const BLVD_SERVICE_PRICING: Record<string, BlvdPricingEntry> = {
 	'Touch Up Laser Treatment - Small Area': {
 		display: '$49 touch-up',
 	},
+	'Touch Up Laser Treatment': {
+		display: 'Touch-ups start at $49',
+	},
 	'Tox/Filler Follow-Up': {
 		display: 'Follow-up visit',
 	},
@@ -186,6 +198,9 @@ export const BLVD_SERVICE_PRICING: Record<string, BlvdPricingEntry> = {
 	},
 	'VI Peel - Precision Plus with Peptides': {
 		display: 'Free Consultation · $339 / $95',
+	},
+	'VI Peel': {
+		display: 'Free Consultation · Starts at $279',
 	},
 	'Weight Loss Consultation': {
 		display: `Free Consultation · ${PUBLIC_SERVICE_PRICING.weightLoss.display}`,

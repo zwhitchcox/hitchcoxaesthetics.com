@@ -7,6 +7,7 @@ import {
 	boulevardBookingAttributionInputSchema,
 	recordBoulevardBookingAttributionTouch,
 } from '#app/utils/blvd-attribution.server.ts'
+import { isBlvdServiceCustomerBookable } from '#app/utils/blvd-service-display.ts'
 import { getProjectedRevenueForBlvdService } from '#app/utils/service-pricing.ts'
 
 type BlvdLocation = {
@@ -350,11 +351,15 @@ export const voiceBookAppointmentSchema = z.object({
 		)
 		.default([]),
 	caller_phone_number: optionalTrimmedString,
+	call_id: optionalTrimmedString,
+	callrail_account_id: optionalTrimmedString,
+	callrail_call_id: optionalTrimmedString,
 	location_id: optionalTrimmedString,
 	location_query: optionalTrimmedString,
 	notes: optionalTrimmedString,
 	ownership_code_id: optionalTrimmedString,
 	ownership_code_value: optionalTrimmedString,
+	retell_public_log_url: optionalTrimmedString,
 	service_id: optionalTrimmedString,
 	service_query: optionalTrimmedString,
 	start_time: z.string().trim().min(1),
@@ -1036,6 +1041,10 @@ export async function bookVoiceAppointment(input: VoiceBookAppointmentInput) {
 			})),
 			attribution: {
 				booking_channel: 'retell_test_agent',
+				callrail_account_id: input.callrail_account_id,
+				callrail_call_id: input.callrail_call_id,
+				retell_call_id: input.call_id,
+				retell_public_log_url: input.retell_public_log_url,
 			},
 			booking: {
 				cartId: checkout.cart.id,
@@ -1149,7 +1158,7 @@ async function getBlvdClient() {
 	return new sdk.Blvd(apiKey, businessId, sdk.PlatformTarget?.Live)
 }
 
-type AdminClientProfile = {
+export type AdminClientProfile = {
 	active?: boolean | null
 	email?: string | null
 	firstName?: string | null
@@ -1259,7 +1268,7 @@ function appointmentNotFound() {
 	}
 }
 
-async function findAdminClientByPhone(phone: string | null) {
+export async function findAdminClientByPhone(phone: string | null) {
 	if (!phone) return null
 	const normalizedPhone = normalizePhoneNumber(phone)
 	if (!normalizedPhone) return null
@@ -1701,7 +1710,7 @@ function serializeCartClientInformation(
 	}
 }
 
-function serializeAdminClientProfile(client: AdminClientProfile) {
+export function serializeAdminClientProfile(client: AdminClientProfile) {
 	return {
 		email: client.email ?? null,
 		first_name: client.firstName ?? null,
@@ -1987,6 +1996,15 @@ function buildServiceEntries(categories: BlvdCategory[]) {
 			if (item.__typename !== 'CartAvailableBookableItem' || item.disabled) {
 				continue
 			}
+			if (
+				!isBlvdServiceCustomerBookable({
+					categoryName: category.name,
+					id: item.id,
+					name: item.name,
+				})
+			) {
+				continue
+			}
 			if (services.has(item.id)) continue
 
 			services.set(item.id, {
@@ -2070,14 +2088,15 @@ export function rankVoiceServiceSearchEntries(
 		}
 	})
 
-	return preferServicesForClientType(rankServices(services, search), clientType).map(
-		service => ({
-			category: service.categoryName,
-			id: service.id,
-			name: service.item.name,
-			score: scoreService(service, search),
-		}),
-	)
+	return preferServicesForClientType(
+		rankServices(services, search),
+		clientType,
+	).map(service => ({
+		category: service.categoryName,
+		id: service.id,
+		name: service.item.name,
+		score: scoreService(service, search),
+	}))
 }
 
 function scoreService(service: ServiceEntry, search: string) {

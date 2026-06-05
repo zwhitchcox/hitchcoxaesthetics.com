@@ -449,21 +449,24 @@ model BlvdBookingIntent {
   status     String   @default("in_progress")
   step       String?
 
-  bookingCartId              String? @unique
-  bookingLocationId          String?
-  bookingLocationName        String?
-  bookingServiceId           String?
-  bookingServiceName         String?
-  bookingServiceCategory     String?
-  bookingSelectedPaymentType String?
-  bookingValueUsd            Float?
-  bookingRequiresCard        Boolean?
-  bookingHasVerifiedMobile   Boolean?
-  bookingHasVerifiedClient   Boolean?
-  appointmentCount           Int?
-  appointmentIds             String?
-  selectedStartTime          DateTime?
-  selectedEndTime            DateTime?
+  bookingCartId                 String?   @unique
+  bookingLocationId             String?
+  bookingLocationName           String?
+  bookingServiceId              String?
+  bookingServiceName            String?
+  bookingServiceCategory        String?
+  bookingSelectedPaymentType    String?
+  bookingClientHistorySelection String?
+  bookingClientType             String?
+  bookingClientTypeSource       String?
+  bookingValueUsd               Float?
+  bookingRequiresCard           Boolean?
+  bookingHasVerifiedMobile      Boolean?
+  bookingHasVerifiedClient      Boolean?
+  appointmentCount              Int?
+  appointmentIds                String?
+  selectedStartTime             DateTime?
+  selectedEndTime               DateTime?
 
   boulevardClientId String?
   clientEmail       String?

@@ -52,6 +52,9 @@ const bookingIntentBookingSchema = z.object({
 	appointmentCount: z.number().int().nonnegative().optional(),
 	appointmentIds: z.array(z.string().min(1)).optional(),
 	cartId: optionalTrimmedString,
+	clientHistorySelection: optionalTrimmedString,
+	clientType: optionalTrimmedString,
+	clientTypeSource: optionalTrimmedString,
 	hasVerifiedClient: z.boolean().optional(),
 	hasVerifiedMobile: z.boolean().optional(),
 	locationId: optionalTrimmedString,
@@ -100,6 +103,13 @@ export async function recordBlvdBookingIntent(
 		appointmentCount: parsed.booking.appointmentCount,
 		appointmentIds: parsed.booking.appointmentIds?.join(',') ?? null,
 		bookingCartId: normalizeOptionalString(parsed.booking.cartId),
+		bookingClientHistorySelection: normalizeOptionalString(
+			parsed.booking.clientHistorySelection,
+		),
+		bookingClientType: normalizeOptionalString(parsed.booking.clientType),
+		bookingClientTypeSource: normalizeOptionalString(
+			parsed.booking.clientTypeSource,
+		),
 		bookingHasVerifiedClient: parsed.booking.hasVerifiedClient,
 		bookingHasVerifiedMobile: parsed.booking.hasVerifiedMobile,
 		bookingLocationId: normalizeOptionalString(parsed.booking.locationId),
@@ -127,7 +137,9 @@ export async function recordBlvdBookingIntent(
 		callrailAccountId: normalizeOptionalString(
 			parsed.attribution.callrail_account_id,
 		),
-		callrailCallId: normalizeOptionalString(parsed.attribution.callrail_call_id),
+		callrailCallId: normalizeOptionalString(
+			parsed.attribution.callrail_call_id,
+		),
 		callrailLandingPageUrl: normalizeOptionalString(
 			parsed.attribution.callrail_landing_page_url,
 		),
@@ -187,9 +199,7 @@ export async function recordBlvdBookingIntent(
 			: null,
 		status: parsed.status,
 		step: normalizeOptionalString(parsed.step),
-		trafficChannel: normalizeOptionalString(
-			parsed.attribution.traffic_channel,
-		),
+		trafficChannel: normalizeOptionalString(parsed.attribution.traffic_channel),
 		trafficPlatform: normalizeOptionalString(
 			parsed.attribution.traffic_platform,
 		),
@@ -253,7 +263,9 @@ async function findExistingBlvdBookingIntent(
 
 	const or = [
 		posthogSessionId ? { posthogSessionId } : null,
-		posthogDistinctId && clientPhone ? { posthogDistinctId, clientPhone } : null,
+		posthogDistinctId && clientPhone
+			? { posthogDistinctId, clientPhone }
+			: null,
 		callrailSessionId ? { callrailSessionId } : null,
 		callrailVisitorId && clientPhone
 			? { callrailVisitorId, clientPhone }

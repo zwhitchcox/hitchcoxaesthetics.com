@@ -6,7 +6,7 @@ import {
 } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
 import { format, isValid } from 'date-fns'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -21,7 +21,28 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import { Input } from '#app/components/ui/input.tsx'
 import { Label } from '#app/components/ui/label.tsx'
 import { Textarea } from '#app/components/ui/textarea.tsx'
+import {
+	isExcludedBookingAnalyticsIdentity,
+	type BookingAnalyticsExclusionInput,
+} from '#app/utils/analytics-exclusions.ts'
+import {
+	BLVD_SERVICE_DISPLAY_GROUPS,
+	type BookingClientHistory,
+	type BlvdServiceDisplayGroup,
+	getBlvdServiceClientFit,
+	getBlvdServiceDisplayGroupServiceIdForClientHistory,
+	getBlvdServiceDisplayGroupServiceIds,
+	getBlvdServicePopularityCount,
+	getBookingClientTypeFromHistory,
+	getCustomerFacingBlvdCategoryName,
+	getCustomerFacingBlvdServiceName,
+	isBlvdServiceVisibleForClientHistory,
+} from '#app/utils/blvd-service-display.ts'
 import { getBookingAnalyticsEventProperties } from '#app/utils/booking-analytics.ts'
+import {
+	type LastBookingServiceHint,
+	readLastBookingServiceHint,
+} from '#app/utils/booking-source-hints.ts'
 import {
 	type Location as SiteLocation,
 	locations as siteLocations,
@@ -220,10 +241,24 @@ type BlvdClient = {
 type ServiceEntry = {
 	categoryName: string
 	categoryOrder: number
+	displayCategoryName: string
+	displayDescription?: string | null
+	displayDurationLabel?: string | null
+	displayGroupId: string | null
+	displayName: string
+	displayPrice?: string | null
+	groupedServiceIds: string[]
 	id: string
 	item: BlvdServiceItem
 	itemOrder: number
+	recentBookingCount: number
 	searchText: string
+	selectionOptions?: Array<{
+		label: string
+		service: ServiceEntry
+		sortOrder: number
+	}>
+	selectionPrompt?: string
 }
 
 type ServiceGroup = {
@@ -258,7 +293,17 @@ const BLVD_BOOK_STEPS: Array<{
 	{ label: 'Reserve', name: 'reserve' },
 ]
 
+const CLIENT_HISTORY_OPTIONS: Array<{
+	label: string
+	value: BookingClientHistory
+}> = [
+	{ label: 'Yes', value: 'returning' },
+	{ label: 'No', value: 'new' },
+	{ label: "Don't Remember", value: 'unsure' },
+]
+
 const DEFAULT_BOOKING_LOCATION_ID: SiteLocation['id'] = 'bearden'
+const BOOKING_PHONE_VERIFICATION_CODE_ID = 'booking-phone'
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
@@ -305,10 +350,28 @@ export default function BlvdBookRoute() {
 	const [initializing, setInitializing] = useState(true)
 	const [initError, setInitError] = useState<string | null>(null)
 	const [services, setServices] = useState<ServiceEntry[]>([])
+	const [clientHistorySelection, setClientHistorySelection] =
+		useState<BookingClientHistory | null>(null)
+	const [clientHistory, setClientHistory] =
+		useState<BookingClientHistory | null>(null)
+	const [clientHistoryLookupError, setClientHistoryLookupError] = useState<
+		string | null
+	>(null)
+	const [clientHistoryLookupMessage, setClientHistoryLookupMessage] = useState<
+		string | null
+	>(null)
+	const [lookingUpClientHistory, setLookingUpClientHistory] = useState(false)
 	const [serviceLocations, setServiceLocations] = useState<BlvdLocation[]>([])
 	const [selectedService, setSelectedService] = useState<ServiceEntry | null>(
 		null,
 	)
+	const [pendingServiceOptionPath, setPendingServiceOptionPath] = useState<
+		ServiceEntry[]
+	>([])
+	const [
+		pendingServiceOptionRootInstanceId,
+		setPendingServiceOptionRootInstanceId,
+	] = useState<string | null>(null)
 	const [selectedLocation, setSelectedLocation] = useState<BlvdLocation | null>(
 		null,
 	)
@@ -335,6 +398,7 @@ export default function BlvdBookRoute() {
 	const [search, setSearch] = useState(sourceHint?.search ?? '')
 	const searchInputRef = useRef<HTMLInputElement>(null)
 	const didHandleInitialEntryBehavior = useRef(false)
+	const didFocusSearchAfterClientHistory = useRef(false)
 	const [activeStep, setActiveStep] = useState<BlvdBookStepName | null>(null)
 	const [clientForm, setClientForm] = useState({
 		cardCvc: '',
@@ -367,8 +431,18 @@ export default function BlvdBookRoute() {
 	const didCaptureBookingFunnelEnteredRef = useRef(false)
 	const pendingBookingStepsRef = useRef<Set<string>>(new Set())
 	const bookingAnalyticsPropertiesRef = useRef<Record<string, unknown>>({})
+	const bookingAnalyticsExclusionInputRef =
+		useRef<BookingAnalyticsExclusionInput>({})
 	const lastBookingIntentKeyRef = useRef<string | null>(null)
 	const lastPostHogIdentityKeyRef = useRef<string | null>(null)
+	bookingAnalyticsExclusionInputRef.current = {
+		emails: [clientForm.email, cart?.clientInformation?.email],
+		phones: [
+			clientForm.phone,
+			ownershipVerifiedPhone,
+			cart?.clientInformation?.phoneNumber,
+		],
+	}
 
 	useEffect(() => {
 		let cancelled = false
@@ -433,20 +507,41 @@ export default function BlvdBookRoute() {
 			return
 		}
 
+		let nextReferrerHint: SourceHint | null = null
+		const lastServiceHint = readLastBookingServiceHint()
+
 		try {
-			if (!document.referrer) return
-			const referrer = new URL(document.referrer)
-			if (referrer.origin !== window.location.origin) return
-			const referrerPath = normalizeSourcePath(referrer.pathname)
-			const currentPath = normalizeSourcePath(window.location.pathname)
-			if (!referrerPath || referrerPath === currentPath) return
-			if (referrerPath === '/blvd-book') return
-			const nextReferrerHint = buildClientSourceHint(referrer.pathname)
+			if (document.referrer) {
+				const referrer = new URL(document.referrer)
+				if (referrer.origin === window.location.origin) {
+					const referrerPath = normalizeSourcePath(referrer.pathname)
+					const currentPath = normalizeSourcePath(window.location.pathname)
+					if (
+						referrerPath &&
+						referrerPath !== currentPath &&
+						referrerPath !== '/blvd-book'
+					) {
+						nextReferrerHint = buildClientSourceHint(
+							referrer.pathname,
+							lastServiceHint,
+						)
+					}
+				}
+			}
+		} catch {
+			// Ignore referrer parsing failures.
+		}
+
+		if (!nextReferrerHint && lastServiceHint) {
+			nextReferrerHint = buildStoredServiceSourceHint(lastServiceHint)
+		}
+
+		try {
 			if (!nextReferrerHint) return
 			setReferrerHint(nextReferrerHint)
 			setSearch(currentSearch => currentSearch || nextReferrerHint.search)
 		} catch {
-			// Ignore referrer parsing failures.
+			// Ignore source-hint state failures.
 		} finally {
 			setHasEvaluatedReferrerHint(true)
 		}
@@ -485,12 +580,14 @@ export default function BlvdBookRoute() {
 		: null
 	const requiresCard = Boolean(cart?.summary.paymentMethodRequired)
 	const hasVerifiedMobile = Boolean(ownershipVerifiedPhone)
-	const hasCompletedOwnershipVerification = Boolean(
-		hasVerifiedMobile && ownershipCodeId,
+	const hasCompletedBlvdOwnershipVerification = Boolean(
+		hasVerifiedMobile &&
+			ownershipCodeId &&
+			ownershipCodeId !== BOOKING_PHONE_VERIFICATION_CODE_ID,
 	)
 	const hasVerifiedClient = Boolean(
 		hasVerifiedMobile &&
-			(hasCompletedOwnershipVerification ||
+			(hasCompletedBlvdOwnershipVerification ||
 				verifiedExistingClient ||
 				hasAttachedBlvdClient(cart?.clientInformation)),
 	)
@@ -531,6 +628,8 @@ export default function BlvdBookRoute() {
 			buildBookingSelectionEventProperties({
 				availablePaymentMethodCount: availablePaymentMethods.length,
 				cart,
+				clientHistory,
+				clientHistorySelection,
 				hasVerifiedClient,
 				selectedExistingPaymentMethod,
 				selectedLocation,
@@ -539,6 +638,8 @@ export default function BlvdBookRoute() {
 		[
 			availablePaymentMethods.length,
 			cart,
+			clientHistory,
+			clientHistorySelection,
 			hasVerifiedClient,
 			selectedExistingPaymentMethod,
 			selectedLocation,
@@ -554,8 +655,49 @@ export default function BlvdBookRoute() {
 		}
 	}, [selectionAnalyticsProperties, sourceHintAnalyticsProperties])
 
+	const isCurrentBookingAnalyticsExcluded = useCallback(
+		(extraInput: BookingAnalyticsExclusionInput = {}) => {
+			const currentInput = bookingAnalyticsExclusionInputRef.current
+			return isExcludedBookingAnalyticsIdentity({
+				emails: [
+					...(currentInput.emails ?? []),
+					extraInput.email,
+					...(extraInput.emails ?? []),
+				],
+				phones: [
+					...(currentInput.phones ?? []),
+					extraInput.phone,
+					...(extraInput.phones ?? []),
+				],
+			})
+		},
+		[],
+	)
+
+	const captureBookingPostHogEvent = useCallback(
+		(
+			event: string,
+			properties: Record<string, unknown>,
+			extraInput?: BookingAnalyticsExclusionInput,
+		) => {
+			if (!posthog) return
+			if (isCurrentBookingAnalyticsExcluded(extraInput)) return
+
+			posthog.capture(event, properties)
+		},
+		[isCurrentBookingAnalyticsExcluded, posthog],
+	)
+
 	function identifyBookingPerson(input: BookingPostHogIdentityInput) {
 		if (!posthog) return
+		if (
+			isExcludedBookingAnalyticsIdentity({
+				email: input.email,
+				phone: input.phone,
+			})
+		) {
+			return
+		}
 
 		const identity = buildBookingPostHogIdentity(input)
 		if (!identity) return
@@ -567,13 +709,43 @@ export default function BlvdBookRoute() {
 		posthog.identify(identity.distinctId, identity.properties)
 	}
 
+	function captureBookingError({
+		action,
+		error,
+		source = 'client',
+		step = currentStep,
+		userMessage,
+	}: {
+		action: string
+		error: unknown
+		source?: 'client' | 'server'
+		step?: string
+		userMessage?: string
+	}) {
+		const details = getBookingErrorDetails(error)
+
+		captureBookingPostHogEvent('booking_error', {
+			...bookingAnalyticsPropertiesRef.current,
+			booking_error_action: action,
+			booking_error_area: 'booking_flow',
+			booking_error_code: details.code,
+			booking_error_message: userMessage ?? details.safeMessage,
+			booking_error_name: details.name,
+			booking_error_source: source,
+			booking_error_technical_message: details.technicalMessage,
+			booking_step: step,
+			cart_id: cart?.id,
+		})
+	}
+
 	const filteredServices = useMemo(() => {
+		const visibleServices = buildDisplayServiceEntries(services, clientHistory)
 		const trimmedSearch = search.trim()
 		if (trimmedSearch.length === 0) {
-			return services
+			return [...visibleServices].sort(compareServiceEntriesForDisplay)
 		}
 
-		return services
+		return visibleServices
 			.map(service => ({
 				service,
 				score: scoreService(service, trimmedSearch),
@@ -581,6 +753,11 @@ export default function BlvdBookRoute() {
 			.filter(result => result.score > 0)
 			.sort((a, b) => {
 				if (a.score !== b.score) return b.score - a.score
+				const popularityComparison = compareServiceEntriesForDisplay(
+					a.service,
+					b.service,
+				)
+				if (popularityComparison !== 0) return popularityComparison
 				if (a.service.categoryOrder !== b.service.categoryOrder) {
 					return a.service.categoryOrder - b.service.categoryOrder
 				}
@@ -590,7 +767,17 @@ export default function BlvdBookRoute() {
 				return a.service.item.name.localeCompare(b.service.item.name)
 			})
 			.map(result => result.service)
-	}, [search, services])
+	}, [clientHistory, search, services])
+	const showPopularServices = Boolean(
+		clientHistory && search.trim().length === 0,
+	)
+	const popularServices = useMemo(() => {
+		if (!showPopularServices) return []
+
+		return filteredServices
+			.filter(service => service.recentBookingCount > 0)
+			.slice(0, 6)
+	}, [filteredServices, showPopularServices])
 	const groupedServices = useMemo(() => {
 		const groups = new Map<string, ServiceGroup>()
 
@@ -651,17 +838,18 @@ export default function BlvdBookRoute() {
 
 	useEffect(() => {
 		pendingBookingStepsRef.current.add(currentStep)
+		if (currentStep === 'service' && !clientHistory) return
 		if (!posthog) return
 
 		for (const step of pendingBookingStepsRef.current) {
-			posthog.capture('booking_step_viewed', {
+			captureBookingPostHogEvent('booking_step_viewed', {
 				...bookingAnalyticsPropertiesRef.current,
 				step,
 			})
 		}
 
 		pendingBookingStepsRef.current.clear()
-	}, [currentStep, posthog])
+	}, [captureBookingPostHogEvent, clientHistory, currentStep, posthog])
 
 	const bookableDateStrings = useMemo(() => {
 		return new Set(
@@ -674,12 +862,18 @@ export default function BlvdBookRoute() {
 		if (!hasEvaluatedReferrerHint || !posthog) return
 
 		didCaptureBookingFunnelEnteredRef.current = true
-		posthog.capture('booking_funnel_entered', {
+		captureBookingPostHogEvent('booking_funnel_entered', {
 			...bookingAnalyticsPropertiesRef.current,
 			booking_prefill_search:
 				activeSourceHint?.search || search.trim() || undefined,
 		})
-	}, [activeSourceHint?.search, hasEvaluatedReferrerHint, posthog, search])
+	}, [
+		activeSourceHint?.search,
+		captureBookingPostHogEvent,
+		hasEvaluatedReferrerHint,
+		posthog,
+		search,
+	])
 
 	useEffect(() => {
 		if (didHandleInitialEntryBehavior.current) return
@@ -699,6 +893,18 @@ export default function BlvdBookRoute() {
 		}, 100)
 	}, [hasEvaluatedReferrerHint, initError, initializing, selectedService])
 
+	useEffect(() => {
+		if (!clientHistory) return
+		if (currentStep !== 'service') return
+		if (selectedService) return
+		if (didFocusSearchAfterClientHistory.current) return
+
+		didFocusSearchAfterClientHistory.current = true
+		window.setTimeout(() => {
+			searchInputRef.current?.focus()
+		}, 0)
+	}, [clientHistory, currentStep, selectedService])
+
 	function resetReturningClientState() {
 		setOwnershipCodeId(null)
 		setOwnershipCodeValue('')
@@ -709,13 +915,150 @@ export default function BlvdBookRoute() {
 		setOwnershipStepError(null)
 	}
 
-	async function handleSelectService(service: ServiceEntry) {
-		setLoadingLocations(true)
+	function handleSelectClientHistory(nextClientHistory: BookingClientHistory) {
+		const nextResolvedClientHistory =
+			nextClientHistory === 'unsure' ? null : nextClientHistory
+		if (
+			clientHistorySelection === nextClientHistory &&
+			clientHistory === nextResolvedClientHistory
+		) {
+			return
+		}
+
+		const nextClientType = getBookingClientTypeFromHistory({
+			clientHistory: nextResolvedClientHistory ?? nextClientHistory,
+			hasVerifiedClient,
+		})
+		const nextClientTypeSource = getBookingClientTypeSource({
+			clientHistory: nextResolvedClientHistory,
+			clientHistorySelection: nextClientHistory,
+			hasVerifiedClient,
+		})
+
+		if (posthog) {
+			const clientHistoryProperties = {
+				...bookingAnalyticsPropertiesRef.current,
+				booking_client_history_selection: nextClientHistory,
+				booking_client_type: nextClientType,
+				booking_client_type_source: nextClientTypeSource,
+			}
+
+			captureBookingPostHogEvent(
+				'booking_client_history_selected',
+				clientHistoryProperties,
+			)
+		}
+
+		setClientHistorySelection(nextClientHistory)
+		setClientHistory(nextResolvedClientHistory)
+		setClientHistoryLookupError(null)
+		setClientHistoryLookupMessage(null)
+		didFocusSearchAfterClientHistory.current = false
 		setStepError(null)
 		setOwnershipStepError(null)
 		setCheckoutSuccess(null)
-		setSelectedService(service)
-		setActiveStep(null)
+		setSelectedService(null)
+		setPendingServiceOptionPath([])
+		setPendingServiceOptionRootInstanceId(null)
+		setSelectedLocation(null)
+		setServiceLocations([])
+		setCart(null)
+		setBookableDates([])
+		setBookableTimes([])
+		setSelectedDateId(null)
+		setSelectedTimeId(null)
+		setQuestionAnswers({})
+		setDetailsSubmitted(false)
+		setActiveStep('service')
+		resetReturningClientState()
+		queueClientHistoryBookingIntent({
+			clientHistory: nextResolvedClientHistory,
+			clientHistorySelection: nextClientHistory,
+			clientTypeSource: nextClientTypeSource,
+			status: 'client_history_selected',
+		})
+	}
+
+	async function handleLookupClientHistory(
+		event: React.FormEvent<HTMLFormElement>,
+	) {
+		event.preventDefault()
+
+		if (!looksLikePhoneNumber(clientForm.phone)) {
+			setClientHistoryLookupError('Enter a valid mobile phone number.')
+			return
+		}
+
+		setLookingUpClientHistory(true)
+		setClientHistoryLookupError(null)
+		setClientHistoryLookupMessage(null)
+
+		try {
+			const result = await requestBookingClientLookup(clientForm.phone)
+			if (!result.ok) {
+				throw new Error(result.error ?? 'Client lookup failed.')
+			}
+
+			const nextClientHistory: BookingClientHistory = result.client_found
+				? 'returning'
+				: 'new'
+			const nextClientTypeSource = 'boulevard_phone_lookup'
+			setClientHistory(nextClientHistory)
+			setClientForm(currentForm => ({
+				...currentForm,
+				phone: result.phone ?? currentForm.phone,
+			}))
+			setClientHistoryLookupMessage(
+				result.client_found
+					? 'We found your profile.'
+					: 'No profile found. Continue as a new client.',
+			)
+			didFocusSearchAfterClientHistory.current = false
+
+			if (posthog) {
+				captureBookingPostHogEvent(
+					'booking_client_history_resolved',
+					{
+						...bookingAnalyticsPropertiesRef.current,
+						booking_client_history_selection: 'unsure',
+						booking_client_type: getBookingClientTypeFromHistory({
+							clientHistory: nextClientHistory,
+							hasVerifiedClient: false,
+						}),
+						booking_client_type_source: nextClientTypeSource,
+					},
+					{ phone: result.phone },
+				)
+			}
+
+			queueClientHistoryBookingIntent({
+				clientHistory: nextClientHistory,
+				clientHistorySelection: 'unsure',
+				clientTypeSource: nextClientTypeSource,
+				phone: result.phone,
+				status: 'client_history_resolved',
+			})
+		} catch (error) {
+			const message = 'We could not check that mobile number. Please try again.'
+			captureBookingError({
+				action: 'lookup_client_history_phone',
+				error,
+				step: 'service',
+				userMessage: message,
+			})
+			setClientHistoryLookupError(message)
+		} finally {
+			setLookingUpClientHistory(false)
+		}
+	}
+
+	async function handleSelectService(
+		service: ServiceEntry,
+		renderInstanceId?: string,
+	) {
+		setStepError(null)
+		setOwnershipStepError(null)
+		setCheckoutSuccess(null)
 		setSelectedLocation(null)
 		setServiceLocations([])
 		setCart(null)
@@ -726,6 +1069,35 @@ export default function BlvdBookRoute() {
 		setQuestionAnswers({})
 		setDetailsSubmitted(false)
 		resetReturningClientState()
+
+		if (service.selectionOptions?.length) {
+			setLoadingLocations(false)
+			setSelectedService(null)
+			setPendingServiceOptionRootInstanceId(currentInstanceId => {
+				if (renderInstanceId) return renderInstanceId
+				return currentInstanceId
+			})
+			setPendingServiceOptionPath(currentPath => {
+				const existingIndex = currentPath.findIndex(
+					optionGroup => optionGroup.id === service.id,
+				)
+				if (existingIndex >= 0) return currentPath.slice(0, existingIndex + 1)
+
+				const activeGroup = currentPath.at(-1)
+				const selectedFromActiveGroup = activeGroup?.selectionOptions?.some(
+					option => option.service.id === service.id,
+				)
+				return selectedFromActiveGroup ? [...currentPath, service] : [service]
+			})
+			setActiveStep('service')
+			return
+		}
+
+		setLoadingLocations(true)
+		setSelectedService(service)
+		setPendingServiceOptionPath([])
+		setPendingServiceOptionRootInstanceId(null)
+		setActiveStep(null)
 
 		try {
 			const variants = await service.item.getLocationVariants()
@@ -741,7 +1113,13 @@ export default function BlvdBookRoute() {
 				setActiveStep('location')
 			}
 		} catch (error) {
-			setStepError(getErrorMessage(error))
+			captureBookingError({
+				action: 'load_service_locations',
+				error,
+				step: 'service',
+				userMessage: 'We could not load locations for that service.',
+			})
+			setStepError('We could not load locations for that service.')
 		} finally {
 			setLoadingLocations(false)
 		}
@@ -794,7 +1172,13 @@ export default function BlvdBookRoute() {
 				setBookableTimes(nextTimes)
 			}
 		} catch (error) {
-			setStepError(getErrorMessage(error))
+			captureBookingError({
+				action: 'load_schedule',
+				error,
+				step: 'location',
+				userMessage: 'We could not load the schedule for that location.',
+			})
+			setStepError('We could not load the schedule for that location.')
 		} finally {
 			setLoadingSchedule(false)
 		}
@@ -820,7 +1204,13 @@ export default function BlvdBookRoute() {
 			})
 			setBookableTimes(nextTimes)
 		} catch (error) {
-			setStepError(getErrorMessage(error))
+			captureBookingError({
+				action: 'load_bookable_times',
+				error,
+				step: 'schedule',
+				userMessage: 'We could not load times for that date.',
+			})
+			setStepError('We could not load times for that date.')
 		} finally {
 			setLoadingTimes(false)
 		}
@@ -847,7 +1237,16 @@ export default function BlvdBookRoute() {
 				step: 'details',
 			})
 		} catch (error) {
-			setStepError(getErrorMessage(error))
+			captureBookingError({
+				action: 'reserve_selected_time',
+				error,
+				step: 'schedule',
+				userMessage:
+					'We could not reserve that time. Please choose another time.',
+			})
+			setStepError(
+				'We could not reserve that time. Please choose another time.',
+			)
 		} finally {
 			setLoadingSchedule(false)
 		}
@@ -1023,11 +1422,11 @@ export default function BlvdBookRoute() {
 			})
 
 			if (posthog) {
-				posthog.capture('booking_step_viewed', {
+				captureBookingPostHogEvent('booking_step_viewed', {
 					...bookingAnalyticsPropertiesRef.current,
 					step: 'success',
 				})
-				posthog.capture('booking_completed', {
+				captureBookingPostHogEvent('booking_completed', {
 					...bookingAnalyticsPropertiesRef.current,
 					appointment_count: checkoutPayload.appointments.length,
 					booking_selected_payment_method_type: selectedPaymentMethodType,
@@ -1036,7 +1435,7 @@ export default function BlvdBookRoute() {
 					location: selectedLocation.name,
 					value: projectedRevenueUsd,
 				})
-				posthog.capture('booking_conversion_completed', {
+				captureBookingPostHogEvent('booking_conversion_completed', {
 					...bookingAnalyticsPropertiesRef.current,
 					$insert_id: `booking-conversion:website:${checkoutPayload.cart.id}`,
 					appointment_count: checkoutPayload.appointments.length,
@@ -1115,12 +1514,20 @@ export default function BlvdBookRoute() {
 				window.scrollTo({ top: 0, behavior: 'smooth' })
 			}
 		} catch (error) {
+			const checkoutUserMessage = getCheckoutUserMessage(error)
+			captureBookingError({
+				action: 'checkout',
+				error,
+				step: 'reserve',
+				userMessage: checkoutUserMessage,
+			})
+
 			if (error && typeof error === 'object') {
 				const err = error as any
 
 				// Try to extract from the standard `response` property
 				if (err.response?.errors?.[0]?.message) {
-					setStepError(err.response.errors[0].message)
+					setStepError(checkoutUserMessage)
 					return
 				}
 
@@ -1143,15 +1550,14 @@ export default function BlvdBookRoute() {
 							const parsed: any = JSON.parse(match[1])
 							// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 							if (parsed?.response?.errors?.[0]?.message) {
-								// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
-								setStepError(parsed.response.errors[0].message)
+								setStepError(checkoutUserMessage)
 								return
 							}
 						}
 					} catch {}
 				}
 			}
-			setStepError(getErrorMessage(error))
+			setStepError(checkoutUserMessage)
 		} finally {
 			setSubmittingBooking(false)
 		}
@@ -1190,9 +1596,19 @@ export default function BlvdBookRoute() {
 		setOwnershipStepError(null)
 
 		try {
-			const codeId = await cart.sendOwnershipCodeBySms(
-				normalizePhoneNumber(clientForm.phone),
-			)
+			const normalizedPhone = normalizePhoneNumber(clientForm.phone)
+			if (clientHistory === 'new') {
+				await sendBookingPhoneVerificationCode(normalizedPhone)
+				setOwnershipCodeId(BOOKING_PHONE_VERIFICATION_CODE_ID)
+				setOwnershipCodeValue('')
+				setOwnershipVerifiedPhone(null)
+				setVerifiedExistingClient(false)
+				setAvailablePaymentMethods([])
+				setSelectedPaymentMethodId('new')
+				return
+			}
+
+			const codeId = await cart.sendOwnershipCodeBySms(normalizedPhone)
 			setOwnershipCodeId(codeId)
 			setOwnershipCodeValue('')
 			setOwnershipVerifiedPhone(null)
@@ -1200,7 +1616,43 @@ export default function BlvdBookRoute() {
 			setAvailablePaymentMethods([])
 			setSelectedPaymentMethodId('new')
 		} catch (error) {
-			setOwnershipStepError(getErrorMessage(error))
+			const normalizedPhone = normalizePhoneNumber(clientForm.phone)
+			const isClientNotFound = isClientNotFoundByMobilePhoneError(error)
+
+			captureBookingError({
+				action: 'send_mobile_verification_code',
+				error,
+				step: 'details',
+				userMessage: getOwnershipCodeUserMessage(error, clientHistory),
+			})
+
+			if (isClientNotFound && clientHistory === 'unsure') {
+				try {
+					await sendBookingPhoneVerificationCode(normalizedPhone)
+					setOwnershipCodeId(BOOKING_PHONE_VERIFICATION_CODE_ID)
+					setOwnershipCodeValue('')
+					setOwnershipVerifiedPhone(null)
+					setVerifiedExistingClient(false)
+					setAvailablePaymentMethods([])
+					setSelectedPaymentMethodId('new')
+					setOwnershipStepError(null)
+					return
+				} catch (fallbackError) {
+					captureBookingError({
+						action: 'send_new_client_mobile_verification_code',
+						error: fallbackError,
+						step: 'details',
+						userMessage:
+							'We could not send that code. Please check the number and try again.',
+					})
+					setOwnershipStepError(
+						'We could not send that code. Please check the number and try again.',
+					)
+					return
+				}
+			}
+
+			setOwnershipStepError(getOwnershipCodeUserMessage(error, clientHistory))
 		} finally {
 			setSendingOwnershipCode(false)
 		}
@@ -1223,6 +1675,32 @@ export default function BlvdBookRoute() {
 		setOwnershipStepError(null)
 
 		try {
+			if (ownershipCodeId === BOOKING_PHONE_VERIFICATION_CODE_ID) {
+				await verifyBookingPhoneVerificationCode({
+					code: normalizedCode,
+					phone: normalizePhoneNumber(clientForm.phone),
+				})
+				identifyBookingPerson({
+					email: clientForm.email,
+					firstName: clientForm.firstName,
+					lastName: clientForm.lastName,
+					phone: normalizePhoneNumber(clientForm.phone),
+				})
+				setOwnershipVerifiedPhone(normalizePhoneNumber(clientForm.phone))
+				setVerifiedExistingClient(false)
+				setOwnershipCodeId(null)
+				setOwnershipCodeValue('')
+				setAvailablePaymentMethods([])
+				setSelectedPaymentMethodId('new')
+				queueCurrentBlvdBookingIntent({
+					hasVerifiedMobileOverride: true,
+					selectedPaymentMethodIdOverride: 'new',
+					status: 'mobile_verified',
+					step: 'details',
+				})
+				return
+			}
+
 			const nextCart = await cart.takeOwnershipByCode(
 				ownershipCodeId,
 				Number(normalizedCode),
@@ -1285,7 +1763,13 @@ export default function BlvdBookRoute() {
 				})
 			}
 		} catch (error) {
-			setOwnershipStepError(getErrorMessage(error))
+			captureBookingError({
+				action: 'verify_mobile_code',
+				error,
+				step: 'details',
+				userMessage: getVerifyCodeUserMessage(error),
+			})
+			setOwnershipStepError(getVerifyCodeUserMessage(error))
 		} finally {
 			setVerifyingOwnershipCode(false)
 		}
@@ -1344,6 +1828,17 @@ export default function BlvdBookRoute() {
 				appointmentCount: appointmentIds?.length,
 				appointmentIds,
 				cartId: intentCart.id,
+				clientHistorySelection:
+					clientHistorySelection ?? clientHistory ?? undefined,
+				clientType: getBookingClientTypeFromHistory({
+					clientHistory,
+					hasVerifiedClient: intentHasVerifiedClient,
+				}),
+				clientTypeSource: getBookingClientTypeSource({
+					clientHistory,
+					clientHistorySelection,
+					hasVerifiedClient: intentHasVerifiedClient,
+				}),
 				hasVerifiedClient: intentHasVerifiedClient,
 				hasVerifiedMobile: intentHasVerifiedMobile,
 				locationId: selectedLocation.id,
@@ -1353,6 +1848,13 @@ export default function BlvdBookRoute() {
 				selectedPaymentMethodType: intentPaymentMethodType,
 				selectedStartTime: intentStartTime?.toISOString(),
 				serviceCategory: selectedService.categoryName,
+				serviceClientFit: getBlvdServiceClientFit({
+					categoryName: selectedService.categoryName,
+					name: selectedService.item.name,
+				}),
+				serviceDisplayName: selectedService.displayName,
+				serviceDisplayGroupId: selectedService.displayGroupId,
+				serviceGroupedServiceIds: selectedService.groupedServiceIds,
 				serviceId: selectedService.item.id,
 				serviceName: selectedService.item.name,
 				valueUsd: getProjectedRevenueForBlvdService(selectedService.item.name),
@@ -1378,6 +1880,191 @@ export default function BlvdBookRoute() {
 		if (lastBookingIntentKeyRef.current === dedupeKey) return
 		lastBookingIntentKeyRef.current = dedupeKey
 		queueBlvdBookingIntent(payload)
+	}
+
+	function queueClientHistoryBookingIntent({
+		clientHistory,
+		clientHistorySelection,
+		clientTypeSource,
+		phone,
+		status,
+	}: {
+		clientHistory: BookingClientHistory | null
+		clientHistorySelection: BookingClientHistory
+		clientTypeSource: string
+		phone?: string | null
+		status: string
+	}) {
+		const intentHasVerifiedMobile = Boolean(ownershipVerifiedPhone)
+		const intentHasVerifiedClient = Boolean(
+			intentHasVerifiedMobile && hasVerifiedClient,
+		)
+		const payload = {
+			attribution: bookingAnalyticsPropertiesRef.current,
+			booking: {
+				clientHistorySelection,
+				clientType: getBookingClientTypeFromHistory({
+					clientHistory: clientHistory ?? clientHistorySelection,
+					hasVerifiedClient: intentHasVerifiedClient,
+				}),
+				clientTypeSource,
+				hasVerifiedClient: intentHasVerifiedClient,
+				hasVerifiedMobile: intentHasVerifiedMobile,
+			},
+			client: {
+				phone: phone ?? ownershipVerifiedPhone ?? clientForm.phone ?? undefined,
+			},
+			occurred_at: new Date().toISOString(),
+			status,
+			step: 'service',
+		}
+		const dedupeKey = JSON.stringify({ ...payload, occurred_at: undefined })
+		if (lastBookingIntentKeyRef.current === dedupeKey) return
+		lastBookingIntentKeyRef.current = dedupeKey
+		queueBlvdBookingIntent(payload)
+	}
+
+	function renderServiceCard(service: ServiceEntry, renderInstanceId: string) {
+		const isActivePendingInstance =
+			pendingServiceOptionRootInstanceId === renderInstanceId
+		const pendingPathIndex = isActivePendingInstance
+			? pendingServiceOptionPath.findIndex(
+					optionGroup => optionGroup.id === service.id,
+				)
+			: -1
+		const activeOptionGroup =
+			pendingPathIndex >= 0 ? pendingServiceOptionPath.at(-1) ?? null : null
+		const isSelected =
+			selectedService?.id === service.id || pendingPathIndex >= 0
+		const displayPrice = service.displayPrice ?? getDisplayPrice(service.item)
+		const displayName = service.displayName
+		const displayDescription =
+			service.displayDescription ?? service.item.description
+		const displayDuration =
+			service.displayDurationLabel ??
+			formatDurationRange(service.item.listDurationRange)
+
+		return (
+			<div key={renderInstanceId} className="min-w-0">
+				<button
+					type="button"
+					onClick={() => {
+						void handleSelectService(service, renderInstanceId)
+					}}
+					className={cn(
+						'w-full min-w-0 rounded-xl border bg-white p-5 text-left transition hover:border-primary hover:shadow-md',
+						isSelected && 'border-primary shadow-sm',
+					)}
+				>
+					<div className="mb-2 flex w-full items-start justify-between gap-4">
+						<div className="min-w-0 flex-1">
+							<h4 className="break-words text-lg font-semibold sm:text-xl">
+								{displayName}
+							</h4>
+							{displayPrice ? (
+								<p className="mt-2 text-sm font-medium text-primary">
+									{displayPrice}
+								</p>
+							) : null}
+						</div>
+						{isSelected ? (
+							<span className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground">
+								Selected
+							</span>
+						) : null}
+					</div>
+					{displayDescription ? (
+						<p className="line-clamp-4 text-sm text-muted-foreground">
+							{displayDescription}
+						</p>
+					) : null}
+					<div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
+						{displayDuration ? <span>{displayDuration}</span> : null}
+					</div>
+				</button>
+				{activeOptionGroup?.selectionOptions?.length ? (
+					<div className="mt-3 rounded-xl border bg-white p-4 shadow-sm">
+						{activeOptionGroup.id !== service.id ? (
+							<div className="text-sm font-semibold text-foreground">
+								{activeOptionGroup.displayName}
+							</div>
+						) : null}
+						<div className="text-sm font-medium text-muted-foreground">
+							{activeOptionGroup.selectionPrompt ?? 'Choose one'}
+						</div>
+						<div className="mt-3 grid gap-2">
+							{activeOptionGroup.selectionOptions.map(option => {
+								const optionPrice =
+									option.service.displayPrice ??
+									getDisplayPrice(option.service.item)
+								const optionDescription =
+									option.service.displayDescription ??
+									option.service.item.description
+								return (
+									<Button
+										key={option.service.id}
+										type="button"
+										variant="outline"
+										className="h-auto min-h-12 w-full flex-col items-start justify-center gap-1 whitespace-normal px-4 py-3 text-left"
+										onClick={() => {
+											void handleSelectService(option.service)
+										}}
+									>
+										<span className="block w-full break-words font-medium leading-snug">
+											{option.label}
+										</span>
+										{optionPrice ? (
+											<span className="block w-full break-words text-sm font-normal leading-snug text-muted-foreground">
+												{optionPrice}
+											</span>
+										) : null}
+										{optionDescription ? (
+											<span className="line-clamp-3 block w-full break-words text-xs font-normal leading-snug text-muted-foreground">
+												{optionDescription}
+											</span>
+										) : null}
+									</Button>
+								)
+							})}
+						</div>
+					</div>
+				) : null}
+			</div>
+		)
+	}
+
+	function renderServiceCardTiles(
+		servicesToRender: ServiceEntry[],
+		sectionKey: string,
+	) {
+		const leftColumnServices = servicesToRender.filter(
+			(_service, index) => index % 2 === 0,
+		)
+		const rightColumnServices = servicesToRender.filter(
+			(_service, index) => index % 2 === 1,
+		)
+
+		return (
+			<>
+				<div className="space-y-4 md:hidden">
+					{servicesToRender.map(service =>
+						renderServiceCard(service, `${sectionKey}:mobile:${service.id}`),
+					)}
+				</div>
+				<div className="hidden w-full gap-4 md:grid md:grid-cols-2">
+					<div className="space-y-4">
+						{leftColumnServices.map(service =>
+							renderServiceCard(service, `${sectionKey}:desktop:${service.id}`),
+						)}
+					</div>
+					<div className="space-y-4">
+						{rightColumnServices.map(service =>
+							renderServiceCard(service, `${sectionKey}:desktop:${service.id}`),
+						)}
+					</div>
+				</div>
+			</>
+		)
 	}
 
 	return (
@@ -1500,35 +2187,123 @@ export default function BlvdBookRoute() {
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
 											Service
 										</h2>
-										<p className="-mt-4 mb-4 max-w-xl text-center text-sm text-muted-foreground">
-											Please select a service.
-										</p>
-										<div className="flex w-full max-w-full flex-col items-center gap-3 px-1 py-1 sm:flex-row">
-											<Input
-												ref={searchInputRef}
-												className="w-full"
-												placeholder="Search Botox, lip filler, microneedling, weight loss..."
-												value={search}
-												onChange={event => setSearch(event.currentTarget.value)}
-											/>
-											{search ? (
-												<Button
-													type="button"
-													variant="outline"
-													className="w-full shrink-0 sm:w-auto"
-													onClick={() => setSearch('')}
-												>
-													Clear Filter
-												</Button>
-											) : null}
-										</div>
+										{clientHistorySelection ? null : (
+											<div className="-mt-2 flex w-full max-w-2xl flex-col items-center gap-3">
+												<h3 className="text-center text-lg font-semibold">
+													Have you been with us before?
+												</h3>
+												<div className="grid w-full max-w-sm grid-cols-1 gap-3">
+													{CLIENT_HISTORY_OPTIONS.map(option => (
+														<Button
+															key={option.value}
+															type="button"
+															variant="outline"
+															className="h-12"
+															onClick={() =>
+																handleSelectClientHistory(option.value)
+															}
+														>
+															{option.label}
+														</Button>
+													))}
+												</div>
+											</div>
+										)}
 
-										{filteredServices.length === 0 ? (
+										{clientHistorySelection === 'unsure' && !clientHistory ? (
+											<form
+												className="w-full max-w-2xl space-y-3 rounded-xl border bg-white p-4"
+												onSubmit={handleLookupClientHistory}
+											>
+												<div className="space-y-2">
+													<Label htmlFor="clientHistoryPhone">
+														Mobile phone
+													</Label>
+													<Input
+														id="clientHistoryPhone"
+														name="phone"
+														type="tel"
+														value={clientForm.phone}
+														onChange={updateClientForm}
+													/>
+												</div>
+												{clientHistoryLookupError ? (
+													<div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+														{clientHistoryLookupError}
+													</div>
+												) : null}
+												<Button
+													type="submit"
+													className="w-full sm:w-auto"
+													disabled={lookingUpClientHistory}
+												>
+													{lookingUpClientHistory ? 'Checking...' : 'Continue'}
+												</Button>
+											</form>
+										) : null}
+
+										{clientHistoryLookupMessage && clientHistory ? (
 											<p className="text-sm text-muted-foreground">
-												No services matched that search yet.
+												{clientHistoryLookupMessage}
 											</p>
+										) : null}
+
+										{clientHistory ? (
+											<div className="flex w-full max-w-full flex-col items-center gap-3 px-1 py-1 sm:flex-row">
+												<Input
+													ref={searchInputRef}
+													className="w-full"
+													placeholder="Search Botox, lip filler, microneedling, weight loss..."
+													value={search}
+													onChange={event =>
+														setSearch(event.currentTarget.value)
+													}
+												/>
+												{search ? (
+													<Button
+														type="button"
+														variant="outline"
+														className="w-full shrink-0 sm:w-auto"
+														onClick={() => setSearch('')}
+													>
+														Clear Filter
+													</Button>
+												) : null}
+											</div>
+										) : null}
+
+										{!clientHistory && !clientHistorySelection ? (
+											<p className="text-sm text-muted-foreground">
+												Choose one to show the right services.
+											</p>
+										) : !clientHistory ? null : filteredServices.length ===
+										  0 ? (
+											<div className="space-y-3 text-center">
+												<p className="text-sm text-muted-foreground">
+													No services matched that search yet.
+												</p>
+												{search ? (
+													<Button
+														type="button"
+														variant="outline"
+														onClick={() => setSearch('')}
+													>
+														Clear Filter
+													</Button>
+												) : null}
+											</div>
 										) : (
 											<div className="w-full max-w-full space-y-8">
+												{popularServices.length > 0 ? (
+													<div className="w-full space-y-4">
+														<div className="border-b pb-3">
+															<h3 className="text-lg font-semibold tracking-wide text-foreground">
+																Popular Services
+															</h3>
+														</div>
+														{renderServiceCardTiles(popularServices, 'popular')}
+													</div>
+												) : null}
 												{groupedServices.map(group => (
 													<div
 														key={group.categoryName}
@@ -1536,67 +2311,16 @@ export default function BlvdBookRoute() {
 													>
 														<div className="border-b pb-3">
 															<h3 className="text-lg font-semibold tracking-wide text-foreground">
-																{group.categoryName}
+																{group.services[0]?.displayCategoryName ??
+																	getCustomerFacingBlvdCategoryName(
+																		group.categoryName,
+																	)}
 															</h3>
 														</div>
-														<div className="grid w-full gap-4 md:grid-cols-2">
-															{group.services.map(service => {
-																const isSelected =
-																	selectedService?.id === service.id
-																const displayPrice = getDisplayPrice(
-																	service.item,
-																)
-																return (
-																	<div key={service.id} className="min-w-0">
-																		<button
-																			type="button"
-																			onClick={() => {
-																				void handleSelectService(service)
-																			}}
-																			className={cn(
-																				'w-full min-w-0 rounded-xl border bg-white p-5 text-left transition hover:border-primary hover:shadow-md',
-																				isSelected &&
-																					'border-primary shadow-sm',
-																			)}
-																		>
-																			<div className="mb-2 flex w-full items-start justify-between gap-4">
-																				<div className="min-w-0 flex-1">
-																					<h4 className="break-words text-lg font-semibold sm:text-xl">
-																						{service.item.name}
-																					</h4>
-																					{displayPrice ? (
-																						<p className="mt-2 text-sm font-medium text-primary">
-																							{displayPrice}
-																						</p>
-																					) : null}
-																				</div>
-																				{isSelected ? (
-																					<span className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground">
-																						Selected
-																					</span>
-																				) : null}
-																			</div>
-																			{service.item.description ? (
-																				<p className="line-clamp-4 text-sm text-muted-foreground">
-																					{service.item.description}
-																				</p>
-																			) : null}
-																			<div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
-																				{formatDurationRange(
-																					service.item.listDurationRange,
-																				) ? (
-																					<span>
-																						{formatDurationRange(
-																							service.item.listDurationRange,
-																						)}
-																					</span>
-																				) : null}
-																			</div>
-																		</button>
-																	</div>
-																)
-															})}
-														</div>
+														{renderServiceCardTiles(
+															group.services,
+															`category:${group.categoryName}`,
+														)}
 													</div>
 												))}
 											</div>
@@ -1608,8 +2332,11 @@ export default function BlvdBookRoute() {
 											Location
 										</h2>
 										<p className="-mt-4 mb-4 text-center text-sm text-muted-foreground">
-											{selectedService?.item.name} is selected. Choose the
-											office and the matching map will appear right next to it.
+											{selectedService
+												? selectedService.displayName
+												: 'Service'}{' '}
+											is selected. Choose the office and the matching map will
+											appear right next to it.
 										</p>
 										<div className="w-full space-y-6">
 											{loadingLocations ? (
@@ -1892,8 +2619,10 @@ export default function BlvdBookRoute() {
 											Client Details
 										</h2>
 										<p className="-mt-4 mb-4 text-center text-sm text-muted-foreground">
-											{selectedService?.item.name} at {selectedLocation?.name}{' '}
-											on{' '}
+											{selectedService
+												? selectedService.displayName
+												: 'Service'}{' '}
+											at {selectedLocation?.name} on{' '}
 											{selectedTime
 												? formatTimeLabel(selectedTime.startTime)
 												: ''}
@@ -2442,7 +3171,7 @@ function BlvdAppointmentDetails({
 					{selectedService ? (
 						<div className="flex w-full flex-col rounded-lg px-2">
 							<div className="text-balance break-words text-lg font-medium tracking-wide">
-								{selectedService.item.name}
+								{selectedService.displayName}
 							</div>
 							{selectedServicePrice ? (
 								<div className="mt-1 text-sm text-muted-foreground">
@@ -2538,10 +3267,6 @@ function uniqueTokens(values: string[]) {
 	return [...tokens]
 }
 
-function humanizePathSegment(value: string) {
-	return value.replace(/[-_/]+/g, ' ').trim()
-}
-
 function normalizeSourcePath(value: string | null) {
 	if (!value) return null
 
@@ -2579,7 +3304,7 @@ function buildServerSourceHint(
 	}
 
 	const page = getPage(slug)
-	if (page) {
+	if (page?.enabled) {
 		const ancestorNames = getAncestors(slug).map(ancestor => ancestor.name)
 		return {
 			label: page.name,
@@ -2588,21 +3313,13 @@ function buildServerSourceHint(
 			search: uniqueTokens([page.name, ...ancestorNames]).join(' '),
 		}
 	}
-
-	const search = uniqueTokens(slug.split('/').map(humanizePathSegment)).join(
-		' ',
-	)
-	if (!search) return null
-
-	return {
-		label: search,
-		path,
-		preferredLocationId: explicitLocation,
-		search,
-	}
+	return null
 }
 
-function buildClientSourceHint(path: string): SourceHint | null {
+function buildClientSourceHint(
+	path: string,
+	lastServiceHint: LastBookingServiceHint | null,
+): SourceHint | null {
 	const normalizedPath = normalizeSourcePath(path)
 	if (!normalizedPath) return null
 
@@ -2617,15 +3334,26 @@ function buildClientSourceHint(path: string): SourceHint | null {
 		}
 	}
 
-	const search = uniqueTokens(slug.split('/').map(humanizePathSegment)).join(
-		' ',
-	)
-	if (!search) return null
+	if (!lastServiceHint) return null
 
+	if (normalizeSourcePath(lastServiceHint.path) !== normalizedPath) {
+		return null
+	}
+
+	return buildStoredServiceSourceHint(lastServiceHint)
+}
+
+function buildStoredServiceSourceHint(
+	hint: LastBookingServiceHint,
+): SourceHint | null {
+	const path = normalizeSourcePath(hint.path)
+	if (!path) return null
+
+	const search = uniqueTokens([hint.search, hint.label]).join(' ')
 	return {
-		label: search,
-		path: normalizedPath,
-		preferredLocationId: null,
+		label: hint.label,
+		path,
+		preferredLocationId: normalizeLocationId(hint.preferredLocationId ?? null),
 		search,
 	}
 }
@@ -2649,11 +3377,22 @@ function buildServiceEntries(categories: BlvdCategory[]) {
 			services.set(item.id, {
 				categoryName: category.name,
 				categoryOrder,
+				displayCategoryName: getCustomerFacingBlvdCategoryName(category.name),
+				displayGroupId: null,
+				displayName: getCustomerFacingBlvdServiceName(item.name),
+				groupedServiceIds: [item.id],
 				id: item.id,
 				item,
 				itemOrder,
+				recentBookingCount: getBlvdServicePopularityCount(item.name),
 				searchText: normalizeText(
-					[category.name, item.name, item.description ?? ''].join(' '),
+					[
+						category.name,
+						getCustomerFacingBlvdCategoryName(category.name),
+						item.name,
+						getCustomerFacingBlvdServiceName(item.name),
+						item.description ?? '',
+					].join(' '),
 				),
 			})
 		}
@@ -2662,12 +3401,391 @@ function buildServiceEntries(categories: BlvdCategory[]) {
 	return [...services.values()]
 }
 
+function buildDisplayServiceEntries(
+	services: ServiceEntry[],
+	clientHistory: BookingClientHistory | null,
+) {
+	if (!clientHistory) return []
+
+	const servicesById = new Map(services.map(service => [service.id, service]))
+	const groupedServiceIds = new Set<string>()
+	const displayServices: ServiceEntry[] = []
+
+	for (const group of BLVD_SERVICE_DISPLAY_GROUPS) {
+		const groupServiceIds = getBlvdServiceDisplayGroupServiceIds(group)
+		for (const serviceId of groupServiceIds) {
+			groupedServiceIds.add(serviceId)
+		}
+
+		const preferredService =
+			servicesById.get(
+				getBlvdServiceDisplayGroupServiceIdForClientHistory(
+					group,
+					clientHistory,
+				),
+			) ?? null
+
+		if (!preferredService) continue
+
+		displayServices.push(
+			buildGroupedServiceEntry({
+				group,
+				preferredService,
+				servicesById,
+			}),
+		)
+	}
+
+	const visibleUngroupedServices = services.filter(service => {
+		if (groupedServiceIds.has(service.id)) return false
+		return isServiceEntryVisibleForClientHistory(service, clientHistory)
+	})
+
+	for (const serviceOptionGroup of buildServiceOptionGroupEntries(
+		visibleUngroupedServices,
+	)) {
+		for (const serviceId of serviceOptionGroup.groupedServiceIds) {
+			groupedServiceIds.add(serviceId)
+		}
+		displayServices.push(serviceOptionGroup)
+	}
+
+	for (const service of services) {
+		if (groupedServiceIds.has(service.id)) continue
+		if (!isServiceEntryVisibleForClientHistory(service, clientHistory)) continue
+
+		displayServices.push(service)
+	}
+
+	return displayServices
+}
+
+function isServiceEntryVisibleForClientHistory(
+	service: ServiceEntry,
+	clientHistory: BookingClientHistory,
+) {
+	return isBlvdServiceVisibleForClientHistory(
+		{
+			categoryName: service.categoryName,
+			id: service.id,
+			name: service.item.name,
+		},
+		clientHistory,
+	)
+}
+
+function buildServiceOptionGroupEntries(services: ServiceEntry[]) {
+	const groups: ServiceEntry[] = []
+	const laserServicesGroup = buildLaserServicesGroupEntry(services)
+	if (laserServicesGroup) groups.push(laserServicesGroup)
+
+	const viPeelGroup = buildServiceOptionGroupEntry({
+		displayCategoryName: 'Aesthetic Treatments',
+		displayDescription: 'Chemical peel options for brighter, smoother skin.',
+		displayName: 'VI Peel',
+		id: 'vi-peel',
+		optionServices: services
+			.map(service => {
+				const option = getViPeelOption(service)
+				return option ? { ...option, service } : null
+			})
+			.filter((option): option is ServiceOptionConfig => Boolean(option)),
+		selectionPrompt: 'Select a peel type',
+	})
+	if (viPeelGroup) groups.push(viPeelGroup)
+
+	const microneedlingGroup = buildServiceOptionGroupEntry({
+		displayCategoryName: 'Aesthetic Treatments',
+		displayDescription:
+			'Microneedling options for texture, tone, and collagen support.',
+		displayName: 'Microneedling',
+		id: 'microneedling',
+		optionServices: services
+			.map(service => {
+				const option = getMicroneedlingOption(service)
+				return option ? { ...option, service } : null
+			})
+			.filter((option): option is ServiceOptionConfig => Boolean(option)),
+		selectionPrompt: 'Select a microneedling type',
+	})
+	if (microneedlingGroup) groups.push(microneedlingGroup)
+
+	return groups
+}
+
+type ServiceOptionConfig = {
+	label: string
+	service: ServiceEntry
+	sortOrder: number
+}
+
+function buildLaserServicesGroupEntry(services: ServiceEntry[]) {
+	const laserServices = services.filter(service => {
+		const category = normalizeText(service.displayCategoryName)
+		return category === 'laser treatments'
+	})
+	if (laserServices.length < 2) return null
+
+	const laserHairReductionGroup = buildServiceOptionGroupEntry({
+		displayCategoryName: 'Laser Treatments',
+		displayDescription:
+			'Laser hair reduction packages for small, medium, and large treatment areas.',
+		displayName: 'Laser Hair Reduction',
+		id: 'laser-hair-reduction',
+		optionServices: laserServices
+			.map(service => {
+				const option = getLaserHairReductionOption(service)
+				return option ? { ...option, service } : null
+			})
+			.filter((option): option is ServiceOptionConfig => Boolean(option)),
+		selectionPrompt: 'Select an area size',
+	})
+
+	const touchUpLaserGroup = buildServiceOptionGroupEntry({
+		displayCategoryName: 'Laser Treatments',
+		displayDescription: 'Touch-up laser treatment by area size.',
+		displayName: 'Touch Up Laser Treatment',
+		id: 'touch-up-laser-treatment',
+		optionServices: laserServices
+			.map(service => {
+				const option = getTouchUpLaserOption(service)
+				return option ? { ...option, service } : null
+			})
+			.filter((option): option is ServiceOptionConfig => Boolean(option)),
+		selectionPrompt: 'Select an area size',
+	})
+
+	const nestedGroupedServiceIds = new Set([
+		...(laserHairReductionGroup?.groupedServiceIds ?? []),
+		...(touchUpLaserGroup?.groupedServiceIds ?? []),
+	])
+	const directLaserOptions = laserServices
+		.filter(service => !nestedGroupedServiceIds.has(service.id))
+		.map(service => ({
+			label: service.displayName,
+			service,
+			sortOrder: getLaserServiceSortOrder(service),
+		}))
+
+	return buildServiceOptionGroupEntry({
+		displayCategoryName: 'Laser Treatments',
+		displayDescription:
+			'Laser treatments for hair reduction, pigment, redness, and skin revitalization.',
+		displayName: 'Laser Services',
+		id: 'laser-services',
+		optionServices: [
+			...(laserHairReductionGroup
+				? [
+						{
+							label: laserHairReductionGroup.displayName,
+							service: laserHairReductionGroup,
+							sortOrder: 10,
+						},
+					]
+				: []),
+			...directLaserOptions,
+			...(touchUpLaserGroup
+				? [
+						{
+							label: touchUpLaserGroup.displayName,
+							service: touchUpLaserGroup,
+							sortOrder: 90,
+						},
+					]
+				: []),
+		],
+		selectionPrompt: 'Select a laser treatment',
+	})
+}
+
+function buildServiceOptionGroupEntry({
+	displayCategoryName,
+	displayDescription,
+	displayName,
+	id,
+	optionServices,
+	selectionPrompt,
+}: {
+	displayCategoryName: string
+	displayDescription: string
+	displayName: string
+	id: string
+	optionServices: ServiceOptionConfig[]
+	selectionPrompt: string
+}) {
+	const sortedOptions = optionServices
+		.filter(option => option.service)
+		.sort((a, b) => {
+			if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+			return a.label.localeCompare(b.label)
+		})
+	if (sortedOptions.length < 2) return null
+
+	const representativeService = sortedOptions[0]!.service
+	const groupedServiceIds = [
+		...new Set(
+			sortedOptions.flatMap(option => option.service.groupedServiceIds),
+		),
+	]
+
+	return {
+		...representativeService,
+		displayCategoryName,
+		displayDescription,
+		displayDurationLabel: 'Varies',
+		displayGroupId: id,
+		displayName,
+		displayPrice: getBlvdBookingPriceDisplay({ serviceName: displayName })
+			.display,
+		groupedServiceIds,
+		id: `display-group:${id}`,
+		recentBookingCount: sortedOptions.reduce(
+			(total, option) => total + option.service.recentBookingCount,
+			0,
+		),
+		searchText: normalizeText(
+			[
+				displayCategoryName,
+				displayName,
+				selectionPrompt,
+				...sortedOptions.flatMap(option => [
+					option.label,
+					option.service.displayName,
+					option.service.item.name,
+					option.service.searchText,
+				]),
+			].join(' '),
+		),
+		selectionOptions: sortedOptions,
+		selectionPrompt,
+	}
+}
+
+function getLaserHairReductionOption(service: ServiceEntry) {
+	const normalizedName = normalizeText(service.item.name)
+	if (!normalizedName.startsWith('laser hair reduction')) return null
+
+	if (normalizedName.includes('small area')) {
+		return { label: 'Small Area', sortOrder: 10 }
+	}
+	if (normalizedName.includes('medium area')) {
+		return { label: 'Medium Area', sortOrder: 20 }
+	}
+	if (normalizedName.includes('large area')) {
+		return { label: 'Large Area', sortOrder: 30 }
+	}
+
+	return null
+}
+
+function getTouchUpLaserOption(service: ServiceEntry) {
+	const normalizedName = normalizeText(service.item.name)
+	if (!normalizedName.startsWith('touch up laser treatment')) return null
+
+	if (normalizedName.includes('small area')) {
+		return { label: 'Small Area', sortOrder: 10 }
+	}
+	if (normalizedName.includes('medium area')) {
+		return { label: 'Medium Area', sortOrder: 20 }
+	}
+	if (normalizedName.includes('large area')) {
+		return { label: 'Large Area', sortOrder: 30 }
+	}
+
+	return null
+}
+
+function getViPeelOption(service: ServiceEntry) {
+	const normalizedName = normalizeText(service.item.name)
+	if (!normalizedName.startsWith('vi peel')) return null
+
+	if (normalizedName.includes('original')) {
+		return { label: 'Original', sortOrder: 10 }
+	}
+	if (normalizedName.includes('advanced')) {
+		return { label: 'Advanced', sortOrder: 20 }
+	}
+	if (normalizedName.includes('precision plus')) {
+		return { label: 'Precision Plus with Peptides', sortOrder: 30 }
+	}
+
+	return null
+}
+
+function getMicroneedlingOption(service: ServiceEntry) {
+	const normalizedName = normalizeText(service.item.name)
+	if (!normalizedName.includes('microneedling')) return null
+
+	if (normalizedName.includes('pdgf')) {
+		return { label: 'With PDGF', sortOrder: 20 }
+	}
+	if (normalizedName.includes('prp')) {
+		return { label: 'With PRP', sortOrder: 30 }
+	}
+	if (
+		normalizedName === 'new client microneedling' ||
+		normalizedName === 'existing client microneedling'
+	) {
+		return { label: 'Traditional', sortOrder: 10 }
+	}
+
+	return null
+}
+
+function getLaserServiceSortOrder(service: ServiceEntry) {
+	const normalizedName = normalizeText(service.item.name)
+	if (normalizedName.includes('pigmented lesion')) return 20
+	if (normalizedName.includes('vascular lesion')) return 30
+	if (normalizedName.includes('skin revitalization')) return 40
+	return 80
+}
+
+function buildGroupedServiceEntry({
+	group,
+	preferredService,
+	servicesById,
+}: {
+	group: BlvdServiceDisplayGroup
+	preferredService: ServiceEntry
+	servicesById: Map<string, ServiceEntry>
+}) {
+	const groupedServices = getBlvdServiceDisplayGroupServiceIds(group)
+		.map(serviceId => servicesById.get(serviceId))
+		.filter((service): service is ServiceEntry => Boolean(service))
+
+	return {
+		...preferredService,
+		displayCategoryName: group.displayCategoryName,
+		displayGroupId: group.id,
+		displayName: group.displayName,
+		groupedServiceIds: groupedServices.map(service => service.id),
+		recentBookingCount: groupedServices.reduce(
+			(total, service) => total + service.recentBookingCount,
+			0,
+		),
+		searchText: normalizeText(
+			[
+				group.displayCategoryName,
+				group.displayName,
+				group.searchAliases.join(' '),
+				...groupedServices.flatMap(service => [
+					service.categoryName,
+					service.displayCategoryName,
+					service.displayName,
+					service.item.name,
+					service.item.description ?? '',
+				]),
+			].join(' '),
+		),
+	}
+}
+
 function scoreService(service: ServiceEntry, search: string) {
 	if (!search.trim()) return 0
 
 	const normalizedSearch = normalizeText(search)
 	const searchTokens = tokenize(search)
-	const normalizedName = normalizeText(service.item.name)
+	const normalizedName = normalizeText(service.displayName)
 	let score = 0
 
 	if (normalizedName === normalizedSearch) score += 150
@@ -2683,6 +3801,18 @@ function scoreService(service: ServiceEntry, search: string) {
 	}
 
 	return score
+}
+
+function compareServiceEntriesForDisplay(a: ServiceEntry, b: ServiceEntry) {
+	if (a.recentBookingCount !== b.recentBookingCount) {
+		return b.recentBookingCount - a.recentBookingCount
+	}
+
+	if (a.categoryOrder !== b.categoryOrder) {
+		return a.categoryOrder - b.categoryOrder
+	}
+	if (a.itemOrder !== b.itemOrder) return a.itemOrder - b.itemOrder
+	return a.displayName.localeCompare(b.displayName)
 }
 
 function dedupeLocations(locations: BlvdLocation[]) {
@@ -2833,6 +3963,8 @@ async function ensureCartHasSelectedTime(
 function buildBookingSelectionEventProperties({
 	availablePaymentMethodCount,
 	cart,
+	clientHistory,
+	clientHistorySelection,
 	hasVerifiedClient,
 	selectedExistingPaymentMethod,
 	selectedLocation,
@@ -2840,25 +3972,44 @@ function buildBookingSelectionEventProperties({
 }: {
 	availablePaymentMethodCount: number
 	cart: BlvdCart | null
+	clientHistory: BookingClientHistory | null
+	clientHistorySelection: BookingClientHistory | null
 	hasVerifiedClient: boolean
 	selectedExistingPaymentMethod: BlvdPaymentMethod | null
 	selectedLocation: BlvdLocation | null
 	selectedService: ServiceEntry | null
 }) {
 	const requiresCard = cart ? Boolean(cart.summary.paymentMethodRequired) : null
-	const bookingClientType = getBookingClientType(hasVerifiedClient)
+	const bookingClientType = getBookingClientTypeFromHistory({
+		clientHistory,
+		hasVerifiedClient,
+	})
 
 	return {
 		booking_has_verified_client: hasVerifiedClient,
+		booking_client_history_selection:
+			clientHistorySelection ?? clientHistory ?? 'not_selected',
 		booking_client_type: bookingClientType,
-		booking_client_type_source: hasVerifiedClient
-			? 'boulevard_sms_ownership'
-			: 'default_unverified_booking_path',
+		booking_client_type_source: getBookingClientTypeSource({
+			clientHistory,
+			clientHistorySelection,
+			hasVerifiedClient,
+		}),
 		...(selectedService
 			? {
 					booking_service_category: selectedService.categoryName,
+					booking_service_client_fit: getBlvdServiceClientFit({
+						categoryName: selectedService.categoryName,
+						name: selectedService.item.name,
+					}),
+					booking_service_display_group_id: selectedService.displayGroupId,
+					booking_service_display_name: selectedService.displayName,
+					booking_service_grouped_service_ids:
+						selectedService.groupedServiceIds,
 					booking_service_id: selectedService.item.id,
 					booking_service_name: selectedService.item.name,
+					booking_service_recent_booking_count:
+						selectedService.recentBookingCount,
 				}
 			: {}),
 		...(selectedLocation
@@ -2883,8 +4034,21 @@ function buildBookingSelectionEventProperties({
 	}
 }
 
-function getBookingClientType(hasVerifiedClient: boolean) {
-	return hasVerifiedClient ? 'returning_client' : 'new_client'
+function getBookingClientTypeSource({
+	clientHistory,
+	clientHistorySelection,
+	hasVerifiedClient,
+}: {
+	clientHistory: BookingClientHistory | null
+	clientHistorySelection: BookingClientHistory | null
+	hasVerifiedClient: boolean
+}) {
+	if (hasVerifiedClient) return 'boulevard_sms_ownership'
+	if (clientHistorySelection === 'unsure' && clientHistory) {
+		return 'boulevard_phone_lookup'
+	}
+	if (clientHistorySelection ?? clientHistory) return 'patient_self_selection'
+	return 'default_unverified_booking_path'
 }
 
 function isUnavailableOnlineBookingServiceName(name: string) {
@@ -2968,6 +4132,92 @@ function queueBlvdBookingIntent(payload: Record<string, unknown>) {
 	}
 }
 
+async function sendBookingPhoneVerificationCode(phone: string) {
+	const result = await requestBookingPhoneVerification({
+		intent: 'send',
+		phone,
+	})
+	if (!result.ok) {
+		throw new Error(result.error ?? 'Unable to send verification code.')
+	}
+}
+
+async function verifyBookingPhoneVerificationCode({
+	code,
+	phone,
+}: {
+	code: string
+	phone: string
+}) {
+	const result = await requestBookingPhoneVerification({
+		code,
+		intent: 'verify',
+		phone,
+	})
+	if (!result.ok) {
+		throw new Error(result.error ?? 'Unable to verify code.')
+	}
+}
+
+async function requestBookingPhoneVerification(
+	payload:
+		| { intent: 'send'; phone: string }
+		| { code: string; intent: 'verify'; phone: string },
+) {
+	const response = await fetch('/resources/booking-phone-verification', {
+		body: JSON.stringify(payload),
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		method: 'POST',
+	})
+	const result = (await response.json().catch(() => null)) as {
+		error?: string
+		ok?: boolean
+	} | null
+
+	if (!response.ok || !result?.ok) {
+		return {
+			error: result?.error ?? 'Verification failed.',
+			ok: false,
+		}
+	}
+
+	return { ok: true }
+}
+
+async function requestBookingClientLookup(phone: string) {
+	const response = await fetch('/resources/booking-client-lookup', {
+		body: JSON.stringify({ phone }),
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		method: 'POST',
+	})
+	const result = (await response.json().catch(() => null)) as {
+		client_found?: boolean
+		client_type?: 'new' | 'returning'
+		error?: string
+		ok?: boolean
+		phone?: string
+	} | null
+
+	if (!response.ok || !result?.ok) {
+		return {
+			error: result?.error ?? 'Client lookup failed.',
+			ok: false as const,
+		}
+	}
+
+	return {
+		client_found: Boolean(result.client_found),
+		client_type:
+			result.client_type ?? (result.client_found ? 'returning' : 'new'),
+		ok: true as const,
+		phone: result.phone,
+	}
+}
+
 function normalizePhoneNumber(value: string) {
 	const digits = value.replace(/\D/g, '')
 	if (digits.length === 10) return `+1${digits}`
@@ -3027,6 +4277,80 @@ function isMobileVerificationValidationError(error: string) {
 		error === 'Mobile phone is required.' ||
 		error === 'Verify your mobile number before continuing.'
 	)
+}
+
+function isClientNotFoundByMobilePhoneError(error: unknown) {
+	const details = getBookingErrorDetails(error)
+	return (
+		details.code === 'CLIENT_NOT_FOUND_BY_MOBILE_PHONE' ||
+		details.technicalMessage.includes('CLIENT_NOT_FOUND_BY_MOBILE_PHONE')
+	)
+}
+
+function getOwnershipCodeUserMessage(
+	error: unknown,
+	clientHistory: BookingClientHistory | null,
+) {
+	if (isClientNotFoundByMobilePhoneError(error)) {
+		if (clientHistory === 'returning') {
+			return 'We could not find an existing profile for that mobile number. Please check the number or choose No above if this is your first visit.'
+		}
+
+		return 'We could not find an existing profile for that number, so we will verify it as a new client.'
+	}
+
+	return 'We could not send that code. Please check the number and try again.'
+}
+
+function getVerifyCodeUserMessage(error: unknown) {
+	const details = getBookingErrorDetails(error)
+	if (details.safeMessage.toLowerCase().includes('not valid')) {
+		return 'That verification code was not valid. Please try again.'
+	}
+	return 'We could not verify that code. Please try again.'
+}
+
+function getCheckoutUserMessage(error: unknown) {
+	const details = getBookingErrorDetails(error)
+	if (
+		details.code === 'CART_PAYMENT_METHOD_FAILED' ||
+		details.technicalMessage.includes('CART_PAYMENT_METHOD_FAILED')
+	) {
+		return 'Please check your payment zip code and CVV and try again.'
+	}
+
+	return 'We could not book the appointment. Please try again.'
+}
+
+function getBookingErrorDetails(error: unknown) {
+	const message = getErrorMessage(error)
+	const technicalMessage = redactSensitiveBookingErrorText(message)
+	const code = extractBoulevardErrorCode(message)
+	const name = error instanceof Error ? error.name : undefined
+
+	return {
+		code,
+		name,
+		safeMessage: code
+			? code.replace(/_/g, ' ').toLowerCase()
+			: technicalMessage,
+		technicalMessage,
+	}
+}
+
+function extractBoulevardErrorCode(value: string) {
+	const codeMatch =
+		value.match(/"code"\s*:\s*"([^"]+)"/) ??
+		value.match(/\b([A-Z][A-Z0-9]+(?:_[A-Z0-9]+){2,})\b/)
+	return codeMatch?.[1] ?? null
+}
+
+function redactSensitiveBookingErrorText(value: string) {
+	return value
+		.replace(/\+?1?\d[\d\s().-]{8,}\d/g, '[phone]')
+		.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
+		.replace(/\s+/g, ' ')
+		.slice(0, 1000)
 }
 
 function formatClientName({

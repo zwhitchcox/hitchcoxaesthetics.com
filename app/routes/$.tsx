@@ -5,12 +5,14 @@ import {
 	type MetaFunction,
 } from '@remix-run/node'
 import { Link, useLoaderData, useLocation } from '@remix-run/react'
+import { useEffect } from 'react'
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
 import { MarkdownContent } from '#app/components/markdown-content.js'
 import { PricingSection } from '#app/components/pricing-table.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
+import { writeLastBookingServiceHint } from '#app/utils/booking-source-hints.ts'
 import { type ServicePageSection } from '#app/utils/location-service-data.server.js'
 import {
 	getPage,
@@ -124,6 +126,17 @@ export default function DynamicPage() {
 	const { page, children, ancestors, siblings, markdown } =
 		useLoaderData<LoaderData>()
 	const blvdUrl = useBlvdUrl()
+
+	useEffect(() => {
+		writeLastBookingServiceHint({
+			label: page.name,
+			path: `/${page.path}`,
+			preferredLocationId: null,
+			search: [page.name, ...(ancestors ?? []).map(ancestor => ancestor.name)]
+				.join(' ')
+				.trim(),
+		})
+	}, [ancestors, page.name, page.path])
 
 	// Carousel images: use heroImages (before/after pairs) from frontmatter
 	const imgs = page.heroImages ?? []

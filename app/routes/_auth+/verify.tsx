@@ -17,7 +17,7 @@ export const codeQueryParam = 'code'
 export const targetQueryParam = 'target'
 export const typeQueryParam = 'type'
 export const redirectToQueryParam = 'redirectTo'
-const types = ['login'] as const
+const types = ['booking-phone', 'login'] as const
 const VerificationTypeSchema = z.enum(types)
 export type VerificationTypes = z.infer<typeof VerificationTypeSchema>
 
@@ -53,6 +53,7 @@ export default function VerifyRoute() {
 	)
 
 	const headings: Record<VerificationTypes, React.ReactNode> = {
+		'booking-phone': checkTexts,
 		login: checkTexts,
 	}
 
