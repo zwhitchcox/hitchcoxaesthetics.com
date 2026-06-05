@@ -935,6 +935,26 @@ function buildBookTool(publicUrl: string, toolHeaders: ToolHeaders) {
 					description:
 						'Caller phone number from the Retell call object, if known. Use null if unavailable; the tool server will also infer it from the call payload.',
 				},
+				call_id: {
+					type: ['string', 'null'],
+					description:
+						'Retell call id if visible. Use null; the server will infer it when available.',
+				},
+				retell_public_log_url: {
+					type: ['string', 'null'],
+					description:
+						'Retell public log URL if visible. Use null; the server will infer it when available.',
+				},
+				callrail_call_id: {
+					type: ['string', 'null'],
+					description:
+						'CallRail call id if known from metadata. Use null if unavailable.',
+				},
+				callrail_account_id: {
+					type: ['string', 'null'],
+					description:
+						'CallRail account id if known from metadata. Use null to use CALLRAIL_ACCOUNT_ID or auto-discovery.',
+				},
 				card: {
 					type: ['object', 'null'],
 					description:
@@ -994,6 +1014,10 @@ function buildBookTool(publicUrl: string, toolHeaders: ToolHeaders) {
 				'time_id',
 				'client',
 				'caller_phone_number',
+				'call_id',
+				'retell_public_log_url',
+				'callrail_call_id',
+				'callrail_account_id',
 				'card',
 				'booking_question_answers',
 				'notes',

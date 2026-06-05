@@ -6,7 +6,11 @@ import {
 } from '#app/utils/blvd-voice-booking.server.ts'
 import {
 	parseRetellToolPayload,
+	pickRetellCallRailAccountId,
+	pickRetellCallRailCallId,
 	pickRetellCallerPhone,
+	pickRetellCallId,
+	pickRetellPublicLogUrl,
 	retellToolError,
 	retellToolJson,
 } from '#app/utils/retell-tools.server.ts'
@@ -24,9 +28,23 @@ export async function action({ request }: ActionFunctionArgs) {
 		return retellToolJson(
 			await bookVoiceAppointment({
 				...payload.args,
+				call_id:
+					payload.args.call_id ?? pickRetellCallId(payload.call) ?? undefined,
+				callrail_account_id:
+					payload.args.callrail_account_id ??
+					pickRetellCallRailAccountId(payload.call) ??
+					undefined,
+				callrail_call_id:
+					payload.args.callrail_call_id ??
+					pickRetellCallRailCallId(payload.call) ??
+					undefined,
 				caller_phone_number:
 					payload.args.caller_phone_number ??
 					pickRetellCallerPhone(payload.call) ??
+					undefined,
+				retell_public_log_url:
+					payload.args.retell_public_log_url ??
+					pickRetellPublicLogUrl(payload.call) ??
 					undefined,
 			}),
 		)
