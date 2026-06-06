@@ -226,6 +226,14 @@ function removeUndefined<T>(value: T): T {
 	return value
 }
 
+function isPostHogGeneratedDashboard(dashboard: DashboardRecord) {
+	return dashboard.name.startsWith('Generated Dashboard:')
+}
+
+function isPostHogGeneratedInsight(insight: InsightRecord) {
+	return insight.name?.startsWith('Feature Flag ') ?? false
+}
+
 function buildEventNode(series: EventSeriesConfig) {
 	return removeUndefined({
 		kind: 'EventsNode',
@@ -686,6 +694,7 @@ async function pruneProject(
 	if (config.project_sync?.prune_unconfigured_dashboards) {
 		for (const dashboard of dashboardMap.values()) {
 			if (configuredDashboardNames.has(dashboard.name)) continue
+			if (isPostHogGeneratedDashboard(dashboard)) continue
 			await client.deleteDashboard(dashboard)
 		}
 	}
@@ -694,6 +703,7 @@ async function pruneProject(
 		for (const insight of insightMap.values()) {
 			if (!insight.name) continue
 			if (configuredInsightNames.has(insight.name)) continue
+			if (isPostHogGeneratedInsight(insight)) continue
 			await client.deleteInsight(insight)
 		}
 	}

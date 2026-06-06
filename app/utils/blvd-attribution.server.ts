@@ -628,7 +628,7 @@ async function syncBlvdRevenueItemToPostHog(
 	await captureServerPostHogEvent({
 		distinctId,
 		event: 'blvd_revenue_recorded',
-		insertId: `blvd-revenue:${revenueItem.externalId}:${touch?.id ?? 'unattributed'}`,
+		insertId: `blvd-revenue:${revenueItem.externalId}`,
 		properties: {
 			blvd_client_id:
 				revenueItem.boulevardClientId ??
@@ -696,6 +696,28 @@ export async function upsertBlvdRevenueItem(
 ) {
 	const parsed = boulevardRevenueItemInputSchema.parse(input)
 	const boulevardClientId = normalizeOptionalString(parsed.boulevardClientId)
+	const existingRevenueItem = await db.blvdRevenueItem.findUnique({
+		where: { externalId: parsed.externalId },
+		select: {
+			attributionMethod: true,
+			attributionTouchId: true,
+			boulevardAppointmentId: true,
+			boulevardClientId: true,
+			boulevardInvoiceId: true,
+			boulevardPaymentId: true,
+			boulevardSaleId: true,
+			currency: true,
+			discountAmountUsd: true,
+			gratuityAmountUsd: true,
+			grossAmountUsd: true,
+			itemName: true,
+			itemType: true,
+			netAmountUsd: true,
+			occurredAt: true,
+			rawPayload: true,
+			serviceCategory: true,
+		},
+	})
 
 	const client = boulevardClientId
 		? await upsertBlvdClientRecord(db, {
@@ -709,6 +731,40 @@ export async function upsertBlvdRevenueItem(
 				occurredAt: parsed.occurredAt,
 			})
 		: null
+	const attributionMethod = attributionTouch
+		? 'last_touch_before_revenue'
+		: 'unattributed'
+	const rawPayload = serializeRawPayload(parsed.rawPayload)
+	const shouldSyncToPostHog = hasRevenueItemMaterialChange(
+		existingRevenueItem,
+		{
+			attributionMethod,
+			attributionTouchId: attributionTouch?.id ?? null,
+			boulevardAppointmentId: normalizeOptionalString(
+				parsed.boulevardAppointmentId,
+			),
+			boulevardClientId,
+			boulevardInvoiceId: normalizeOptionalString(parsed.boulevardInvoiceId),
+			boulevardPaymentId: normalizeOptionalString(parsed.boulevardPaymentId),
+			boulevardSaleId: normalizeOptionalString(parsed.boulevardSaleId),
+			currency: parsed.currency,
+			discountAmountUsd: parsed.discountAmountUsd ?? null,
+			gratuityAmountUsd: parsed.gratuityAmountUsd ?? null,
+			grossAmountUsd: parsed.grossAmountUsd,
+			itemName: parsed.itemName,
+			itemType: normalizeOptionalString(parsed.itemType),
+			netAmountUsd: parsed.netAmountUsd ?? null,
+			occurredAt: parsed.occurredAt,
+			rawPayload,
+			serviceCategory: normalizeOptionalString(parsed.serviceCategory),
+		},
+	)
+
+	if (existingRevenueItem && !shouldSyncToPostHog) {
+		return db.blvdRevenueItem.findUniqueOrThrow({
+			where: { externalId: parsed.externalId },
+		})
+	}
 
 	const revenueItem = await db.blvdRevenueItem.upsert({
 		where: { externalId: parsed.externalId },
@@ -731,11 +787,9 @@ export async function upsertBlvdRevenueItem(
 			discountAmountUsd: parsed.discountAmountUsd ?? null,
 			gratuityAmountUsd: parsed.gratuityAmountUsd ?? null,
 			currency: parsed.currency,
-			rawPayload: serializeRawPayload(parsed.rawPayload),
+			rawPayload,
 			attributionTouchId: attributionTouch?.id ?? null,
-			attributionMethod: attributionTouch
-				? 'last_touch_before_revenue'
-				: 'unattributed',
+			attributionMethod,
 			attributedAt: attributionTouch ? new Date() : null,
 		},
 		update: {
@@ -756,19 +810,82 @@ export async function upsertBlvdRevenueItem(
 			discountAmountUsd: parsed.discountAmountUsd ?? null,
 			gratuityAmountUsd: parsed.gratuityAmountUsd ?? null,
 			currency: parsed.currency,
-			rawPayload: serializeRawPayload(parsed.rawPayload),
+			rawPayload,
 			attributionTouchId: attributionTouch?.id ?? null,
-			attributionMethod: attributionTouch
-				? 'last_touch_before_revenue'
-				: 'unattributed',
+			attributionMethod,
 			attributedAt: attributionTouch ? new Date() : null,
 		},
 	})
 
-	await refreshBlvdBookingPricingAudit(db)
-	await syncBlvdRevenueItemToPostHog({ revenueItemId: revenueItem.id }, db)
+	if (shouldSyncToPostHog) {
+		await refreshBlvdBookingPricingAudit(db)
+		await syncBlvdRevenueItemToPostHog({ revenueItemId: revenueItem.id }, db)
+	}
 
 	return revenueItem
+}
+
+function hasRevenueItemMaterialChange(
+	existing: {
+		attributionMethod: string | null
+		attributionTouchId: string | null
+		boulevardAppointmentId: string | null
+		boulevardClientId: string | null
+		boulevardInvoiceId: string | null
+		boulevardPaymentId: string | null
+		boulevardSaleId: string | null
+		currency: string
+		discountAmountUsd: number | null
+		gratuityAmountUsd: number | null
+		grossAmountUsd: number
+		itemName: string
+		itemType: string | null
+		netAmountUsd: number | null
+		occurredAt: Date
+		rawPayload: string | null
+		serviceCategory: string | null
+	} | null,
+	next: {
+		attributionMethod: string
+		attributionTouchId: string | null
+		boulevardAppointmentId: string | null
+		boulevardClientId: string | null
+		boulevardInvoiceId: string | null
+		boulevardPaymentId: string | null
+		boulevardSaleId: string | null
+		currency: string
+		discountAmountUsd: number | null
+		gratuityAmountUsd: number | null
+		grossAmountUsd: number
+		itemName: string
+		itemType: string | null
+		netAmountUsd: number | null
+		occurredAt: Date
+		rawPayload: string | null
+		serviceCategory: string | null
+	},
+) {
+	if (!existing) return true
+
+	return (
+		existing.attributionMethod !== next.attributionMethod ||
+		existing.attributionTouchId !== next.attributionTouchId ||
+		existing.boulevardAppointmentId !== next.boulevardAppointmentId ||
+		existing.boulevardClientId !== next.boulevardClientId ||
+		existing.boulevardInvoiceId !== next.boulevardInvoiceId ||
+		existing.boulevardPaymentId !== next.boulevardPaymentId ||
+		existing.boulevardSaleId !== next.boulevardSaleId ||
+		existing.currency !== next.currency ||
+		existing.discountAmountUsd !== next.discountAmountUsd ||
+		existing.gratuityAmountUsd !== next.gratuityAmountUsd ||
+		existing.grossAmountUsd !== next.grossAmountUsd ||
+		existing.itemName !== next.itemName ||
+		existing.itemType !== next.itemType ||
+		existing.netAmountUsd !== next.netAmountUsd ||
+		existing.occurredAt.getTime() !== next.occurredAt.getTime() ||
+		existing.rawPayload !== next.rawPayload ||
+		existing.serviceCategory !== next.serviceCategory
+	)
 }
 
 export async function reconcileBlvdRevenueItemAttribution(

@@ -58,6 +58,7 @@ test('normalizes Boulevard closed order lines into revenue items', () => {
 		itemName: 'Botox',
 		itemType: 'service',
 		netAmountUsd: 120,
+		serviceCategory: 'Injectables',
 	})
 	expect(revenueItems[1]).toMatchObject({
 		boulevardAppointmentId: 'urn:blvd:Appointment:appointment_1',
@@ -66,5 +67,42 @@ test('normalizes Boulevard closed order lines into revenue items', () => {
 		gratuityAmountUsd: 20,
 		itemName: 'Gratuity',
 		itemType: 'gratuity',
+		serviceCategory: 'Gratuity',
 	})
+})
+
+test('infers broad revenue service categories from Boulevard line names', () => {
+	const revenueItems = buildRevenueItemsForOrder({
+		clientId: 'urn:blvd:Client:client_1',
+		closedAt: '2026-06-01T21:31:49.131153Z',
+		id: 'urn:blvd:Order:order_1',
+		lineGroups: [
+			{
+				id: 'appointment_1',
+				lines: [
+					{
+						currentSubtotal: 15000,
+						id: 'line_1',
+						name: 'Weight Loss Injection',
+					},
+					{
+						currentSubtotal: 89900,
+						id: 'line_2',
+						name: 'Laser Hair Reduction - Large Area',
+					},
+					{
+						currentSubtotal: 27900,
+						id: 'line_3',
+						name: 'VI Peel - Original',
+					},
+				],
+			},
+		],
+	})
+
+	expect(revenueItems.map(item => item.serviceCategory)).toEqual([
+		'Weight Loss & Wellness',
+		'Laser Services',
+		'Aesthetic Treatments',
+	])
 })

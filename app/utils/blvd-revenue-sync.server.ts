@@ -11,7 +11,8 @@ import { reportCallRailRealRevenueConversion } from '#app/utils/callrail-booking
 import { prisma } from '#app/utils/db.server.ts'
 
 const REVENUE_IMPORT_STATE_KEY = 'blvd_revenue_import_last_sync_at'
-const CALLRAIL_REAL_REVENUE_STATE_KEY = 'blvd_real_revenue_callrail_last_sync_at'
+const CALLRAIL_REAL_REVENUE_STATE_KEY =
+	'blvd_real_revenue_callrail_last_sync_at'
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 30
 const DEFAULT_IMPORT_OVERLAP_HOURS = 24
 const DEFAULT_CALLRAIL_OVERLAP_HOURS = 6
@@ -107,9 +108,7 @@ type BlvdPageInfo = {
 	hasNextPage?: boolean | null
 }
 
-export async function syncBoulevardRealRevenue(
-	options: SyncOptions = {},
-) {
+export async function syncBoulevardRealRevenue(options: SyncOptions = {}) {
 	const db = options.db ?? prisma
 	if (!hasBoulevardAdminEnv()) {
 		return {
@@ -206,7 +205,10 @@ export async function importBoulevardClosedOrderRevenue({
 			if (dryRun) continue
 
 			for (const item of revenueItems) {
-				await upsertBlvdRevenueItem(boulevardRevenueItemInputSchema.parse(item), db)
+				await upsertBlvdRevenueItem(
+					boulevardRevenueItemInputSchema.parse(item),
+					db,
+				)
 				imported += 1
 			}
 		}
@@ -296,7 +298,9 @@ export async function syncBlvdRealRevenueToCallRail({
 				]?.occurredAt.toISOString(),
 			revenueItemCount: touch.revenueItems.length,
 			serviceNames: [
-				...new Set(touch.revenueItems.map(item => item.itemName).filter(Boolean)),
+				...new Set(
+					touch.revenueItems.map(item => item.itemName).filter(Boolean),
+				),
 			],
 			totalGrossRevenueUsd,
 		})
@@ -332,8 +336,11 @@ export function buildRevenueItemsForOrder(order: BlvdOrder) {
 		parseDateString(order.createdAt) ??
 		new Date()
 	const firstPaymentId = pickFirstPayment(order)?.id ?? undefined
-	const firstInvoiceId = pickFirstInvoiceAllocation(order)?.invoiceId ?? undefined
-	const revenueItems: BoulevardRevenueItemInput[] = (order.lineGroups ?? []).flatMap(group => {
+	const firstInvoiceId =
+		pickFirstInvoiceAllocation(order)?.invoiceId ?? undefined
+	const revenueItems: BoulevardRevenueItemInput[] = (
+		order.lineGroups ?? []
+	).flatMap(group => {
 		const appointmentId = getAppointmentIdForLineGroup(group)
 		return (group.lines ?? []).flatMap(line => {
 			if (!line.id) return []
@@ -356,6 +363,7 @@ export function buildRevenueItemsForOrder(order: BlvdOrder) {
 					itemType: getOrderLineItemType(line),
 					netAmountUsd: grossAmountUsd,
 					occurredAt,
+					serviceCategory: inferRevenueServiceCategory(line.name),
 					rawPayload: {
 						line,
 						lineGroup: {
@@ -375,7 +383,9 @@ export function buildRevenueItemsForOrder(order: BlvdOrder) {
 		})
 	})
 
-	const gratuityAmountUsd = centsToUsd(order.summary?.currentGratuityAmount ?? 0)
+	const gratuityAmountUsd = centsToUsd(
+		order.summary?.currentGratuityAmount ?? 0,
+	)
 	if (gratuityAmountUsd > 0) {
 		const appointmentId = pickSingleAppointmentId(order.lineGroups ?? [])
 		revenueItems.push({
@@ -393,6 +403,7 @@ export function buildRevenueItemsForOrder(order: BlvdOrder) {
 			itemType: 'gratuity',
 			netAmountUsd: gratuityAmountUsd,
 			occurredAt,
+			serviceCategory: 'Gratuity',
 			rawPayload: {
 				order: {
 					clientId: order.clientId,
@@ -427,7 +438,7 @@ async function* listBlvdClosedOrdersForLocation({
 		page += 1
 		const response: BlvdOrdersResponse =
 			await boulevardAdminFetch<BlvdOrdersResponse>(
-			`query Orders($after: String, $locationId: ID!) {
+				`query Orders($after: String, $locationId: ID!) {
 				orders(after: $after, first: ${ORDER_PAGE_SIZE}, locationId: $locationId) {
 					pageInfo {
 						endCursor
@@ -498,8 +509,8 @@ async function* listBlvdClosedOrdersForLocation({
 					}
 				}
 			}`,
-			{ after, locationId },
-		)
+				{ after, locationId },
+			)
 		const orders =
 			response.orders?.edges
 				?.map((edge: { node?: BlvdOrder | null }) => edge.node)
@@ -611,6 +622,51 @@ function pickFirstInvoiceAllocation(order: BlvdOrder) {
 
 function centsToUsd(value: number) {
 	return Number((value / 100).toFixed(2))
+}
+
+function inferRevenueServiceCategory(name?: string | null) {
+	const normalized = normalizeRevenueText(name)
+	if (!normalized) return undefined
+
+	if (
+		/\b(tox|botox|dysport|jeuveau|xeomin|filler|kybella|skinvive|lip flip|hylenex|injectable|prp)\b/.test(
+			normalized,
+		)
+	) {
+		return 'Injectables'
+	}
+
+	if (
+		/\b(weight loss|semaglutide|tirzepatide|lipotropic|b12|lab draw)\b/.test(
+			normalized,
+		)
+	) {
+		return 'Weight Loss & Wellness'
+	}
+
+	if (
+		/\b(laser|hair reduction|vascular lesion|pigmented lesion|sun spots|skin revitalization)\b/.test(
+			normalized,
+		)
+	) {
+		return 'Laser Services'
+	}
+
+	if (
+		/\b(microneedling|vi peel|dermaplane|facial|hair restoration)\b/.test(
+			normalized,
+		)
+	) {
+		return 'Aesthetic Treatments'
+	}
+
+	if (/\bconsultation\b/.test(normalized)) return 'General Services'
+
+	return undefined
+}
+
+function normalizeRevenueText(value?: string | null) {
+	return (value ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 function parseDateString(value?: string | null) {

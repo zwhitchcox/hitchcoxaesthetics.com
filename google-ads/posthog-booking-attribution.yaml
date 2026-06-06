@@ -285,6 +285,191 @@ dashboards:
             math_property: gross_amount_usd
             math_property_type: event
 
+  - name: Appointment Volume & Marketing Performance
+    description:
+      Daily and weekly booked appointment volume, source performance, and
+      attributed revenue for website and phone conversions.
+    tags:
+      - booking
+      - attribution
+      - marketing
+      - volume
+    managed_tag: managed:appointment-volume-marketing-performance
+    sync_mode: replace_managed
+    insights:
+      - kind: trend
+        name: Daily Appointments Booked
+        description:
+          Daily count of normalized booking conversions. Includes website
+          checkout and qualified phone-call booking conversions.
+        interval: day
+        series:
+          - event: booking_conversion_completed
+            custom_name: Appointments Booked
+
+      - kind: trend
+        name: Weekly Appointments Booked
+        description:
+          Weekly count of normalized booking conversions. Use this for
+          higher-signal marketing trend reviews when daily volume is noisy.
+        interval: week
+        date_range:
+          date_from: -12w
+        series:
+          - event: booking_conversion_completed
+            custom_name: Appointments Booked
+
+      - kind: trend
+        name: Daily Website Bookings
+        description:
+          Daily count of completed website checkouts only. Phone-call
+          conversions are excluded from this view.
+        interval: day
+        series:
+          - event: booking_completed
+            custom_name: Website Bookings
+
+      - kind: trend
+        name: Daily Booking Starts vs Bookings
+        description:
+          Daily booking funnel starts compared with normalized booking
+          conversions.
+        interval: day
+        series:
+          - event: booking_funnel_entered
+            custom_name: Booking Starts
+          - event: booking_conversion_completed
+            custom_name: Appointments Booked
+
+      - kind: trend
+        name: Weekly Bookings by Source Detail
+        description:
+          Weekly normalized booking conversions broken down by practical
+          marketing source.
+        breakdown: traffic_source_detail
+        interval: week
+        date_range:
+          date_from: -12w
+        series:
+          - event: booking_conversion_completed
+            custom_name: Bookings by Source Detail
+
+      - kind: trend
+        name: Weekly Bookings by Channel
+        description:
+          Weekly normalized booking conversions broken down by broad marketing
+          channel.
+        breakdown: traffic_channel
+        interval: week
+        date_range:
+          date_from: -12w
+        series:
+          - event: booking_conversion_completed
+            custom_name: Bookings by Channel
+
+      - kind: trend
+        name: Weekly Bookings by Client Type
+        description:
+          Weekly normalized booking conversions broken down by new vs returning
+          client when known.
+        breakdown: booking_client_type
+        interval: week
+        date_range:
+          date_from: -12w
+        series:
+          - event: booking_conversion_completed
+            custom_name: Bookings by Client Type
+
+      - kind: trend
+        name: Daily Attributed Revenue
+        description:
+          Daily actual Boulevard revenue attributed back to the latest known
+          marketing touch for the client. Revenue is recorded from Boulevard
+          order lines; historical rows before June 6, 2026 may include duplicate
+          PostHog events until cleaned.
+        interval: day
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Weekly Attributed Revenue
+        description:
+          Weekly actual Boulevard revenue attributed back to the latest known
+          marketing touch for the client. Revenue is recorded from Boulevard
+          order lines; historical rows before June 6, 2026 may include duplicate
+          PostHog events until cleaned.
+        interval: week
+        date_range:
+          date_from: -12w
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Daily Attributed Revenue by Source Detail
+        description:
+          Daily actual Boulevard revenue broken down by practical marketing
+          source. Revenue is recorded from Boulevard order lines; historical
+          rows before June 6, 2026 may include duplicate PostHog events until
+          cleaned.
+        breakdown: traffic_source_detail
+        interval: day
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue by Source Detail
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Daily Attributed Revenue by Service Category
+        description:
+          Daily actual Boulevard revenue broken down by inferred Boulevard
+          service category. Revenue is recorded from Boulevard order lines;
+          historical rows before June 6, 2026 may include duplicate PostHog
+          events until cleaned.
+        breakdown: service_category
+        interval: day
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue by Service Category
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: trend
+        name: Weekly Attributed Revenue by Source Detail
+        description:
+          Weekly actual Boulevard revenue attributed back to the latest known
+          marketing touch for the client. Revenue is recorded from Boulevard
+          order lines; historical rows before June 6, 2026 may include duplicate
+          PostHog events until cleaned.
+        breakdown: traffic_source_detail
+        interval: week
+        date_range:
+          date_from: -12w
+        series:
+          - event: blvd_revenue_recorded
+            custom_name: Attributed Revenue
+            math: sum
+            math_property: gross_amount_usd
+            math_property_type: event
+
+      - kind: funnel
+        name: Site To Combined Booking Rate - Source Detail
+        description:
+          Site entry to any completed booking conversion, broken down by
+          practical marketing source.
+        breakdown: traffic_source_detail
+        steps: *site_to_combined_booking_steps
+
   - name: Booking Experiments - Service Page UX
     description:
       PostHog feature-flag experiment reporting for the booking service page
@@ -719,8 +904,11 @@ dashboards:
       - kind: trend
         name: Attributed Revenue Trend - Service Category
         description:
-          Attributed Boulevard revenue summed by booking_service_category.
-        breakdown: booking_service_category
+          Attributed Boulevard revenue summed by inferred Boulevard service
+          category. Revenue is recorded from Boulevard order lines; historical
+          rows before June 6, 2026 may include duplicate PostHog events until
+          cleaned.
+        breakdown: service_category
         series:
           - event: blvd_revenue_recorded
             custom_name: Attributed Revenue Trend - Service Category
