@@ -15,6 +15,45 @@ defaults:
     - booking
     - attribution
 
+feature_flags:
+  - key: booking-popular-services-layout
+    name: Booking service page popular services layout
+    active: true
+    tags:
+      - booking
+      - experiments
+    filters:
+      groups:
+        - properties: []
+          rollout_percentage: 100
+      multivariate:
+        variants:
+          - key: popular_top
+            name: Popular services at top
+            rollout_percentage: 50
+          - key: no_popular_top
+            name: No popular services section
+            rollout_percentage: 50
+
+  - key: booking-client-history-gate
+    name: Booking service page client history question
+    active: true
+    tags:
+      - booking
+      - experiments
+    filters:
+      groups:
+        - properties: []
+          rollout_percentage: 100
+      multivariate:
+        variants:
+          - key: ask_client_history
+            name: Ask client history question
+            rollout_percentage: 50
+          - key: show_all_services
+            name: Show all customer-bookable services
+            rollout_percentage: 50
+
 dashboards:
   - name: Booking Overview - Source & Revenue
     description:
@@ -245,6 +284,88 @@ dashboards:
             math: sum
             math_property: gross_amount_usd
             math_property_type: event
+
+  - name: Booking Experiments - Service Page UX
+    description:
+      PostHog feature-flag experiment reporting for the booking service page
+      layout.
+    tags:
+      - booking
+      - experiments
+    managed_tag: managed:booking-experiments-service-page-ux
+    sync_mode: replace_managed
+    insights:
+      - kind: funnel
+        name: Entry To Phone CTA - Popular Services Layout
+        description:
+          Booking page entry to phone CTA click, broken down by the popular
+          services layout experiment variant.
+        breakdown: booking_experiment_popular_services_layout
+        steps:
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: phone_cta_clicked
+            custom_name: Phone CTA Clicked
+
+      - kind: funnel
+        name: Entry To Website Booking - Popular Services Layout
+        description:
+          Booking page entry to completed website booking, broken down by the
+          popular services layout experiment variant.
+        breakdown: booking_experiment_popular_services_layout
+        steps:
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: booking_completed
+            custom_name: Booking Completed
+
+      - kind: funnel
+        name: Entry To Combined Booking - Popular Services Layout
+        description:
+          Booking page entry to any tracked booking conversion, broken down by
+          the popular services layout experiment variant.
+        breakdown: booking_experiment_popular_services_layout
+        steps:
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: booking_conversion_completed
+            custom_name: Booking Conversion Completed
+
+      - kind: funnel
+        name: Entry To Phone CTA - Client History Gate
+        description:
+          Booking page entry to phone CTA click, broken down by whether the
+          client-history question was shown.
+        breakdown: booking_experiment_client_history_gate
+        steps:
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: phone_cta_clicked
+            custom_name: Phone CTA Clicked
+
+      - kind: funnel
+        name: Entry To Website Booking - Client History Gate
+        description:
+          Booking page entry to completed website booking, broken down by
+          whether the client-history question was shown.
+        breakdown: booking_experiment_client_history_gate
+        steps:
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: booking_completed
+            custom_name: Booking Completed
+
+      - kind: funnel
+        name: Entry To Combined Booking - Client History Gate
+        description:
+          Booking page entry to any tracked booking conversion, broken down by
+          whether the client-history question was shown.
+        breakdown: booking_experiment_client_history_gate
+        steps:
+          - event: booking_funnel_entered
+            custom_name: Booking Funnel Entered
+          - event: booking_conversion_completed
+            custom_name: Booking Conversion Completed
 
   - name: Booking Pages - Conversion
     description:

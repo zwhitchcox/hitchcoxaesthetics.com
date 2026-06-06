@@ -24,6 +24,33 @@ const eventSeriesSchema = z.object({
 	math_property_type: z.string().optional(),
 })
 
+const featureFlagVariantSchema = z.object({
+	key: z.string(),
+	name: z.string().optional(),
+	rollout_percentage: z.number().min(0).max(100),
+	payload: z.any().optional(),
+})
+
+const featureFlagFiltersSchema = z
+	.object({
+		groups: z.array(z.object({}).passthrough()).optional(),
+		multivariate: z
+			.object({
+				variants: z.array(featureFlagVariantSchema).min(2),
+			})
+			.passthrough()
+			.optional(),
+	})
+	.passthrough()
+
+const featureFlagSchema = z.object({
+	key: z.string(),
+	name: z.string().optional(),
+	active: z.boolean().default(true),
+	tags: z.array(z.string()).optional(),
+	filters: featureFlagFiltersSchema.optional(),
+})
+
 const dateRangeSchema = z
 	.object({
 		date_from: z.string().optional(),
@@ -86,11 +113,13 @@ const configSchema = z.object({
 			insight_tags: z.array(z.string()).optional(),
 		})
 		.optional(),
+	feature_flags: z.array(featureFlagSchema).optional(),
 	dashboards: z.array(dashboardSchema).min(1),
 })
 
 type Config = z.infer<typeof configSchema>
 type DashboardConfig = z.infer<typeof dashboardSchema>
+type FeatureFlagConfig = z.infer<typeof featureFlagSchema>
 type InsightConfig = DashboardConfig['insights'][number]
 type EventSeriesConfig = z.infer<typeof eventSeriesSchema>
 
@@ -112,6 +141,15 @@ type InsightRecord = {
 	name: string | null
 	short_id: string
 	dashboards?: number[]
+	tags?: string[]
+}
+
+type FeatureFlagRecord = {
+	active?: boolean
+	filters?: Record<string, unknown>
+	id: number
+	key: string
+	name?: string
 	tags?: string[]
 }
 
@@ -348,6 +386,12 @@ class PostHogClient {
 		)
 	}
 
+	async listFeatureFlags() {
+		return this.paginate<FeatureFlagRecord>(
+			`/api/projects/${this.projectId}/feature_flags/?limit=200`,
+		)
+	}
+
 	async createDashboard(payload: Record<string, unknown>) {
 		console.log(
 			`${this.apply ? 'CREATE' : 'DRY RUN create'} dashboard: ${payload.name}`,
@@ -417,6 +461,47 @@ class PostHogClient {
 
 		await this.request<Record<string, unknown>>(
 			`${this.host}/api/projects/${this.projectId}/insights/${insightId}/`,
+			{
+				method: 'PATCH',
+				body: JSON.stringify(payload),
+			},
+		)
+	}
+
+	async createFeatureFlag(payload: Record<string, unknown>) {
+		console.log(
+			`${this.apply ? 'CREATE' : 'DRY RUN create'} feature flag: ${payload.key}`,
+		)
+
+		if (!this.apply) {
+			return {
+				id: -1,
+				key: String(payload.key),
+				name: payload.name ? String(payload.name) : undefined,
+			} as FeatureFlagRecord
+		}
+
+		return this.request<FeatureFlagRecord>(
+			`${this.host}/api/projects/${this.projectId}/feature_flags/`,
+			{
+				method: 'POST',
+				body: JSON.stringify(payload),
+			},
+		)
+	}
+
+	async updateFeatureFlag(
+		featureFlagId: number,
+		payload: Record<string, unknown>,
+	) {
+		console.log(
+			`${this.apply ? 'UPDATE' : 'DRY RUN update'} feature flag: ${payload.key ?? featureFlagId}`,
+		)
+
+		if (!this.apply) return
+
+		await this.request<Record<string, unknown>>(
+			`${this.host}/api/projects/${this.projectId}/feature_flags/${featureFlagId}/`,
 			{
 				method: 'PATCH',
 				body: JSON.stringify(payload),
@@ -548,6 +633,41 @@ async function syncDashboard(
 	}
 }
 
+async function syncFeatureFlags(
+	client: PostHogClient,
+	featureFlags: FeatureFlagConfig[] = [],
+) {
+	if (featureFlags.length === 0) return
+
+	const existingFeatureFlags = await client.listFeatureFlags()
+	const featureFlagMap = new Map(
+		existingFeatureFlags.map(featureFlag => [featureFlag.key, featureFlag]),
+	)
+
+	for (const featureFlag of featureFlags) {
+		const payload = removeUndefined({
+			key: featureFlag.key,
+			name: featureFlag.name,
+			active: featureFlag.active,
+			filters: featureFlag.filters,
+			tags: featureFlag.tags,
+		})
+		const existing = featureFlagMap.get(featureFlag.key)
+
+		if (!existing) {
+			const created = await client.createFeatureFlag(payload)
+			featureFlagMap.set(featureFlag.key, created)
+			continue
+		}
+
+		await client.updateFeatureFlag(existing.id, payload)
+		featureFlagMap.set(featureFlag.key, {
+			...existing,
+			...payload,
+		})
+	}
+}
+
 async function pruneProject(
 	client: PostHogClient,
 	config: Config,
@@ -609,6 +729,8 @@ async function main() {
 			.filter(insight => insight.name)
 			.map(insight => [insight.name as string, insight]),
 	)
+
+	await syncFeatureFlags(client, config.feature_flags)
 
 	for (const dashboard of config.dashboards) {
 		console.log(`Syncing dashboard: ${dashboard.name}`)

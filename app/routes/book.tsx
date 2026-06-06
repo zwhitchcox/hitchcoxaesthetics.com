@@ -36,6 +36,7 @@ import {
 	getBookingClientTypeFromHistory,
 	getCustomerFacingBlvdCategoryName,
 	getCustomerFacingBlvdServiceName,
+	isBlvdServiceCustomerBookable,
 	isBlvdServiceVisibleForClientHistory,
 } from '#app/utils/blvd-service-display.ts'
 import { getBookingAnalyticsEventProperties } from '#app/utils/booking-analytics.ts'
@@ -304,6 +305,26 @@ const CLIENT_HISTORY_OPTIONS: Array<{
 
 const DEFAULT_BOOKING_LOCATION_ID: SiteLocation['id'] = 'bearden'
 const BOOKING_PHONE_VERIFICATION_CODE_ID = 'booking-phone'
+const BOOKING_POPULAR_SERVICES_EXPERIMENT_KEY =
+	'booking-popular-services-layout'
+const BOOKING_CLIENT_HISTORY_EXPERIMENT_KEY = 'booking-client-history-gate'
+
+type BookingPopularServicesVariant = 'popular_top' | 'no_popular_top'
+type BookingClientHistoryGateVariant =
+	| 'ask_client_history'
+	| 'show_all_services'
+
+type BookingExperimentVariants = {
+	clientHistoryGate: BookingClientHistoryGateVariant
+	loaded: boolean
+	popularServicesLayout: BookingPopularServicesVariant
+}
+
+const DEFAULT_BOOKING_EXPERIMENT_VARIANTS: BookingExperimentVariants = {
+	clientHistoryGate: 'ask_client_history',
+	loaded: false,
+	popularServicesLayout: 'popular_top',
+}
 
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
@@ -435,6 +456,8 @@ export default function BlvdBookRoute() {
 		useRef<BookingAnalyticsExclusionInput>({})
 	const lastBookingIntentKeyRef = useRef<string | null>(null)
 	const lastPostHogIdentityKeyRef = useRef<string | null>(null)
+	const [bookingExperimentVariants, setBookingExperimentVariants] =
+		useState<BookingExperimentVariants>(DEFAULT_BOOKING_EXPERIMENT_VARIANTS)
 	bookingAnalyticsExclusionInputRef.current = {
 		emails: [clientForm.email, cart?.clientInformation?.email],
 		phones: [
@@ -443,6 +466,55 @@ export default function BlvdBookRoute() {
 			cart?.clientInformation?.phoneNumber,
 		],
 	}
+
+	useEffect(() => {
+		if (!posthog) {
+			setBookingExperimentVariants({
+				...DEFAULT_BOOKING_EXPERIMENT_VARIANTS,
+				loaded: true,
+			})
+			return
+		}
+
+		const updateBookingExperimentVariants = () => {
+			setBookingExperimentVariants(currentVariants => {
+				const nextVariants = {
+					clientHistoryGate: normalizeBookingClientHistoryGateVariant(
+						posthog.getFeatureFlag(BOOKING_CLIENT_HISTORY_EXPERIMENT_KEY),
+					),
+					loaded: true,
+					popularServicesLayout: normalizeBookingPopularServicesVariant(
+						posthog.getFeatureFlag(BOOKING_POPULAR_SERVICES_EXPERIMENT_KEY),
+					),
+				}
+
+				if (
+					currentVariants.loaded === nextVariants.loaded &&
+					currentVariants.clientHistoryGate ===
+						nextVariants.clientHistoryGate &&
+					currentVariants.popularServicesLayout ===
+						nextVariants.popularServicesLayout
+				) {
+					return currentVariants
+				}
+
+				return nextVariants
+			})
+		}
+		const fallbackTimer = window.setTimeout(
+			updateBookingExperimentVariants,
+			1500,
+		)
+		const unsubscribe = posthog.onFeatureFlags(() => {
+			window.clearTimeout(fallbackTimer)
+			updateBookingExperimentVariants()
+		})
+
+		return () => {
+			window.clearTimeout(fallbackTimer)
+			unsubscribe()
+		}
+	}, [posthog])
 
 	useEffect(() => {
 		let cancelled = false
@@ -623,6 +695,10 @@ export default function BlvdBookRoute() {
 			activeSourceHint?.search,
 		],
 	)
+	const bookingExperimentAnalyticsProperties = useMemo(
+		() => getBookingExperimentAnalyticsProperties(bookingExperimentVariants),
+		[bookingExperimentVariants],
+	)
 	const selectionAnalyticsProperties = useMemo(
 		() =>
 			buildBookingSelectionEventProperties({
@@ -650,10 +726,24 @@ export default function BlvdBookRoute() {
 	useEffect(() => {
 		bookingAnalyticsPropertiesRef.current = {
 			...getBookingAnalyticsEventProperties(),
+			...bookingExperimentAnalyticsProperties,
 			...sourceHintAnalyticsProperties,
 			...selectionAnalyticsProperties,
 		}
-	}, [selectionAnalyticsProperties, sourceHintAnalyticsProperties])
+	}, [
+		bookingExperimentAnalyticsProperties,
+		selectionAnalyticsProperties,
+		sourceHintAnalyticsProperties,
+	])
+
+	useEffect(() => {
+		if (!posthog || !bookingExperimentVariants.loaded) return
+		posthog.register(bookingExperimentAnalyticsProperties)
+	}, [
+		bookingExperimentAnalyticsProperties,
+		bookingExperimentVariants.loaded,
+		posthog,
+	])
 
 	const isCurrentBookingAnalyticsExcluded = useCallback(
 		(extraInput: BookingAnalyticsExclusionInput = {}) => {
@@ -738,8 +828,20 @@ export default function BlvdBookRoute() {
 		})
 	}
 
+	const shouldSkipClientHistoryGate =
+		bookingExperimentVariants.clientHistoryGate === 'show_all_services'
+	const shouldShowClientHistoryGate =
+		bookingExperimentVariants.clientHistoryGate === 'ask_client_history'
+	const canBrowseServices =
+		shouldSkipClientHistoryGate || Boolean(clientHistory)
 	const filteredServices = useMemo(() => {
-		const visibleServices = buildDisplayServiceEntries(services, clientHistory)
+		const visibleServices = buildDisplayServiceEntries(
+			services,
+			clientHistory,
+			{
+				showAllClientFits: shouldSkipClientHistoryGate,
+			},
+		)
 		const trimmedSearch = search.trim()
 		if (trimmedSearch.length === 0) {
 			return [...visibleServices].sort(compareServiceEntriesForDisplay)
@@ -767,9 +869,11 @@ export default function BlvdBookRoute() {
 				return a.service.item.name.localeCompare(b.service.item.name)
 			})
 			.map(result => result.service)
-	}, [clientHistory, search, services])
+	}, [clientHistory, search, services, shouldSkipClientHistoryGate])
 	const showPopularServices = Boolean(
-		clientHistory && search.trim().length === 0,
+		canBrowseServices &&
+			bookingExperimentVariants.popularServicesLayout === 'popular_top' &&
+			search.trim().length === 0,
 	)
 	const popularServices = useMemo(() => {
 		if (!showPopularServices) return []
@@ -838,8 +942,8 @@ export default function BlvdBookRoute() {
 
 	useEffect(() => {
 		pendingBookingStepsRef.current.add(currentStep)
-		if (currentStep === 'service' && !clientHistory) return
-		if (!posthog) return
+		if (currentStep === 'service' && !canBrowseServices) return
+		if (!posthog || !bookingExperimentVariants.loaded) return
 
 		for (const step of pendingBookingStepsRef.current) {
 			captureBookingPostHogEvent('booking_step_viewed', {
@@ -849,7 +953,13 @@ export default function BlvdBookRoute() {
 		}
 
 		pendingBookingStepsRef.current.clear()
-	}, [captureBookingPostHogEvent, clientHistory, currentStep, posthog])
+	}, [
+		bookingExperimentVariants.loaded,
+		canBrowseServices,
+		captureBookingPostHogEvent,
+		currentStep,
+		posthog,
+	])
 
 	const bookableDateStrings = useMemo(() => {
 		return new Set(
@@ -859,7 +969,13 @@ export default function BlvdBookRoute() {
 
 	useEffect(() => {
 		if (didCaptureBookingFunnelEnteredRef.current) return
-		if (!hasEvaluatedReferrerHint || !posthog) return
+		if (
+			!hasEvaluatedReferrerHint ||
+			!posthog ||
+			!bookingExperimentVariants.loaded
+		) {
+			return
+		}
 
 		didCaptureBookingFunnelEnteredRef.current = true
 		captureBookingPostHogEvent('booking_funnel_entered', {
@@ -869,6 +985,7 @@ export default function BlvdBookRoute() {
 		})
 	}, [
 		activeSourceHint?.search,
+		bookingExperimentVariants.loaded,
 		captureBookingPostHogEvent,
 		hasEvaluatedReferrerHint,
 		posthog,
@@ -894,7 +1011,7 @@ export default function BlvdBookRoute() {
 	}, [hasEvaluatedReferrerHint, initError, initializing, selectedService])
 
 	useEffect(() => {
-		if (!clientHistory) return
+		if (!canBrowseServices) return
 		if (currentStep !== 'service') return
 		if (selectedService) return
 		if (didFocusSearchAfterClientHistory.current) return
@@ -902,8 +1019,9 @@ export default function BlvdBookRoute() {
 		didFocusSearchAfterClientHistory.current = true
 		window.setTimeout(() => {
 			searchInputRef.current?.focus()
+			searchInputRef.current?.select()
 		}, 0)
-	}, [clientHistory, currentStep, selectedService])
+	}, [canBrowseServices, currentStep, selectedService])
 
 	function resetReturningClientState() {
 		setOwnershipCodeId(null)
@@ -2187,7 +2305,7 @@ export default function BlvdBookRoute() {
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
 											Service
 										</h2>
-										{clientHistorySelection ? null : (
+										{shouldShowClientHistoryGate && !clientHistorySelection ? (
 											<div className="-mt-2 flex w-full max-w-2xl flex-col items-center gap-3">
 												<h3 className="text-center text-lg font-semibold">
 													Have you been with us before?
@@ -2208,9 +2326,11 @@ export default function BlvdBookRoute() {
 													))}
 												</div>
 											</div>
-										)}
+										) : null}
 
-										{clientHistorySelection === 'unsure' && !clientHistory ? (
+										{shouldShowClientHistoryGate &&
+										clientHistorySelection === 'unsure' &&
+										!clientHistory ? (
 											<form
 												className="w-full max-w-2xl space-y-3 rounded-xl border bg-white p-4"
 												onSubmit={handleLookupClientHistory}
@@ -2242,13 +2362,15 @@ export default function BlvdBookRoute() {
 											</form>
 										) : null}
 
-										{clientHistoryLookupMessage && clientHistory ? (
+										{shouldShowClientHistoryGate &&
+										clientHistoryLookupMessage &&
+										clientHistory ? (
 											<p className="text-sm text-muted-foreground">
 												{clientHistoryLookupMessage}
 											</p>
 										) : null}
 
-										{clientHistory ? (
+										{canBrowseServices ? (
 											<div className="flex w-full max-w-full flex-col items-center gap-3 px-1 py-1 sm:flex-row">
 												<Input
 													ref={searchInputRef}
@@ -2272,11 +2394,13 @@ export default function BlvdBookRoute() {
 											</div>
 										) : null}
 
-										{!clientHistory && !clientHistorySelection ? (
+										{shouldShowClientHistoryGate &&
+										!clientHistory &&
+										!clientHistorySelection ? (
 											<p className="text-sm text-muted-foreground">
 												Choose one to show the right services.
 											</p>
-										) : !clientHistory ? null : filteredServices.length ===
+										) : !canBrowseServices ? null : filteredServices.length ===
 										  0 ? (
 											<div className="space-y-3 text-center">
 												<p className="text-sm text-muted-foreground">
@@ -3404,42 +3528,54 @@ function buildServiceEntries(categories: BlvdCategory[]) {
 function buildDisplayServiceEntries(
 	services: ServiceEntry[],
 	clientHistory: BookingClientHistory | null,
+	options: { showAllClientFits?: boolean } = {},
 ) {
-	if (!clientHistory) return []
+	const showAllClientFits = Boolean(options.showAllClientFits)
+	if (!clientHistory && !showAllClientFits) return []
 
 	const servicesById = new Map(services.map(service => [service.id, service]))
 	const groupedServiceIds = new Set<string>()
 	const displayServices: ServiceEntry[] = []
 
-	for (const group of BLVD_SERVICE_DISPLAY_GROUPS) {
-		const groupServiceIds = getBlvdServiceDisplayGroupServiceIds(group)
-		for (const serviceId of groupServiceIds) {
-			groupedServiceIds.add(serviceId)
-		}
+	if (!showAllClientFits && clientHistory) {
+		for (const group of BLVD_SERVICE_DISPLAY_GROUPS) {
+			const groupServiceIds = getBlvdServiceDisplayGroupServiceIds(group)
+			for (const serviceId of groupServiceIds) {
+				groupedServiceIds.add(serviceId)
+			}
 
-		const preferredService =
-			servicesById.get(
-				getBlvdServiceDisplayGroupServiceIdForClientHistory(
+			const preferredService =
+				servicesById.get(
+					getBlvdServiceDisplayGroupServiceIdForClientHistory(
+						group,
+						clientHistory,
+					),
+				) ?? null
+
+			if (!preferredService) continue
+
+			displayServices.push(
+				buildGroupedServiceEntry({
 					group,
-					clientHistory,
-				),
-			) ?? null
-
-		if (!preferredService) continue
-
-		displayServices.push(
-			buildGroupedServiceEntry({
-				group,
-				preferredService,
-				servicesById,
-			}),
-		)
+					preferredService,
+					servicesById,
+				}),
+			)
+		}
 	}
 
-	const visibleUngroupedServices = services.filter(service => {
-		if (groupedServiceIds.has(service.id)) return false
-		return isServiceEntryVisibleForClientHistory(service, clientHistory)
-	})
+	const visibleUngroupedServices = services
+		.filter(service => {
+			if (groupedServiceIds.has(service.id)) return false
+			return showAllClientFits
+				? isServiceEntryCustomerBookable(service)
+				: isServiceEntryVisibleForClientHistory(service, clientHistory!)
+		})
+		.map(service =>
+			showAllClientFits
+				? buildClientHistoryExplicitServiceEntry(service)
+				: service,
+		)
 
 	for (const serviceOptionGroup of buildServiceOptionGroupEntries(
 		visibleUngroupedServices,
@@ -3450,14 +3586,47 @@ function buildDisplayServiceEntries(
 		displayServices.push(serviceOptionGroup)
 	}
 
-	for (const service of services) {
+	for (const service of visibleUngroupedServices) {
 		if (groupedServiceIds.has(service.id)) continue
-		if (!isServiceEntryVisibleForClientHistory(service, clientHistory)) continue
 
 		displayServices.push(service)
 	}
 
 	return displayServices
+}
+
+function buildClientHistoryExplicitServiceEntry(service: ServiceEntry) {
+	const displayName = getClientHistoryExplicitBlvdServiceName(service.item.name)
+
+	return {
+		...service,
+		displayName,
+		searchText: normalizeText(
+			[
+				service.categoryName,
+				service.displayCategoryName,
+				service.item.name,
+				displayName,
+				service.item.description ?? '',
+			].join(' '),
+		),
+	}
+}
+
+function getClientHistoryExplicitBlvdServiceName(name: string) {
+	return name
+		.replace(/\s*\|\s*\*?In Person\*?/gi, '')
+		.replace(/\s*\((?:In[-\s]?Person|In Person)\)\s*/gi, '')
+		.replace(/\s+/g, ' ')
+		.trim()
+}
+
+function isServiceEntryCustomerBookable(service: ServiceEntry) {
+	return isBlvdServiceCustomerBookable({
+		categoryName: service.categoryName,
+		id: service.id,
+		name: service.item.name,
+	})
 }
 
 function isServiceEntryVisibleForClientHistory(
@@ -3958,6 +4127,36 @@ async function ensureCartHasSelectedTime(
 ) {
 	if (cartHasSelectedTime(cart, selectedTime)) return cart
 	return cart.reserveBookableItems(selectedTime)
+}
+
+function normalizeBookingPopularServicesVariant(
+	value: boolean | string | undefined,
+): BookingPopularServicesVariant {
+	if (value === 'no_popular_top') return 'no_popular_top'
+	return 'popular_top'
+}
+
+function normalizeBookingClientHistoryGateVariant(
+	value: boolean | string | undefined,
+): BookingClientHistoryGateVariant {
+	if (value === 'show_all_services') return 'show_all_services'
+	return 'ask_client_history'
+}
+
+function getBookingExperimentAnalyticsProperties({
+	clientHistoryGate,
+	loaded,
+	popularServicesLayout,
+}: BookingExperimentVariants) {
+	return {
+		booking_experiment_client_history_gate: clientHistoryGate,
+		booking_experiment_client_history_gate_flag_key:
+			BOOKING_CLIENT_HISTORY_EXPERIMENT_KEY,
+		booking_experiment_flags_loaded: loaded,
+		booking_experiment_popular_services_layout: popularServicesLayout,
+		booking_experiment_popular_services_layout_flag_key:
+			BOOKING_POPULAR_SERVICES_EXPERIMENT_KEY,
+	}
 }
 
 function buildBookingSelectionEventProperties({
