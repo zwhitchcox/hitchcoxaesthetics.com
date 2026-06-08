@@ -287,6 +287,10 @@ export function buildUpdatedPrompt(
 		brand,
 	)
 	const pricingInstruction = `Pricing guidance: Use this as the source of truth for estimated caller-facing prices: ${getRetellPricingSummary({ serviceFocus: brand.serviceFocus })} Say pricing is an estimate or starting point when appropriate, and do not invent exact totals.`
+	const questionPacingInstruction =
+		'Question pacing: Ask at most one question in each spoken turn. If multiple details are missing, ask only the next most important question and wait for the caller to answer before asking the next one. Do not combine separate questions like service, location, date, time, client status, name, phone, email, callback permission, or cancellation/reschedule choice in one response. A short either/or choice such as "morning or afternoon?" counts as one question.'
+	const callerPhoneInstruction =
+		'Caller phone handling: Retell usually provides caller ID to tools. When a new or unknown caller needs a phone number for booking, follow-up, or callback, do not ask them to recite their number first. Ask exactly one question: "Is this a good phone number for you?" If they say yes, call the tool with caller_phone_number null and omit client.phone so the server uses caller ID. If they say no, ask exactly one follow-up question: "What is the best phone number where we can reach you?" and use that number. Only ask for a phone number directly if a tool says caller phone number is missing or unavailable.'
 	const identityInstruction =
 		'Caller identity: Treat the caller profile returned by lookup_caller or lookup_caller_appointments as the single source of truth for name, phone, email, client type, saved card status, and other contact details. If the caller already stated their name in this call, such as "this is Emily", "my name is Emily", or gave a first and/or last name, and the returned profile name matches that stated name or first name, treat identity as already confirmed and do not ask "Am I speaking with..." again. If a returned profile has a name and the caller has not already stated or confirmed a matching name in this call, ask exactly once, "Am I speaking with [full name]?" After identity is confirmed or matched from their stated name, reuse that profile anywhere a name, phone, email, client type, or caller details are needed; do not ask for first name, last name, phone number, or email again unless a tool explicitly returns missing_client_details or the caller says the profile is wrong. If the profile is missing or the caller says it is not them, ask only for the missing details needed for the current task. For messages or follow-up, use the confirmed profile if available, ask for a name only when no profile/name is available, and ask "Can Sarah call you back at this number?" before asking for another callback number. Keep any context the caller gives and pass it to send_staff_message.'
 	const callerLookupInstruction =
@@ -309,12 +313,14 @@ export function buildUpdatedPrompt(
 		'When calling block_spam_caller, pass caller_phone_number from the current call object if available. If Retell does not expose it, pass null; the tool server will also try to infer it from the call payload.'
 	const prompt = currentPrompt?.trim()
 	if (!prompt) {
-		return `${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${closingInstruction}\n${spamInstruction}\n${phoneInstruction}`
+		return `${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${questionPacingInstruction}\n${callerPhoneInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${closingInstruction}\n${spamInstruction}\n${phoneInstruction}`
 	}
 	if (
 		prompt.includes(openingInstruction) &&
 		prompt.includes(brandInstruction) &&
 		prompt.includes(pricingInstruction) &&
+		prompt.includes(questionPacingInstruction) &&
+		prompt.includes(callerPhoneInstruction) &&
 		prompt.includes(availabilityInstruction) &&
 		prompt.includes(identityInstruction) &&
 		prompt.includes(callerLookupInstruction) &&
@@ -339,6 +345,8 @@ export function buildUpdatedPrompt(
 				!line.includes('Brand identity:') &&
 				!line.includes('Start of call:') &&
 				!line.includes('Pricing guidance:') &&
+				!line.includes('Question pacing:') &&
+				!line.includes('Caller phone handling:') &&
 				!line.includes(
 					'When calling block_spam_caller, pass caller_phone_number',
 				) &&
@@ -373,13 +381,14 @@ export function buildUpdatedPrompt(
 				),
 		)
 		.join('\n')
-	return `${withoutManagedLines}\n${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${closingInstruction}\n${spamInstruction}\n${phoneInstruction}`
+	return `${withoutManagedLines}\n${openingInstruction}\n${brandInstruction}\n${pricingInstruction}\n${questionPacingInstruction}\n${callerPhoneInstruction}\n${availabilityInstruction}\n${identityInstruction}\n${callerLookupInstruction}\n${locationInstruction}\n${dateSpeechInstruction}\n${returningClientInstruction}\n${appointmentManagementInstruction}\n${staffMessageInstruction}\n${transferInstruction}\n${closingInstruction}\n${spamInstruction}\n${phoneInstruction}`
 }
 
 function buildBasePrompt(brand: RetellBookingBrandConfig) {
 	return [
 		`You are a booking and follow-up agent for ${brand.businessName}.`,
 		'Your job is to help callers choose a service, choose Bearden or Farragut, find live Boulevard availability, collect booking details, and book the appointment.',
+		'Ask at most one question in each spoken turn. If multiple details are missing, ask the next most important question and wait for the answer.',
 		'Important service mapping: callers usually say Botox, but Boulevard often names those services Tox. Treat Botox, Tox, Dysport, Jeuveau, Xeomin, neurotoxin, and wrinkle relaxer as the same service family.',
 		'Use caller-friendly location names: say "Bearden on Kingston Pike" and "Farragut on Campbell Station" instead of vague labels like Knoxville or raw Boulevard location names.',
 		'Do not say an appointment is booked until book_appointment returns ok: true.',

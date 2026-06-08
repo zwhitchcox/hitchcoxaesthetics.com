@@ -955,12 +955,19 @@ export async function bookVoiceAppointment(input: VoiceBookAppointmentInput) {
 
 	const clientInformation = buildClientInformation(input, clientProfile.client)
 	if (!clientInformation) {
+		const requiredClientFields = [
+			'first_name',
+			'last_name',
+			'email',
+			...(callerPhone ? [] : ['phone']),
+		]
 		return {
 			error: 'missing_client_details',
-			message:
-				'No complete Boulevard client profile could be identified from the caller phone number. Ask for first name, last name, email, and phone, then call book_appointment again. Do not send or ask for an SMS verification code.',
+			message: callerPhone
+				? 'No complete Boulevard client profile could be identified from the caller phone number. Ask for first name, last name, and email. For the phone number, first ask "Is this a good phone number for you?" If yes, call book_appointment again without client.phone so caller ID is used. If no, ask for the best phone number where they can be reached. Do not send or ask for an SMS verification code.'
+				: 'No complete Boulevard client profile could be identified because caller phone number is unavailable. Ask for first name, last name, email, and the best phone number where they can be reached, then call book_appointment again. Do not send or ask for an SMS verification code.',
 			ok: false,
-			required_client_fields: ['first_name', 'last_name', 'email', 'phone'],
+			required_client_fields: requiredClientFields,
 		}
 	}
 
