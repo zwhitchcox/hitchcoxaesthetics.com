@@ -96,6 +96,7 @@ export function trackBookingAnalyticsPageView({
 	const stored =
 		readStoredBookingAnalytics() ??
 		createStoredBookingAnalytics({ now, pathname, referrer, search })
+	mergeMarketingParamsIntoStoredAnalytics(stored, search)
 	const callrailTracking = getCallRailTrackingFromBrowser(search)
 
 	const previousPageviewCount = stored.pageviewCount
@@ -405,10 +406,7 @@ function createStoredBookingAnalytics({
 	referrer?: string | null
 	search: string
 }): StoredBookingAnalytics {
-	const searchParams = new URLSearchParams(search)
-	const marketingParams = Object.fromEntries(
-		MARKETING_PARAM_KEYS.map(key => [key, searchParams.get(key)]),
-	) as Record<MarketingParamKey, string | null>
+	const marketingParams = getMarketingParamsFromSearch(search)
 	const callrailTracking = getCallRailTrackingFromBrowser(search)
 	const initialReferrer = normalizeReferrer(referrer)
 	const trafficAttribution = inferTrafficAttribution({
@@ -440,7 +438,98 @@ function createStoredBookingAnalytics({
 	}
 }
 
-function inferTrafficAttribution({
+export function getMarketingParamsFromSearch(
+	search: string,
+): Record<MarketingParamKey, string | null> {
+	const searchParams = new URLSearchParams(search)
+	const marketingParams = Object.fromEntries(
+		MARKETING_PARAM_KEYS.map(key => [
+			key,
+			searchParams.get(key)?.trim() || null,
+		]),
+	) as Record<MarketingParamKey, string | null>
+	const googleLinkerClickIds = getGoogleClickIdsFromLinkerParam(
+		searchParams.get('_gl'),
+	)
+
+	return {
+		...marketingParams,
+		gbraid: marketingParams.gbraid ?? googleLinkerClickIds.gbraid ?? null,
+		gclid: marketingParams.gclid ?? googleLinkerClickIds.gclid ?? null,
+		wbraid: marketingParams.wbraid ?? googleLinkerClickIds.wbraid ?? null,
+	}
+}
+
+function mergeMarketingParamsIntoStoredAnalytics(
+	stored: StoredBookingAnalytics,
+	search: string,
+) {
+	const marketingParams = getMarketingParamsFromSearch(search)
+	let changed = false
+
+	for (const key of MARKETING_PARAM_KEYS) {
+		const value = marketingParams[key]
+		if (!value || stored[key] === value) continue
+		stored[key] = value
+		changed = true
+	}
+
+	if (!changed) return
+
+	const trafficAttribution = getStoredTrafficAttribution(stored)
+	stored.trafficChannel = trafficAttribution.channel
+}
+
+function getGoogleClickIdsFromLinkerParam(value?: string | null) {
+	if (!value) return {}
+
+	const clickIds: Partial<
+		Record<'gbraid' | 'gclid' | 'wbraid', string | null>
+	> = {}
+	const parts = value.split('*')
+	for (let index = 0; index < parts.length - 1; index++) {
+		const key = parts[index]
+		const encodedValue = parts[index + 1]
+		if (!key || !encodedValue) continue
+
+		const decodedValue = decodeGoogleLinkerValue(encodedValue)
+		const clickId = getGoogleClickIdFromDecodedLinkerValue(decodedValue)
+		if (!clickId) continue
+
+		if (key === '_gcl_aw' || key === '_gcl_dc') {
+			clickIds.gclid = clickId
+		} else if (key === '_gcl_gb') {
+			clickIds.gbraid = clickId
+		} else if (key === '_gcl_wb') {
+			clickIds.wbraid = clickId
+		}
+	}
+
+	return clickIds
+}
+
+function decodeGoogleLinkerValue(value: string) {
+	try {
+		const normalized = value
+			.replace(/-/g, '+')
+			.replace(/_/g, '/')
+			.replace(/\./g, '=')
+		const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+		return globalThis.atob(padded)
+	} catch {
+		return value
+	}
+}
+
+function getGoogleClickIdFromDecodedLinkerValue(value: string | null) {
+	const trimmed = value?.trim()
+	if (!trimmed) return null
+
+	const parts = trimmed.split('.')
+	return parts.length >= 3 ? parts[parts.length - 1]?.trim() || null : trimmed
+}
+
+export function inferTrafficAttribution({
 	fbclid,
 	gbraid,
 	gclid,
@@ -485,6 +574,35 @@ function inferTrafficAttribution({
 	const socialPlatform = getSocialPlatform(source, referrerDomain, campaign)
 	const searchPlatform = getSearchPlatform(source, referrerDomain, campaign)
 
+	if (fbclid || (isPaidMedium && socialPlatform === 'meta')) {
+		return {
+			channel: 'paid_social',
+			detail: 'meta_ads',
+			platform: 'meta',
+		}
+	}
+
+	if (msclkid || (isPaidMedium && searchPlatform === 'bing')) {
+		return {
+			channel: 'paid_search',
+			detail: 'bing_ads',
+			platform: 'bing',
+		}
+	}
+
+	if (
+		gclid ||
+		gbraid ||
+		wbraid ||
+		(isPaidMedium && searchPlatform === 'google')
+	) {
+		return {
+			channel: 'paid_search',
+			detail: 'google_ads',
+			platform: 'google',
+		}
+	}
+
 	if (
 		matchesAny(combined, [
 			'gmb',
@@ -515,35 +633,6 @@ function inferTrafficAttribution({
 			channel: 'sms',
 			detail: source ? `${source}_sms` : 'sms',
 			platform: source || 'sms',
-		}
-	}
-
-	if (fbclid || (isPaidMedium && socialPlatform === 'meta')) {
-		return {
-			channel: 'paid_social',
-			detail: 'meta_ads',
-			platform: 'meta',
-		}
-	}
-
-	if (msclkid || (isPaidMedium && searchPlatform === 'bing')) {
-		return {
-			channel: 'paid_search',
-			detail: 'bing_ads',
-			platform: 'bing',
-		}
-	}
-
-	if (
-		gclid ||
-		gbraid ||
-		wbraid ||
-		(isPaidMedium && searchPlatform === 'google')
-	) {
-		return {
-			channel: 'paid_search',
-			detail: 'google_ads',
-			platform: 'google',
 		}
 	}
 

@@ -1,6 +1,10 @@
 import { expect, test } from 'vitest'
 
-import { getBookingTemporalEventProperties } from '#app/utils/booking-analytics.ts'
+import {
+	getBookingTemporalEventProperties,
+	getMarketingParamsFromSearch,
+	inferTrafficAttribution,
+} from '#app/utils/booking-analytics.ts'
 
 test('formats booking temporal analytics buckets in Knoxville time', () => {
 	expect(
@@ -19,6 +23,38 @@ test('formats booking temporal analytics buckets in Knoxville time', () => {
 
 test('omits booking temporal analytics buckets for invalid timestamps', () => {
 	expect(
-		getBookingTemporalEventProperties(new Date('not-a-date'), 'booking_entered'),
+		getBookingTemporalEventProperties(
+			new Date('not-a-date'),
+			'booking_entered',
+		),
 	).toEqual({})
+})
+
+test('classifies Google ad click ids as paid search before GMB campaign labels', () => {
+	expect(
+		inferTrafficAttribution({
+			fbclid: null,
+			gbraid: '0AAAAADvi5k11sssI8Ghs7zeEOhzjb65I_',
+			gclid: 'EAIaIQobChMI4tmli_PmlAMVTirUAR39ZybWEBAYASABEgLOUfD_BwE',
+			initialReferrer: null,
+			initialReferringDomain: null,
+			msclkid: null,
+			utm_campaign: 'gmb',
+			utm_medium: null,
+			utm_source: null,
+			wbraid: null,
+		}),
+	).toEqual({
+		channel: 'paid_search',
+		detail: 'google_ads',
+		platform: 'google',
+	})
+})
+
+test('extracts Google click ids from linker params', () => {
+	expect(
+		getMarketingParamsFromSearch(
+			'?_gl=1*ov8xn0*_gcl_aw*R0NMLjE3ODAzMTg0NzYuRUFJYUlRb2JDaE1JLTV1UDZJcm1sQU1WNmpiVUFSMktoUzBFRUFBWUFpQUFFZ0tLTnZEX0J3RQ..*_gcl_au*MTgwODEwNDEyMS4xNzgwMzE4NDc2',
+		).gclid,
+	).toBe('EAIaIQobChMI-5uP6IrmlAMV6jbUAR2KhS0EEAAYAiAAEgKKNvD_BwE')
 })

@@ -1517,6 +1517,7 @@ export default function BlvdBookRoute() {
 			if (typeof window !== 'undefined' && 'gtag' in window) {
 				trackGoogleEvent('purchase', {
 					currency: 'USD',
+					transaction_id: checkoutPayload.cart.id,
 					value: projectedRevenueUsd,
 					items: [
 						{
@@ -1546,6 +1547,7 @@ export default function BlvdBookRoute() {
 				})
 				captureBookingPostHogEvent('booking_completed', {
 					...bookingAnalyticsPropertiesRef.current,
+					$insert_id: `booking-completed:website:${checkoutPayload.cart.id}`,
 					appointment_count: checkoutPayload.appointments.length,
 					booking_selected_payment_method_type: selectedPaymentMethodType,
 					booking_value_usd: projectedRevenueUsd,
