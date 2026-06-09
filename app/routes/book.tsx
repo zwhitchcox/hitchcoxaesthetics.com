@@ -41,6 +41,9 @@ import {
 } from '#app/utils/blvd-service-display.ts'
 import { getBookingAnalyticsEventProperties } from '#app/utils/booking-analytics.ts'
 import {
+	requestBookingMobileVerificationCode,
+} from '#app/utils/booking-phone-verification-flow.ts'
+import {
 	type LastBookingServiceHint,
 	readLastBookingServiceHint,
 } from '#app/utils/booking-source-hints.ts'
@@ -216,7 +219,7 @@ type BlvdCart = {
 	reserveBookableItems(time: BlvdBookableTime): Promise<BlvdCart>
 	sendOwnershipCodeBySms(mobilePhone: string): Promise<string>
 	selectPaymentMethod(paymentMethod: BlvdPaymentMethod): Promise<BlvdCart>
-	takeOwnershipByCode(codeId: string, codeValue: number): Promise<BlvdCart>
+	takeOwnershipByCode(codeId: string, codeValue: string): Promise<BlvdCart>
 	update(opts: {
 		clientInformation?: {
 			email?: string
@@ -1717,9 +1720,30 @@ export default function BlvdBookRoute() {
 
 		try {
 			const normalizedPhone = normalizePhoneNumber(clientForm.phone)
-			if (clientHistory === 'new') {
-				await sendBookingPhoneVerificationCode(normalizedPhone)
+			const result = await requestBookingMobileVerificationCode({
+				clientHistory,
+				normalizedPhone,
+				requestBlvdOwnershipCode: phone => cart.sendOwnershipCodeBySms(phone),
+				requestBookingPhoneVerificationCode: sendBookingPhoneVerificationCode,
+			})
+
+			if (result.type === 'booking_phone_code') {
 				setOwnershipCodeId(BOOKING_PHONE_VERIFICATION_CODE_ID)
+				setOwnershipCodeValue('')
+				setOwnershipVerifiedPhone(null)
+				setVerifiedExistingClient(false)
+				setAvailablePaymentMethods([])
+				setSelectedPaymentMethodId('new')
+				if (result.fallbackReason === 'client_not_found') {
+					setClientHistory(currentHistory =>
+						currentHistory === 'returning' ? currentHistory : 'new',
+					)
+				}
+				return
+			}
+
+			if (result.type === 'blvd_ownership_code') {
+				setOwnershipCodeId(result.codeId)
 				setOwnershipCodeValue('')
 				setOwnershipVerifiedPhone(null)
 				setVerifiedExistingClient(false)
@@ -1728,51 +1752,13 @@ export default function BlvdBookRoute() {
 				return
 			}
 
-			const codeId = await cart.sendOwnershipCodeBySms(normalizedPhone)
-			setOwnershipCodeId(codeId)
-			setOwnershipCodeValue('')
-			setOwnershipVerifiedPhone(null)
-			setVerifiedExistingClient(false)
-			setAvailablePaymentMethods([])
-			setSelectedPaymentMethodId('new')
-		} catch (error) {
-			const normalizedPhone = normalizePhoneNumber(clientForm.phone)
-			const isClientNotFound = isClientNotFoundByMobilePhoneError(error)
-
 			captureBookingError({
-				action: 'send_mobile_verification_code',
-				error,
+				action: result.action,
+				error: result.error,
 				step: 'details',
-				userMessage: getOwnershipCodeUserMessage(error, clientHistory),
+				userMessage: result.message,
 			})
-
-			if (isClientNotFound && clientHistory === 'unsure') {
-				try {
-					await sendBookingPhoneVerificationCode(normalizedPhone)
-					setOwnershipCodeId(BOOKING_PHONE_VERIFICATION_CODE_ID)
-					setOwnershipCodeValue('')
-					setOwnershipVerifiedPhone(null)
-					setVerifiedExistingClient(false)
-					setAvailablePaymentMethods([])
-					setSelectedPaymentMethodId('new')
-					setOwnershipStepError(null)
-					return
-				} catch (fallbackError) {
-					captureBookingError({
-						action: 'send_new_client_mobile_verification_code',
-						error: fallbackError,
-						step: 'details',
-						userMessage:
-							'We could not send that code. Please check the number and try again.',
-					})
-					setOwnershipStepError(
-						'We could not send that code. Please check the number and try again.',
-					)
-					return
-				}
-			}
-
-			setOwnershipStepError(getOwnershipCodeUserMessage(error, clientHistory))
+			setOwnershipStepError(result.message)
 		} finally {
 			setSendingOwnershipCode(false)
 		}
@@ -1781,10 +1767,18 @@ export default function BlvdBookRoute() {
 	async function handleVerifyOwnershipCode() {
 		if (!cart || !ownershipCodeId) return
 
-		const normalizedCode = ownershipCodeValue.replace(/\D/g, '')
-		if (normalizedCode.length !== 6) {
+		const isBookingPhoneVerificationCode =
+			ownershipCodeId === BOOKING_PHONE_VERIFICATION_CODE_ID
+		const normalizedCode = isBookingPhoneVerificationCode
+			? ownershipCodeValue.replace(/\D/g, '')
+			: ownershipCodeValue.trim().replace(/[\s-]/g, '')
+		const codeIsValid = isBookingPhoneVerificationCode
+			? normalizedCode.length === 6
+			: /^[a-zA-Z0-9]{6}$/.test(normalizedCode)
+
+		if (!codeIsValid) {
 			setOwnershipStepError(
-				'Enter the 6-digit verification code from your text message.',
+				'Enter the verification code from your text message.',
 			)
 			setStepError(null)
 			return
@@ -1823,7 +1817,7 @@ export default function BlvdBookRoute() {
 
 			const nextCart = await cart.takeOwnershipByCode(
 				ownershipCodeId,
-				Number(normalizedCode),
+				normalizedCode,
 			)
 			identifyBookingPerson({
 				boulevardClientId: nextCart.clientInformation?.externalId,
@@ -2819,13 +2813,21 @@ export default function BlvdBookRoute() {
 																			onChange={event => {
 																				setOwnershipCodeValue(
 																					event.currentTarget.value
-																						.replace(/\D/g, '')
+																						.replace(/[^a-zA-Z0-9]/g, '')
+																						.toUpperCase()
 																						.slice(0, 6),
 																				)
 																			}}
-																			inputMode="numeric"
+																			autoCapitalize="characters"
+																			autoComplete="one-time-code"
+																			inputMode="text"
 																			maxLength={6}
-																			placeholder="123456"
+																			placeholder={
+																				ownershipCodeId ===
+																				BOOKING_PHONE_VERIFICATION_CODE_ID
+																					? '123456'
+																					: 'ABC123'
+																			}
 																		/>
 																		<Button
 																			type="button"
@@ -4478,29 +4480,6 @@ function isMobileVerificationValidationError(error: string) {
 		error === 'Mobile phone is required.' ||
 		error === 'Verify your mobile number before continuing.'
 	)
-}
-
-function isClientNotFoundByMobilePhoneError(error: unknown) {
-	const details = getBookingErrorDetails(error)
-	return (
-		details.code === 'CLIENT_NOT_FOUND_BY_MOBILE_PHONE' ||
-		details.technicalMessage.includes('CLIENT_NOT_FOUND_BY_MOBILE_PHONE')
-	)
-}
-
-function getOwnershipCodeUserMessage(
-	error: unknown,
-	clientHistory: BookingClientHistory | null,
-) {
-	if (isClientNotFoundByMobilePhoneError(error)) {
-		if (clientHistory === 'returning') {
-			return 'We could not find an existing profile for that mobile number. Please check the number or choose No above if this is your first visit.'
-		}
-
-		return 'We could not find an existing profile for that number, so we will verify it as a new client.'
-	}
-
-	return 'We could not send that code. Please check the number and try again.'
 }
 
 function getVerifyCodeUserMessage(error: unknown) {
