@@ -1772,14 +1772,13 @@ export default function BlvdBookRoute() {
 	async function handleVerifyOwnershipCode() {
 		if (!cart || !ownershipCodeId) return
 
-		const isBookingPhoneVerificationCode =
-			ownershipCodeId === BOOKING_PHONE_VERIFICATION_CODE_ID
-		const normalizedCode = isBookingPhoneVerificationCode
-			? ownershipCodeValue.replace(/\D/g, '')
-			: ownershipCodeValue.trim().replace(/[\s-]/g, '')
-		const codeIsValid = isBookingPhoneVerificationCode
-			? normalizedCode.length === 6
-			: /^[a-zA-Z0-9]{6}$/.test(normalizedCode)
+		// Both Boulevard ownership codes and our SMS verification codes are
+		// 6-character uppercase alphanumerics (e.g. 368TQ8)
+		const normalizedCode = ownershipCodeValue
+			.trim()
+			.replace(/[\s-]/g, '')
+			.toUpperCase()
+		const codeIsValid = /^[A-Z0-9]{6}$/.test(normalizedCode)
 
 		if (!codeIsValid) {
 			setOwnershipStepError(
@@ -2827,12 +2826,7 @@ export default function BlvdBookRoute() {
 																			autoComplete="one-time-code"
 																			inputMode="text"
 																			maxLength={6}
-																			placeholder={
-																				ownershipCodeId ===
-																				BOOKING_PHONE_VERIFICATION_CODE_ID
-																					? '123456'
-																					: 'ABC123'
-																			}
+																			placeholder="ABC123"
 																		/>
 																		<Button
 																			type="button"

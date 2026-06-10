@@ -193,7 +193,7 @@ test('new clients can verify their phone and complete a mocked booking', async (
 	await user.type(screen.getByLabelText(/Mobile phone/i), '8659780953')
 	await user.click(screen.getByRole('button', { name: /Text Me A Code/i }))
 
-	const verificationCodeInput = await screen.findByPlaceholderText('123456')
+	const verificationCodeInput = await screen.findByPlaceholderText('ABC123')
 	expect(verificationCodeInput).toBeVisible()
 	await user.type(verificationCodeInput, 'AB12CD')
 	expect(verificationCodeInput).toHaveValue('AB12CD')
@@ -202,7 +202,8 @@ test('new clients can verify their phone and complete a mocked booking', async (
 		screen.queryByText(/could not find an existing profile/i),
 	).not.toBeInTheDocument()
 
-	await user.type(verificationCodeInput, '123456')
+	// codes are alphanumeric (e.g. 368TQ8) — must not be treated as digits-only
+	await user.type(verificationCodeInput, '368tq8')
 	await user.click(screen.getByRole('button', { name: /Verify Code/i }))
 
 	await user.type(await screen.findByLabelText(/First name/i), 'Jane')
