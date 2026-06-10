@@ -38,6 +38,7 @@
     "fix-review-ratings": "node --no-deprecation scripts/fetch-reviews.js --fix-ratings-only",
     "update-analytics": "npm run fetch-reviews",
     "blvd:import-revenue": "tsx scripts/blvd-import-revenue.ts",
+    "blvd:project-revenue": "tsx scripts/blvd-project-weekly-revenue.ts",
     "blvd:reconcile-revenue": "tsx scripts/blvd-reconcile-revenue.ts",
     "blvd:sync-revenue": "tsx scripts/blvd-sync-revenue.ts",
     "blvd:sync-revenue:apply": "tsx scripts/blvd-sync-revenue.ts --apply",
