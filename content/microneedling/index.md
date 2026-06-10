@@ -3,9 +3,9 @@ name: Microneedling
 tagline: for collagen renewal
 title: Microneedling Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Microneedling for face and hair loss at Sarah Hitchcox Aesthetics in
-  Knoxville, TN. Stimulate collagen for smoother skin and thicker hair. -
-  microneedling/facial - microneedling/hair-loss
+  Microneedling in Knoxville, TN for smoother skin and thicker hair. Collagen
+  induction therapy for acne scars, fine lines, and hair loss at Sarah
+  Hitchcox Aesthetics.
 shortDescription:
   Collagen-boosting microneedling for skin rejuvenation and hair restoration.
 ctaText: Book Microneedling Consultation
@@ -97,7 +97,7 @@ heroImages:
 ## Microneedling in Knoxville
 
 Reawaken your skin's natural potential with collagen induction therapy.
-**Microneedling in Knoxville, TN** is a versatile, minimally invasive treatment
+Microneedling in Knoxville, TN is a versatile, minimally invasive treatment
 that triggers the body's self-repair mechanisms to smooth texture, reduce
 scarring, and restore firmness. By creating thousands of microscopic channels in
 the skin, we stimulate the production of new collagen and elastin, the building
@@ -105,8 +105,8 @@ blocks of healthy, youthful skin.
 
 At Sarah Hitchcox Aesthetics, we offer this transformative procedure for both
 facial rejuvenation and hair restoration. Whether you are looking to fade acne
-scars, minimize fine lines, or combat thinning hair, our **Knoxville
-microneedling services** are tailored to your specific goals. We also offer PRP
+scars, minimize fine lines, or combat thinning hair, our Knoxville
+microneedling services are tailored to your specific goals. We also offer PRP
 (Platelet-Rich Plasma) enhancements, using your body's own growth factors to
 supercharge healing and maximize results.
 

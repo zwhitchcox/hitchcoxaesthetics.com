@@ -210,20 +210,20 @@ heroImages:
 
 Jeuveau, often called "Newtox," is a modern neurotoxin specifically designed for
 aesthetic use. It effectively smooths moderate to severe frown lines between the
-eyebrows, giving you a refreshed and rested appearance. **Jeuveau injections in
-Knoxville** at Sarah Hitchcox Aesthetics are a popular choice for patients who
+eyebrows, giving you a refreshed and rested appearance. Jeuveau injections in
+Knoxville at Sarah Hitchcox Aesthetics are a popular choice for patients who
 want a fast-acting, precise solution to dynamic wrinkles without the "frozen"
 look.
 
 As a dedicated aesthetic product, Jeuveau offers a refined formulation that many
 patients find kicks in quickly—often within just a few days. Our expert
-injectors use **Knoxville Jeuveau treatments** to soften expression lines while
+injectors use Jeuveau to soften expression lines while
 preserving your natural facial mobility. Whether you are new to neuromodulators
 or looking for an alternative to other brands, Jeuveau provides reliable,
 beautiful results.
 
 This treatment pairs seamlessly with other injectables. You can combine it with
-[Kybella](/injectables/kybella) for jawline definition or
-[SkinVive](/injectables/skinvive) for enhanced skin quality. Explore our full
-[Knoxville Botox treatments](/botox) to see how we can customize a comprehensive
+[Kybella](/kybella) for jawline definition or
+[SkinVive](/skinvive) for enhanced skin quality. Explore our full
+[injectable treatments](/injectables) to see how we can customize a comprehensive
 anti-aging plan for you.

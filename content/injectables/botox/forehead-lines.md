@@ -1,7 +1,7 @@
 ---
 name: Forehead Lines
 tagline: for smooth forehead skin
-title: Forehead Lines Knoxville | Sarah Hitchcox Aesthetics
+title: Botox for Forehead Lines Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox for forehead lines in Knoxville, TN. Smooth horizontal forehead wrinkles
   with natural-looking results at Sarah Hitchcox Aesthetics.

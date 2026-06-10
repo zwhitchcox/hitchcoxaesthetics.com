@@ -1,11 +1,11 @@
 ---
 name: Semaglutide
 tagline: for sustainable weight loss
-title: Semaglutide Knoxville | Sarah Hitchcox Aesthetics
+title: Semaglutide Weight Loss Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Medical weight loss with semaglutide (Ozempic/Wegovy) injections in Knoxville,
-  TN. GLP-1 therapy at about half the price. Free consultations at Sarah
-  Hitchcox Aesthetics.
+  Medical weight loss with semaglutide (Ozempic/Wegovy) injections in
+  Knoxville, TN. GLP-1 therapy at about half the price, with free
+  consultations.
 shortDescription: >-
   GLP-1 injections for safe, medically supervised weight loss at half the
   brand-name price.
@@ -98,20 +98,20 @@ heroImages:
 Semaglutide — the active ingredient in Ozempic and Wegovy — has emerged as a
 game-changer for medical weight management. As a GLP-1 receptor agonist, it
 works by mimicking a natural hormone that targets the areas of the brain that
-regulate appetite and food intake. Our **semaglutide program in Knoxville**
+regulate appetite and food intake. Our semaglutide program in Knoxville
 offers this FDA-approved medication at about half the brand-name price, helping
 you feel fuller faster and stay satisfied longer, making calorie reduction
 manageable and sustainable.
 
 At Sarah Hitchcox Aesthetics, we prioritize your safety and results. Our
-**Knoxville semaglutide treatments** are medically supervised, ensuring that
+Every semaglutide treatment is medically supervised, ensuring that
 your dosage is optimized for your body while minimizing side effects. Patients
 often see significant weight reduction when combining this therapy with healthy
 lifestyle changes. It is an effective tool for those who have struggled with
 weight despite their best efforts with diet and exercise alone.
 
 If you are considering other options, we also offer
-[tirzepatide injections](/weight-loss/tirzepatide), a dual-action medication. We
+[tirzepatide injections](/tirzepatide), a dual-action medication. We
 can help you decide which path is right for you during your consultation. Learn
 more about our comprehensive
 [GLP-1 weight loss programs in Knoxville](/weight-loss) and take the first step

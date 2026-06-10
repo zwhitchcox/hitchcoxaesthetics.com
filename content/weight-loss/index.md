@@ -1,13 +1,11 @@
 ---
 name: GLP-1 Weight Loss
 tagline: medically supervised results
-title:
-  GLP-1 Weight Loss Knoxville | Semaglutide & Tirzepatide | Sarah Hitchcox
-  Aesthetics
+title: GLP-1 Weight Loss Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  GLP-1 weight loss injections in Knoxville, TN. Semaglutide (Ozempic/Wegovy)
-  and tirzepatide (Zepbound/Mounjaro) programs with medical supervision at Sarah
-  Hitchcox Aesthetics.
+  GLP-1 weight loss injections in Knoxville, TN. Medically supervised
+  semaglutide (Ozempic/Wegovy) and tirzepatide (Zepbound/Mounjaro) programs
+  with free consultations.
 shortDescription: >-
   GLP-1 agonist injections for medically supervised weight loss in Knoxville.
 ctaText: Book GLP-1 Consultation
@@ -38,7 +36,7 @@ heroImages:
 
 GLP-1 agonists have transformed medical weight loss by targeting the biological
 mechanisms that make losing weight so difficult. At Sarah Hitchcox Aesthetics,
-our **Knoxville GLP-1 weight loss programs** use semaglutide and tirzepatide to
+our Knoxville GLP-1 weight loss programs use semaglutide and tirzepatide to
 help patients achieve sustainable results under full medical supervision. These
 medications work by regulating appetite, slowing digestion, and improving how
 your body processes blood sugar — making it easier to eat less without feeling
@@ -50,8 +48,8 @@ GLP-1 (glucagon-like peptide-1) agonists mimic a hormone your body naturally
 produces after eating. By activating GLP-1 receptors, these medications reduce
 hunger signals, increase feelings of fullness, and help regulate blood sugar.
 Clinical trials show patients lose 15–20% of their body weight with semaglutide
-and even more with dual-action tirzepatide. Our **GLP-1 weight loss program in
-Knoxville, TN** includes regular check-ins, dose adjustments, and lifestyle
+and even more with dual-action tirzepatide. Our GLP-1 weight loss program in
+Knoxville, TN includes regular check-ins, dose adjustments, and lifestyle
 coaching to maximize your results.
 
 ## Semaglutide and Tirzepatide in Knoxville
@@ -60,8 +58,7 @@ We offer two proven GLP-1 medications at our Knoxville med spa. Semaglutide (the
 active ingredient in Ozempic and Wegovy) is a once-weekly injection that has
 helped millions achieve lasting weight loss. Tirzepatide (Zepbound/Mounjaro) is
 a newer dual-action GIP/GLP-1 agonist that targets two hormonal pathways for
-even greater results. During your consultation, we'll determine which
-**Knoxville GLP-1 treatment** is the best fit for your health history and weight
+even greater results. During your consultation, we'll determine which GLP-1 medication is the best fit for your health history and weight
 loss goals.
 
 ## Beyond Weight Loss in Knoxville, TN
@@ -70,7 +67,7 @@ As your body transforms, you may want to complement your results with other
 treatments at our Knoxville med spa.
 [Skin tightening laser treatments in Knoxville](/laser-services) can address
 laxity that sometimes accompanies significant weight loss, while
-[Knoxville Botox treatments](/botox) can refresh your appearance to match how
+[Botox](/botox) can refresh your appearance to match how
 you feel. Our [microneedling services in Knoxville](/microneedling) also help
 improve skin texture and firmness during your transformation.
 

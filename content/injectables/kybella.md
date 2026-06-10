@@ -74,17 +74,17 @@ heroImages:
 Eliminate stubborn fat under the chin and redefine your profile with Kybella.
 This FDA-approved injectable permanently destroys fat cells in the submental
 area, addressing the "double chin" that often resists diet and exercise.
-**Kybella treatments in Knoxville** provide a non-surgical alternative to
+Kybella treatments in Knoxville provide a non-surgical alternative to
 liposuction, offering a way to sculpt a sleeker, more youthful jawline.
 
 The active ingredient in Kybella is a synthetic form of deoxycholic acid, a
 molecule that naturally breaks down dietary fat. When injected, it targets fat
-storage cells, which are then processed and eliminated by the body. **Knoxville
-Kybella injections** result in gradual, natural-looking improvement over a
+storage cells, which are then processed and eliminated by the body. Kybella
+injections result in gradual, natural-looking improvement over a
 series of treatments. Once the fat is gone, it does not return, providing
 lasting confidence in your profile.
 
-Enhance your new jawline by pairing Kybella with [Jeuveau](/injectables/jeuveau)
-to smooth upper face wrinkles or [SkinVive](/injectables/skinvive) to hydrate
-and glow. Visit our [Botox Knoxville overview](/botox) to discover how we can
+Enhance your new jawline by pairing Kybella with [Jeuveau](/jeuveau)
+to smooth upper face wrinkles or [SkinVive](/skinvive) to hydrate
+and glow. Explore our [injectable treatments](/injectables) to discover how we can
 help you achieve complete facial harmony.

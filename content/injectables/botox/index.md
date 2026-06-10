@@ -3,10 +3,8 @@ name: Botox
 tagline: for wrinkles and fine lines
 title: Botox Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  FDA-approved Botox injections for wrinkles, fine lines, crow's feet, and frown
-  lines in Knoxville, TN. Natural results by Sarah Hitchcox, RN. -
-  botox/forehead-lines - botox/frown-lines - botox/crows-feet - botox/lip-flip -
-  botox/bunny-lines - botox/gummy-smile - botox/chin-dimpling - botox/brow-lift
+  FDA-approved Botox injections for forehead lines, crow's feet, and frown
+  lines in Knoxville, TN. Natural-looking results from Sarah Hitchcox, RN.
 shortDescription: >-
   FDA-approved Botox injections to smooth wrinkles and prevent new lines from
   forming.
@@ -228,49 +226,46 @@ heroImages:
     caption: Lip Flip
 ---
 
-## Expert Botox Knoxville, TN Treatments
+## Expert Botox Treatments in Knoxville, TN
 
 Botox remains the gold standard for non-surgical anti-aging, trusted by millions
 for its ability to smooth dynamic wrinkles and prevent new lines from forming.
-At Sarah Hitchcox Aesthetics, we provide expert **Botox in Knoxville, TN**,
-delivering precise treatments that relax facial muscles while preserving your
-natural expressions. Whether you are noticing the first signs of aging or want
-to maintain a youthful look, our personalized Botox Knoxville approach ensures
-you never look "frozen"—just refreshed and well-rested.
+At Sarah Hitchcox Aesthetics, every treatment is performed by Sarah Hitchcox,
+RN, an experienced aesthetic injector who relaxes the muscles that cause
+wrinkles while preserving your natural expressions. Whether you are noticing the
+first signs of aging or want to maintain a youthful look, a personalized plan
+ensures you never look "frozen" — just refreshed and well-rested.
 
-## How Botox Works in Knoxville, TN
+## How Botox Works
 
-This FDA-approved neuromodulator works by temporarily blocking nerve signals to
-specific facial muscles, preventing them from contracting deeply. This action
-softens existing wrinkles and stops them from etching further into the skin.
-Knoxville Botox patients most commonly treat the forehead, around the eyes, and
-between the brows. As the top choice for **Botox Knoxville, TN** patients, our
-treatments are often the first step toward a smoother, more youthful complexion
-without any downtime.
+This FDA-approved neuromodulator temporarily blocks nerve signals to specific
+facial muscles, preventing them from contracting deeply. That softens existing
+wrinkles and stops them from etching further into the skin. The most commonly
+treated areas are [forehead lines](/botox/forehead-lines),
+[crow's feet around the eyes](/botox/crows-feet), and the
+["11s" between the brows](/botox/frown-lines) — often the first step toward a
+smoother, more youthful complexion with no downtime.
 
-## Botox vs. Dysport in Knoxville
+## Botox vs. Dysport
 
 While Botox is the most recognized name in wrinkle relaxers, we also offer
-[Dysport in Knoxville](/dysport) as another effective neuromodulator that
-spreads slightly differently, making it an excellent choice for certain areas or
-patients. During your **Botox Knoxville** consultation, we will assess your
-muscle strength and facial anatomy to recommend the product that will yield the
-best possible results for you.
+[Dysport](/dysport), another effective neuromodulator that spreads slightly
+differently, making it an excellent choice for certain areas or patients. During
+your consultation we will assess your muscle strength and facial anatomy to
+recommend the product that will yield the best results for you.
 
-## Combine Botox with Fillers in Knoxville, TN
+## Combine Botox with Dermal Fillers
 
-Botox pairs seamlessly with other aesthetic treatments to provide full-face
-rejuvenation. Many of our **Knoxville, TN Botox** patients combine wrinkle
-relaxers with [dermal fillers in Knoxville](/filler) to address both lines and
-volume loss in a single visit. While Botox smooths the upper face, fillers can
-restore contour to cheeks and lips, creating a balanced and harmonious result
-that enhances your overall facial structure.
+Botox pairs seamlessly with other aesthetic treatments for full-face
+rejuvenation. Many patients combine wrinkle relaxers with
+[dermal fillers](/filler) to address both lines and volume loss in a single
+visit. While Botox smooths the upper face, fillers restore contour to cheeks and
+lips, creating a balanced result that enhances your overall facial structure.
 
 ## Schedule Your Botox Consultation in Knoxville
 
-Ready to see what **Botox Knoxville, TN** can do for you? Sarah Hitchcox
-Aesthetics offers free consultations to discuss your goals and create a
-personalized treatment plan. Our Knoxville Botox specialists work with you to
-target the exact areas that will make the biggest impact, whether that is
-smoothing forehead lines, softening crow's feet, or preventing new wrinkles from
-forming.
+Sarah Hitchcox Aesthetics offers free consultations at both of our Knoxville
+area locations — Bearden and Farragut — to discuss your goals and create a
+personalized treatment plan. We will target the exact areas that make the
+biggest impact, whether that is smoothing forehead lines, softening crow's feet,
+or preventing new wrinkles from forming.

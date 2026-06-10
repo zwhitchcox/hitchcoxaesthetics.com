@@ -1,12 +1,11 @@
 ---
 name: Filler
 tagline: 'for lips, cheeks, facial balancing'
-title: Filler Knoxville | Sarah Hitchcox Aesthetics
+title: Dermal Fillers Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Dermal filler treatments for lips, cheeks, chin, jawline, and facial balancing
-  in Knoxville, TN. Natural volume restoration at Sarah Hitchcox Aesthetics. -
-  filler/lip-filler - filler/cheek-filler - filler/chin-filler -
-  filler/jawline-filler - filler/under-eye-filler - filler/nasolabial-folds
+  Dermal fillers for lips, cheeks, chin, jawline, and under-eyes in Knoxville,
+  TN. Natural volume restoration and facial balancing at Sarah Hitchcox
+  Aesthetics.
 shortDescription:
   Restore volume and enhance contours with hyaluronic acid dermal fillers.
 whyChooseTitle: Expert Filler Injections in Knoxville
@@ -138,7 +137,7 @@ Most modern fillers are made from hyaluronic acid (HA), a substance naturally
 found in the body that attracts and retains moisture. This makes HA fillers
 safe, reversible, and incredibly effective at creating soft, natural volume.
 Whether you need structural support in the chin or soft hydration in the lips,
-our range of [Botox in Knoxville](/botox) allows us to select the perfect
+our curated range of HA fillers allows us to select the perfect
 product density for each specific area of your face.
 
 ## Customized Filler Treatments in Knoxville, TN

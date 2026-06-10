@@ -94,6 +94,20 @@ export async function loader({ params }: LoaderFunctionArgs) {
 		return redirect(`/${stripped.basePath}`, { status: 301 })
 	}
 
+	// 301 redirect: old hierarchical URLs → canonical root slugs
+	// e.g. /laser-services/everesse/face → /everesse/face,
+	//      /injectables/kybella → /kybella
+	if (splat.includes('/') && !getPage(splat)) {
+		const segments = splat.split('/')
+		for (let i = 1; i < segments.length; i++) {
+			const candidate = segments.slice(i).join('/')
+			const candidatePage = getPage(candidate)
+			if (candidatePage?.enabled) {
+				return redirect(`/${candidate}`, { status: 301 })
+			}
+		}
+	}
+
 	// Direct match in site-pages → render the service page
 	const page = getPage(splat)
 	if (page && page.enabled) {

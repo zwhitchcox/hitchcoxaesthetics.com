@@ -1,7 +1,7 @@
 ---
 name: Gummy Smile
 tagline: for balanced smile aesthetics
-title: Gummy Smile Knoxville | Sarah Hitchcox Aesthetics
+title: Gummy Smile Botox Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox for gummy smile correction in Knoxville, TN. Reduce excessive gum
   exposure for a balanced smile at Sarah Hitchcox Aesthetics.

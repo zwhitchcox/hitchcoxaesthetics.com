@@ -1,7 +1,7 @@
 ---
 name: Crow's Feet
 tagline: for lines around the eyes
-title: Botox for Crow's Feet | Knoxville | SHA
+title: Botox for Crow's Feet Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox for crow's feet and fine lines around the eyes in Knoxville, TN.
   Diminish eye wrinkles at Sarah Hitchcox Aesthetics.

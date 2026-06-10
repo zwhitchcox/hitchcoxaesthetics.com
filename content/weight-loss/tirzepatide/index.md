@@ -1,7 +1,7 @@
 ---
 name: Tirzepatide
 tagline: for medical weight loss
-title: Tirzepatide Knoxville | Sarah Hitchcox Aesthetics
+title: Tirzepatide Weight Loss Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Tirzepatide (Zepbound/Mounjaro) weight loss injections in Knoxville, TN.
   Dual-action GIP/GLP-1 medication for significant, sustainable weight loss.
@@ -58,17 +58,17 @@ For those seeking an advanced option in weight management, tirzepatide — the
 active ingredient in Zepbound and Mounjaro — offers a powerful dual-action
 approach. By targeting both GIP and GLP-1 receptors, this medication not only
 curbs appetite but also improves how your body breaks down sugar and fat. Our
-**tirzepatide treatments in Knoxville** are designed for patients looking to
+tirzepatide treatments in Knoxville are designed for patients looking to
 maximize their weight loss potential with a medically proven solution.
 
 Clinical studies have shown that tirzepatide can lead to substantial weight
 reduction, often surpassing results seen with single-action medications.
-**Knoxville tirzepatide injections** at our clinic are administered under strict
+Tirzepatide injections at our clinic are administered under strict
 medical supervision, ensuring a safe and supportive environment for your
 journey. We work closely with you to adjust your plan as you progress, helping
 you achieve and maintain your target weight.
 
-Compare this option with our [semaglutide program](/weight-loss/semaglutide) to
+Compare this option with our [semaglutide program](/semaglutide) to
 see which medication aligns best with your needs. Whichever you choose, our
 [Knoxville GLP-1 weight loss team](/weight-loss) is here to guide you every step
 of the way towards a healthier, more confident lifestyle.

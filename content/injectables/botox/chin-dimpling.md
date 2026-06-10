@@ -1,7 +1,7 @@
 ---
 name: Chin Dimpling
 tagline: for smoother chin texture
-title: Chin Dimpling Knoxville | Sarah Hitchcox Aesthetics
+title: Chin Dimpling Botox Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
   Botox for chin dimpling and "orange peel" chin texture in Knoxville, TN.
   Smooth, refined results at Sarah Hitchcox Aesthetics.

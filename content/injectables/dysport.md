@@ -242,8 +242,8 @@ One of the key advantages of Dysport is its rapid onset; many patients begin to
 see smoothing effects in as little as two to three days. This makes it a
 favorite for those wanting quick results before an event. Additionally, its
 spreadability allows for a very smooth, "airbrushed" finish that avoids a heavy
-or stiff appearance. As a core part of our [Knoxville Botox treatments](/botox),
-Dysport offers a versatile solution for treating frown lines, crow's feet, and
+or stiff appearance. Alongside [Botox](/botox), Dysport
+offers a versatile solution for treating frown lines, crow's feet, and
 forehead wrinkles.
 
 ## Dysport vs. Other Wrinkle Relaxers

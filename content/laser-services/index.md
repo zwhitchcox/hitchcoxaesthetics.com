@@ -3,10 +3,9 @@ name: Laser Services
 tagline: 'for clearer, smoother skin'
 title: Laser Services Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  Advanced laser treatments for hair removal, skin revitalization, pigmented
-  lesions, and vascular lesions in Knoxville, TN. Sarah Hitchcox Aesthetics. -
-  laser-hair-removal - skin-revitalization - pigmented-lesion-reduction -
-  vascular-lesion-reduction - everesse
+  Medical-grade laser treatments in Knoxville, TN — laser hair removal, skin
+  revitalization, sun spot and spider vein reduction, and Everesse skin
+  tightening.
 shortDescription: >-
   Hair removal, skin revitalization, lesion reduction, and skin tightening with
   advanced laser and energy technology.
@@ -66,16 +65,16 @@ Achieving clear, radiant skin requires advanced technology and expert care. At
 Sarah Hitchcox Aesthetics, we provide a comprehensive suite of medical-grade
 laser treatments designed to address your specific skin concerns. Whether you
 are looking to remove unwanted hair, correct sun damage, or tighten lax tissue,
-our **Knoxville laser services** offer safe, effective solutions for all skin
+our Knoxville laser services offer safe, effective solutions for all skin
 types. We utilize state-of-the-art energy platforms that deliver consistent
 results with minimal downtime, allowing you to return to your daily routine with
 confidence.
 
 Our approach to laser therapy focuses on customizing each session to your unique
-needs. From [Everesse skin tightening](/laser-services/everesse) to targeted
-[pigmented lesion reduction](/laser-services/pigmented-lesion-reduction), we
+needs. From [Everesse skin tightening](/everesse) to targeted
+[pigmented lesion reduction](/pigmented-lesion-reduction), we
 build treatment plans that respect your skin's integrity while delivering
-visible improvement. Residents seeking **laser treatments in Knoxville, TN**
+visible improvement. Residents seeking laser treatments in Knoxville, TN
 trust our practice for our attention to detail and commitment to safety,
 ensuring that every visit moves you closer to your aesthetic goals.
 
