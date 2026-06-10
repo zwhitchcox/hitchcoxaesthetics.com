@@ -220,7 +220,7 @@ type BlvdCart = {
 	reserveBookableItems(time: BlvdBookableTime): Promise<BlvdCart>
 	sendOwnershipCodeBySms(mobilePhone: string): Promise<string>
 	selectPaymentMethod(paymentMethod: BlvdPaymentMethod): Promise<BlvdCart>
-	takeOwnershipByCode(codeId: string, codeValue: string): Promise<BlvdCart>
+	takeOwnershipByCode(codeId: string, codeValue: number): Promise<BlvdCart>
 	update(opts: {
 		clientInformation?: {
 			email?: string
@@ -1772,17 +1772,23 @@ export default function BlvdBookRoute() {
 	async function handleVerifyOwnershipCode() {
 		if (!cart || !ownershipCodeId) return
 
-		// Both Boulevard ownership codes and our SMS verification codes are
-		// 6-character uppercase alphanumerics (e.g. 368TQ8)
+		// Our SMS verification codes are 6-char uppercase alphanumerics
+		// (e.g. 368TQ8); Boulevard ownership codes are 6-digit numbers.
+		const isBookingPhoneVerificationCode =
+			ownershipCodeId === BOOKING_PHONE_VERIFICATION_CODE_ID
 		const normalizedCode = ownershipCodeValue
 			.trim()
 			.replace(/[\s-]/g, '')
 			.toUpperCase()
-		const codeIsValid = /^[A-Z0-9]{6}$/.test(normalizedCode)
+		const codeIsValid = isBookingPhoneVerificationCode
+			? /^[A-Z0-9]{6}$/.test(normalizedCode)
+			: /^\d{6}$/.test(normalizedCode)
 
 		if (!codeIsValid) {
 			setOwnershipStepError(
-				'Enter the verification code from your text message.',
+				isBookingPhoneVerificationCode
+					? 'Enter the 6-character code from your most recent text message.'
+					: 'Enter the 6-digit code from your most recent text message.',
 			)
 			setStepError(null)
 			return
@@ -1819,9 +1825,11 @@ export default function BlvdBookRoute() {
 				return
 			}
 
+			// Boulevard's API takes the ownership code as an Int — passing a
+			// string fails GraphQL validation before the code is even checked
 			const nextCart = await cart.takeOwnershipByCode(
 				ownershipCodeId,
-				normalizedCode,
+				Number(normalizedCode),
 			)
 			identifyBookingPerson({
 				boulevardClientId: nextCart.clientInformation?.externalId,
@@ -2826,7 +2834,12 @@ export default function BlvdBookRoute() {
 																			autoComplete="one-time-code"
 																			inputMode="text"
 																			maxLength={6}
-																			placeholder="ABC123"
+																			placeholder={
+																				ownershipCodeId ===
+																				BOOKING_PHONE_VERIFICATION_CODE_ID
+																					? 'ABC123'
+																					: '123456'
+																			}
 																		/>
 																		<Button
 																			type="button"
@@ -4483,8 +4496,14 @@ function isMobileVerificationValidationError(error: string) {
 
 function getVerifyCodeUserMessage(error: unknown) {
 	const details = getBookingErrorDetails(error)
-	if (details.safeMessage.toLowerCase().includes('not valid')) {
-		return 'That verification code was not valid. Please try again.'
+	const safeMessage = details.safeMessage.toLowerCase()
+	if (
+		safeMessage.includes('not valid') ||
+		safeMessage.includes('invalid') ||
+		safeMessage.includes('incorrect') ||
+		safeMessage.includes('expired')
+	) {
+		return 'That verification code was not valid. Please check the most recent text message and try again.'
 	}
 	return 'We could not verify that code. Please try again.'
 }

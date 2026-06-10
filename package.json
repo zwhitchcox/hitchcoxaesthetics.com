@@ -53,7 +53,8 @@
     "posthog:callrail:sync:apply": "tsx scripts/posthog-sync-callrail-conversions.ts --apply",
     "ga4:callrail:sync": "tsx scripts/ga4-sync-callrail-conversions.ts",
     "ga4:callrail:sync:apply": "tsx scripts/ga4-sync-callrail-conversions.ts --apply",
-    "secrets:push": "tsx scripts/push-secrets.ts"
+    "secrets:push": "tsx scripts/push-secrets.ts",
+    "verify:phone:e2e": "tsx scripts/booking-phone-verification-e2e.ts"
   },
   "eslintIgnore": [
     "/node_modules",
