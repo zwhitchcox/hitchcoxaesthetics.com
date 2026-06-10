@@ -34,6 +34,9 @@ vite.config.*.timestamp-*
 /data/
 cookies.json
 
+# Google review snapshots written by scripts/fetch-reviews.js (backups only)
+/reviews/
+
 # Image processing
 public/img/candidates/
 public/img/candidates-new/
