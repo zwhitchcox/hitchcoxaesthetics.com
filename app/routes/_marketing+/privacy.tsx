@@ -1,16 +1,14 @@
 import { type MetaFunction } from '@remix-run/node'
 import { Link } from '@remix-run/react'
+import { getSocialMetas } from '#app/utils/seo.ts'
 
-export const meta: MetaFunction = () => [
-	{
+export const meta: MetaFunction = ({ location }) =>
+	getSocialMetas({
 		title: 'Privacy Policy | Sarah Hitchcox Aesthetics',
-	},
-	{
-		name: 'description',
-		content:
+		description:
 			'Privacy policy for Sarah Hitchcox Aesthetics including HIPAA notice, SMS consent, and data use practices.',
-	},
-]
+		pathname: location.pathname,
+	})
 
 export default function PrivacyRoute() {
 	return (

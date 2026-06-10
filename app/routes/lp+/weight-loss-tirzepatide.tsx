@@ -1,1 +1,1 @@
-export { loader, default } from './tirzepatide'
+export { loader, meta, default } from './tirzepatide'

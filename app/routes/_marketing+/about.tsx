@@ -1,26 +1,15 @@
 import { type MetaFunction } from '@remix-run/node'
 import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
+import { getSocialMetas } from '#app/utils/seo.ts'
 
-export const meta: MetaFunction = () => [
-	{
+export const meta: MetaFunction = ({ location }) =>
+	getSocialMetas({
 		title:
 			'About Sarah Hitchcox | Knoxville and Farragut | Sarah Hitchcox Aesthetics',
-	},
-	{
-		name: 'description',
-		content:
+		description:
 			'Meet Sarah Hitchcox, RN and aesthetic injector in Knoxville and Farragut, TN. Specializing in Botox, dermal fillers, and preventative treatments with a focus on natural beauty.',
-	},
-	{
-		property: 'og:title',
-		content: 'About Sarah Hitchcox | Knoxville and Farragut Med Spa',
-	},
-	{
-		property: 'og:description',
-		content:
-			'Meet Sarah Hitchcox, RN and aesthetic injector in Knoxville and Farragut, TN. Specializing in Botox, dermal fillers, and preventative treatments.',
-	},
-]
+		pathname: location.pathname,
+	})
 
 export default function About() {
 	const blvdUrl = useBlvdUrl()

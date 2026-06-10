@@ -14,6 +14,7 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 import { writeLastBookingServiceHint } from '#app/utils/booking-source-hints.ts'
 import { type ServicePageSection } from '#app/utils/location-service-data.server.js'
+import { getSocialMetas } from '#app/utils/seo.ts'
 import {
 	getPage,
 	getChildren,
@@ -22,6 +23,7 @@ import {
 	type SitePage,
 } from '#app/utils/site-pages.server.js'
 import {
+	BreadcrumbJsonLd,
 	FAQJsonLd,
 	ServiceCheckMarks,
 	ServiceFAQ,
@@ -111,15 +113,14 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	throw new Response('Not found', { status: 404 })
 }
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
+export const meta: MetaFunction<typeof loader> = ({ data, location }) => {
 	if (!data) return [{ title: 'Not Found | Sarah Hitchcox Aesthetics' }]
 	const { page } = data
-	return [
-		{ title: page.title },
-		{ name: 'description', content: page.metaDescription },
-		{ property: 'og:title', content: page.title },
-		{ property: 'og:description', content: page.metaDescription },
-	]
+	return getSocialMetas({
+		title: page.title,
+		description: page.metaDescription,
+		pathname: location.pathname,
+	})
 }
 
 export default function DynamicPage() {
@@ -231,6 +232,10 @@ export default function DynamicPage() {
 				name={page.name}
 				description={page.metaDescription}
 				url={`https://hitchcoxaesthetics.com/${page.path}`}
+			/>
+
+			<BreadcrumbJsonLd
+				items={[...breadcrumbItems, { name: page.name, path: `/${page.path}` }]}
 			/>
 
 			{page.faq && page.faq.length > 0 && (

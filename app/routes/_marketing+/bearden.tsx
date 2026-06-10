@@ -5,29 +5,17 @@ import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
 import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 import { getLocationById } from '#app/utils/locations.js'
+import { getSocialMetas } from '#app/utils/seo.ts'
 import { getCategoryPages } from '#app/utils/site-pages.server.js'
 
-export const meta: MetaFunction = () => [
-	{
+export const meta: MetaFunction = ({ location }) =>
+	getSocialMetas({
 		title:
 			'Bearden (West Knoxville) Med Spa | Botox, Fillers & Lasers | Sarah Hitchcox Aesthetics',
-	},
-	{
-		name: 'description',
-		content:
+		description:
 			'Visit Sarah Hitchcox Aesthetics in Bearden, Knoxville, TN (5113 Kingston Pike). Expert Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
-	},
-	{
-		property: 'og:title',
-		content:
-			'Bearden (West Knoxville) Med Spa | Botox, Fillers & Lasers | Sarah Hitchcox Aesthetics',
-	},
-	{
-		property: 'og:description',
-		content:
-			'Visit Sarah Hitchcox Aesthetics in Bearden, Knoxville for expert Botox, fillers, and laser treatments.',
-	},
-]
+		pathname: location.pathname,
+	})
 
 export async function loader() {
 	const categories = getCategoryPages().map(c => ({

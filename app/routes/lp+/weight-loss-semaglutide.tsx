@@ -1,1 +1,1 @@
-export { loader, default } from './semaglutide'
+export { loader, meta, default } from './semaglutide'

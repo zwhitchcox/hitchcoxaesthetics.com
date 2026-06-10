@@ -83,6 +83,34 @@ export function ServiceJsonLd({
 	)
 }
 
+/**
+ * Generates BreadcrumbList JSON-LD structured data for SEO.
+ * Items should be ordered from the root (Home) to the current page.
+ */
+export function BreadcrumbJsonLd({
+	items,
+}: {
+	items: { name: string; path: string }[]
+}) {
+	const jsonLd = {
+		'@context': 'https://schema.org',
+		'@type': 'BreadcrumbList',
+		itemListElement: items.map((item, index) => ({
+			'@type': 'ListItem',
+			position: index + 1,
+			name: item.name,
+			item: `https://hitchcoxaesthetics.com${item.path}`,
+		})),
+	}
+
+	return (
+		<script
+			type="application/ld+json"
+			dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+		/>
+	)
+}
+
 export function ServiceHeader({ children }: { children: React.ReactNode }) {
 	return <h2 className="text-3xl font-semibold text-gray-700">{children}</h2>
 }
@@ -177,10 +205,8 @@ export function ServiceLayout({
 	const service = location.pathname.split('/').pop()
 	// If no images passed, don't render carousel with broken URLs
 	imgs ??= []
-	const serviceUrl = `https://hitchcoxaesthetics.com${location.pathname}`
 	return (
 		<>
-			<ServiceJsonLd name={title} description={description} url={serviceUrl} />
 			<div className="font-poppins flex h-[calc(100dvh-3rem)] w-full flex-col bg-white">
 				<div className="relative flex h-[calc(100dvh-3.1rem)]  w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row sm:bg-inherit">
 					<div

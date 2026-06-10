@@ -11,6 +11,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		'about',
 		'bearden',
 		'farragut',
+		'book',
 		'support',
 		'privacy',
 		'tos',

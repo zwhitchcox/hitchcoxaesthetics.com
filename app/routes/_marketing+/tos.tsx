@@ -1,3 +1,15 @@
+import { type MetaFunction } from '@remix-run/node'
+import { Link } from '@remix-run/react'
+import { getSocialMetas } from '#app/utils/seo.ts'
+
+export const meta: MetaFunction = ({ location }) =>
+	getSocialMetas({
+		title: 'Terms of Service | Sarah Hitchcox Aesthetics',
+		description:
+			'Terms and conditions for using the Sarah Hitchcox Aesthetics website and booking services.',
+		pathname: location.pathname,
+	})
+
 export default function TermsOfServiceRoute() {
 	return (
 		<div className="mx-auto max-w-4xl p-4">
@@ -7,7 +19,7 @@ export default function TermsOfServiceRoute() {
 			<div className="h-96 overflow-auto rounded-lg bg-white p-6 shadow-md">
 				<h2 className="text-xl font-semibold">1. Introduction</h2>
 				<p>
-					Welcome to Hitchox Aesthetics App! These Terms and Conditions govern
+					Welcome to Sarah Hitchcox Aesthetics! These Terms and Conditions govern
 					your use of our app and services. By accessing or using the app, you
 					agree to be bound by these terms.
 				</p>
@@ -53,8 +65,8 @@ export default function TermsOfServiceRoute() {
 				</h2>
 				<p>
 					All content on the app, including text, graphics, logos, and software,
-					is the property of [Your Med Spa Name] and is protected by copyright
-					and other intellectual property laws.
+					is the property of Sarah Hitchcox Aesthetics and is protected by
+					copyright and other intellectual property laws.
 				</p>
 
 				<h2 className="mt-4 text-xl font-semibold">8. Privacy Policy</h2>
@@ -67,7 +79,7 @@ export default function TermsOfServiceRoute() {
 					9. Limitation of Liability
 				</h2>
 				<p>
-					To the extent permitted by law, [Your Med Spa Name] shall not be
+					To the extent permitted by law, Sarah Hitchcox Aesthetics shall not be
 					liable for any indirect, incidental, special, consequential, or
 					punitive damages arising out of or related to your use of the app.
 				</p>
@@ -91,18 +103,22 @@ export default function TermsOfServiceRoute() {
 				<h2 className="mt-4 text-xl font-semibold">12. Governing Law</h2>
 				<p>
 					These terms shall be governed by and construed in accordance with the
-					laws of the state or country where the med spa is located.
+					laws of the State of Tennessee.
 				</p>
 
 				<h2 className="mt-4 text-xl font-semibold">13. Contact Information</h2>
 				<p>
 					If you have any questions about these Terms and Conditions, please
-					contact us at sarah[at]hitchcoxaesthetics.com.
+					contact us at{' '}
+					<Link
+						to="mailto:sarah@hitchcoxaesthetics.com"
+						className="text-primary hover:underline"
+					>
+						sarah@hitchcoxaesthetics.com
+					</Link>
+					.
 				</p>
 			</div>
-			<button className="focus:shadow-outline mt-6 rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700 focus:outline-none">
-				Accept Terms and Conditions
-			</button>
 		</div>
 	)
 }

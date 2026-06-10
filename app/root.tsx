@@ -1,4 +1,3 @@
-import { getFormProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod'
 import { invariantResponse } from '@epic-web/invariant'
 import {
@@ -10,22 +9,18 @@ import {
 	type MetaFunction,
 } from '@remix-run/node'
 import {
-	Form,
 	Link,
 	Links,
 	Meta,
 	Outlet,
 	Scripts,
 	ScrollRestoration,
-	useFetcher,
 	useFetchers,
 	useLoaderData,
 	useLocation,
-	useMatches,
-	useSubmit,
 } from '@remix-run/react'
 import { withSentry } from '@sentry/remix'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HoneypotProvider } from 'remix-utils/honeypot/react'
 import { z } from 'zod'
 
@@ -33,16 +28,7 @@ import { GeneralErrorBoundary } from '#/app/components/error-boundary.tsx'
 import { ListWithDot } from '#/app/components/list-with-dot'
 import Logo from '#/app/components/logo'
 import { EpicProgress } from '#/app/components/progress-bar.tsx'
-import { SearchBar } from '#/app/components/search-bar.tsx'
 import { useToast } from '#/app/components/toaster.tsx'
-import { Button } from '#/app/components/ui/button.tsx'
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuPortal,
-	DropdownMenuTrigger,
-} from '#/app/components/ui/dropdown-menu.tsx'
 import { Icon } from '#/app/components/ui/icon.tsx'
 import { EpicToaster } from '#/app/components/ui/sonner.tsx'
 import '#/app/styles/global.css'
@@ -69,18 +55,14 @@ import {
 	PHONE,
 } from '#/app/utils/locations.ts'
 import { menuLinks } from '#/app/utils/menu-links.server.ts'
-import {
-	combineHeaders,
-	getDomainUrl,
-	getUserImgSrc,
-} from '#/app/utils/misc.tsx'
+import { combineHeaders, getDomainUrl } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { useRequestInfo } from '#/app/utils/request-info.ts'
+import { getSocialMetas } from '#/app/utils/seo.ts'
 import { isServicePage } from '#/app/utils/site-pages.server.ts'
 import { setTheme, type Theme } from '#/app/utils/theme.server.ts'
 import { makeTimings, time } from '#/app/utils/timing.server.ts'
 import { getToast } from '#/app/utils/toast.server.ts'
-import { useOptionalUser, useUser } from '#/app/utils/user.ts'
 import { BlvdProvider } from './utils/blvd-context'
 import { CTA } from './utils/cta'
 import { PhoneLink, PhoneProvider } from './utils/phone-context'
@@ -107,57 +89,15 @@ export const links: LinksFunction = () => {
 	].filter(Boolean)
 }
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-	return [
-		{ title: data ? 'Hitchcox Aesthetics' : 'Error | Hitchcox Aesthetics' },
-		{
-			name: 'description',
-			content:
-				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and GLP-1 weight loss in Knoxville and Farragut, TN. Book your consultation today.',
-		},
-		// Open Graph
-		{ property: 'og:type', content: 'website' },
-		{ property: 'og:site_name', content: 'Sarah Hitchcox Aesthetics' },
-		{
-			property: 'og:title',
-			content: data
-				? 'Sarah Hitchcox Aesthetics | Knoxville & Farragut Med Spa'
-				: 'Error | Hitchcox Aesthetics',
-		},
-		{
-			property: 'og:description',
-			content:
-				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and GLP-1 weight loss in Knoxville and Farragut, TN. Book your consultation today.',
-		},
-		{
-			property: 'og:image',
-			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}/img/sarah.jpg`,
-		},
-		{ property: 'og:image:width', content: '1200' },
-		{ property: 'og:image:height', content: '630' },
-		{
-			property: 'og:url',
-			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}${data?.requestInfo.path ?? '/'}`,
-		},
-		{ property: 'og:locale', content: 'en_US' },
-		// Twitter Card
-		{ name: 'twitter:card', content: 'summary_large_image' },
-		{
-			name: 'twitter:title',
-			content: data
-				? 'Sarah Hitchcox Aesthetics | Knoxville & Farragut Med Spa'
-				: 'Error | Hitchcox Aesthetics',
-		},
-		{
-			name: 'twitter:description',
-			content:
-				'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and GLP-1 weight loss in Knoxville and Farragut, TN.',
-		},
-		{
-			name: 'twitter:image',
-			content: `${data?.requestInfo.origin ?? 'https://hitchcoxaesthetics.com'}/img/sarah.jpg`,
-		},
-	]
+export const meta: MetaFunction<typeof loader> = ({ data, location }) => {
+	return getSocialMetas({
+		title: data
+			? 'Sarah Hitchcox Aesthetics | Knoxville & Farragut Med Spa'
+			: 'Error | Sarah Hitchcox Aesthetics',
+		description:
+			'Sarah Hitchcox Aesthetics offers Botox, dermal fillers, laser treatments, and GLP-1 weight loss in Knoxville and Farragut, TN. Book your consultation today.',
+		pathname: location.pathname,
+	})
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -318,10 +258,10 @@ function Document({
 	return (
 		<html lang="en" className={`${theme} h-full overflow-x-hidden`}>
 			<head>
-				<ClientHintCheck nonce={nonce} />
-				<Meta />
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width,initial-scale=1" />
+				<ClientHintCheck nonce={nonce} />
+				<Meta />
 				<link rel="canonical" href={canonicalUrl} />
 				<Links />
 				<script
@@ -595,34 +535,6 @@ function Header({
 	)
 }
 
-function _Header() {
-	const user = useOptionalUser()
-	const matches = useMatches()
-	const isOnSearchPage = matches.find(m => m.id === 'routes/users+/index')
-	const searchBar = isOnSearchPage ? null : <SearchBar status="idle" />
-	return (
-		<header className="container py-6">
-			<nav className="flex flex-wrap items-center justify-between gap-4 sm:flex-nowrap md:gap-8">
-				<Logo className="text-white" />
-				<div className="ml-auto hidden max-w-sm flex-1 sm:block">
-					{searchBar}
-				</div>
-				<div className="flex items-center gap-10">
-					{user ? (
-						<UserDropdown />
-					) : (
-						<Button asChild variant="default" size="lg">
-							<Link to="/auth">Log In</Link>
-						</Button>
-					)}
-				</div>
-				<div className="block w-full sm:hidden">{searchBar}</div>
-			</nav>
-		</header>
-	)
-}
-
-// instagram https://www.instagram.com/hitchcoxaesthetics/
 function Footer() {
 	return (
 		<div className="container py-12 pb-32">
@@ -678,19 +590,6 @@ function Footer() {
 	)
 }
 
-// function Logo() {
-// 	return (
-// 		<Link to="/" className="group grid leading-snug">
-// 			<span className="font-light transition group-hover:-translate-x-1">
-// 				epic
-// 			</span>
-// 			<span className="font-bold transition group-hover:translate-x-1">
-// 				notes
-// 			</span>
-// 		</Link>
-// 	)
-// }
-
 const posthogOptions = {
 	api_host: ENV.REACT_APP_PUBLIC_POSTHOG_HOST,
 }
@@ -714,67 +613,6 @@ function AppWithProviders() {
 }
 
 export default withSentry(AppWithProviders)
-
-function UserDropdown() {
-	const user = useUser()
-	const submit = useSubmit()
-	const formRef = useRef<HTMLFormElement>(null)
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button asChild variant="secondary">
-					<Link
-						to={`/users/${user.id}`}
-						// this is for progressive enhancement
-						onClick={e => e.preventDefault()}
-						className="flex items-center gap-2"
-					>
-						<img
-							className="h-8 w-8 rounded-full object-cover"
-							alt={user.name ?? user.id}
-							src={getUserImgSrc(user.image?.id)}
-						/>
-						<span className="text-body-sm font-bold">
-							{user.name ?? user.id}
-						</span>
-					</Link>
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuPortal>
-				<DropdownMenuContent sideOffset={8} align="start">
-					<DropdownMenuItem asChild>
-						<Link prefetch="intent" to={`/users/${user.id}`}>
-							<Icon className="text-body-md" name="avatar">
-								Profile
-							</Icon>
-						</Link>
-					</DropdownMenuItem>
-					<DropdownMenuItem asChild>
-						<Link prefetch="intent" to={`/users/${user.id}/notes`}>
-							<Icon className="text-body-md" name="pencil-2">
-								Notes
-							</Icon>
-						</Link>
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						asChild
-						// this prevents the menu from closing before the form submission is completed
-						onSelect={event => {
-							event.preventDefault()
-							submit(formRef.current)
-						}}
-					>
-						<Form action="/logout" method="POST" ref={formRef}>
-							<Icon className="text-body-md" name="exit">
-								<button type="submit">Logout</button>
-							</Icon>
-						</Form>
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenuPortal>
-		</DropdownMenu>
-	)
-}
 
 /**
  * @returns the user's theme preference, or the client hint theme if the user
@@ -809,51 +647,6 @@ export function useOptimisticThemeMode() {
 	}
 }
 
-function _ThemeSwitch({ userPreference }: { userPreference?: Theme | null }) {
-	const fetcher = useFetcher<typeof action>()
-
-	const [form] = useForm({
-		id: 'theme-switch',
-		lastResult: fetcher.data?.result,
-	})
-
-	const optimisticMode = useOptimisticThemeMode()
-	const mode = optimisticMode ?? userPreference ?? 'system'
-	const nextMode =
-		mode === 'system' ? 'light' : mode === 'light' ? 'dark' : 'system'
-	const modeLabel = {
-		light: (
-			<Icon name="sun">
-				<span className="sr-only">Light</span>
-			</Icon>
-		),
-		dark: (
-			<Icon name="moon">
-				<span className="sr-only">Dark</span>
-			</Icon>
-		),
-		system: (
-			<Icon name="laptop">
-				<span className="sr-only">System</span>
-			</Icon>
-		),
-	}
-
-	return (
-		<fetcher.Form method="POST" {...getFormProps(form)}>
-			<input type="hidden" name="theme" value={nextMode} />
-			<div className="flex gap-2">
-				<button
-					type="submit"
-					className="flex h-8 w-8 cursor-pointer items-center justify-center"
-				>
-					{modeLabel[mode]}
-				</button>
-			</div>
-		</fetcher.Form>
-	)
-}
-
 function useLinks() {
 	const data = useLoaderData<typeof loader>()
 	return data.menuLinks
@@ -877,5 +670,3 @@ export function ErrorBoundary() {
 		</Document>
 	)
 }
-
-// hello

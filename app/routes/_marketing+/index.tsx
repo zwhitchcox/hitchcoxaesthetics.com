@@ -3,25 +3,16 @@ import { Link, useLoaderData, useOutletContext } from '@remix-run/react'
 import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
+import { getSocialMetas } from '#app/utils/seo.ts'
 import { getCategoryPages, getPage } from '#app/utils/site-pages.server.js'
 
-export const meta: MetaFunction = () => [
-	{ title: 'Sarah Hitchcox Aesthetics | Knoxville Med Spa' },
-	{
-		name: 'description',
-		content:
+export const meta: MetaFunction = ({ location }) =>
+	getSocialMetas({
+		title: 'Sarah Hitchcox Aesthetics | Knoxville Med Spa',
+		description:
 			'Sarah Hitchcox Aesthetics is a premier med spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and GLP-1 weight loss.',
-	},
-	{
-		property: 'og:title',
-		content: 'Sarah Hitchcox Aesthetics | Knoxville Med Spa',
-	},
-	{
-		property: 'og:description',
-		content:
-			'Premier med spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and GLP-1 weight loss.',
-	},
-]
+		pathname: location.pathname,
+	})
 
 export async function loader() {
 	const categories = getCategoryPages()

@@ -61,6 +61,7 @@ import {
 	getBlvdBookingPriceDisplay,
 	getProjectedRevenueForBlvdService,
 } from '#app/utils/service-pricing.ts'
+import { getSocialMetas } from '#app/utils/seo.ts'
 import { getAncestors, getPage } from '#app/utils/site-pages.server.ts'
 
 type SourceHint = {
@@ -333,9 +334,13 @@ export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
 }
 
-export const meta: MetaFunction = () => [
-	{ title: 'Book Online | Sarah Hitchcox Aesthetics' },
-]
+export const meta: MetaFunction = ({ location }) =>
+	getSocialMetas({
+		title: 'Book Online | Sarah Hitchcox Aesthetics',
+		description:
+			'Book your appointment online at Sarah Hitchcox Aesthetics in Knoxville or Farragut, TN. Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
+		pathname: location.pathname,
+	})
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const url = new URL(request.url)
