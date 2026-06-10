@@ -36,6 +36,9 @@ export default defineConfig({
 		stderr: 'pipe',
 		env: {
 			PORT,
+			// The e2e server runs with MOCKS=true (MSW intercepts outbound email),
+			// so a real key is never needed — but env validation requires it be set.
+			RESEND_API_KEY: process.env.RESEND_API_KEY ?? 'MOCK_RESEND_API_KEY',
 		},
 	},
 })
