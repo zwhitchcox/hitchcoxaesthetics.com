@@ -4,6 +4,7 @@ import { promisify } from 'node:util'
 
 import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
 import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
+import { syncCallRailPhoneConversionsToGa4 } from '#app/utils/ga4-phone-conversions.server.ts'
 
 // Background job types and interfaces
 export interface JobStatus {
@@ -39,6 +40,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	blvdRealRevenueSync: {
 		id: 'blvdRealRevenueSync',
 		name: 'Boulevard Real Revenue Sync',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	callRailGa4ConversionSync: {
+		id: 'callRailGa4ConversionSync',
+		name: 'CallRail GA4 Conversion Sync',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -131,6 +141,38 @@ export async function runCallRailPostHogConversionSyncJob(): Promise<void> {
 	}
 }
 
+export async function runCallRailGa4ConversionSyncJob(): Promise<void> {
+	const job = jobStatuses['callRailGa4ConversionSync']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+
+	try {
+		const result = await syncCallRailPhoneConversionsToGa4()
+		if (!result.ok) {
+			job.status = 'failed'
+			job.lastError = result.error ?? 'Unknown CallRail/GA4 sync error'
+			return
+		}
+
+		console.log('CallRail GA4 conversion sync completed:', result)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('CallRail GA4 conversion sync failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getCallRailGa4SyncIntervalMs(),
+		).toISOString()
+	}
+}
+
 export async function runBlvdRealRevenueSyncJob(): Promise<void> {
 	const job = jobStatuses['blvdRealRevenueSync']
 	if (!job) return
@@ -201,6 +243,22 @@ export function initializeBackgroundJobs() {
 		}, 90_000)
 	}
 
+	if (shouldAutoRunCallRailGa4Sync()) {
+		const intervalMs = getCallRailGa4SyncIntervalMs()
+		jobIntervals.callRailGa4ConversionSync = setInterval(() => {
+			runCallRailGa4ConversionSyncJob().catch(console.error)
+		}, intervalMs)
+
+		const ga4Sync = jobStatuses['callRailGa4ConversionSync']
+		if (ga4Sync) {
+			ga4Sync.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		}
+
+		setTimeout(() => {
+			runCallRailGa4ConversionSyncJob().catch(console.error)
+		}, 105_000)
+	}
+
 	if (shouldAutoRunBlvdRevenueSync()) {
 		const intervalMs = getBlvdRevenueSyncIntervalMs()
 		jobIntervals.blvdRealRevenueSync = setInterval(() => {
@@ -233,6 +291,23 @@ function shouldAutoRunBlvdRevenueSync() {
 		process.env.NODE_ENV === 'production' ||
 		process.env.ENABLE_DEV_BACKGROUND_JOBS === '1'
 	)
+}
+
+function shouldAutoRunCallRailGa4Sync() {
+	return (
+		(process.env.NODE_ENV === 'production' ||
+			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1') &&
+		Boolean(process.env.GA_MEASUREMENT_PROTOCOL_API_SECRET?.trim())
+	)
+}
+
+function getCallRailGa4SyncIntervalMs() {
+	const minutes = Number.parseInt(
+		process.env.CALLRAIL_GA4_SYNC_INTERVAL_MINUTES ?? '30',
+		10,
+	)
+	const safeMinutes = Number.isFinite(minutes) && minutes >= 5 ? minutes : 30
+	return safeMinutes * 60 * 1000
 }
 
 function getCallRailPostHogSyncIntervalMs() {

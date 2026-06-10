@@ -596,6 +596,8 @@ model CallTrackingSessionAttribution {
 
   posthogDistinctId String?
   posthogSessionId  String?
+  gaClientId        String?
+  gaSessionId       String?
   callrailSessionId String?
   callrailVisitorId String?
 
@@ -636,7 +638,30 @@ model CallTrackingSessionAttribution {
   @@index([posthogDistinctId])
   @@index([callrailSessionId])
   @@index([callrailVisitorId])
+  @@index([gclid])
   @@index([lastSeenAt])
+}
+
+model Ga4PhoneConversion {
+  id String @id @default(cuid())
+
+  callrailCallId    String  @unique
+  callrailAccountId String?
+
+  gclid      String?
+  gaClientId String?
+  gaSessionId String?
+
+  attributionMatch String?
+  valueUsd         Float?
+  callStartedAt    DateTime?
+  sentAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gclid])
+  @@index([sentAt])
 }
 
 model RetellCallOutcome {

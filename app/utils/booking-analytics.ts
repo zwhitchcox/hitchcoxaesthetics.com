@@ -336,9 +336,11 @@ export function queueCallTrackingSessionAttribution({
 			return Boolean(payload.callrail_session_id || payload.callrail_visitor_id)
 		}
 		sentCallTrackingAttributionKeys.add(sentKey)
-		void persistCallTrackingSessionAttribution(payload).catch(error => {
-			console.error('Failed to persist call tracking attribution', error)
-		})
+		void attachGaTrackingIds(payload)
+			.then(persistCallTrackingSessionAttribution)
+			.catch(error => {
+				console.error('Failed to persist call tracking attribution', error)
+			})
 		return Boolean(payload.callrail_session_id || payload.callrail_visitor_id)
 	}
 
@@ -366,6 +368,42 @@ function getCallTrackingSessionAttributionPayload({
 				? properties.initial_referrer
 				: normalizeReferrer(referrer),
 		occurred_at: new Date().toISOString(),
+	})
+}
+
+const GA_TRACKING_ID_TIMEOUT_MS = 1000
+
+function getGaTagValue(field: 'client_id' | 'session_id') {
+	return new Promise<string | null>(resolve => {
+		const measurementId = window.ENV?.GA_MEASUREMENT_ID
+		if (!measurementId || typeof window.gtag !== 'function') {
+			resolve(null)
+			return
+		}
+		// gtag never invokes the callback until the GA library has loaded, so
+		// resolve null after a short wait — later pageviews will fill these in.
+		const timeout = window.setTimeout(
+			() => resolve(null),
+			GA_TRACKING_ID_TIMEOUT_MS,
+		)
+		window.gtag('get', measurementId, field, (value: unknown) => {
+			window.clearTimeout(timeout)
+			if (typeof value === 'string' && value) resolve(value)
+			else if (typeof value === 'number') resolve(String(value))
+			else resolve(null)
+		})
+	})
+}
+
+async function attachGaTrackingIds(payload: Record<string, unknown>) {
+	const [gaClientId, gaSessionId] = await Promise.all([
+		getGaTagValue('client_id'),
+		getGaTagValue('session_id'),
+	])
+	return compactEventProperties({
+		...payload,
+		ga_client_id: gaClientId ?? undefined,
+		ga_session_id: gaSessionId ?? undefined,
 	})
 }
 

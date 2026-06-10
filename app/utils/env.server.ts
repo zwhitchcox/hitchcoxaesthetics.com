@@ -20,6 +20,8 @@ const schema = z.object({
 	GA_CONVERSION_ID: z.string(),
 	GA_CONVERSION_LABEL: z.string(),
 	GA_MEASUREMENT_ID: z.string().optional(),
+	// Server-only — never expose through getEnv()
+	GA_MEASUREMENT_PROTOCOL_API_SECRET: z.string().optional(),
 	ENABLE_DEV_POSTHOG: z.string().optional(),
 	REACT_APP_PUBLIC_POSTHOG_KEY: z.string().optional(),
 	REACT_APP_PUBLIC_POSTHOG_HOST: z.string().optional(),

@@ -30,7 +30,7 @@ const POSTHOG_DISTINCT_CUSTOM_KEYS = [
 
 type DbLike = typeof prisma
 
-type CallRailConversionCall = CallRailCall & {
+export type CallRailConversionCall = CallRailCall & {
 	custom?: unknown
 	customer_name?: string | null
 	lead_status?: string | null
@@ -336,7 +336,7 @@ async function getSyncWindow(
 	}
 }
 
-async function listRecentCallRailCalls({
+export async function listRecentCallRailCalls({
 	accountId,
 	apiKey,
 	limit,
@@ -651,7 +651,7 @@ function mapSessionAttribution(input: {
 	}
 }
 
-function isConversionCall(call: CallRailConversionCall) {
+export function isConversionCall(call: CallRailConversionCall) {
 	const tags = getStringArray(call.tags)
 	return (
 		pickOptionalString(call.lead_status) === 'good_lead' ||
@@ -675,7 +675,7 @@ function parseDateString(value: unknown) {
 	return Number.isNaN(date.getTime()) ? null : date
 }
 
-function parseMoneyValue(value: unknown) {
+export function parseMoneyValue(value: unknown) {
 	if (typeof value === 'number') return Number.isFinite(value) ? value : 0
 	if (typeof value !== 'string') return 0
 	const parsed = Number.parseFloat(value.replace(/[$,]/g, ''))

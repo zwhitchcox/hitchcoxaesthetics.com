@@ -12,6 +12,7 @@ import { StatusButton } from '#app/components/ui/status-button.tsx'
 import {
 	type JobStatus,
 	runBlvdRealRevenueSyncJob,
+	runCallRailGa4ConversionSyncJob,
 	runCallRailPostHogConversionSyncJob,
 	runReviewsFetchJob,
 	getJobStatuses,
@@ -69,6 +70,14 @@ export async function action({ request }: Route['ActionArgs']) {
 		return json({
 			success: true,
 			message: 'CallRail PostHog conversion sync job started',
+		})
+	}
+
+	if (intent === 'run-callRailGa4ConversionSync') {
+		runCallRailGa4ConversionSyncJob().catch(console.error)
+		return json({
+			success: true,
+			message: 'CallRail GA4 conversion sync job started',
 		})
 	}
 
