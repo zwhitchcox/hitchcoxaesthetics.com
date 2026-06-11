@@ -10,8 +10,7 @@ import { getCategoryPages } from '#app/utils/site-pages.server.js'
 
 export const meta: MetaFunction = ({ location }) =>
 	getSocialMetas({
-		title:
-			'Bearden (West Knoxville) Med Spa | Botox, Fillers & Lasers | Sarah Hitchcox Aesthetics',
+		title: 'Bearden (West Knoxville) Med Spa | Sarah Hitchcox Aesthetics',
 		description:
 			'Visit Sarah Hitchcox Aesthetics in Bearden, Knoxville, TN (5113 Kingston Pike). Expert Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
 		pathname: location.pathname,
