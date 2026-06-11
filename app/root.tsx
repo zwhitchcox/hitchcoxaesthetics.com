@@ -219,11 +219,13 @@ function Document({
 	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
 	const canonicalUrl = `${origin}${location.pathname}`
 
-	// JSON-LD: Knoxville-focused MedicalBusiness
+	// JSON-LD: Knoxville-focused med spa. MedicalClinic is included because
+	// medicalSpecialty is only valid on MedicalClinic/MedicalOrganization —
+	// not on MedicalBusiness (schema.org vocabulary).
 	const bearden = getLocationById('bearden')!
 	const localBusinessJsonLd = {
 		'@context': 'https://schema.org',
-		'@type': 'MedicalBusiness',
+		'@type': ['MedicalBusiness', 'MedicalClinic'],
 		name: 'Sarah Hitchcox Aesthetics',
 		description:
 			'Medical spa in Knoxville, TN offering Botox, dermal fillers, laser treatments, microneedling, and GLP-1 weight loss.',
@@ -251,7 +253,7 @@ function Document({
 			name: 'Sarah Hitchcox',
 			jobTitle: 'Registered Nurse, Aesthetic Injector',
 		},
-		medicalSpecialty: 'Dermatology',
+		medicalSpecialty: 'https://schema.org/Dermatology',
 		areaServed: { '@type': 'City', name: 'Knoxville' },
 	}
 
