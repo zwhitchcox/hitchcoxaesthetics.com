@@ -804,6 +804,19 @@ export default function BlvdBookRoute() {
 		if (lastPostHogIdentityKeyRef.current === identityKey) return
 		lastPostHogIdentityKeyRef.current = identityKey
 
+		// PostHog cannot merge two already-identified persons. If this session
+		// was already identified under a different booking id, keep that person
+		// and just update its properties — re-identifying would split the
+		// journey across two persons and break funnel insights.
+		const currentDistinctId = posthog.get_distinct_id?.()
+		const isAlreadyIdentified =
+			typeof currentDistinctId === 'string' &&
+			/^(email|phone|blvd-client):/.test(currentDistinctId)
+		if (isAlreadyIdentified && currentDistinctId !== identity.distinctId) {
+			posthog.setPersonProperties?.(identity.properties)
+			return
+		}
+
 		posthog.identify(identity.distinctId, identity.properties)
 	}
 

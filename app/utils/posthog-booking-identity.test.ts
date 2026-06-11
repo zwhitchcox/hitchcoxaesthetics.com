@@ -12,7 +12,10 @@ test('builds a searchable PostHog identity from booking details', () => {
 			phone: '(865) 210-1404',
 		}),
 	).toEqual({
-		distinctId: 'email:jane@example.com',
+		// phone-first: the verified phone is the stable id across the whole
+		// journey (and matches phone-call conversion identities); email is a
+		// person property
+		distinctId: 'phone:+18652101404',
 		properties: {
 			$email: 'jane@example.com',
 			$name: 'Jane Doe',
@@ -26,19 +29,19 @@ test('builds a searchable PostHog identity from booking details', () => {
 	})
 })
 
-test('falls back to phone when email is not available', () => {
+test('falls back to email when phone is not available', () => {
 	expect(
 		buildBookingPostHogIdentity({
+			email: 'jane@example.com',
 			firstName: 'Jane',
-			phone: '8652101404',
 		}),
 	).toMatchObject({
-		distinctId: 'phone:+18652101404',
+		distinctId: 'email:jane@example.com',
 		properties: {
+			$email: 'jane@example.com',
 			$name: 'Jane',
 			first_name: 'Jane',
 			name: 'Jane',
-			phone: '+18652101404',
 		},
 	})
 })
