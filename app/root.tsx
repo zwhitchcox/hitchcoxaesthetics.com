@@ -584,6 +584,7 @@ function Footer() {
 				</div>
 				<div className="flex flex-col space-y-4 text-lg">
 					<h2 className="text-2xl font-semibold">Policies & Legal</h2>
+					<Link to="/support">Contact & Support</Link>
 					<Link to="/tos">Terms of Service</Link>
 					<Link to="/privacy">Privacy Policy</Link>
 				</div>

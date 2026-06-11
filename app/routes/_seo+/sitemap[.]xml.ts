@@ -26,7 +26,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 	const urls = allPaths
 		.map(p => {
-			const loc = p ? `${siteUrl}/${p}` : siteUrl
+			// trailing slash on the root so the sitemap URL matches internal links
+			const loc = p ? `${siteUrl}/${p}` : `${siteUrl}/`
 			const priority = p === '' ? '1.0' : !p.includes('/') ? '0.9' : '0.7'
 			return `  <url>\n    <loc>${loc}</loc>\n    <priority>${priority}</priority>\n  </url>`
 		})
