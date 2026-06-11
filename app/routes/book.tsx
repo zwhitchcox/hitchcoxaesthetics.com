@@ -2486,11 +2486,7 @@ export default function BlvdBookRoute() {
 
 										{shouldShowClientHistoryGate &&
 										!clientHistory &&
-										!clientHistorySelection ? (
-											<p className="text-sm text-muted-foreground">
-												Choose one to show the right services.
-											</p>
-										) : !canBrowseServices ? null : filteredServices.length ===
+										!clientHistorySelection ? null : !canBrowseServices ? null : filteredServices.length ===
 										  0 ? (
 											<div className="space-y-3 text-center">
 												<p className="text-sm text-muted-foreground">
