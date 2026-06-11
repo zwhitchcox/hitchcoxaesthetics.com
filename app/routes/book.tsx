@@ -3265,7 +3265,7 @@ function BlvdStepTracker({
 						>
 							<div
 								className={cn(
-									'flex h-8 w-8 items-center justify-center rounded-full',
+									'flex h-6 w-6 items-center justify-center rounded-full text-xs sm:h-8 sm:w-8 sm:text-base',
 									isActive
 										? 'bg-gray-700 text-white'
 										: isComplete
@@ -3277,7 +3277,7 @@ function BlvdStepTracker({
 							</div>
 							<div
 								className={cn(
-									'mt-1 text-sm',
+									'mt-1 hidden text-sm sm:block',
 									isActive ? 'font-medium text-gray-700' : 'text-gray-500',
 								)}
 							>
@@ -3287,7 +3287,7 @@ function BlvdStepTracker({
 						{index < BLVD_BOOK_STEPS.length - 1 && (
 							<div
 								className={cn(
-									'h-0.5 w-full -translate-y-3',
+									'h-0.5 w-full translate-y-0 sm:-translate-y-3',
 									isComplete || isActive ? 'bg-gray-500' : 'bg-gray-300',
 								)}
 							/>
