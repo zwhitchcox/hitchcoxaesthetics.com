@@ -145,6 +145,11 @@ test('either-location shows merged availability and reserves at the picked offic
 	// location step offers both offices plus Either
 	await screen.findByRole('button', { name: /Knoxville/i })
 	screen.getByRole('button', { name: /Farragut/ })
+
+	// each office card shows the weekdays it has openings (Jun 10 is a Wed)
+	const dayLabels = await screen.findAllByText('Wed')
+	expect(dayLabels).toHaveLength(2)
+
 	await user.click(screen.getByRole('button', { name: /Either Location/i }))
 
 	// merged schedule shows both slots labeled with their office

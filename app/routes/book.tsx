@@ -412,6 +412,9 @@ export default function BlvdBookRoute() {
 	const [locationChoice, setLocationChoice] = useState<'either' | string | null>(
 		null,
 	)
+	const [locationDayPreviews, setLocationDayPreviews] = useState<
+		Record<string, string[]>
+	>({})
 	const [scheduleOptions, setScheduleOptions] = useState<LocationScheduleOption[]>(
 		[],
 	)
@@ -1212,6 +1215,7 @@ export default function BlvdBookRoute() {
 		setSelectedLocation(null)
 		setLocationChoice(null)
 		setScheduleOptions([])
+		setLocationDayPreviews({})
 		setServiceLocations([])
 		setCart(null)
 		setBookableDates([])
@@ -1263,6 +1267,7 @@ export default function BlvdBookRoute() {
 				await handleSelectLocationChoice(nextLocations[0]!, service)
 			} else {
 				setActiveStep('location')
+				void prefetchLocationDayPreviews(nextLocations, service)
 			}
 		} catch (error) {
 			captureBookingError({
@@ -1275,6 +1280,44 @@ export default function BlvdBookRoute() {
 		} finally {
 			setLoadingLocations(false)
 		}
+	}
+
+	/**
+	 * Loads each location's bookable dates in the background so the location
+	 * cards can show which days of the week Sarah is in that office.
+	 */
+	async function prefetchLocationDayPreviews(
+		locations: BlvdLocation[],
+		service: ServiceEntry,
+	) {
+		if (!client) return
+		setLocationDayPreviews({})
+		const preferredStaffVariant = await getPreferredStaffVariant(service.item)
+		await Promise.all(
+			locations.map(async location => {
+				try {
+					let previewCart = await client.carts.create(location)
+					previewCart = await previewCart.addBookableItem(service.item, {
+						...(preferredStaffVariant
+							? { staffVariant: preferredStaffVariant }
+							: {}),
+					})
+					const dates = await previewCart.getBookableDates({
+						location,
+						timezone: location.tz ?? undefined,
+					})
+					setLocationDayPreviews(current => ({
+						...current,
+						[location.id]: getWeekdayPattern(dates),
+					}))
+				} catch {
+					setLocationDayPreviews(current => ({
+						...current,
+						[location.id]: [],
+					}))
+				}
+			}),
+		)
 	}
 
 	async function handleSelectLocationChoice(
@@ -2518,11 +2561,8 @@ export default function BlvdBookRoute() {
 											{!loadingLocations && serviceLocations.length > 0 ? (
 												<div className="grid gap-4">
 													{serviceLocations.map(location => {
-														const matchingSiteLocation =
-															getSiteLocationForBlvdLocation(location)
-														const isPreferred =
-															preferredLocationId !== null &&
-															matchingSiteLocation?.id === preferredLocationId
+														const previewDays =
+															locationDayPreviews[location.id]
 
 														return (
 															<button
@@ -2542,11 +2582,13 @@ export default function BlvdBookRoute() {
 																			{formatBlvdAddress(location)}
 																		</p>
 																	</div>
-																	{isPreferred ? (
-																		<span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-																			Suggested
-																		</span>
-																	) : null}
+																	<span className="whitespace-nowrap pt-1 text-right text-sm font-medium text-muted-foreground">
+																		{previewDays === undefined
+																			? '…'
+																			: previewDays.length === 0
+																				? 'No openings soon'
+																				: previewDays.join(' · ')}
+																	</span>
 																</div>
 															</button>
 														)
@@ -2560,19 +2602,14 @@ export default function BlvdBookRoute() {
 															}}
 															className="rounded-xl border border-dashed bg-white p-5 text-left transition hover:border-primary hover:shadow-md"
 														>
-															<div className="flex items-start justify-between gap-4">
-																<div>
-																	<h3 className="text-xl font-semibold">
-																		Either Location
-																	</h3>
-																	<p className="mt-2 text-sm text-muted-foreground">
-																		See every available date and time across both
-																		offices and pick whatever works best.
-																	</p>
-																</div>
-																<span className="rounded-full border border-muted-foreground/30 bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-																	Most options
-																</span>
+															<div>
+																<h3 className="text-xl font-semibold">
+																	Either Location
+																</h3>
+																<p className="mt-2 text-sm text-muted-foreground">
+																	See every available date and time across both
+																	offices and pick whatever works best.
+																</p>
 															</div>
 														</button>
 													) : null}
@@ -4123,6 +4160,18 @@ type BookableTimeEntry = {
 	cart: BlvdCart
 	location: BlvdLocation
 	time: BlvdBookableTime
+}
+
+const WEEKDAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+/** Distinct weekdays (Mon-Sun order) present in a location's bookable dates. */
+function getWeekdayPattern(dates: BlvdBookableDate[]) {
+	const seen = new Set<string>()
+	for (const bookable of dates) {
+		const date = toDate(bookable.date)
+		if (date) seen.add(format(date, 'EEE'))
+	}
+	return WEEKDAY_ORDER.filter(day => seen.has(day))
 }
 
 /** Union of every option's bookable dates, one representative per day. */
