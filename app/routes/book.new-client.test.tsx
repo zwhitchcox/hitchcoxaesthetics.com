@@ -185,10 +185,7 @@ test('new clients can verify their phone and complete a mocked booking', async (
 	await user.click(await screen.findByRole('button', { name: 'No' }))
 	const toxButtons = await screen.findAllByRole('button', { name: /Tox/i })
 	await user.click(toxButtons[0]!)
-	const continueButtons = await screen.findAllByRole('button', {
-		name: /Continue to Schedule/i,
-	})
-	await user.click(continueButtons[0]!)
+	// single-location services skip the location step straight to the schedule
 	await user.click(await screen.findByRole('button', { name: /6:15 PM/i }))
 	await user.type(screen.getByLabelText(/Mobile phone/i), '8659780953')
 	await user.click(screen.getByRole('button', { name: /Text Me A Code/i }))

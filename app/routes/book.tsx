@@ -406,7 +406,15 @@ export default function BlvdBookRoute() {
 	)
 	const [cart, setCart] = useState<BlvdCart | null>(null)
 	const [bookableDates, setBookableDates] = useState<BlvdBookableDate[]>([])
-	const [bookableTimes, setBookableTimes] = useState<BlvdBookableTime[]>([])
+	const [bookableTimeEntries, setBookableTimeEntries] = useState<
+		BookableTimeEntry[]
+	>([])
+	const [locationChoice, setLocationChoice] = useState<'either' | string | null>(
+		null,
+	)
+	const [scheduleOptions, setScheduleOptions] = useState<LocationScheduleOption[]>(
+		[],
+	)
 	const [selectedDateId, setSelectedDateId] = useState<string | null>(null)
 	const [selectedTimeId, setSelectedTimeId] = useState<string | null>(null)
 	const [loadingLocations, setLoadingLocations] = useState(false)
@@ -653,8 +661,9 @@ export default function BlvdBookRoute() {
 		bookableDates.find(date => date.id === selectedDateId) ??
 		bookableDates[0] ??
 		null
-	const selectedTime =
-		bookableTimes.find(time => time.id === selectedTimeId) ?? null
+	const selectedTimeEntry =
+		bookableTimeEntries.find(entry => entry.time.id === selectedTimeId) ?? null
+	const selectedTime = selectedTimeEntry?.time ?? null
 	const selectedSiteLocation = selectedLocation
 		? getSiteLocationForBlvdLocation(selectedLocation) ?? null
 		: null
@@ -928,7 +937,7 @@ export default function BlvdBookRoute() {
 	const derivedStep = getCurrentBlvdStep({
 		checkoutSuccess,
 		detailsSubmitted,
-		selectedLocation,
+		locationChoice,
 		selectedService,
 		selectedTime,
 	})
@@ -937,13 +946,13 @@ export default function BlvdBookRoute() {
 		reserve: detailsSubmitted,
 		details: Boolean(selectedTime),
 		location: Boolean(selectedService),
-		schedule: Boolean(selectedLocation),
+		schedule: Boolean(locationChoice),
 		service: true,
 	}
 	const stepCompletion: Record<BlvdBookStepName, boolean> = {
 		reserve: Boolean(checkoutSuccess),
 		details: detailsSubmitted,
-		location: Boolean(selectedLocation),
+		location: Boolean(locationChoice),
 		schedule: Boolean(selectedTime),
 		service: Boolean(selectedService),
 	}
@@ -1100,10 +1109,12 @@ export default function BlvdBookRoute() {
 		setPendingServiceOptionPath([])
 		setPendingServiceOptionRootInstanceId(null)
 		setSelectedLocation(null)
+		setLocationChoice(null)
+		setScheduleOptions([])
 		setServiceLocations([])
 		setCart(null)
 		setBookableDates([])
-		setBookableTimes([])
+		setBookableTimeEntries([])
 		setSelectedDateId(null)
 		setSelectedTimeId(null)
 		setQuestionAnswers({})
@@ -1199,10 +1210,12 @@ export default function BlvdBookRoute() {
 		setOwnershipStepError(null)
 		setCheckoutSuccess(null)
 		setSelectedLocation(null)
+		setLocationChoice(null)
+		setScheduleOptions([])
 		setServiceLocations([])
 		setCart(null)
 		setBookableDates([])
-		setBookableTimes([])
+		setBookableTimeEntries([])
 		setSelectedDateId(null)
 		setSelectedTimeId(null)
 		setQuestionAnswers({})
@@ -1247,7 +1260,7 @@ export default function BlvdBookRoute() {
 			setServiceLocations(nextLocations)
 
 			if (nextLocations.length === 1) {
-				await handleSelectLocation(nextLocations[0]!, service)
+				await handleSelectLocationChoice(nextLocations[0]!, service)
 			} else {
 				setActiveStep('location')
 			}
@@ -1264,51 +1277,62 @@ export default function BlvdBookRoute() {
 		}
 	}
 
-	async function handleSelectLocation(
-		location: BlvdLocation,
+	async function handleSelectLocationChoice(
+		choice: BlvdLocation | 'either',
 		serviceOverride?: ServiceEntry,
 	) {
 		const activeService = serviceOverride ?? selectedService
 		if (!client || !activeService) return
 
+		const targetLocations =
+			choice === 'either' ? serviceLocations : [choice]
+		if (targetLocations.length === 0) return
+
 		setLoadingSchedule(true)
 		setStepError(null)
 		setOwnershipStepError(null)
 		setCheckoutSuccess(null)
-		setSelectedLocation(location)
-		setActiveStep('location')
+		setLocationChoice(choice === 'either' ? 'either' : choice.id)
+		setSelectedLocation(choice === 'either' ? null : choice)
+		setActiveStep('schedule')
 		setDetailsSubmitted(false)
 		resetReturningClientState()
+		setScheduleOptions([])
 		setBookableDates([])
-		setBookableTimes([])
+		setBookableTimeEntries([])
 		setSelectedDateId(null)
 		setSelectedTimeId(null)
 
 		try {
-			let nextCart = await client.carts.create(location)
 			const preferredStaffVariant = await getPreferredStaffVariant(
 				activeService.item,
 			)
-			nextCart = await nextCart.addBookableItem(activeService.item, {
-				...(preferredStaffVariant
-					? { staffVariant: preferredStaffVariant }
-					: {}),
-			})
-			setCart(nextCart)
+			const options = await Promise.all(
+				targetLocations.map(async location => {
+					let nextCart = await client.carts.create(location)
+					nextCart = await nextCart.addBookableItem(activeService.item, {
+						...(preferredStaffVariant
+							? { staffVariant: preferredStaffVariant }
+							: {}),
+					})
+					const dates = await nextCart.getBookableDates({
+						location,
+						timezone: location.tz ?? undefined,
+					})
+					return { cart: nextCart, dates, location }
+				}),
+			)
+			setScheduleOptions(options)
+			setCart(choice === 'either' ? null : options[0]?.cart ?? null)
 
-			const nextDates = await nextCart.getBookableDates({
-				location,
-				timezone: location.tz ?? undefined,
-			})
-			setBookableDates(nextDates)
+			const mergedDates = mergeBookableDates(options)
+			setBookableDates(mergedDates)
 
-			if (nextDates[0]) {
-				setSelectedDateId(getBookableDateKey(nextDates[0]) ?? nextDates[0].id)
-				const nextTimes = await nextCart.getBookableTimes(nextDates[0], {
-					location,
-					timezone: location.tz ?? undefined,
-				})
-				setBookableTimes(nextTimes)
+			if (mergedDates[0]) {
+				const firstKey =
+					getBookableDateKey(mergedDates[0]) ?? mergedDates[0].id
+				setSelectedDateId(firstKey)
+				setBookableTimeEntries(await loadTimeEntriesForDate(options, firstKey))
 			}
 		} catch (error) {
 			captureBookingError({
@@ -1324,24 +1348,23 @@ export default function BlvdBookRoute() {
 	}
 
 	async function handleSelectDate(date: BlvdBookableDate) {
-		if (!cart || !selectedLocation) return
+		if (scheduleOptions.length === 0) return
 
+		const dateKey = getBookableDateKey(date) ?? date.id
 		setLoadingTimes(true)
 		setStepError(null)
 		setOwnershipStepError(null)
-		setSelectedDateId(getBookableDateKey(date) ?? date.id)
+		setSelectedDateId(dateKey)
 		setActiveStep(null)
 		setDetailsSubmitted(false)
 		setSelectedTimeId(null)
 		setCheckoutSuccess(null)
-		setBookableTimes([])
+		setBookableTimeEntries([])
 
 		try {
-			const nextTimes = await cart.getBookableTimes(date, {
-				location: selectedLocation,
-				timezone: selectedLocation.tz ?? undefined,
-			})
-			setBookableTimes(nextTimes)
+			setBookableTimeEntries(
+				await loadTimeEntriesForDate(scheduleOptions, dateKey),
+			)
 		} catch (error) {
 			captureBookingError({
 				action: 'load_bookable_times',
@@ -1355,9 +1378,7 @@ export default function BlvdBookRoute() {
 		}
 	}
 
-	async function handleSelectTime(time: BlvdBookableTime) {
-		if (!cart) return
-
+	async function handleSelectTime(entry: BookableTimeEntry) {
 		setLoadingSchedule(true)
 		setStepError(null)
 		setOwnershipStepError(null)
@@ -1365,13 +1386,15 @@ export default function BlvdBookRoute() {
 		setDetailsSubmitted(false)
 
 		try {
-			const nextCart = await cart.reserveBookableItems(time)
+			const nextCart = await entry.cart.reserveBookableItems(entry.time)
 			setCart(nextCart)
+			setSelectedLocation(entry.location)
 			setActiveStep(null)
-			setSelectedTimeId(time.id)
+			setSelectedTimeId(entry.time.id)
 			queueCurrentBlvdBookingIntent({
 				cartOverride: nextCart,
-				selectedTimeOverride: time,
+				locationOverride: entry.location,
+				selectedTimeOverride: entry.time,
 				status: 'time_selected',
 				step: 'details',
 			})
@@ -1918,6 +1941,7 @@ export default function BlvdBookRoute() {
 		appointmentIds,
 		cartOverride,
 		hasVerifiedMobileOverride,
+		locationOverride,
 		selectedPaymentMethodIdOverride,
 		selectedTimeOverride,
 		status,
@@ -1926,13 +1950,15 @@ export default function BlvdBookRoute() {
 		appointmentIds?: string[]
 		cartOverride?: BlvdCart | null
 		hasVerifiedMobileOverride?: boolean
+		locationOverride?: BlvdLocation | null
 		selectedPaymentMethodIdOverride?: string
 		selectedTimeOverride?: BlvdBookableTime | null
 		status: string
 		step: string
 	}) {
 		const intentCart = cartOverride ?? cart
-		if (!intentCart || !selectedService || !selectedLocation) return
+		const intentLocation = locationOverride ?? selectedLocation
+		if (!intentCart || !selectedService || !intentLocation) return
 
 		const intentSelectedTime = selectedTimeOverride ?? selectedTime
 		const intentHasVerifiedMobile =
@@ -1980,8 +2006,8 @@ export default function BlvdBookRoute() {
 				}),
 				hasVerifiedClient: intentHasVerifiedClient,
 				hasVerifiedMobile: intentHasVerifiedMobile,
-				locationId: selectedLocation.id,
-				locationName: selectedLocation.name,
+				locationId: intentLocation.id,
+				locationName: intentLocation.name,
 				requiresCard: Boolean(intentCart.summary.paymentMethodRequired),
 				selectedEndTime: intentEndTime?.toISOString(),
 				selectedPaymentMethodType: intentPaymentMethodType,
@@ -2480,10 +2506,9 @@ export default function BlvdBookRoute() {
 											{selectedService
 												? selectedService.displayName
 												: 'Service'}{' '}
-											is selected. Choose the office and the matching map will
-											appear right next to it.
+											is selected. Pick an office — or see availability at both.
 										</p>
-										<div className="w-full space-y-6">
+										<div className="w-full max-w-2xl space-y-6">
 											{loadingLocations ? (
 												<p className="text-sm text-muted-foreground">
 													Checking which locations can book this service.
@@ -2491,148 +2516,66 @@ export default function BlvdBookRoute() {
 											) : null}
 
 											{!loadingLocations && serviceLocations.length > 0 ? (
-												<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-													<div className="grid gap-4">
-														{serviceLocations.map(location => {
-															const isSelected =
-																selectedLocation?.id === location.id
-															const matchingSiteLocation =
-																getSiteLocationForBlvdLocation(location)
-															const isPreferred =
-																preferredLocationId !== null &&
-																matchingSiteLocation?.id === preferredLocationId
+												<div className="grid gap-4">
+													{serviceLocations.map(location => {
+														const matchingSiteLocation =
+															getSiteLocationForBlvdLocation(location)
+														const isPreferred =
+															preferredLocationId !== null &&
+															matchingSiteLocation?.id === preferredLocationId
 
-															return (
-																<button
-																	key={location.id}
-																	type="button"
-																	onClick={() => {
-																		void handleSelectLocation(location)
-																	}}
-																	className={cn(
-																		'rounded-xl border bg-white p-5 text-left transition hover:border-primary hover:shadow-md',
-																		isSelected && 'border-primary shadow-sm',
-																	)}
-																>
-																	<div className="flex items-start justify-between gap-4">
-																		<div>
-																			<h3 className="text-xl font-semibold">
-																				{location.name}
-																			</h3>
-																			<p className="mt-2 text-sm text-muted-foreground">
-																				{formatBlvdAddress(location)}
-																			</p>
-																			{location.arrivalInstructions ? (
-																				<p className="mt-3 text-sm text-muted-foreground">
-																					{location.arrivalInstructions}
-																				</p>
-																			) : null}
-																		</div>
-																		<div className="flex flex-col items-end gap-2">
-																			{isPreferred ? (
-																				<span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-																					Suggested
-																				</span>
-																			) : null}
-																			{isSelected ? (
-																				<span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground">
-																					Selected
-																				</span>
-																			) : null}
-																		</div>
-																	</div>
-																</button>
-															)
-														})}
-													</div>
-
-													{selectedLocation ? (
-														<div className="order-2 lg:hidden">
-															<Button
+														return (
+															<button
+																key={location.id}
 																type="button"
-																size="lg"
-																className="w-full"
-																disabled={loadingSchedule}
-																onClick={() => setActiveStep('schedule')}
+																onClick={() => {
+																	void handleSelectLocationChoice(location)
+																}}
+																className="rounded-xl border bg-white p-5 text-left transition hover:border-primary hover:shadow-md"
 															>
-																{loadingSchedule
-																	? 'Loading Schedule...'
-																	: 'Continue to Schedule'}
-															</Button>
-														</div>
-													) : null}
-
-													<div className="flex flex-col rounded-xl border bg-muted/20 p-4">
-														<div className="flex-1">
-															{selectedLocation && selectedSiteLocation ? (
-																<div className="space-y-4">
-																	<div className="space-y-2">
+																<div className="flex items-start justify-between gap-4">
+																	<div>
 																		<h3 className="text-xl font-semibold">
-																			{selectedSiteLocation.displayName}
+																			{location.name}
 																		</h3>
-																		<p className="text-sm text-muted-foreground">
-																			{selectedSiteLocation.address},{' '}
-																			{selectedSiteLocation.city},{' '}
-																			{selectedSiteLocation.state}{' '}
-																			{selectedSiteLocation.zip}
+																		<p className="mt-2 text-sm text-muted-foreground">
+																			{formatBlvdAddress(location)}
 																		</p>
-																		<a
-																			href={
-																				selectedSiteLocation.googleMapsDirectionsUrl
-																			}
-																			target="_blank"
-																			rel="noreferrer"
-																			className="text-sm font-medium text-primary hover:underline"
-																		>
-																			Open Directions
-																		</a>
 																	</div>
-																	<div className="h-80 overflow-hidden rounded-lg border bg-background">
-																		<iframe
-																			src={
-																				selectedSiteLocation.googleMapsEmbedUrl
-																			}
-																			width="100%"
-																			height="100%"
-																			allowFullScreen={false}
-																			loading="lazy"
-																			referrerPolicy="no-referrer-when-downgrade"
-																			title={`Map of ${selectedSiteLocation.displayName}`}
-																			style={{ border: 0 }}
-																		/>
-																	</div>
+																	{isPreferred ? (
+																		<span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+																			Suggested
+																		</span>
+																	) : null}
 																</div>
-															) : selectedLocation ? (
-																<div className="space-y-2">
+															</button>
+														)
+													})}
+
+													{serviceLocations.length > 1 ? (
+														<button
+															type="button"
+															onClick={() => {
+																void handleSelectLocationChoice('either')
+															}}
+															className="rounded-xl border border-dashed bg-white p-5 text-left transition hover:border-primary hover:shadow-md"
+														>
+															<div className="flex items-start justify-between gap-4">
+																<div>
 																	<h3 className="text-xl font-semibold">
-																		{selectedLocation.name}
+																		Either Location
 																	</h3>
-																	<p className="text-sm text-muted-foreground">
-																		{formatBlvdAddress(selectedLocation)}
+																	<p className="mt-2 text-sm text-muted-foreground">
+																		See every available date and time across both
+																		offices and pick whatever works best.
 																	</p>
 																</div>
-															) : (
-																<div className="flex h-full min-h-72 items-center justify-center rounded-lg border border-dashed bg-background/60 px-6 text-center text-sm text-muted-foreground">
-																	Select a location to show the embedded map.
-																</div>
-															)}
-														</div>
-														{selectedLocation ? (
-															<div className="mt-6 hidden justify-end lg:flex">
-																<Button
-																	type="button"
-																	size="lg"
-																	className="w-full sm:w-auto"
-																	disabled={loadingSchedule}
-																	onClick={() => setActiveStep('schedule')}
-																>
-																	{loadingSchedule
-																		? 'Loading Schedule...'
-																		: 'Continue to Schedule'}
-																</Button>
+																<span className="rounded-full border border-muted-foreground/30 bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+																	Most options
+																</span>
 															</div>
-														) : null}
-													</div>
+														</button>
+													) : null}
 												</div>
 											) : null}
 
@@ -2649,10 +2592,47 @@ export default function BlvdBookRoute() {
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
 											Schedule
 										</h2>
-										<p className="-mt-4 mb-4 text-center text-sm text-muted-foreground">
-											{selectedLocation?.name} is selected. Choose a date first,
-											then pick a time.
+										<p className="-mt-4 mb-2 text-center text-sm text-muted-foreground">
+											Choose a date first, then pick a time.
 										</p>
+										{serviceLocations.length > 1 ? (
+											<div className="flex flex-wrap items-center justify-center gap-2">
+												{[
+													...serviceLocations.map(location => ({
+														id: location.id,
+														label: location.name,
+														choice: location as BlvdLocation | 'either',
+													})),
+													{
+														id: 'either',
+														label: 'Either',
+														choice: 'either' as const,
+													},
+												].map(pill => {
+													const isActive = locationChoice === pill.id
+													return (
+														<button
+															key={pill.id}
+															type="button"
+															disabled={loadingSchedule}
+															onClick={() => {
+																if (isActive) return
+																void handleSelectLocationChoice(pill.choice)
+															}}
+															className={cn(
+																'rounded-full border px-4 py-1.5 text-sm font-medium transition',
+																isActive
+																	? 'border-primary bg-primary text-primary-foreground'
+																	: 'bg-white text-foreground hover:border-primary',
+																loadingSchedule && 'opacity-60',
+															)}
+														>
+															{pill.label}
+														</button>
+													)
+												})}
+											</div>
+										) : null}
 										<div className="w-full space-y-6">
 											{loadingSchedule ? (
 												<p className="text-sm text-muted-foreground">
@@ -2710,29 +2690,38 @@ export default function BlvdBookRoute() {
 																	) : null}
 																</div>
 
-																{bookableTimes.length > 0 ? (
+																{bookableTimeEntries.length > 0 ? (
 																	<div className="flex flex-col gap-2">
-																		{bookableTimes.map(time => {
+																		{bookableTimeEntries.map(entry => {
 																			const isSelected =
-																				time.id === selectedTimeId
+																				entry.time.id === selectedTimeId
+																			const showLocation =
+																				locationChoice === 'either'
 																			return (
 																				<Button
-																					key={time.id}
+																					key={`${entry.location.id}:${entry.time.id}`}
 																					type="button"
 																					variant={
 																						isSelected ? 'secondary' : 'outline'
 																					}
 																					className={cn(
-																						'block h-11 w-full border transition duration-300',
+																						'flex h-11 w-full items-center justify-center gap-2 border transition duration-300',
 																						isSelected
 																							? 'border-primary'
 																							: 'hover:border-gray-400',
 																					)}
 																					onClick={() => {
-																						void handleSelectTime(time)
+																						void handleSelectTime(entry)
 																					}}
 																				>
-																					{formatTimeLabel(time.startTime)}
+																					<span>
+																						{formatTimeLabel(entry.time.startTime)}
+																					</span>
+																					{showLocation ? (
+																						<span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+																							· {entry.location.name}
+																						</span>
+																					) : null}
 																				</Button>
 																			)
 																		})}
@@ -3185,20 +3174,20 @@ export function ErrorBoundary() {
 function getCurrentBlvdStep({
 	checkoutSuccess,
 	detailsSubmitted,
-	selectedLocation,
+	locationChoice,
 	selectedService,
 	selectedTime,
 }: {
 	checkoutSuccess: CheckoutSuccess | null
 	detailsSubmitted: boolean
-	selectedLocation: BlvdLocation | null
+	locationChoice: 'either' | string | null
 	selectedService: ServiceEntry | null
 	selectedTime: BlvdBookableTime | null
 }): BlvdBookStepName {
 	if (checkoutSuccess) return 'reserve'
 	if (detailsSubmitted) return 'reserve'
 	if (selectedTime) return 'details'
-	if (selectedLocation) return 'schedule'
+	if (locationChoice) return 'schedule'
 	if (selectedService) return 'location'
 	return 'service'
 }
@@ -4122,6 +4111,61 @@ function toDate(value: Date | string | null | undefined) {
 
 	const parsed = new Date(value)
 	return isValid(parsed) ? parsed : null
+}
+
+type LocationScheduleOption = {
+	cart: BlvdCart
+	dates: BlvdBookableDate[]
+	location: BlvdLocation
+}
+
+type BookableTimeEntry = {
+	cart: BlvdCart
+	location: BlvdLocation
+	time: BlvdBookableTime
+}
+
+/** Union of every option's bookable dates, one representative per day. */
+function mergeBookableDates(options: LocationScheduleOption[]) {
+	const byKey = new Map<string, BlvdBookableDate>()
+	for (const option of options) {
+		for (const date of option.dates) {
+			const key = getBookableDateKey(date) ?? date.id
+			if (!byKey.has(key)) byKey.set(key, date)
+		}
+	}
+	return [...byKey.entries()]
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([, date]) => date)
+}
+
+/** Fetch times for the matching day at every location and merge by start time. */
+async function loadTimeEntriesForDate(
+	options: LocationScheduleOption[],
+	dateKey: string,
+): Promise<BookableTimeEntry[]> {
+	const perLocation = await Promise.all(
+		options.map(async option => {
+			const matchedDate = option.dates.find(
+				date => (getBookableDateKey(date) ?? date.id) === dateKey,
+			)
+			if (!matchedDate) return []
+			const times = await option.cart.getBookableTimes(matchedDate, {
+				location: option.location,
+				timezone: option.location.tz ?? undefined,
+			})
+			return times.map(time => ({
+				cart: option.cart,
+				location: option.location,
+				time,
+			}))
+		}),
+	)
+	return perLocation.flat().sort((a, b) => {
+		const aTime = toDate(a.time.startTime)?.getTime() ?? 0
+		const bTime = toDate(b.time.startTime)?.getTime() ?? 0
+		return aTime - bTime
+	})
 }
 
 function getBookableDateKey(date: BlvdBookableDate) {
