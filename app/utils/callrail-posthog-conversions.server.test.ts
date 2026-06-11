@@ -65,6 +65,7 @@ test('captures a Retell booking conversion against the matched CallRail web sess
 
 	const result = await captureCallRailPhoneConversionToPostHog({
 		accountId: 'ACC_TEST',
+		lookupClientByPhone: async () => null,
 		call: {
 			id: 'CAL_RETELL',
 			customer_phone_number: '+18652329501',
@@ -101,7 +102,16 @@ test('captures a Retell booking conversion against the matched CallRail web sess
 	const posthogCalls = fetchMock.mock.calls.filter(
 		([url]) => String(url) === 'https://us.i.posthog.com/capture/',
 	)
-	expect(posthogCalls).toHaveLength(2)
+	expect(posthogCalls).toHaveLength(3)
+	const identifyBody = JSON.parse(posthogCalls[2][1]?.body as string)
+	expect(identifyBody).toMatchObject({
+		distinct_id: 'phone:+18652329501',
+		event: '$identify',
+		properties: {
+			$anon_distinct_id: 'ph_distinct_from_web',
+			$set: { phone: '+18652329501' },
+		},
+	})
 	const conversionBody = JSON.parse(posthogCalls[0][1]?.body as string)
 	expect(conversionBody).toMatchObject({
 		distinct_id: 'ph_distinct_from_web',
@@ -152,6 +162,7 @@ test('skips excluded CallRail phone conversions', async () => {
 
 	const result = await captureCallRailPhoneConversionToPostHog({
 		accountId: 'ACC_TEST',
+		lookupClientByPhone: async () => null,
 		call: {
 			id: 'CAL_INTERNAL',
 			customer_phone_number: '(865) 210-1404',
@@ -261,6 +272,7 @@ test('syncs qualified CallRail phone conversions into PostHog with matched attri
 	}
 
 	const result = await syncCallRailPhoneConversionsToPostHog({
+		lookupClientByPhone: async () => null,
 		accountIds: ['ACC_TEST'],
 		db: db as never,
 		now: new Date('2026-06-01T16:00:00.000Z'),
@@ -279,7 +291,7 @@ test('syncs qualified CallRail phone conversions into PostHog with matched attri
 	const posthogCalls = fetchMock.mock.calls.filter(
 		([url]) => String(url) === 'https://us.i.posthog.com/capture/',
 	)
-	expect(posthogCalls).toHaveLength(2)
+	expect(posthogCalls).toHaveLength(3)
 	const posthogCall = posthogCalls.find(call => {
 		const body = JSON.parse(call[1]?.body as string) as { event?: string }
 		return body.event === 'phone_call_conversion'

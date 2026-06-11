@@ -6,6 +6,7 @@ import {
 	CALLRAIL_CALL_FIELDS,
 	callRailFetch,
 	getCallRailAccountIds,
+	normalizePhoneNumber,
 	type CallRailCall,
 } from '#app/utils/callrail-booking.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
@@ -50,10 +51,20 @@ type SyncCallRailPhoneConversionsOptions = {
 	db?: DbLike
 	dryRun?: boolean
 	limit?: number
+	lookupClientByPhone?: LookupClientByPhone
 	now?: Date
 	since?: Date
 	until?: Date
 }
+
+type LookupClientByPhone = (
+	phone: string,
+) => Promise<{
+	email?: string | null
+	firstName?: string | null
+	id: string
+	lastName?: string | null
+} | null>
 
 type CaptureCallRailPhoneConversionOptions = {
 	accountId: string
@@ -61,6 +72,7 @@ type CaptureCallRailPhoneConversionOptions = {
 	db?: DbLike
 	dryRun?: boolean
 	extraProperties?: Record<string, unknown>
+	lookupClientByPhone?: LookupClientByPhone
 	timestamp?: string
 }
 
@@ -94,6 +106,7 @@ export async function captureCallRailPhoneConversionToPostHog({
 	db = prisma,
 	dryRun = false,
 	extraProperties,
+	lookupClientByPhone = defaultLookupClientByPhone,
 	timestamp,
 }: CaptureCallRailPhoneConversionOptions) {
 	const event = await buildPhoneConversionEvent({
@@ -196,6 +209,8 @@ export async function captureCallRailPhoneConversionToPostHog({
 		timestamp: event.timestamp,
 	})
 
+	await identifyPhoneConversionPerson(event, lookupClientByPhone)
+
 	return {
 		ok: true,
 		dry_run: false,
@@ -203,6 +218,97 @@ export async function captureCallRailPhoneConversionToPostHog({
 		captured: 1,
 		attribution: event.attribution,
 		distinctId: event.distinctId,
+	}
+}
+
+/**
+ * After a phone conversion, identify the caller so the PostHog person carries
+ * real customer data (name/email from the call and the matched Boulevard
+ * profile). When the conversion matched an anonymous web session, merge that
+ * session into the caller's phone-first person — the same `phone:` identity
+ * the website booking flow uses.
+ */
+async function identifyPhoneConversionPerson(
+	event: {
+		callerPhone: string | null
+		callId: string
+		distinctId: string
+		properties: Record<string, unknown>
+	},
+	lookupClientByPhone: LookupClientByPhone,
+) {
+	if (!event.callerPhone) return
+
+	const personProperties = compactRecord({
+		phone: event.callerPhone,
+		name: pickOptionalString(event.properties.callrail_customer_name),
+		...(await getBoulevardPersonProperties(
+			event.callerPhone,
+			lookupClientByPhone,
+		)),
+	})
+
+	const phoneDistinctId = `phone:${event.callerPhone}`
+	const isAnonymousWebPerson = !/^(email|phone|blvd-client|callrail):/.test(
+		event.distinctId,
+	)
+
+	try {
+		if (isAnonymousWebPerson) {
+			// Server-side identify: merges the anonymous web session person
+			// into the caller's phone person.
+			await captureServerPostHogEvent({
+				distinctId: phoneDistinctId,
+				event: '$identify',
+				insertId: `callrail-phone-identify:${event.callId}`,
+				properties: {
+					$anon_distinct_id: event.distinctId,
+					$set: personProperties,
+				},
+			})
+			return
+		}
+
+		await captureServerPostHogEvent({
+			distinctId: event.distinctId,
+			event: '$set',
+			insertId: `callrail-phone-set:${event.callId}`,
+			properties: { $set: personProperties },
+		})
+	} catch (error) {
+		console.warn('Failed to identify phone conversion person', error)
+	}
+}
+
+async function defaultLookupClientByPhone(phone: string) {
+	const { findAdminClientByPhone } = await import(
+		'#app/utils/blvd-voice-booking.server.ts'
+	)
+	return findAdminClientByPhone(phone)
+}
+
+async function getBoulevardPersonProperties(
+	callerPhone: string,
+	lookupClientByPhone: LookupClientByPhone,
+) {
+	try {
+		const client = await lookupClientByPhone(callerPhone)
+		if (!client) return {}
+		return compactRecord({
+			blvd_client_id: client.id,
+			email: pickOptionalString(client.email),
+			$email: pickOptionalString(client.email),
+			first_name: pickOptionalString(client.firstName),
+			last_name: pickOptionalString(client.lastName),
+			name:
+				[client.firstName, client.lastName]
+					.map(part => pickOptionalString(part))
+					.filter(Boolean)
+					.join(' ') || undefined,
+		})
+	} catch (error) {
+		console.warn('Boulevard client lookup for PostHog identify failed', error)
+		return {}
 	}
 }
 
@@ -275,6 +381,7 @@ export async function syncCallRailPhoneConversionsToPostHog(
 				call,
 				db,
 				dryRun: options.dryRun,
+				lookupClientByPhone: options.lookupClientByPhone,
 			})
 			stats.matched += result.matched
 			stats.unmatched += result.unmatched
@@ -395,16 +502,21 @@ async function buildPhoneConversionEvent({
 }) {
 	const callId = requireString(call.id, 'CallRail call is missing id')
 	const attribution = await findMatchedAttribution({ call, db })
+	const callerPhone = normalizePhoneNumber(call.customer_phone_number)
+	// Prefer the matched web session person; otherwise fall back to the same
+	// phone-first identity the website booking flow uses so calls and web
+	// bookings from one client unify into a single PostHog person.
 	const distinctId =
 		attribution.posthog_distinct_id ??
 		attribution.posthog_session_id ??
-		`callrail:${callId}`
+		(callerPhone ? `phone:${callerPhone}` : `callrail:${callId}`)
 	const tags = getStringArray(call.tags)
 	const valueUsd = parseMoneyValue(call.value)
 	const callStartTime = parseDateString(call.start_time)
 
 	return {
 		attribution,
+		callerPhone,
 		callId,
 		distinctId,
 		properties: compactRecord({
