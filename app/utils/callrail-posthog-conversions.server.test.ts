@@ -235,7 +235,39 @@ test('syncs qualified CallRail phone conversions into PostHog with matched attri
 	})
 	vi.stubGlobal('fetch', fetchMock)
 
+	const callRecords = new Map<string, Record<string, unknown>>()
 	const db = {
+		callRailCall: {
+			findUnique: vi.fn(
+				async ({ where }: { where: { callrailCallId: string } }) =>
+					callRecords.get(where.callrailCallId) ?? null,
+			),
+			create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+				const record = {
+					receivedEventAt: null,
+					conversionEventAt: null,
+					analyzedAt: null,
+					analysisError: null,
+					...data,
+				}
+				callRecords.set(String(data.callrailCallId), record)
+				return record
+			}),
+			update: vi.fn(
+				async ({
+					where,
+					data,
+				}: {
+					where: { callrailCallId: string }
+					data: Record<string, unknown>
+				}) => {
+					const record = callRecords.get(where.callrailCallId) ?? {}
+					Object.assign(record, data)
+					callRecords.set(where.callrailCallId, record)
+					return record
+				},
+			),
+		},
 		blvdSyncState: {
 			findUnique: vi.fn(async () => null),
 			upsert: vi.fn(async () => ({})),
@@ -279,19 +311,28 @@ test('syncs qualified CallRail phone conversions into PostHog with matched attri
 	})
 
 	expect(result).toMatchObject({
+		calls_recorded: 2,
 		captured: 1,
 		conversion_count: 1,
 		matched: 1,
 		ok: true,
 		scanned: 2,
-		skipped: 1,
+		skipped: 0,
 		unmatched: 0,
 	})
 
 	const posthogCalls = fetchMock.mock.calls.filter(
 		([url]) => String(url) === 'https://us.i.posthog.com/capture/',
 	)
-	expect(posthogCalls).toHaveLength(3)
+	// 2 phone_call_received + phone_call_conversion + booking_conversion_completed + $identify
+	expect(posthogCalls).toHaveLength(5)
+	const receivedEvents = posthogCalls
+		.map(
+			([, init]) =>
+				JSON.parse((init as RequestInit).body as string) as { event?: string },
+		)
+		.filter(body => body.event === 'phone_call_received')
+	expect(receivedEvents).toHaveLength(2)
 	const posthogCall = posthogCalls.find(call => {
 		const body = JSON.parse(call[1]?.body as string) as { event?: string }
 		return body.event === 'phone_call_conversion'
@@ -332,9 +373,6 @@ test('syncs qualified CallRail phone conversions into PostHog with matched attri
 		},
 		timestamp: '2026-06-01T14:00:00.000Z',
 	})
-	expect(db.blvdSyncState.upsert).toHaveBeenCalledWith(
-		expect.objectContaining({
-			where: { key: 'callrail_posthog_conversion_last_sync_at' },
-		}),
-	)
+	// per-call records dedupe future runs (replaces the moving sync window)
+	expect(db.callRailCall.create).toHaveBeenCalledTimes(2)
 })

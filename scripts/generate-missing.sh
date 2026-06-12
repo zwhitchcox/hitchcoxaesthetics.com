@@ -9,8 +9,8 @@
 
 set -e
 
-if [ -z "$OPENAI_API_KEY" ]; then
-  echo "Error: OPENAI_API_KEY is required"
+if [ -z "$OPEN_ROUTER_API_KEY" ]; then
+  echo "Error: OPEN_ROUTER_API_KEY is required"
   exit 1
 fi
 

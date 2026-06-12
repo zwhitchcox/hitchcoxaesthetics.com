@@ -664,6 +664,33 @@ model Ga4PhoneConversion {
   @@index([sentAt])
 }
 
+model CallRailCall {
+  id String @id @default(cuid())
+
+  callrailCallId    String  @unique
+  callrailAccountId String?
+
+  source          String?
+  callerPhone     String?
+  durationSeconds Int?
+  answered        Boolean?
+  startedAt       DateTime?
+
+  qualified         Boolean   @default(false)
+  receivedEventAt   DateTime?
+  conversionEventAt DateTime?
+
+  analyzedAt    DateTime?
+  analysisJson  String?
+  analysisError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startedAt])
+  @@index([qualified])
+}
+
 model RetellCallOutcome {
   id                 String  @id @default(cuid())
   retellCallId       String? @unique

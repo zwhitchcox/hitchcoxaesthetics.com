@@ -3,6 +3,12 @@ import {
 	isExcludedBookingAnalyticsIdentity,
 } from '#app/utils/analytics-exclusions.ts'
 import {
+	analyzeCallAudio,
+	fetchCallRecordingAudio,
+	getCallIntelligenceConfig,
+	type CallAnalysis,
+} from '#app/utils/call-intelligence.server.ts'
+import {
 	CALLRAIL_CALL_FIELDS,
 	callRailFetch,
 	getCallRailAccountIds,
@@ -12,9 +18,7 @@ import {
 import { prisma } from '#app/utils/db.server.ts'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 
-const SYNC_STATE_KEY = 'callrail_posthog_conversion_last_sync_at'
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 30
-const DEFAULT_OVERLAP_HOURS = 6
 const DEFAULT_PER_PAGE = 100
 const DEFAULT_MAX_PAGES = 20
 
@@ -48,6 +52,8 @@ export type CallRailConversionCall = CallRailCall & {
 
 type SyncCallRailPhoneConversionsOptions = {
 	accountIds?: string[]
+	analyzeCalls?: boolean
+	analyzeLimit?: number
 	db?: DbLike
 	dryRun?: boolean
 	limit?: number
@@ -340,23 +346,38 @@ export async function syncCallRailPhoneConversionsToPostHog(
 		}
 	}
 
+	// Always re-scan the full window: calls get tagged "booked appointment"
+	// or good_lead days after they happen, and the old moving window
+	// silently missed those late qualifications. The CallRailCall table
+	// dedupes captures, so re-scanning is cheap and idempotent.
 	const now = options.now ?? new Date()
-	const syncWindow = await getSyncWindow(db, options, now)
+	const since =
+		options.since ??
+		new Date(now.getTime() - DEFAULT_INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
+	const until = options.until ?? now
 	const accountIds =
 		options.accountIds && options.accountIds.length > 0
 			? options.accountIds
 			: await getCallRailAccountIds(apiKey)
+	const analysisConfig =
+		options.analyzeCalls === false ? null : getCallIntelligenceConfig()
+	const analyzeLimit = options.analyzeLimit ?? 10
+	let analyzedThisRun = 0
+
 	const stats = {
 		account_count: accountIds.length,
+		analyzed: 0,
+		analysis_failed: 0,
+		calls_recorded: 0,
 		captured: 0,
 		conversion_count: 0,
 		dry_run: Boolean(options.dryRun),
 		matched: 0,
 		scanned: 0,
-		since: syncWindow.since.toISOString(),
+		since: since.toISOString(),
 		skipped: 0,
 		unmatched: 0,
-		until: syncWindow.until.toISOString(),
+		until: until.toISOString(),
 	}
 
 	for (const accountId of accountIds) {
@@ -364,44 +385,111 @@ export async function syncCallRailPhoneConversionsToPostHog(
 			accountId,
 			apiKey,
 			limit: options.limit,
-			since: syncWindow.since,
-			until: syncWindow.until,
+			since,
+			until,
 		})
 		stats.scanned += calls.length
 
 		for (const call of calls) {
-			if (!isConversionCall(call)) {
-				stats.skipped += 1
-				continue
+			const callId = pickOptionalString(call.id)
+			if (!callId) continue
+
+			const isQualified = isConversionCall(call)
+			if (isQualified) stats.conversion_count += 1
+			if (options.dryRun) continue
+
+			const record =
+				(await db.callRailCall.findUnique({
+					where: { callrailCallId: callId },
+				})) ??
+				(await db.callRailCall.create({
+					data: {
+						callrailCallId: callId,
+						callrailAccountId: accountId,
+						source:
+							pickOptionalString(call.source) ??
+							pickOptionalString(call.source_name),
+						callerPhone: pickOptionalString(call.customer_phone_number),
+						durationSeconds: Number(call.duration) || null,
+						answered: typeof call.answered === 'boolean' ? call.answered : null,
+						startedAt: parseDateString(call.start_time),
+						qualified: isQualified,
+					},
+				}))
+
+			// 1. every inbound call becomes a PostHog event, once
+			if (!record.receivedEventAt) {
+				const event = await buildPhoneConversionEvent({
+					accountId,
+					call,
+					db,
+				})
+				const result = await captureServerPostHogEvent({
+					distinctId: event.distinctId,
+					event: 'phone_call_received',
+					insertId: `callrail-call:${callId}`,
+					properties: {
+						...event.properties,
+						call_answered: call.answered ?? undefined,
+						call_duration_seconds: Number(call.duration) || undefined,
+					},
+					timestamp: event.timestamp,
+				})
+				if (result?.ok) {
+					stats.calls_recorded += 1
+					await db.callRailCall.update({
+						where: { callrailCallId: callId },
+						data: { receivedEventAt: new Date() },
+					})
+				}
 			}
 
-			stats.conversion_count += 1
-			const result = await captureCallRailPhoneConversionToPostHog({
-				accountId,
-				call,
-				db,
-				dryRun: options.dryRun,
-				lookupClientByPhone: options.lookupClientByPhone,
-			})
-			stats.matched += result.matched
-			stats.unmatched += result.unmatched
-			if ('skipped' in result && result.skipped) stats.skipped += 1
-			if (!options.dryRun && result.ok) stats.captured += result.captured
-			if (!options.dryRun && !result.ok) stats.skipped += 1
-		}
-	}
+			// 2. qualified conversions, including ones tagged late
+			if (isQualified && !record.conversionEventAt) {
+				const result = await captureCallRailPhoneConversionToPostHog({
+					accountId,
+					call,
+					db,
+					lookupClientByPhone: options.lookupClientByPhone,
+				})
+				stats.matched += result.matched
+				stats.unmatched += result.unmatched
+				if (result.ok && 'captured' in result && result.captured) {
+					stats.captured += result.captured
+					await db.callRailCall.update({
+						where: { callrailCallId: callId },
+						data: { conversionEventAt: new Date(), qualified: true },
+					})
+				}
+			} else if (isQualified && !record.qualified) {
+				await db.callRailCall.update({
+					where: { callrailCallId: callId },
+					data: { qualified: true },
+				})
+			}
 
-	if (!options.dryRun) {
-		await db.blvdSyncState.upsert({
-			where: { key: SYNC_STATE_KEY },
-			create: {
-				key: SYNC_STATE_KEY,
-				value: syncWindow.until.toISOString(),
-			},
-			update: {
-				value: syncWindow.until.toISOString(),
-			},
-		})
+			// 3. AI analysis of the recording (newest calls first, capped per run)
+			if (
+				analysisConfig &&
+				analyzedThisRun < analyzeLimit &&
+				!record.analyzedAt &&
+				!record.analysisError &&
+				call.answered === true &&
+				Number(call.duration) >= 25 &&
+				pickOptionalString(call.recording)
+			) {
+				analyzedThisRun += 1
+				const outcome = await analyzeCallRecordingToPostHog({
+					accountId,
+					apiKey,
+					call,
+					callId,
+					db,
+				})
+				if (outcome === 'analyzed') stats.analyzed += 1
+				if (outcome === 'failed') stats.analysis_failed += 1
+			}
+		}
 	}
 
 	return {
@@ -410,36 +498,80 @@ export async function syncCallRailPhoneConversionsToPostHog(
 	}
 }
 
-async function getSyncWindow(
-	db: DbLike,
-	options: SyncCallRailPhoneConversionsOptions,
-	now: Date,
-) {
-	if (options.since) {
-		return {
-			since: options.since,
-			until: options.until ?? now,
+async function analyzeCallRecordingToPostHog({
+	accountId,
+	apiKey,
+	call,
+	callId,
+	db,
+}: {
+	accountId: string
+	apiKey: string
+	call: CallRailConversionCall
+	callId: string
+	db: DbLike
+}): Promise<'analyzed' | 'failed'> {
+	try {
+		const audio = await fetchCallRecordingAudio({
+			recordingUrl: String(call.recording),
+			callRailApiKey: apiKey,
+		})
+		if (!audio) {
+			await db.callRailCall.update({
+				where: { callrailCallId: callId },
+				data: { analysisError: 'recording_unavailable' },
+			})
+			return 'failed'
 		}
+		const result = await analyzeCallAudio({ audio })
+		if (!result.ok) {
+			await db.callRailCall.update({
+				where: { callrailCallId: callId },
+				data: { analysisError: result.error },
+			})
+			return 'failed'
+		}
+
+		const event = await buildPhoneConversionEvent({ accountId, call, db })
+		await captureServerPostHogEvent({
+			distinctId: event.distinctId,
+			event: 'phone_call_analyzed',
+			insertId: `callrail-call-analysis:${callId}`,
+			properties: {
+				...event.properties,
+				...prefixAnalysis(result.analysis),
+			},
+			timestamp: event.timestamp,
+		})
+		await db.callRailCall.update({
+			where: { callrailCallId: callId },
+			data: {
+				analyzedAt: new Date(),
+				analysisJson: JSON.stringify(result.analysis),
+				analysisError: null,
+			},
+		})
+		return 'analyzed'
+	} catch (error) {
+		await db.callRailCall.update({
+			where: { callrailCallId: callId },
+			data: {
+				analysisError: error instanceof Error ? error.message : 'unknown',
+			},
+		})
+		return 'failed'
 	}
+}
 
-	const state = await db.blvdSyncState.findUnique({
-		where: { key: SYNC_STATE_KEY },
-		select: { value: true },
-	})
-	const lastSyncedAt = state?.value ? new Date(state.value) : null
-	const fallbackSince = new Date(
-		now.getTime() - DEFAULT_INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
-	)
-	const overlappedSince =
-		lastSyncedAt && !Number.isNaN(lastSyncedAt.getTime())
-			? new Date(
-					lastSyncedAt.getTime() - DEFAULT_OVERLAP_HOURS * 60 * 60 * 1000,
-				)
-			: fallbackSince
-
+function prefixAnalysis(analysis: CallAnalysis) {
 	return {
-		since: overlappedSince,
-		until: options.until ?? now,
+		call_reason: analysis.reason ?? undefined,
+		call_intent: analysis.caller_intent,
+		call_service_interest: analysis.service_interest ?? undefined,
+		call_outcome: analysis.outcome,
+		call_not_booked_reason: analysis.not_booked_reason ?? undefined,
+		call_follow_up_recommended: analysis.follow_up_recommended,
+		call_summary: analysis.summary,
 	}
 }
 

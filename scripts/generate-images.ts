@@ -4,9 +4,9 @@
  * Images have transparent backgrounds and are saved as PNG, then converted to WebP.
  *
  * Usage:
- *   OPENAI_API_KEY=sk-... tsx scripts/generate-images.ts botox-forehead-lines
- *   OPENAI_API_KEY=sk-... tsx scripts/generate-images.ts botox-forehead-lines before
- *   OPENAI_API_KEY=sk-... tsx scripts/generate-images.ts --missing
+ *   OPEN_ROUTER_API_KEY=sk-or-... tsx scripts/generate-images.ts botox-forehead-lines
+ *   OPEN_ROUTER_API_KEY=sk-or-... tsx scripts/generate-images.ts botox-forehead-lines before
+ *   OPEN_ROUTER_API_KEY=sk-or-... tsx scripts/generate-images.ts --missing
  *   tsx scripts/generate-images.ts --list-missing
  *   tsx scripts/generate-images.ts --generate-script   # outputs scripts/generate-missing.sh
  */
@@ -14,7 +14,6 @@
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import OpenAI from 'openai'
 import sharp from 'sharp'
 
 const PUBLIC_IMG_DIR = path.join(process.cwd(), 'public', 'img')
@@ -339,13 +338,45 @@ async function generatePair(service: string): Promise<void> {
 		process.exit(1)
 	}
 
-	const apiKey = process.env.OPENAI_API_KEY
+	const apiKey = process.env.OPEN_ROUTER_API_KEY
 	if (!apiKey) {
-		console.error('OPENAI_API_KEY environment variable is required')
+		console.error('OPEN_ROUTER_API_KEY environment variable is required')
 		process.exit(1)
 	}
 
-	const openai = new OpenAI({ apiKey })
+	const imageModel =
+		process.env.OPENROUTER_IMAGE_MODEL ?? 'google/gemini-2.5-flash-image'
+
+	async function generateImage(
+		content: Array<Record<string, unknown>>,
+	): Promise<string | undefined> {
+		const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${apiKey}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				model: imageModel,
+				modalities: ['image', 'text'],
+				messages: [{ role: 'user', content }],
+			}),
+		})
+		const data = (await response.json()) as {
+			choices?: {
+				message?: { images?: { image_url?: { url?: string } }[] }
+			}[]
+			error?: { message?: string }
+		}
+		if (data.error) {
+			console.error('  OpenRouter error:', data.error.message)
+			return undefined
+		}
+		const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url
+		return url?.startsWith('data:')
+			? url.slice(url.indexOf(',') + 1)
+			: undefined
+	}
 	const outputDir = path.join(PUBLIC_IMG_DIR, service)
 	fs.mkdirSync(outputDir, { recursive: true })
 
@@ -368,19 +399,13 @@ async function generatePair(service: string): Promise<void> {
 		'No text, no labels, no watermarks.',
 	].join(' ')
 
-	const beforeResponse = await openai.images.generate({
-		model: 'gpt-image-1.5',
-		prompt: beforePrompt,
-		n: 1,
-		size: '1024x1024',
-		quality: 'high',
-		background: 'transparent',
-		output_format: 'png',
-	})
-
-	const beforeB64 = beforeResponse.data?.[0]?.b64_json
+	// Note: OpenRouter image models do not support transparent backgrounds;
+	// run scripts/rembg-remove.py afterwards if transparency is needed.
+	const beforeB64 = await generateImage([
+		{ type: 'text', text: beforePrompt },
+	])
 	if (!beforeB64) {
-		console.error('  No before image returned from OpenAI')
+		console.error('  No before image returned from OpenRouter')
 		process.exit(1)
 	}
 
@@ -409,52 +434,16 @@ async function generatePair(service: string): Promise<void> {
 		'Output a single photo, NOT a side-by-side comparison.',
 	].join(' ')
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const afterResponse: any = await openai.responses.create({
-		model: 'gpt-5.2',
-		input: [
-			{
-				role: 'user',
-				content: [
-					{
-						type: 'input_image',
-						image_url: `data:image/png;base64,${beforeB64}`,
-						detail: 'high',
-					},
-					{
-						type: 'input_text',
-						text: afterPrompt,
-					},
-				],
-			},
-		],
-		tools: [
-			{
-				type: 'image_generation',
-				model: 'gpt-image-1.5',
-				background: 'transparent',
-				output_format: 'png',
-				size: '1024x1024',
-				quality: 'high',
-			},
-		],
-	} as any)
-
-	// Extract the generated image from the response
-	let afterB64: string | undefined
-	for (const item of afterResponse.output ?? []) {
-		if (item.type === 'image_generation_call' && item.result) {
-			afterB64 = item.result
-			break
-		}
-	}
+	const afterB64 = await generateImage([
+		{
+			type: 'image_url',
+			image_url: { url: `data:image/png;base64,${beforeB64}` },
+		},
+		{ type: 'text', text: afterPrompt },
+	])
 
 	if (!afterB64) {
 		console.error('  No after image returned')
-		console.error(
-			'  Output types:',
-			JSON.stringify(afterResponse.output?.map((o: any) => o.type)),
-		)
 		process.exit(1)
 	}
 
@@ -496,8 +485,8 @@ function generateScript(): void {
 		'',
 		'set -e',
 		'',
-		'if [ -z "$OPENAI_API_KEY" ]; then',
-		'  echo "Error: OPENAI_API_KEY is required"',
+		'if [ -z "$OPEN_ROUTER_API_KEY" ]; then',
+		'  echo "Error: OPEN_ROUTER_API_KEY is required"',
 		'  exit 1',
 		'fi',
 		'',
@@ -517,7 +506,7 @@ function generateScript(): void {
 	console.log(`Generated: ${scriptPath}`)
 	console.log(`  ${missing.length} images across ${byService.size} services`)
 	console.log(
-		`\nRun it:\n  OPENAI_API_KEY=sk-... bash scripts/generate-missing.sh`,
+		`\nRun it:\n  OPEN_ROUTER_API_KEY=sk-or-... bash scripts/generate-missing.sh`,
 	)
 }
 

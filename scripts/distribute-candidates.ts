@@ -87,7 +87,7 @@ function main() {
 	console.log(`\nNext steps:`)
 	console.log(`  1. Review: open public/img/candidates/`)
 	console.log(
-		`  2. Split:  OPENAI_API_KEY=sk-... tsx scripts/scrape-before-after.ts --split`,
+		`  2. Split:  OPEN_ROUTER_API_KEY=sk-... tsx scripts/scrape-before-after.ts --split`,
 	)
 	console.log(`  3. Finalize: tsx scripts/scrape-before-after.ts --finalize`)
 }

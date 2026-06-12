@@ -29,6 +29,10 @@ export const CALLRAIL_CALL_FIELDS = [
 	'fbclid',
 	'msclkid',
 	'custom',
+	'duration',
+	'answered',
+	'recording',
+	'source_name',
 ].join(',')
 
 const POSTHOG_SESSION_CUSTOM_KEYS = [

@@ -19,9 +19,10 @@ import {
 
 loadDotenv()
 
-const DEFAULT_AGENT_MODEL = process.env.RETELL_A2A_AGENT_MODEL ?? 'gpt-5.1-mini'
+const DEFAULT_AGENT_MODEL =
+	process.env.RETELL_A2A_AGENT_MODEL ?? 'openai/gpt-5.1-mini'
 const DEFAULT_CALLER_MODEL =
-	process.env.RETELL_A2A_CALLER_MODEL ?? 'gpt-5.1-mini'
+	process.env.RETELL_A2A_CALLER_MODEL ?? 'openai/gpt-5.1-mini'
 const TEST_LOCAL_DATE = 'Saturday, May 30, 2026'
 const TEST_TIME_ZONE = 'America/New_York'
 const TEST_PHONE = '+18652101404'
@@ -1174,15 +1175,15 @@ async function main() {
 		return
 	}
 
-	const apiKey = process.env.OPENAI_API_KEY?.trim()
+	const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim()
 	if (!apiKey) {
 		throw new Error(
-			'OPENAI_API_KEY is required. This is a manual paid test; it is not part of CI.',
+			'OPEN_ROUTER_API_KEY is required. This is a manual paid test; it is not part of CI.',
 		)
 	}
 
 	const selectedScenarios = pickScenarios(options.scenario)
-	const openai = new OpenAI({ apiKey })
+	const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 	const tools = buildOpenAiTools(options.brand)
 	let failedCount = 0
 	let totalInputTokens = 0

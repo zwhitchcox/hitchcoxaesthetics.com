@@ -22,6 +22,9 @@ const schema = z.object({
 	GA_MEASUREMENT_ID: z.string().optional(),
 	// Server-only — never expose through getEnv()
 	GA_MEASUREMENT_PROTOCOL_API_SECRET: z.string().optional(),
+	// Server-only — powers AI call analysis
+	OPEN_ROUTER_API_KEY: z.string().optional(),
+	OPENROUTER_CALL_MODEL: z.string().optional(),
 	ENABLE_DEV_POSTHOG: z.string().optional(),
 	REACT_APP_PUBLIC_POSTHOG_KEY: z.string().optional(),
 	REACT_APP_PUBLIC_POSTHOG_HOST: z.string().optional(),

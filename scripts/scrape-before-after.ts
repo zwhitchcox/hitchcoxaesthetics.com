@@ -4,12 +4,12 @@
  * then split into separate before/after images with transparent backgrounds.
  *
  * Usage:
- *   OPENAI_API_KEY=sk-... tsx scripts/scrape-before-after.ts botox
- *   OPENAI_API_KEY=sk-... tsx scripts/scrape-before-after.ts --missing
+ *   OPEN_ROUTER_API_KEY=sk-... tsx scripts/scrape-before-after.ts botox
+ *   OPEN_ROUTER_API_KEY=sk-... tsx scripts/scrape-before-after.ts --missing
  *   tsx scripts/scrape-before-after.ts --list-missing
  *
  * Requirements:
- *   - OPENAI_API_KEY: OpenAI API key (for vision + image edit)
+ *   - OPEN_ROUTER_API_KEY: OpenAI API key (for vision + image edit)
  *   - cwebp: for PNG -> WebP conversion
  */
 

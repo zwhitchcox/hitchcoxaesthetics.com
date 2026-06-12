@@ -13,8 +13,6 @@ import {
 	sendGa4PurchaseEvent,
 } from '#app/utils/ga4-measurement-protocol.server.ts'
 
-const SYNC_STATE_KEY = 'callrail_ga4_conversion_last_sync_at'
-const DEFAULT_OVERLAP_HOURS = 6
 
 type DbLike = typeof prisma
 
@@ -105,14 +103,6 @@ export async function syncCallRailPhoneConversionsToGa4(
 			else if (result.ok) stats.sent += 1
 			else stats.failed += 1
 		}
-	}
-
-	if (!options.dryRun) {
-		await db.blvdSyncState.upsert({
-			where: { key: SYNC_STATE_KEY },
-			create: { key: SYNC_STATE_KEY, value: syncWindow.until.toISOString() },
-			update: { value: syncWindow.until.toISOString() },
-		})
 	}
 
 	return { ok: true as const, ...stats }
@@ -253,7 +243,7 @@ async function findGaSessionForCall({
 }
 
 async function getSyncWindow(
-	db: DbLike,
+	_db: DbLike,
 	options: SyncCallRailPhoneConversionsToGa4Options,
 	now: Date,
 ) {
@@ -261,24 +251,11 @@ async function getSyncWindow(
 		return { since: options.since, until: options.until ?? now }
 	}
 
-	const state = await db.blvdSyncState.findUnique({
-		where: { key: SYNC_STATE_KEY },
-		select: { value: true },
-	})
-	const lastSyncedAt = state?.value ? new Date(state.value) : null
-	// GA4 MP drops events older than ~72h, so never look back further than that.
-	const earliestUseful = new Date(
-		now.getTime() - GA4_MEASUREMENT_PROTOCOL_MAX_EVENT_AGE_MS,
-	)
-	const overlappedSince =
-		lastSyncedAt && !Number.isNaN(lastSyncedAt.getTime())
-			? new Date(
-					lastSyncedAt.getTime() - DEFAULT_OVERLAP_HOURS * 60 * 60 * 1000,
-				)
-			: earliestUseful
-
+	// Re-scan the full backdating window every run: calls get tagged as
+	// conversions days late, and GA4 drops events older than ~72h anyway.
+	// The Ga4PhoneConversion table dedupes already-sent calls.
 	return {
-		since: overlappedSince > earliestUseful ? overlappedSince : earliestUseful,
+		since: new Date(now.getTime() - GA4_MEASUREMENT_PROTOCOL_MAX_EVENT_AGE_MS),
 		until: options.until ?? now,
 	}
 }
