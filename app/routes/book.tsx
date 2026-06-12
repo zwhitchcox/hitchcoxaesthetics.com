@@ -3069,18 +3069,18 @@ export default function BlvdBookRoute() {
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
 											Confirm & Book
 										</h2>
-										<div
-											className="w-full rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-center"
-											role="status"
-										>
-											<p className="font-semibold text-amber-900">
-												One more step — your appointment is not booked yet.
-											</p>
-											<p className="mt-1 text-sm text-amber-800">
-												Tap{' '}
-												<span className="font-semibold">Book Appointment</span>{' '}
-												below to lock in your time.
-											</p>
+										<div className="pointer-events-none flex w-full justify-center">
+											<BlvdAppointmentDetails
+												appointmentDate={appointmentDate}
+												appointmentEndTime={appointmentEndTime}
+												appointmentStartTime={appointmentStartTime}
+												cart={cart}
+												selectedLocation={selectedLocation}
+												selectedService={selectedService}
+												selectedSiteLocation={selectedSiteLocation}
+												servicePendingConfirmation={false}
+												sourceHint={null}
+											/>
 										</div>
 										<div className="w-full space-y-6">
 											<form className="space-y-8" onSubmit={handleCheckout}>
@@ -3242,24 +3242,6 @@ export default function BlvdBookRoute() {
 												) : null}
 
 												<div className="flex flex-col gap-4 border-t pt-6">
-													<div className="text-sm text-muted-foreground">
-														{patientName ? (
-															<p>
-																Patient:{' '}
-																<span className="font-medium text-foreground">
-																	{patientName}
-																</span>
-															</p>
-														) : null}
-														<p>
-															Selected time:{' '}
-															<span className="font-medium text-foreground">
-																{selectedTime
-																	? formatTimeLabel(selectedTime.startTime)
-																	: ''}
-															</span>
-														</p>
-													</div>
 													<Button
 														type="submit"
 														size="lg"
