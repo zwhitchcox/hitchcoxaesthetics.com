@@ -63,12 +63,12 @@ maximize their weight loss potential with a medically proven solution.
 
 Clinical studies have shown that tirzepatide can lead to substantial weight
 reduction, often surpassing results seen with single-action medications.
-Tirzepatide injections at our clinic are administered under strict
-medical supervision, ensuring a safe and supportive environment for your
-journey. We work closely with you to adjust your plan as you progress, helping
-you achieve and maintain your target weight.
+Tirzepatide injections at our clinic are administered under strict medical
+supervision, ensuring a safe and supportive environment for your journey. We
+work closely with you to adjust your plan as you progress, helping you achieve
+and maintain your target weight.
 
-Compare this option with our [semaglutide program](/semaglutide) to
-see which medication aligns best with your needs. Whichever you choose, our
+Compare this option with our [semaglutide program](/semaglutide) to see which
+medication aligns best with your needs. Whichever you choose, our
 [Knoxville GLP-1 weight loss team](/weight-loss) is here to guide you every step
 of the way towards a healthier, more confident lifestyle.

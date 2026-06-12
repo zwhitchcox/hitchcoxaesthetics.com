@@ -63,16 +63,15 @@ treatment is safe for all skin types and effective on virtually any area of the
 body, from the face and underarms to legs and back.
 
 At Sarah Hitchcox Aesthetics, we prioritize your comfort and safety. Our system
-features built-in cooling mechanisms that make laser hair removal
-virtually pain-free. Most patients see significant hair reduction after a series
-of sessions, resulting in permanent freedom from razors and ingrown hairs.
-Whether you are prepping for summer or just want to simplify your daily routine,
-our team provides expert care tailored to your skin and hair type.
+features built-in cooling mechanisms that make laser hair removal virtually
+pain-free. Most patients see significant hair reduction after a series of
+sessions, resulting in permanent freedom from razors and ingrown hairs. Whether
+you are prepping for summer or just want to simplify your daily routine, our
+team provides expert care tailored to your skin and hair type.
 
 Smooth skin is the perfect canvas for other aesthetic enhancements. Once you are
 hair-free, consider refining your skin's texture with
-[skin revitalization in Knoxville](/skin-revitalization) or
-treating sun spots with
-[pigmented lesion reduction](/pigmented-lesion-reduction). For a
+[skin revitalization in Knoxville](/skin-revitalization) or treating sun spots
+with [pigmented lesion reduction](/pigmented-lesion-reduction). For a
 comprehensive approach to skin health, browse our complete menu of
 [laser services](/laser-services) to find the perfect combination for you.

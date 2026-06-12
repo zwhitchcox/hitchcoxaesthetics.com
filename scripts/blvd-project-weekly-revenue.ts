@@ -231,7 +231,11 @@ function buildProjectionRow({
 	const hasEnoughHistory = average && average.sampleSize >= minSampleSize
 	const compositeAverage = hasEnoughHistory
 		? null
-		: getCompositeServiceAverage(segment.serviceName, serviceAverages, minSampleSize)
+		: getCompositeServiceAverage(
+				segment.serviceName,
+				serviceAverages,
+				minSampleSize,
+			)
 	const projectedUsd = hasEnoughHistory
 		? average.averageUsd
 		: compositeAverage
@@ -349,7 +353,9 @@ function getServiceAverage(
 	serviceName: string,
 ) {
 	return (
-		(serviceId ? serviceAverages.get(getServiceAverageKey(serviceId, serviceName)) : null) ??
+		(serviceId
+			? serviceAverages.get(getServiceAverageKey(serviceId, serviceName))
+			: null) ??
 		serviceAverages.get(getServiceAverageKey(null, serviceName)) ??
 		null
 	)
@@ -543,7 +549,10 @@ function buildRevenueSamplesForOrder(order: OrderNode, occurredAt: Date) {
 		if (serviceLines.length === 0) continue
 
 		const groupTotalUsd = roundCurrency(
-			lines.reduce((sum, line) => sum + centsToUsd(getLineAmountCents(line)), 0),
+			lines.reduce(
+				(sum, line) => sum + centsToUsd(getLineAmountCents(line)),
+				0,
+			),
 		)
 		if (groupTotalUsd <= 0) {
 			for (const serviceLine of serviceLines) {
@@ -605,7 +614,11 @@ function getReportWindow(options: CliOptions) {
 	const anchorDay = Number(formatInTimeZone(anchor, BUSINESS_TIMEZONE, 'i'))
 	const monday = new Date(anchor)
 	monday.setUTCDate(anchor.getUTCDate() - (anchorDay - 1))
-	const mondayDateKey = formatInTimeZone(monday, BUSINESS_TIMEZONE, 'yyyy-MM-dd')
+	const mondayDateKey = formatInTimeZone(
+		monday,
+		BUSINESS_TIMEZONE,
+		'yyyy-MM-dd',
+	)
 	const start = fromZonedTime(`${mondayDateKey} 00:00:00`, BUSINESS_TIMEZONE)
 	const end = new Date(start)
 	end.setUTCDate(start.getUTCDate() + 7)
@@ -713,7 +726,7 @@ function printReport(
 				? `avg ${formatUsd(row.projectedUsd)} from ${row.sampleSize} historical`
 				: row.source === 'composite_historical_average'
 					? `composite avg ${formatUsd(row.projectedUsd)} from historical`
-				: `fallback ${formatUsd(row.projectedUsd)}`
+					: `fallback ${formatUsd(row.projectedUsd)}`
 		const cancelled = row.cancelled ? ' CANCELLED' : ''
 		console.log(
 			[
@@ -770,7 +783,10 @@ function serializeProjectionRow(row: ProjectionRow) {
 	}
 }
 
-function summarizeRows(rows: ProjectionRow[], keyFn: (row: ProjectionRow) => string) {
+function summarizeRows(
+	rows: ProjectionRow[],
+	keyFn: (row: ProjectionRow) => string,
+) {
 	const grouped = new Map<string, { count: number; totalUsd: number }>()
 	for (const row of rows) {
 		const key = keyFn(row)
@@ -868,8 +884,13 @@ function normalizeServiceName(value: string) {
 		.trim()
 }
 
-function getServiceAverageKey(serviceId: string | null | undefined, serviceName: string) {
-	return serviceId ? `service:${serviceId}` : `name:${normalizeServiceName(serviceName)}`
+function getServiceAverageKey(
+	serviceId: string | null | undefined,
+	serviceName: string,
+) {
+	return serviceId
+		? `service:${serviceId}`
+		: `name:${normalizeServiceName(serviceName)}`
 }
 
 function roundCurrency(value: number) {

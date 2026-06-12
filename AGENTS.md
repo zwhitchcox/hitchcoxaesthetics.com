@@ -29,14 +29,12 @@ when committing/pushing, make sure to check the linter/tsc
 Strict hierarchy rules to prevent circular logic and maintain silo structure:
 
 1. **Category Pages** (e.g., `/injectables`, `/laser-services`)
-
    - **Can link to:** Sibling categories (e.g., `/microneedling`,
      `/weight-loss`)
    - **Cannot link to:** Sub-services or children in body text (e.g.,
      `/botox/forehead-lines`). Use the automated card grid for child navigation.
 
 2. **Mid-Level Pages** (e.g., `/botox`, `/everesse`)
-
    - **Must link to:** Parent category (e.g., `/injectables`)
    - **Can link to:** Sibling mid-level pages (e.g., `/filler`, `/dysport`)
    - **Cannot link to:** Child leaf pages (e.g., `/botox/forehead-lines`) in
@@ -53,6 +51,5 @@ Strict hierarchy rules to prevent circular logic and maintain silo structure:
 - Use descriptive, keyword-rich anchor text.
 - **Bad:** "Click here", "Learn more"
 - **Good:** "Learn more about [Knoxville Botox treatments](/botox)", "Explore
-  our [dermal filler options in Knoxville](/filler)"
-  o
-npm install @typescript/native-preview
+  our [dermal filler options in Knoxville](/filler)" o npm install
+  @typescript/native-preview

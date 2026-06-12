@@ -106,10 +106,10 @@ topical growth factors or PRP, significantly enhancing their effectiveness
 compared to surface application alone.
 
 This non-surgical approach is suitable for both men and women experiencing early
-stages of hair loss or thinning. Hair restoration using
-microneedling is a proactive way to maintain hair density and improve scalp
-health. Patients often report thicker, stronger hair strands and new growth in
-treated areas over a series of sessions.
+stages of hair loss or thinning. Hair restoration using microneedling is a
+proactive way to maintain hair density and improve scalp health. Patients often
+report thicker, stronger hair strands and new growth in treated areas over a
+series of sessions.
 
 While focusing on your hair, do not forget about your skin. Many patients choose
 to treat their complexion simultaneously with

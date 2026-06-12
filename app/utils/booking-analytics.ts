@@ -427,9 +427,9 @@ async function persistCallTrackingSessionAttribution(
 function hasSessionAttribution(payload: Record<string, unknown>) {
 	return Boolean(
 		payload.posthog_session_id ||
-			payload.posthog_distinct_id ||
-			payload.callrail_session_id ||
-			payload.callrail_visitor_id,
+		payload.posthog_distinct_id ||
+		payload.callrail_session_id ||
+		payload.callrail_visitor_id,
 	)
 }
 

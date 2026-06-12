@@ -579,8 +579,8 @@ async function getSyncWindow({
 function hasBoulevardAdminEnv() {
 	return Boolean(
 		process.env.BLVD_API_KEY?.trim() &&
-			process.env.BLVD_BUSINESS_ID?.trim() &&
-			process.env.BLVD_SECRET_KEY?.trim(),
+		process.env.BLVD_BUSINESS_ID?.trim() &&
+		process.env.BLVD_SECRET_KEY?.trim(),
 	)
 }
 

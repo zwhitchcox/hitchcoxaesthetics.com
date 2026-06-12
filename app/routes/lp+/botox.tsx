@@ -6,7 +6,7 @@ import { getEnv } from '#app/utils/env.server.ts'
 
 // Ad landing page — noindex to avoid duplicate content with the main service pages
 export const meta: MetaFunction = () => [
-	{ title: "20% Off Botox — Knoxville | Sarah Hitchcox Aesthetics" },
+	{ title: '20% Off Botox — Knoxville | Sarah Hitchcox Aesthetics' },
 	{ name: 'robots', content: 'noindex' },
 ]
 
@@ -52,7 +52,9 @@ const html = `<!doctype html>
 		/>
 
 		<!-- GTM HEAD -->
-		${ENV.GTM_ID ? `
+		${
+			ENV.GTM_ID
+				? `
 		<script>
 			window.dataLayer = window.dataLayer || [];
 			function gtag(){dataLayer.push(arguments);}
@@ -66,7 +68,9 @@ const html = `<!doctype html>
 			'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 			})(window,document,'script','dataLayer','${ENV.GTM_ID}');
 		</script>
-		` : ''}
+		`
+				: ''
+		}
 		<!-- End GTM HEAD -->
 
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1158,10 +1162,14 @@ const html = `<!doctype html>
 </head>
 	<body>
 		<!-- GTM BODY -->
-		${ENV.GTM_ID ? `
+		${
+			ENV.GTM_ID
+				? `
 		<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${ENV.GTM_ID}"
 		height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-		` : ''}
+		`
+				: ''
+		}
 		<!-- End GTM BODY -->
 
 		<!-- ======== HEADER (B) ======== -->
@@ -1394,7 +1402,7 @@ const html = `<!doctype html>
 								</div>
 							</div>
 							<div class="c-price-card-right">
-								<div class="c-price-card-amount">\$13 <small>/unit</small></div>
+								<div class="c-price-card-amount">$13 <small>/unit</small></div>
 								<a
 									href="${DEFAULT_BLVD_BOOKING_URL}"
 									class="c-price-card-book"
@@ -1410,7 +1418,7 @@ const html = `<!doctype html>
 								</div>
 							</div>
 							<div class="c-price-card-right">
-								<div class="c-price-card-amount">\$129</div>
+								<div class="c-price-card-amount">$129</div>
 								<a
 									href="${DEFAULT_BLVD_BOOKING_URL}"
 									class="c-price-card-book"

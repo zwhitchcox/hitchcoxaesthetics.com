@@ -99,11 +99,10 @@ improves texture but also enhances the absorption of potent topical serums
 applied during the treatment.
 
 Regular sessions can dramatically improve overall skin quality, giving you a
-radiant and more youthful complexion. Skin needling is safe for
-all skin types and tones, making it an inclusive option for anyone wanting to
-revitalize their appearance. With minimal downtime, you can enjoy the benefits
-of deep structural renewal without the recovery time of more aggressive
-procedures.
+radiant and more youthful complexion. Skin needling is safe for all skin types
+and tones, making it an inclusive option for anyone wanting to revitalize their
+appearance. With minimal downtime, you can enjoy the benefits of deep structural
+renewal without the recovery time of more aggressive procedures.
 
 To address other concerns, you can combine facial treatments with
 [hair loss microneedling](/microneedling/hair-loss) for a complete rejuvenation

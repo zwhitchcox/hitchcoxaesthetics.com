@@ -54,10 +54,7 @@ vi.mock('@boulevard/blvd-book-sdk', () => {
 
 	// Same day at both offices, different times
 	const sharedDate = { date: new Date('2026-06-10T04:00:00.000Z'), id: 'd1' }
-	const slotsByLocation: Record<
-		string,
-		{ id: string; startTime: Date }[]
-	> = {
+	const slotsByLocation: Record<string, { id: string; startTime: Date }[]> = {
 		[knoxville.id]: [
 			{ id: 'time-knox-1815', startTime: new Date('2026-06-10T22:15:00.000Z') },
 		],
@@ -84,7 +81,9 @@ vi.mock('@boulevard/blvd-book-sdk', () => {
 			]),
 			getAvailablePaymentMethods: vi.fn(async () => []),
 			getBookableDates: vi.fn(async () => [sharedDate]),
-			getBookableTimes: vi.fn(async () => slotsByLocation[location?.id ?? ''] ?? []),
+			getBookableTimes: vi.fn(
+				async () => slotsByLocation[location?.id ?? ''] ?? [],
+			),
 			reserveBookableItems: vi.fn(async () => {
 				if (location?.name === 'Knoxville') reserveCalls.knoxville++
 				else reserveCalls.farragut++
@@ -121,7 +120,10 @@ function okResponse() {
 }
 
 test('either-location shows merged availability and reserves at the picked office', async () => {
-	vi.stubGlobal('fetch', vi.fn(async () => okResponse()))
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => okResponse()),
+	)
 	vi.stubGlobal('scrollTo', vi.fn())
 	const user = userEvent.setup()
 
@@ -175,7 +177,10 @@ test('either-location shows merged availability and reserves at the picked offic
 })
 
 test('switching the location pill narrows availability to that office', async () => {
-	vi.stubGlobal('fetch', vi.fn(async () => okResponse()))
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => okResponse()),
+	)
 	vi.stubGlobal('scrollTo', vi.fn())
 	const user = userEvent.setup()
 

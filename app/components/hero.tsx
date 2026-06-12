@@ -21,7 +21,7 @@ export function Hero({
 }) {
 	return (
 		<div className="relative h-[calc(100dvh-3.1rem)] w-full flex-col overflow-hidden bg-[#070707] sm:flex sm:flex-row">
-			<div className="flex flex-1 items-center justify-center bg-[#070707] sm:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)] ">
+			<div className="flex flex-1 items-center justify-center bg-[#070707] sm:[clip-path:polygon(0_0,_100%_0,_90%_100%,_0%_100%)]">
 				<img
 					src={image}
 					alt={imageAlt}

@@ -137,8 +137,8 @@ Most modern fillers are made from hyaluronic acid (HA), a substance naturally
 found in the body that attracts and retains moisture. This makes HA fillers
 safe, reversible, and incredibly effective at creating soft, natural volume.
 Whether you need structural support in the chin or soft hydration in the lips,
-our curated range of HA fillers allows us to select the perfect
-product density for each specific area of your face.
+our curated range of HA fillers allows us to select the perfect product density
+for each specific area of your face.
 
 ## Customized Filler Treatments in Knoxville, TN
 

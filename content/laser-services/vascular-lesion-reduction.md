@@ -51,11 +51,11 @@ heroImages:
 ## Vascular Vein Treatment in Knoxville
 
 Visible veins and persistent redness can detract from an otherwise clear
-complexion. Our vascular lesion reduction treatments offer a targeted
-solution for spider veins, broken capillaries, and rosacea. Using specialized
-laser energy, we selectively heat and collapse the problematic blood vessels,
-causing them to fade and be reabsorbed by the body. This leaves you with clearer
-skin and a more even tone.
+complexion. Our vascular lesion reduction treatments offer a targeted solution
+for spider veins, broken capillaries, and rosacea. Using specialized laser
+energy, we selectively heat and collapse the problematic blood vessels, causing
+them to fade and be reabsorbed by the body. This leaves you with clearer skin
+and a more even tone.
 
 Whether you are dealing with tiny veins around the nose or diffuse redness on
 the cheeks, our technology provides precise and effective treatment. Knoxville
@@ -65,8 +65,8 @@ concerns that topical creams simply cannot reach, restoring confidence in your
 skin's appearance.
 
 For a complete complexion overhaul, many patients combine vascular treatments
-with [pigmented lesion reduction](/pigmented-lesion-reduction) to
-address brown spots at the same time. You might also consider
-[skin revitalization](/skin-revitalization) to improve overall
-texture and glow. Check out our [laser services overview](/laser-services) to
-understand how we can customize a protocol for your unique skin needs.
+with [pigmented lesion reduction](/pigmented-lesion-reduction) to address brown
+spots at the same time. You might also consider
+[skin revitalization](/skin-revitalization) to improve overall texture and glow.
+Check out our [laser services overview](/laser-services) to understand how we
+can customize a protocol for your unique skin needs.

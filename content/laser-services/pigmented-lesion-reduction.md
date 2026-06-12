@@ -50,24 +50,22 @@ heroImages:
 ## Pigment Correction in Knoxville
 
 Sun exposure and aging can leave behind unwanted dark spots that make skin look
-uneven and aged. Our pigmented lesion reduction treatments use precision
-laser technology to target and break down excess melanin in sun spots, age
-spots, and freckles. This focused approach clears discoloration without harming
-the surrounding tissue, revealing a brighter, more uniform complexion on the
-face, hands, chest, or body.
+uneven and aged. Our pigmented lesion reduction treatments use precision laser
+technology to target and break down excess melanin in sun spots, age spots, and
+freckles. This focused approach clears discoloration without harming the
+surrounding tissue, revealing a brighter, more uniform complexion on the face,
+hands, chest, or body.
 
 The treatment works by shattering the pigment particles, which your body then
 naturally eliminates over time. Patients typically see fading after just one
-session, with optimal clarity achieved after a short series. Knoxville dark
-spot removal at Sarah Hitchcox Aesthetics is a safe, effective way to reverse
-years of sun damage and restore a pristine look to your skin.
+session, with optimal clarity achieved after a short series. Knoxville dark spot
+removal at Sarah Hitchcox Aesthetics is a safe, effective way to reverse years
+of sun damage and restore a pristine look to your skin.
 
 Clear skin pairs beautifully with other rejuvenation therapies. You can combine
-pigment correction with
-[vascular lesion reduction](/vascular-lesion-reduction) to treat
-redness and veins simultaneously, or add
-[skin revitalization](/skin-revitalization) for overall texture
-improvement. For those looking to tighten as well as tone,
-[Everesse skin tightening](/everesse) is an excellent addition.
-View our full [laser services menu](/laser-services) to see how we can help you
-achieve flawless skin.
+pigment correction with [vascular lesion reduction](/vascular-lesion-reduction)
+to treat redness and veins simultaneously, or add
+[skin revitalization](/skin-revitalization) for overall texture improvement. For
+those looking to tighten as well as tone, [Everesse skin tightening](/everesse)
+is an excellent addition. View our full [laser services menu](/laser-services)
+to see how we can help you achieve flawless skin.

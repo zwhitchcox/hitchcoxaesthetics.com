@@ -72,13 +72,13 @@ micro-droplets of hyaluronic acid directly into the dermis, boosting moisture
 retention and creating a lasting, radiant glow that topical creams cannot match.
 
 This treatment is perfect for anyone looking to refresh dull texture or enhance
-their skin's natural luminosity. SkinVive injections improve skin
-quality on the cheeks and face, leaving you looking healthy and rested for up to
-six months. It is a subtle yet powerful way to polish your appearance without
-altering your facial structure.
+their skin's natural luminosity. SkinVive injections improve skin quality on the
+cheeks and face, leaving you looking healthy and rested for up to six months. It
+is a subtle yet powerful way to polish your appearance without altering your
+facial structure.
 
 SkinVive works beautifully as a finishing touch to other procedures. Combine it
-with [Jeuveau](/jeuveau) for wrinkle relaxation or
-[Kybella](/kybella) for contouring. Learn more about our full range
-of [injectable treatments](/injectables) to see how we can elevate your skincare
+with [Jeuveau](/jeuveau) for wrinkle relaxation or [Kybella](/kybella) for
+contouring. Learn more about our full range of
+[injectable treatments](/injectables) to see how we can elevate your skincare
 routine.

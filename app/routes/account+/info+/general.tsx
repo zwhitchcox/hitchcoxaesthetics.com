@@ -130,7 +130,7 @@ export default function General() {
 						/>
 						<ErrorList errors={form.errors} id={form.errorId} />
 						<StatusButton
-							status={isPending ? 'pending' : form.status ?? 'idle'}
+							status={isPending ? 'pending' : (form.status ?? 'idle')}
 							type="submit"
 							disabled={isPending}
 							variant="secondary"

@@ -64,7 +64,7 @@ export default function () {
 			<Separator className="my-6" />
 			<div className="mx-auto grid w-full grid-cols-7 gap-2">
 				<ScrollArea className="col-span-7 w-full md:col-span-2 lg:max-w-none">
-					<nav className="flex space-x-2  pb-1 md:flex-col lg:space-x-0 lg:space-y-1">
+					<nav className="flex space-x-2 pb-1 md:flex-col lg:space-x-0 lg:space-y-1">
 						{forms.map(item => (
 							<NavLink
 								to={item.slug}

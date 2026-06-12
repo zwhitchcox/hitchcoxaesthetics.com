@@ -1,0 +1,86 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["import", "typescript", "react", "react-hooks", "jsx-a11y"],
+	"env": {
+		"browser": true,
+		"node": true,
+		"es2024": true
+	},
+	"categories": {
+		"correctness": "error"
+	},
+	"rules": {
+		"no-empty-pattern": "off",
+		"no-unused-vars": [
+			"error",
+			{
+				"destructuredArrayIgnorePattern": "^_",
+				"varsIgnorePattern": "^_",
+				"argsIgnorePattern": "^_"
+			}
+		],
+		"typescript/consistent-type-imports": [
+			"warn",
+			{
+				"prefer": "type-imports",
+				"disallowTypeAnnotations": true,
+				"fixStyle": "inline-type-imports"
+			}
+		],
+		"import/no-duplicates": "warn",
+		"react-hooks/rules-of-hooks": "error",
+		"react-hooks/exhaustive-deps": "warn",
+		"no-async-promise-executor": "warn",
+		"jsx-a11y/control-has-associated-label": "warn",
+		"jsx-a11y/prefer-tag-over-role": "warn",
+		"jsx-a11y/heading-has-content": "warn",
+		"jsx-a11y/no-autofocus": "off"
+	},
+	"overrides": [
+		{
+			"files": ["app/**"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["**/tests/**", "app/**/__tests__/**/*"],
+								"message": "Do not import test files in app files"
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": [
+				"**/tests/**",
+				"app/**/__tests__/**/*",
+				"app/**/*.test.*",
+				"app/**/*.spec.*"
+			],
+			"rules": {
+				"no-restricted-imports": "off"
+			}
+		},
+		{
+			"files": ["tests/**"],
+			"rules": {
+				"react-hooks/rules-of-hooks": "off"
+			}
+		}
+	],
+	"ignorePatterns": [
+		"build",
+		"public/build",
+		"server-build",
+		"test-results",
+		"playwright-report",
+		"playwright/.cache",
+		"coverage",
+		"prisma/migrations",
+		"other",
+		"location-reviews"
+	]
+}

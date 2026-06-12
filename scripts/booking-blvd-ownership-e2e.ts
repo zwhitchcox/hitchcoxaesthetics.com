@@ -13,9 +13,8 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const { findAdminClientByPhone } = await import(
-	'#app/utils/blvd-voice-booking.server.ts'
-)
+const { findAdminClientByPhone } =
+	await import('#app/utils/blvd-voice-booking.server.ts')
 const { boulevardAdminFetch } = await import('#app/utils/blvd-admin.server.ts')
 
 // A second SMS-capable Twilio number on this account (reserved for e2e tests)
@@ -114,8 +113,11 @@ console.log(`   received code ${found.code} ("${found.body.slice(0, 60)}…")`)
 
 console.log('4. Taking cart ownership with the numeric code…')
 const nextCart = await cart.takeOwnershipByCode(codeId, Number(found.code))
-const info = (nextCart as unknown as { clientInformation?: { firstName?: string; lastName?: string } })
-	.clientInformation
+const info = (
+	nextCart as unknown as {
+		clientInformation?: { firstName?: string; lastName?: string }
+	}
+).clientInformation
 console.log(
 	'   ownership taken ✓ client on cart:',
 	info?.firstName,

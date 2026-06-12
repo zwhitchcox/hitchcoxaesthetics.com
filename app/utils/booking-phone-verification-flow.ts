@@ -40,7 +40,8 @@ export async function requestBookingMobileVerificationCode({
 			return {
 				action: 'send_new_client_mobile_verification_code',
 				error,
-				message: 'We could not send that code. Please check the number and try again.',
+				message:
+					'We could not send that code. Please check the number and try again.',
 				type: 'error',
 			}
 		}

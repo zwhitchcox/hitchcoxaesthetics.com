@@ -48,7 +48,7 @@ export default async function handleRequest(...args: DocRequestArgs) {
 		? 'onAllReady'
 		: 'onShellReady'
 
-	const nonce = String(loadContext.cspNonce) ?? undefined
+	const nonce = String(loadContext.cspNonce ?? '')
 	return new Promise(async (resolve, reject) => {
 		let didError = false
 		// NOTE: this timing will only include things that are rendered in the shell
@@ -119,7 +119,9 @@ export function handleError(
 			properties: {
 				booking_error_action: 'server_route_error',
 				booking_error_area: 'runtime',
-				booking_error_message: redactServerErrorText(getServerErrorMessage(error)),
+				booking_error_message: redactServerErrorText(
+					getServerErrorMessage(error),
+				),
 				booking_error_name: error instanceof Error ? error.name : undefined,
 				booking_error_source: 'server_global',
 				booking_error_url: redactServerErrorText(request.url),

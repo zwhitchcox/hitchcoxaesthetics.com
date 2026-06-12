@@ -7,7 +7,10 @@ import {
 import { Link, useLoaderData, useLocation } from '@remix-run/react'
 import { useEffect } from 'react'
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
-import { GoogleRatingBadge, ReviewQuotes } from '#app/components/google-reviews.tsx'
+import {
+	GoogleRatingBadge,
+	ReviewQuotes,
+} from '#app/components/google-reviews.tsx'
 import { MarkdownContent } from '#app/components/markdown-content.js'
 import { PricingSection } from '#app/components/pricing-table.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
@@ -150,8 +153,15 @@ export const meta: MetaFunction<typeof loader> = ({ data, location }) => {
 }
 
 export default function DynamicPage() {
-	const { page, children, ancestors, siblings, markdown, reviews, reviewSummary } =
-		useLoaderData<LoaderData>()
+	const {
+		page,
+		children,
+		ancestors,
+		siblings,
+		markdown,
+		reviews,
+		reviewSummary,
+	} = useLoaderData<LoaderData>()
 	const blvdUrl = useBlvdUrl()
 
 	useEffect(() => {

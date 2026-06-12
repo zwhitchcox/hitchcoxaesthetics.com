@@ -13,7 +13,6 @@ import {
 	sendGa4PurchaseEvent,
 } from '#app/utils/ga4-measurement-protocol.server.ts'
 
-
 type DbLike = typeof prisma
 
 export type SyncCallRailPhoneConversionsToGa4Options = {

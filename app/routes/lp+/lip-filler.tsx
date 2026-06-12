@@ -6,7 +6,10 @@ import { getEnv } from '#app/utils/env.server.ts'
 
 // Ad landing page — noindex to avoid duplicate content with the main service pages
 export const meta: MetaFunction = () => [
-	{ title: "Lip Filler Starting at $450 — Knoxville | Sarah Hitchcox Aesthetics" },
+	{
+		title:
+			'Lip Filler Starting at $450 — Knoxville | Sarah Hitchcox Aesthetics',
+	},
 	{ name: 'robots', content: 'noindex' },
 ]
 
@@ -45,8 +48,8 @@ const html = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#020817">
-    <title>Lip Filler Starting at \$450 — Knoxville | Sarah Hitchcox Aesthetics</title>
-    <meta name="description" content="Lip Filler starting at \$450. Perfect 5.0 Google rating with 217+ reviews. RN-administered in Knoxville, TN. Book your appointment today.">
+    <title>Lip Filler Starting at $450 — Knoxville | Sarah Hitchcox Aesthetics</title>
+    <meta name="description" content="Lip Filler starting at $450. Perfect 5.0 Google rating with 217+ reviews. RN-administered in Knoxville, TN. Book your appointment today.">
 
     
 
@@ -1009,8 +1012,8 @@ const html = `<!DOCTYPE html>
                             RN-Administered · Knoxville
                         </div>
 
-                        <h1>Lip Filler<br>Starting at <span>\$450</span></h1>
-                        <p class="b-hero-price">Full, natural-looking lips starting at <strong>\$450</strong>. RN-administered with a perfect 5-star rating and 217+ reviews.</p>
+                        <h1>Lip Filler<br>Starting at <span>$450</span></h1>
+                        <p class="b-hero-price">Full, natural-looking lips starting at <strong>$450</strong>. RN-administered with a perfect 5-star rating and 217+ reviews.</p>
 
                         <div class="b-hero-rating">
                             <div class="b-hero-rating-score">5.0</div>
@@ -1040,7 +1043,7 @@ const html = `<!DOCTYPE html>
 
                     <div class="b-hero-photo">
                         <img src="https://hitchcoxaesthetics.com/img/knoxville-med-spa.webp" alt="Sarah Hitchcox Aesthetics — Knoxville Med Spa" loading="eager">
-                        <div class="b-hero-photo-badge">Starting at \$450</div>
+                        <div class="b-hero-photo-badge">Starting at $450</div>
                     </div>
                 </div>
             </div>
@@ -1089,7 +1092,7 @@ const html = `<!DOCTYPE html>
 <div class="c-price-card-desc">Full, natural lip volume</div>
                         </div>
                         <div class="c-price-card-right">
-                            <div class="c-price-card-amount">\$450+</div>
+                            <div class="c-price-card-amount">$450+</div>
                             <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
@@ -1099,7 +1102,7 @@ const html = `<!DOCTYPE html>
                             <div class="c-price-card-desc">Subtle upper lip enhancement</div>
                         </div>
                         <div class="c-price-card-right">
-                            <div class="c-price-card-amount">\$129</div>
+                            <div class="c-price-card-amount">$129</div>
                             <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
@@ -1109,7 +1112,7 @@ const html = `<!DOCTYPE html>
                             <div class="c-price-card-desc">Wrinkle relaxer, most popular</div>
                         </div>
                         <div class="c-price-card-right">
-                            <div class="c-price-card-amount">\$13 <small>/unit</small></div>
+                            <div class="c-price-card-amount">$13 <small>/unit</small></div>
                             <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
@@ -1356,7 +1359,7 @@ const html = `<!DOCTYPE html>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div class="c-faq-a">
-                        <div class="c-faq-a-inner">A Lip Flip (\$129) subtly flips the upper lip outward using a neuromodulator. Lip Filler (starting at \$450) adds actual volume and fullness. If you want a noticeable change in lip size and shape, filler is the better choice. Sarah will help you decide during your free consultation.</div>
+                        <div class="c-faq-a-inner">A Lip Flip ($129) subtly flips the upper lip outward using a neuromodulator. Lip Filler (starting at $450) adds actual volume and fullness. If you want a noticeable change in lip size and shape, filler is the better choice. Sarah will help you decide during your free consultation.</div>
                     </div>
                 </div>
 
@@ -1432,7 +1435,7 @@ const html = `<!DOCTYPE html>
                 <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             </div>
             <h2>Ready for Smoother Skin?</h2>
-            <p>Full, natural-looking lips starting at \$450. Book your appointment today.</p>
+            <p>Full, natural-looking lips starting at $450. Book your appointment today.</p>
             <div class="b-final-ctas">
                 <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-btn-white" target="_blank" rel="noopener">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>

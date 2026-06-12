@@ -32,7 +32,9 @@ export async function markCallRailCallerAsSpam(input: CallRailSpamInput) {
 	const note = [
 		'Marked as spam by Sarah Hitchcox Aesthetics Retell booking agent.',
 		input.reason ? `Reason: ${input.reason}` : null,
-	].filter(Boolean).join(' ')
+	]
+		.filter(Boolean)
+		.join(' ')
 
 	if (!input.callrail_call_id && !normalizedCallerPhone) {
 		return {
@@ -53,10 +55,15 @@ export async function markCallRailCallerAsSpam(input: CallRailSpamInput) {
 	if (input.callrail_call_id) {
 		const accountId = accountIds[0]
 		if (!accountId) throw new Error('No CallRail account was found.')
-		const call = await updateCallRailCall(apiKey, accountId, input.callrail_call_id, {
-			note,
-			spam: true,
-		})
+		const call = await updateCallRailCall(
+			apiKey,
+			accountId,
+			input.callrail_call_id,
+			{
+				note,
+				spam: true,
+			},
+		)
 		return buildSpamResult({ accountId, call, matchedBy: 'callrail_call_id' })
 	}
 
@@ -75,8 +82,8 @@ export async function markCallRailCallerAsSpam(input: CallRailSpamInput) {
 		})
 		return buildSpamResult({
 			accountId,
-		call: updatedCall,
-		matchedBy: 'caller_phone_number',
+			call: updatedCall,
+			matchedBy: 'caller_phone_number',
 		})
 	}
 
@@ -149,13 +156,14 @@ async function findCallByPhoneInDateRange(
 		params,
 	})
 	const calls = Array.isArray(response.calls) ? response.calls : []
-	return (
-		calls.find(call => {
-			if (!call || typeof call !== 'object') return false
-			const candidate = call as CallRailCall
-			return normalizePhoneNumber(candidate.customer_phone_number) === callerPhoneNumber
-		}) as CallRailCall | undefined
-	)
+	return calls.find(call => {
+		if (!call || typeof call !== 'object') return false
+		const candidate = call as CallRailCall
+		return (
+			normalizePhoneNumber(candidate.customer_phone_number) ===
+			callerPhoneNumber
+		)
+	}) as CallRailCall | undefined
 }
 
 async function updateCallRailCall(
@@ -194,9 +202,10 @@ async function callRailFetch(
 		},
 		method,
 	})
-	const payload = (await response.json().catch(() => null)) as
-		| Record<string, unknown>
-		| null
+	const payload = (await response.json().catch(() => null)) as Record<
+		string,
+		unknown
+	> | null
 
 	if (!response.ok) {
 		throw new Error(

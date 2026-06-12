@@ -1,5 +1,8 @@
 import { cn } from '#app/utils/misc.tsx'
-import { type FeaturedReview, type ReviewSummary } from '#app/utils/reviews.server.ts'
+import {
+	type FeaturedReview,
+	type ReviewSummary,
+} from '#app/utils/reviews.server.ts'
 
 const GOOGLE_REVIEWS_URL =
 	'https://www.google.com/maps/search/Sarah+Hitchcox+Aesthetics+Knoxville+TN'
@@ -36,7 +39,9 @@ export function GoogleRatingBadge({
 			rel="noreferrer"
 			className={cn(
 				'inline-flex items-center gap-2 text-sm font-medium',
-				dark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900',
+				dark
+					? 'text-gray-300 hover:text-white'
+					: 'text-gray-600 hover:text-gray-900',
 				className,
 			)}
 			aria-label={`Rated ${rounded} stars from ${summary.totalReviews} Google reviews`}

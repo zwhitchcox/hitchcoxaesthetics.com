@@ -134,7 +134,7 @@ export default function AuthRoute() {
 							autoComplete="tel"
 							aria-invalid={Boolean(fields.phone?.errors?.length)}
 							aria-describedby={`${fields.phone.id}-error`}
-							className="lineheight-.5 w-full  rounded px-2 py-1 text-center text-2xl tracking-widest focus-visible:ring-0"
+							className="lineheight-.5 w-full rounded px-2 py-1 text-center text-2xl tracking-widest focus-visible:ring-0"
 							defaultValue={fields.phone.value}
 						/>
 					</InputMask>
@@ -144,7 +144,7 @@ export default function AuthRoute() {
 					/>
 					<StatusButton
 						className="mt-6 w-full"
-						status={isPending ? 'pending' : form.status ?? 'idle'}
+						status={isPending ? 'pending' : (form.status ?? 'idle')}
 						type="submit"
 						disabled={isPending}
 					>

@@ -5,8 +5,7 @@ export type LastBookingServiceHint = {
 	search: string
 }
 
-const LAST_BOOKING_SERVICE_HINT_STORAGE_KEY =
-	'sha:last-booking-service-source'
+const LAST_BOOKING_SERVICE_HINT_STORAGE_KEY = 'sha:last-booking-service-source'
 
 function normalizeLastBookingServiceHint(
 	value: unknown,
@@ -49,9 +48,7 @@ export function readLastBookingServiceHint() {
 	}
 }
 
-export function writeLastBookingServiceHint(
-	hint: LastBookingServiceHint,
-) {
+export function writeLastBookingServiceHint(hint: LastBookingServiceHint) {
 	if (typeof window === 'undefined') return
 
 	const normalizedHint = normalizeLastBookingServiceHint(hint)

@@ -1,6 +1,9 @@
 import { json, type MetaFunction } from '@remix-run/node'
 import { Link, useLoaderData, useOutletContext } from '@remix-run/react'
-import { GoogleRatingBadge, ReviewQuotes } from '#app/components/google-reviews.tsx'
+import {
+	GoogleRatingBadge,
+	ReviewQuotes,
+} from '#app/components/google-reviews.tsx'
 import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'

@@ -182,11 +182,10 @@ export function isBlvdServiceVisibleForClientHistory(
 	return clientFit !== 'returning_client'
 }
 
-export function isBlvdServiceCustomerBookable(service: BlvdServiceDisplayInput) {
-	if (
-		service.id &&
-		BLVD_CUSTOMER_BOOKING_BLOCKED_SERVICE_IDS.has(service.id)
-	) {
+export function isBlvdServiceCustomerBookable(
+	service: BlvdServiceDisplayInput,
+) {
+	if (service.id && BLVD_CUSTOMER_BOOKING_BLOCKED_SERVICE_IDS.has(service.id)) {
 		return false
 	}
 

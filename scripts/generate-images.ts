@@ -350,18 +350,21 @@ async function generatePair(service: string): Promise<void> {
 	async function generateImage(
 		content: Array<Record<string, unknown>>,
 	): Promise<string | undefined> {
-		const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-			method: 'POST',
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				'Content-Type': 'application/json',
+		const response = await fetch(
+			'https://openrouter.ai/api/v1/chat/completions',
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${apiKey}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					model: imageModel,
+					modalities: ['image', 'text'],
+					messages: [{ role: 'user', content }],
+				}),
 			},
-			body: JSON.stringify({
-				model: imageModel,
-				modalities: ['image', 'text'],
-				messages: [{ role: 'user', content }],
-			}),
-		})
+		)
 		const data = (await response.json()) as {
 			choices?: {
 				message?: { images?: { image_url?: { url?: string } }[] }
@@ -401,9 +404,7 @@ async function generatePair(service: string): Promise<void> {
 
 	// Note: OpenRouter image models do not support transparent backgrounds;
 	// run scripts/rembg-remove.py afterwards if transparency is needed.
-	const beforeB64 = await generateImage([
-		{ type: 'text', text: beforePrompt },
-	])
+	const beforeB64 = await generateImage([{ type: 'text', text: beforePrompt }])
 	if (!beforeB64) {
 		console.error('  No before image returned from OpenRouter')
 		process.exit(1)

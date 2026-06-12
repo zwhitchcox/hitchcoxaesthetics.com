@@ -117,7 +117,11 @@ if (!verify.body?.ok) {
 console.log('   verified ✓')
 
 console.log('4. Confirming a reused code is rejected…')
-const reuse = await postVerification({ code: found.code, intent: 'verify', phone })
+const reuse = await postVerification({
+	code: found.code,
+	intent: 'verify',
+	phone,
+})
 if (reuse.body?.ok) {
 	console.error('Reused code unexpectedly accepted')
 	process.exit(1)

@@ -6,7 +6,7 @@ import { getEnv } from '#app/utils/env.server.ts'
 
 // Ad landing page — noindex to avoid duplicate content with the main service pages
 export const meta: MetaFunction = () => [
-	{ title: "20% Off Jeuveau — Knoxville | Sarah Hitchcox Aesthetics" },
+	{ title: '20% Off Jeuveau — Knoxville | Sarah Hitchcox Aesthetics' },
 	{ name: 'robots', content: 'noindex' },
 ]
 
@@ -1089,7 +1089,7 @@ const html = `<!DOCTYPE html>
 <div class="c-price-card-desc">Purpose-built wrinkle relaxer</div>
                         </div>
                         <div class="c-price-card-right">
-                            <div class="c-price-card-amount">\$13 <small>/unit</small></div>
+                            <div class="c-price-card-amount">$13 <small>/unit</small></div>
                             <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
@@ -1099,7 +1099,7 @@ const html = `<!DOCTYPE html>
                             <div class="c-price-card-desc">Smooth, airbrushed finish</div>
                         </div>
                         <div class="c-price-card-right">
-                            <div class="c-price-card-amount">\$13 <small>/unit</small></div>
+                            <div class="c-price-card-amount">$13 <small>/unit</small></div>
                             <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
@@ -1366,7 +1366,7 @@ const html = `<!DOCTYPE html>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div class="c-faq-a">
-                        <div class="c-faq-a-inner">Jeuveau is \$13 per unit. The number of units you need depends on your treatment areas — typically 20-40 units for forehead and frown lines. New clients get 20% off their first visit.</div>
+                        <div class="c-faq-a-inner">Jeuveau is $13 per unit. The number of units you need depends on your treatment areas — typically 20-40 units for forehead and frown lines. New clients get 20% off their first visit.</div>
                     </div>
                 </div>
             </div>

@@ -68,7 +68,7 @@ export const CTA = memo(function CTA() {
 
 	return (
 		<div
-			className={`fade-in shadow-top fixed bottom-0 left-0 right-0 z-50 flex h-[3.2rem] items-center justify-center bg-black py-4 text-center`}
+			className={`shadow-top fixed bottom-0 left-0 right-0 z-50 flex h-[3.2rem] items-center justify-center bg-black py-4 text-center fade-in`}
 		>
 			<div className="flex w-full animate-fade-in justify-evenly px-2 text-sm sm:text-xl">
 				<a

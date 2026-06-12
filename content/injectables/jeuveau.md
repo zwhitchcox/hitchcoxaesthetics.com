@@ -217,13 +217,11 @@ look.
 
 As a dedicated aesthetic product, Jeuveau offers a refined formulation that many
 patients find kicks in quickly—often within just a few days. Our expert
-injectors use Jeuveau to soften expression lines while
-preserving your natural facial mobility. Whether you are new to neuromodulators
-or looking for an alternative to other brands, Jeuveau provides reliable,
-beautiful results.
+injectors use Jeuveau to soften expression lines while preserving your natural
+facial mobility. Whether you are new to neuromodulators or looking for an
+alternative to other brands, Jeuveau provides reliable, beautiful results.
 
 This treatment pairs seamlessly with other injectables. You can combine it with
-[Kybella](/kybella) for jawline definition or
-[SkinVive](/skinvive) for enhanced skin quality. Explore our full
-[injectable treatments](/injectables) to see how we can customize a comprehensive
-anti-aging plan for you.
+[Kybella](/kybella) for jawline definition or [SkinVive](/skinvive) for enhanced
+skin quality. Explore our full [injectable treatments](/injectables) to see how
+we can customize a comprehensive anti-aging plan for you.

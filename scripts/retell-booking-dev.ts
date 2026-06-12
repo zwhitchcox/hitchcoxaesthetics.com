@@ -713,8 +713,8 @@ async function listRetellPhoneNumbers() {
 		hasMore =
 			Boolean(
 				payload &&
-					typeof payload === 'object' &&
-					(payload as Record<string, unknown>).has_more,
+				typeof payload === 'object' &&
+				(payload as Record<string, unknown>).has_more,
 			) && Boolean(paginationKey)
 	}
 

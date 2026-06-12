@@ -40,9 +40,7 @@ import {
 	isBlvdServiceVisibleForClientHistory,
 } from '#app/utils/blvd-service-display.ts'
 import { getBookingAnalyticsEventProperties } from '#app/utils/booking-analytics.ts'
-import {
-	requestBookingMobileVerificationCode,
-} from '#app/utils/booking-phone-verification-flow.ts'
+import { requestBookingMobileVerificationCode } from '#app/utils/booking-phone-verification-flow.ts'
 import {
 	type LastBookingServiceHint,
 	readLastBookingServiceHint,
@@ -409,18 +407,18 @@ export default function BlvdBookRoute() {
 	const [bookableTimeEntries, setBookableTimeEntries] = useState<
 		BookableTimeEntry[]
 	>([])
-	const [locationChoice, setLocationChoice] = useState<'either' | string | null>(
-		null,
-	)
+	const [locationChoice, setLocationChoice] = useState<
+		'either' | string | null
+	>(null)
 	const [locationDayPreviews, setLocationDayPreviews] = useState<
 		Record<string, string[]>
 	>({})
 	const [openMapLocationId, setOpenMapLocationId] = useState<string | null>(
 		null,
 	)
-	const [scheduleOptions, setScheduleOptions] = useState<LocationScheduleOption[]>(
-		[],
-	)
+	const [scheduleOptions, setScheduleOptions] = useState<
+		LocationScheduleOption[]
+	>([])
 	const [selectedDateId, setSelectedDateId] = useState<string | null>(null)
 	const [selectedTimeId, setSelectedTimeId] = useState<string | null>(null)
 	const [loadingLocations, setLoadingLocations] = useState(false)
@@ -672,20 +670,20 @@ export default function BlvdBookRoute() {
 		bookableTimeEntries.find(entry => entry.time.id === selectedTimeId) ?? null
 	const selectedTime = selectedTimeEntry?.time ?? null
 	const selectedSiteLocation = selectedLocation
-		? getSiteLocationForBlvdLocation(selectedLocation) ?? null
+		? (getSiteLocationForBlvdLocation(selectedLocation) ?? null)
 		: null
 	const requiresCard = Boolean(cart?.summary.paymentMethodRequired)
 	const hasVerifiedMobile = Boolean(ownershipVerifiedPhone)
 	const hasCompletedBlvdOwnershipVerification = Boolean(
 		hasVerifiedMobile &&
-			ownershipCodeId &&
-			ownershipCodeId !== BOOKING_PHONE_VERIFICATION_CODE_ID,
+		ownershipCodeId &&
+		ownershipCodeId !== BOOKING_PHONE_VERIFICATION_CODE_ID,
 	)
 	const hasVerifiedClient = Boolean(
 		hasVerifiedMobile &&
-			(hasCompletedBlvdOwnershipVerification ||
-				verifiedExistingClient ||
-				hasAttachedBlvdClient(cart?.clientInformation)),
+		(hasCompletedBlvdOwnershipVerification ||
+			verifiedExistingClient ||
+			hasAttachedBlvdClient(cart?.clientInformation)),
 	)
 	const shouldCollectClientInformation = hasVerifiedMobile && !hasVerifiedClient
 	const canRequestOwnershipCode =
@@ -696,9 +694,9 @@ export default function BlvdBookRoute() {
 	const selectedExistingPaymentMethod =
 		selectedPaymentMethodId === 'new'
 			? null
-			: availablePaymentMethods.find(
+			: (availablePaymentMethods.find(
 					paymentMethod => paymentMethod.id === selectedPaymentMethodId,
-				) ?? null
+				) ?? null)
 	const shouldCollectCardDetails =
 		requiresCard && !selectedExistingPaymentMethod
 	const sourceHintAnalyticsProperties = useMemo(
@@ -905,8 +903,8 @@ export default function BlvdBookRoute() {
 	}, [clientHistory, search, services, shouldSkipClientHistoryGate])
 	const showPopularServices = Boolean(
 		canBrowseServices &&
-			bookingExperimentVariants.popularServicesLayout === 'popular_top' &&
-			search.trim().length === 0,
+		bookingExperimentVariants.popularServicesLayout === 'popular_top' &&
+		search.trim().length === 0,
 	)
 	const popularServices = useMemo(() => {
 		if (!showPopularServices) return []
@@ -1335,8 +1333,7 @@ export default function BlvdBookRoute() {
 		const activeService = serviceOverride ?? selectedService
 		if (!client || !activeService) return
 
-		const targetLocations =
-			choice === 'either' ? serviceLocations : [choice]
+		const targetLocations = choice === 'either' ? serviceLocations : [choice]
 		if (targetLocations.length === 0) return
 
 		setLoadingSchedule(true)
@@ -1374,14 +1371,13 @@ export default function BlvdBookRoute() {
 				}),
 			)
 			setScheduleOptions(options)
-			setCart(choice === 'either' ? null : options[0]?.cart ?? null)
+			setCart(choice === 'either' ? null : (options[0]?.cart ?? null))
 
 			const mergedDates = mergeBookableDates(options)
 			setBookableDates(mergedDates)
 
 			if (mergedDates[0]) {
-				const firstKey =
-					getBookableDateKey(mergedDates[0]) ?? mergedDates[0].id
+				const firstKey = getBookableDateKey(mergedDates[0]) ?? mergedDates[0].id
 				setSelectedDateId(firstKey)
 				setBookableTimeEntries(await loadTimeEntriesForDate(options, firstKey))
 			}
@@ -2029,14 +2025,14 @@ export default function BlvdBookRoute() {
 		const intentSelectedExistingPaymentMethod =
 			intentSelectedPaymentMethodId === 'new'
 				? null
-				: availablePaymentMethods.find(
+				: (availablePaymentMethods.find(
 						paymentMethod => paymentMethod.id === intentSelectedPaymentMethodId,
-					) ?? null
+					) ?? null)
 		const intentHasVerifiedClient = Boolean(
 			intentHasVerifiedMobile &&
-				(hasVerifiedClient ||
-					Boolean(hasVerifiedMobileOverride) ||
-					hasAttachedBlvdClient(intentCart.clientInformation)),
+			(hasVerifiedClient ||
+				Boolean(hasVerifiedMobileOverride) ||
+				hasAttachedBlvdClient(intentCart.clientInformation)),
 		)
 		const intentStartTime =
 			toDate(intentSelectedTime?.startTime ?? null) ??
@@ -2159,7 +2155,7 @@ export default function BlvdBookRoute() {
 				)
 			: -1
 		const activeOptionGroup =
-			pendingPathIndex >= 0 ? pendingServiceOptionPath.at(-1) ?? null : null
+			pendingPathIndex >= 0 ? (pendingServiceOptionPath.at(-1) ?? null) : null
 		const isSelected =
 			selectedService?.id === service.id || pendingPathIndex >= 0
 		const displayPrice = service.displayPrice ?? getDisplayPrice(service.item)
@@ -2575,12 +2571,10 @@ export default function BlvdBookRoute() {
 											{!loadingLocations && serviceLocations.length > 0 ? (
 												<div className="grid gap-4">
 													{serviceLocations.map(location => {
-														const previewDays =
-															locationDayPreviews[location.id]
+														const previewDays = locationDayPreviews[location.id]
 														const siteLocation =
 															getSiteLocationForBlvdLocation(location)
-														const isMapOpen =
-															openMapLocationId === location.id
+														const isMapOpen = openMapLocationId === location.id
 
 														return (
 															<div
@@ -2748,7 +2742,7 @@ export default function BlvdBookRoute() {
 														className="col-span-1"
 														selected={
 															selectedDate
-																? toDate(selectedDate.date) ?? undefined
+																? (toDate(selectedDate.date) ?? undefined)
 																: undefined
 														}
 														onSelect={d => {
@@ -2815,7 +2809,9 @@ export default function BlvdBookRoute() {
 																					}}
 																				>
 																					<span>
-																						{formatTimeLabel(entry.time.startTime)}
+																						{formatTimeLabel(
+																							entry.time.startTime,
+																						)}
 																					</span>
 																					{showLocation ? (
 																						<span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -3256,8 +3252,6 @@ export default function BlvdBookRoute() {
 														) : null}
 													</div>
 												) : null}
-
-	
 											</form>
 										</div>
 									</div>
@@ -4724,7 +4718,6 @@ function redactSensitiveBookingErrorText(value: string) {
 		.slice(0, 1000)
 }
 
-
 function allRequiredBookingQuestionsAnswered(
 	cart: Pick<BlvdCart, 'bookingQuestions'>,
 	answers: Record<string, unknown>,
@@ -4740,9 +4733,9 @@ function hasAttachedBlvdClient(
 ) {
 	return Boolean(
 		clientInformation?.externalId?.trim() ||
-			(clientInformation?.email?.trim() &&
-				clientInformation.firstName?.trim() &&
-				clientInformation.lastName?.trim()),
+		(clientInformation?.email?.trim() &&
+			clientInformation.firstName?.trim() &&
+			clientInformation.lastName?.trim()),
 	)
 }
 

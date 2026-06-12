@@ -28,16 +28,16 @@ texture. Using sophisticated radiofrequency energy, we target the delicate skin
 of the neck to stimulate collagen production, resulting in a smoother, firmer,
 and more youthful neckline.
 
-Unlike a surgical neck lift, this procedure requires
-no incisions and involves zero social downtime. The advanced cooling technology
-ensures your comfort while the heat energy works deep within the tissue to
-tighten and lift. Over a series of treatments, you will notice a visible
-reduction in laxity and an improvement in skin quality, helping you feel more
-confident in low-cut tops or when looking in the mirror.
+Unlike a surgical neck lift, this procedure requires no incisions and involves
+zero social downtime. The advanced cooling technology ensures your comfort while
+the heat energy works deep within the tissue to tighten and lift. Over a series
+of treatments, you will notice a visible reduction in laxity and an improvement
+in skin quality, helping you feel more confident in low-cut tops or when looking
+in the mirror.
 
 To maximize your rejuvenation, this treatment pairs perfectly with
-[Everesse jawline contouring](/everesse/jawline) for a seamless
-look from face to décolletage. You might also consider addressing facial
-concerns with [Everesse face tightening](/everesse/face). Explore
-the full potential of [Everesse in Knoxville](/everesse) to see
-how we can customize a plan for your specific needs.
+[Everesse jawline contouring](/everesse/jawline) for a seamless look from face
+to décolletage. You might also consider addressing facial concerns with
+[Everesse face tightening](/everesse/face). Explore the full potential of
+[Everesse in Knoxville](/everesse) to see how we can customize a plan for your
+specific needs.

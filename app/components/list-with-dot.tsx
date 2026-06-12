@@ -149,55 +149,59 @@ export function ListWithDot({
 			)}
 			{linksToRender.map((link, index) => {
 				const resolvedTo =
-					'to' in link && isBlvdBookingUrl(link.to) ? blvdUrl : 'to' in link ? link.to : null
+					'to' in link && isBlvdBookingUrl(link.to)
+						? blvdUrl
+						: 'to' in link
+							? link.to
+							: null
 
 				return (
-				<li
-					key={'to' in link ? link.to : `submenu-${index}`}
-					onMouseEnter={() => handleMouseEnter(index)}
-					onMouseLeave={handleMouseLeave}
-					className={cn('group/link', 'py-1')}
-					id={`nav-link-${index}`}
-				>
-					{'subLinks' in link ? (
-						<button
-							className="flex w-full flex-col items-center py-2"
-							onClick={() => {
-								setActiveSubMenus(prev => [...prev, index])
-								handleLinkClick()
-							}}
-						>
-							<div className="flex items-center">
-								{link.label}
-								<Icon name="chevron-right" className="ml-2 h-4 w-4" />
-							</div>
-							{link.hint && (
-								<div className="block text-center text-sm text-muted-foreground group-hover/link:block">
-									{link.hint}
+					<li
+						key={'to' in link ? link.to : `submenu-${index}`}
+						onMouseEnter={() => handleMouseEnter(index)}
+						onMouseLeave={handleMouseLeave}
+						className={cn('group/link', 'py-1')}
+						id={`nav-link-${index}`}
+					>
+						{'subLinks' in link ? (
+							<button
+								className="flex w-full flex-col items-center py-2"
+								onClick={() => {
+									setActiveSubMenus(prev => [...prev, index])
+									handleLinkClick()
+								}}
+							>
+								<div className="flex items-center">
+									{link.label}
+									<Icon name="chevron-right" className="ml-2 h-4 w-4" />
 								</div>
-							)}
-						</button>
-					) : (
-						<NavLink
-							className={({ isActive }) =>
-								`flex flex-col items-center py-2 ${
-									isActive ? 'italic text-muted-foreground' : ''
-								}`
-							}
-							to={resolvedTo ?? '/'}
-							prefetch="intent"
-							target={resolvedTo?.startsWith('http') ? '_blank' : undefined}
-							onClick={handleLinkClick}
-						>
-							<div>{link.label}</div>
-							{link.hint && (
-								<div className="block text-center text-sm text-muted-foreground group-hover/link:block">
-									{link.hint}
-								</div>
-							)}
-						</NavLink>
-					)}
-				</li>
+								{link.hint && (
+									<div className="block text-center text-sm text-muted-foreground group-hover/link:block">
+										{link.hint}
+									</div>
+								)}
+							</button>
+						) : (
+							<NavLink
+								className={({ isActive }) =>
+									`flex flex-col items-center py-2 ${
+										isActive ? 'italic text-muted-foreground' : ''
+									}`
+								}
+								to={resolvedTo ?? '/'}
+								prefetch="intent"
+								target={resolvedTo?.startsWith('http') ? '_blank' : undefined}
+								onClick={handleLinkClick}
+							>
+								<div>{link.label}</div>
+								{link.hint && (
+									<div className="block text-center text-sm text-muted-foreground group-hover/link:block">
+										{link.hint}
+									</div>
+								)}
+							</NavLink>
+						)}
+					</li>
 				)
 			})}
 		</ul>

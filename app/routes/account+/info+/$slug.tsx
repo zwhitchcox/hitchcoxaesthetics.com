@@ -410,7 +410,7 @@ export default function () {
 				[field.slug]:
 					field.type === FieldType.MultiSelect
 						? field.record?.selected.map(option => option.id)
-						: field.record?.answer ?? '',
+						: (field.record?.answer ?? ''),
 			}),
 			{ redirectTo },
 		),
@@ -465,7 +465,7 @@ export default function () {
 						})}
 						<StatusButton
 							type="submit"
-							status={isSubmitting ? 'pending' : form.status ?? 'idle'}
+							status={isSubmitting ? 'pending' : (form.status ?? 'idle')}
 							className="flex w-full items-center justify-center"
 							disabled={isSubmitting}
 						>

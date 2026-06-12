@@ -6,7 +6,7 @@ import { getEnv } from '#app/utils/env.server.ts'
 
 // Ad landing page — noindex to avoid duplicate content with the main service pages
 export const meta: MetaFunction = () => [
-	{ title: "20% Off Kybella — Knoxville | Sarah Hitchcox Aesthetics" },
+	{ title: '20% Off Kybella — Knoxville | Sarah Hitchcox Aesthetics' },
 	{ name: 'robots', content: 'noindex' },
 ]
 
@@ -1089,7 +1089,7 @@ const html = `<!DOCTYPE html>
 <div class="c-price-card-desc">Permanent double chin reduction</div>
                         </div>
                         <div class="c-price-card-right">
-                            <div class="c-price-card-amount">\$600 <small>/vial</small></div>
+                            <div class="c-price-card-amount">$600 <small>/vial</small></div>
                             <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
@@ -1099,7 +1099,7 @@ const html = `<!DOCTYPE html>
                             <div class="c-price-card-desc">Wrinkle relaxer, fast results</div>
                         </div>
                         <div class="c-price-card-right">
-                            <div class="c-price-card-amount">\$13 <small>/unit</small></div>
+                            <div class="c-price-card-amount">$13 <small>/unit</small></div>
                             <a href="${DEFAULT_BLVD_BOOKING_URL}" class="c-price-card-book">Book Now</a>
                         </div>
                     </div>
@@ -1366,7 +1366,7 @@ const html = `<!DOCTYPE html>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div class="c-faq-a">
-                        <div class="c-faq-a-inner">Kybella is \$600 per vial. Most treatments use 1-3 vials per session. New clients get 20% off their first treatment. Sarah will discuss exactly how many vials you'll need during your free consultation.</div>
+                        <div class="c-faq-a-inner">Kybella is $600 per vial. Most treatments use 1-3 vials per session. New clients get 20% off their first treatment. Sarah will discuss exactly how many vials you'll need during your free consultation.</div>
                     </div>
                 </div>
             </div>

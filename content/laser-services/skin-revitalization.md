@@ -61,18 +61,15 @@ result is smoother, healthier-looking skin with a natural glow.
 
 This "lunchtime laser facial" is a favorite among our clients because it fits
 easily into a busy schedule. With no downtime required, you can return to your
-activities immediately after your appointment. Skin revitalization
-is effective for all skin types and offers cumulative benefits; as you progress
-through your treatment series, you will notice continued improvement in tone and
-texture. It is the ideal way to maintain youthful skin and prevent future
-damage.
+activities immediately after your appointment. Skin revitalization is effective
+for all skin types and offers cumulative benefits; as you progress through your
+treatment series, you will notice continued improvement in tone and texture. It
+is the ideal way to maintain youthful skin and prevent future damage.
 
 To further enhance your complexion, consider pairing this treatment with
-[pigmented lesion reduction](/pigmented-lesion-reduction) to
-clear sun spots or
-[vascular lesion reduction](/vascular-lesion-reduction) to
-address redness. If skin laxity is a concern,
-[Everesse skin tightening](/everesse) works synergistically to
-firm contours while we revitalize the surface. Discover all our
-[Knoxville laser services](/laser-services) to build your ultimate skin care
+[pigmented lesion reduction](/pigmented-lesion-reduction) to clear sun spots or
+[vascular lesion reduction](/vascular-lesion-reduction) to address redness. If
+skin laxity is a concern, [Everesse skin tightening](/everesse) works
+synergistically to firm contours while we revitalize the surface. Discover all
+our [Knoxville laser services](/laser-services) to build your ultimate skin care
 plan.

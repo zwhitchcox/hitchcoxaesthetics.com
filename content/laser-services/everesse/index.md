@@ -104,23 +104,22 @@ Everesse is a breakthrough non-surgical treatment designed to firm and lift
 sagging skin without the need for invasive procedures. Using advanced
 radiofrequency technology, this system delivers controlled heat deep into the
 dermis while keeping the surface cool and comfortable. At Sarah Hitchcox
-Aesthetics, we use Everesse to stimulate your body's natural
-collagen production, resulting in tighter contours and a smoother, more youthful
+Aesthetics, we use Everesse to stimulate your body's natural collagen
+production, resulting in tighter contours and a smoother, more youthful
 appearance. It is an ideal solution for those noticing early signs of laxity who
 are not ready for surgery.
 
 The treatment is highly versatile and effective for multiple areas of the face
 and neck. Whether you want to define your jawline, lift cheeks, or smooth crepey
-skin on the neck, Everesse offers a customizable
-approach. Patients typically describe the sensation as a warm massage, and with
-no significant downtime, it fits easily into a busy lifestyle. Results develop
-gradually over several weeks as new collagen forms, creating a natural
-improvement that looks like you, only refreshed.
+skin on the neck, Everesse offers a customizable approach. Patients typically
+describe the sensation as a warm massage, and with no significant downtime, it
+fits easily into a busy lifestyle. Results develop gradually over several weeks
+as new collagen forms, creating a natural improvement that looks like you, only
+refreshed.
 
 For a comprehensive rejuvenation strategy, Everesse works beautifully alongside
 other services. You can combine it with
-[laser skin revitalization](/skin-revitalization) to address
-surface texture or
-[vascular lesion reduction](/vascular-lesion-reduction) to clear
-redness. Explore our full range of [Knoxville laser services](/laser-services)
-to see how we can tailor a plan that targets all your skin concerns at once.
+[laser skin revitalization](/skin-revitalization) to address surface texture or
+[vascular lesion reduction](/vascular-lesion-reduction) to clear redness.
+Explore our full range of [Knoxville laser services](/laser-services) to see how
+we can tailor a plan that targets all your skin concerns at once.

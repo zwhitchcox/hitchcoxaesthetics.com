@@ -187,7 +187,9 @@ function UpdateProfile() {
 					size="wide"
 					name="intent"
 					value={profileUpdateActionIntent}
-					status={fetcher.state !== 'idle' ? 'pending' : form.status ?? 'idle'}
+					status={
+						fetcher.state !== 'idle' ? 'pending' : (form.status ?? 'idle')
+					}
 				>
 					Save changes
 				</StatusButton>
@@ -234,7 +236,7 @@ function SignOutOfSessions() {
 						status={
 							fetcher.state !== 'idle'
 								? 'pending'
-								: fetcher.data?.status ?? 'idle'
+								: (fetcher.data?.status ?? 'idle')
 						}
 					>
 						<Icon name="avatar">

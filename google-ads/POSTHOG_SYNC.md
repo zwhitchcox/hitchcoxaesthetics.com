@@ -31,9 +31,9 @@ The booking config includes these managed dashboards:
 - `Booking CTA Performance`
 - `Phone Calls - Conversion Attribution`
 
-Use `Booking Funnel - Diagnostics` to check whether booking flow changes
-improve step-to-step conversion. Use `Phone Calls - Conversion Attribution` to
-compare phone-call conversions after CallRail data has been synced.
+Use `Booking Funnel - Diagnostics` to check whether booking flow changes improve
+step-to-step conversion. Use `Phone Calls - Conversion Attribution` to compare
+phone-call conversions after CallRail data has been synced.
 
 ## Required Env Vars
 

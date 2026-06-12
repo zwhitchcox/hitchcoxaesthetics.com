@@ -3,8 +3,8 @@ name: Botox
 tagline: for wrinkles and fine lines
 title: Botox Knoxville | Sarah Hitchcox Aesthetics
 metaDescription: >-
-  FDA-approved Botox injections for forehead lines, crow's feet, and frown
-  lines in Knoxville, TN. Natural-looking results from Sarah Hitchcox, RN.
+  FDA-approved Botox injections for forehead lines, crow's feet, and frown lines
+  in Knoxville, TN. Natural-looking results from Sarah Hitchcox, RN.
 shortDescription: >-
   FDA-approved Botox injections to smooth wrinkles and prevent new lines from
   forming.

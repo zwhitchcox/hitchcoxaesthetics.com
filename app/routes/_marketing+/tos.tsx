@@ -19,9 +19,9 @@ export default function TermsOfServiceRoute() {
 			<div className="h-96 overflow-auto rounded-lg bg-white p-6 shadow-md">
 				<h2 className="text-xl font-semibold">1. Introduction</h2>
 				<p>
-					Welcome to Sarah Hitchcox Aesthetics! These Terms and Conditions govern
-					your use of our app and services. By accessing or using the app, you
-					agree to be bound by these terms.
+					Welcome to Sarah Hitchcox Aesthetics! These Terms and Conditions
+					govern your use of our app and services. By accessing or using the
+					app, you agree to be bound by these terms.
 				</p>
 
 				<h2 className="mt-4 text-xl font-semibold">2. Eligibility</h2>

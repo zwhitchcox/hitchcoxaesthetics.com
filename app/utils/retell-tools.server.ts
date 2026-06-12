@@ -34,7 +34,7 @@ export async function parseRetellToolPayload<TSchema extends z.ZodTypeAny>(
 	const body = await request.json()
 	const envelope = retellEnvelopeSchema.safeParse(body)
 	const rawArgs = envelope.success
-		? envelope.data.args ?? envelope.data.arguments ?? body
+		? (envelope.data.args ?? envelope.data.arguments ?? body)
 		: body
 	const call = envelope.success ? getRecord(envelope.data.call) : null
 	return {
