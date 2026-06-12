@@ -440,6 +440,7 @@ export default function BlvdBookRoute() {
 	)
 	const [search, setSearch] = useState(sourceHint?.search ?? '')
 	const searchInputRef = useRef<HTMLInputElement>(null)
+	const ownershipCodeInputRef = useRef<HTMLInputElement>(null)
 	const didHandleInitialEntryBehavior = useRef(false)
 	const didFocusSearchAfterClientHistory = useRef(false)
 	const [activeStep, setActiveStep] = useState<BlvdBookStepName | null>(null)
@@ -1794,6 +1795,14 @@ export default function BlvdBookRoute() {
 		setClientForm(currentForm => ({ ...currentForm, [name]: value }))
 	}
 
+	function focusOwnershipCodeInput() {
+		// The code input mounts on the state update that follows a successful
+		// send, so focus on the next tick.
+		window.setTimeout(() => {
+			ownershipCodeInputRef.current?.focus()
+		}, 0)
+	}
+
 	async function handleSendOwnershipCode() {
 		if (!cart) return
 
@@ -1830,6 +1839,7 @@ export default function BlvdBookRoute() {
 						currentHistory === 'returning' ? currentHistory : 'new',
 					)
 				}
+				focusOwnershipCodeInput()
 				return
 			}
 
@@ -1840,6 +1850,7 @@ export default function BlvdBookRoute() {
 				setVerifiedExistingClient(false)
 				setAvailablePaymentMethods([])
 				setSelectedPaymentMethodId('new')
+				focusOwnershipCodeInput()
 				return
 			}
 
@@ -2922,6 +2933,7 @@ export default function BlvdBookRoute() {
 																{canShowOwnershipCodeEntry ? (
 																	<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
 																		<Input
+																			ref={ownershipCodeInputRef}
 																			className="placeholder:text-muted-foreground/45"
 																			value={ownershipCodeValue}
 																			onChange={event => {

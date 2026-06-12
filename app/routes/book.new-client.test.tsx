@@ -192,6 +192,8 @@ test('new clients can verify their phone and complete a mocked booking', async (
 
 	const verificationCodeInput = await screen.findByPlaceholderText('ABC123')
 	expect(verificationCodeInput).toBeVisible()
+	// sending the code focuses the input automatically
+	await waitFor(() => expect(verificationCodeInput).toHaveFocus())
 	await user.type(verificationCodeInput, 'AB12CD')
 	expect(verificationCodeInput).toHaveValue('AB12CD')
 	await user.clear(verificationCodeInput)
