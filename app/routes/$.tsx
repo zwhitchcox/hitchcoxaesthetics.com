@@ -13,7 +13,14 @@ import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
 import { writeLastBookingServiceHint } from '#app/utils/booking-source-hints.ts'
+import { GoogleRatingBadge, ReviewQuotes } from '#app/components/google-reviews.tsx'
 import { type ServicePageSection } from '#app/utils/location-service-data.server.js'
+import { getPricingForSlug } from '#app/utils/pricing.js'
+import {
+	getReviewHighlights,
+	type FeaturedReview,
+	type ReviewSummary,
+} from '#app/utils/reviews.server.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
 import {
 	getPage,
@@ -52,6 +59,8 @@ type LoaderData = {
 	ancestors: SitePage[]
 	siblings: SitePage[]
 	markdown: string
+	reviews: FeaturedReview[]
+	reviewSummary: ReviewSummary
 }
 
 function getTreatmentLabel(pageName: string) {
@@ -114,6 +123,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 		const children = getChildren(splat)
 		const ancestors = getAncestors(splat)
 		const siblings = getSiblings(splat)
+		const { reviews, summary: reviewSummary } = await getReviewHighlights(3)
 
 		return json<LoaderData>({
 			page,
@@ -121,6 +131,8 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			ancestors,
 			siblings,
 			markdown: page.content,
+			reviews,
+			reviewSummary,
 		})
 	}
 
@@ -138,7 +150,7 @@ export const meta: MetaFunction<typeof loader> = ({ data, location }) => {
 }
 
 export default function DynamicPage() {
-	const { page, children, ancestors, siblings, markdown } =
+	const { page, children, ancestors, siblings, markdown, reviews, reviewSummary } =
 		useLoaderData<LoaderData>()
 	const blvdUrl = useBlvdUrl()
 
@@ -240,8 +252,16 @@ export default function DynamicPage() {
 			? page.name
 			: `${page.name} Knoxville`
 
+	const hasPricing = (getPricingForSlug(page.path)?.length ?? 0) > 0
+
 	return (
-		<ServiceLayout title={title} description={page.tagline} imgs={imgs}>
+		<ServiceLayout
+			title={title}
+			description={page.tagline}
+			imgs={imgs}
+			ratingBadge={<GoogleRatingBadge summary={reviewSummary} />}
+			showPricingButton={hasPricing}
+		>
 			<ServiceJsonLd
 				name={page.name}
 				description={page.metaDescription}
@@ -307,8 +327,15 @@ export default function DynamicPage() {
 			{/* Dynamic Sections */}
 			{page.sections?.map((section, index) => renderSection(section, index))}
 
+			{/* Reviews */}
+			{reviews.length > 0 ? (
+				<ReviewQuotes reviews={reviews} summary={reviewSummary} />
+			) : null}
+
 			{/* Pricing */}
-			<PricingSection serviceSlug={page.path} />
+			<div id="pricing">
+				<PricingSection serviceSlug={page.path} />
+			</div>
 
 			{/* Sub-service Grid (for pages with children) */}
 			{childCards.length > 0 && (

@@ -1,8 +1,10 @@
 import { json, type MetaFunction } from '@remix-run/node'
 import { Link, useLoaderData, useOutletContext } from '@remix-run/react'
+import { GoogleRatingBadge, ReviewQuotes } from '#app/components/google-reviews.tsx'
 import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
+import { getReviewHighlights } from '#app/utils/reviews.server.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
 import { getCategoryPages, getPage } from '#app/utils/site-pages.server.js'
 
@@ -38,11 +40,14 @@ export async function loader() {
 		})
 		.filter(Boolean)
 
-	return json({ serviceCategories, popularServices })
+	const { reviews, summary: reviewSummary } = await getReviewHighlights(3)
+
+	return json({ serviceCategories, popularServices, reviews, reviewSummary })
 }
 
 export default function Index() {
-	const { serviceCategories, popularServices } = useLoaderData<typeof loader>()
+	const { serviceCategories, popularServices, reviews, reviewSummary } =
+		useLoaderData<typeof loader>()
 	const _context = useOutletContext<{
 		setIsMenuOpen: (isOpen: boolean) => void
 	}>()
@@ -65,6 +70,9 @@ export default function Index() {
 			{/* Welcome / Intro Section */}
 			<div className="bg-white py-16 text-center">
 				<div className="mx-auto max-w-3xl px-6">
+					<div className="mb-4 flex justify-center">
+						<GoogleRatingBadge summary={reviewSummary} />
+					</div>
 					<h2 className="mb-6 text-3xl font-bold text-gray-900">
 						Enhance Your Natural Beauty
 					</h2>
@@ -85,6 +93,15 @@ export default function Index() {
 					</div>
 				</div>
 			</div>
+
+			{/* Reviews */}
+			{reviews.length > 0 ? (
+				<div className="bg-white pb-20">
+					<div className="mx-auto max-w-7xl px-6">
+						<ReviewQuotes reviews={reviews} summary={reviewSummary} />
+					</div>
+				</div>
+			) : null}
 
 			{/* Popular Services */}
 			<div className="bg-gray-50 py-20">

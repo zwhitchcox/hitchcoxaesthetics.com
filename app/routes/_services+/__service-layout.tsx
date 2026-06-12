@@ -194,12 +194,16 @@ export function ServiceLayout({
 	children,
 	imgContainerClassName,
 	imgs,
+	ratingBadge,
+	showPricingButton = false,
 }: {
 	title: string
 	description: string
 	children: React.ReactNode
 	imgContainerClassName?: string
 	imgs?: HeroImagePair[]
+	ratingBadge?: React.ReactNode
+	showPricingButton?: boolean
 }) {
 	const location = useLocation()
 	const service = location.pathname.split('/').pop()
@@ -241,13 +245,24 @@ export function ServiceLayout({
 										: description}
 								</div>
 							</div>
-							<div className="flex flex-col items-center justify-center space-y-2">
+							{ratingBadge ? (
+								<div className="animate-fade-in">{ratingBadge}</div>
+							) : null}
+							<div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
 								<button
-									className="text-md mx-2  w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
+									className="text-md mx-2 w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
 									onClick={() => scrollToId(service!)}
 								>
 									Learn More
 								</button>
+								{showPricingButton ? (
+									<button
+										className="text-md mx-2 w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-center font-semibold text-black transition duration-300 ease-in-out hover:bg-gray-200 sm:w-48 sm:text-lg"
+										onClick={() => scrollToId('pricing')}
+									>
+										View Pricing
+									</button>
+								) : null}
 							</div>
 						</div>
 					</div>

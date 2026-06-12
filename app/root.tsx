@@ -274,6 +274,7 @@ function Document({
 					}}
 				/>
 				<script
+					async
 					type="text/javascript"
 					src="//cdn.callrail.com/companies/537900585/0c3f6789c4c11b8e98b9/12/swap.js"
 				/>
