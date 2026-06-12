@@ -215,7 +215,7 @@ test('new clients can verify their phone and complete a mocked booking', async (
 	await user.click(screen.getByRole('button', { name: /Confirm Details/i }))
 
 	await screen.findByRole('heading', { name: /Confirm & Book/i })
-	await user.click(screen.getByRole('button', { name: /Confirm Appointment/i }))
+	await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
 	await expect(
 		screen.findByText(/Your appointment is confirmed/i),

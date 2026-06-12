@@ -3087,6 +3087,19 @@ export default function BlvdBookRoute() {
 										</h2>
 										<div className="w-full space-y-6">
 											<form className="space-y-8" onSubmit={handleCheckout}>
+												<div className="flex flex-col items-center gap-2">
+													<p className="text-center text-sm text-muted-foreground">
+														Click to confirm your appointment.
+													</p>
+													<Button
+														type="submit"
+														size="lg"
+														className="font-bold"
+														disabled={submittingBooking}
+													>
+														{submittingBooking ? 'Confirming...' : 'Confirm'}
+													</Button>
+												</div>
 												<div className="space-y-2">
 													<Label htmlFor="notes">Optional note</Label>
 													<Textarea
@@ -3244,21 +3257,7 @@ export default function BlvdBookRoute() {
 													</div>
 												) : null}
 
-												<div className="flex flex-col gap-4 border-t pt-6">
-													<Button
-														type="submit"
-														size="lg"
-														className="h-14 w-full bg-blue-700 text-lg font-bold text-white hover:bg-blue-800"
-														disabled={submittingBooking}
-													>
-														{submittingBooking
-															? 'Confirming Your Appointment...'
-															: 'Click to Confirm Appointment'}
-													</Button>
-													<p className="text-center text-xs text-muted-foreground">
-														Your time is not reserved until you confirm.
-													</p>
-												</div>
+	
 											</form>
 										</div>
 									</div>
