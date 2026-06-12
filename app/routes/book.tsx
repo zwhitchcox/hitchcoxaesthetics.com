@@ -2861,6 +2861,17 @@ export default function BlvdBookRoute() {
 															type="tel"
 															value={clientForm.phone}
 															onChange={updateClientForm}
+															onKeyDown={event => {
+																if (event.key !== 'Enter') return
+																if (hasVerifiedMobile) return
+																event.preventDefault()
+																if (
+																	canRequestOwnershipCode &&
+																	!sendingOwnershipCode
+																) {
+																	void handleSendOwnershipCode()
+																}
+															}}
 														/>
 													</div>
 													<div className="space-y-4 rounded-xl border bg-white p-5 md:col-span-2">
@@ -2916,6 +2927,13 @@ export default function BlvdBookRoute() {
 																						.toUpperCase()
 																						.slice(0, 6),
 																				)
+																			}}
+																			onKeyDown={event => {
+																				if (event.key !== 'Enter') return
+																				event.preventDefault()
+																				if (!verifyingOwnershipCode) {
+																					void handleVerifyOwnershipCode()
+																				}
 																			}}
 																			autoCapitalize="characters"
 																			autoComplete="one-time-code"
