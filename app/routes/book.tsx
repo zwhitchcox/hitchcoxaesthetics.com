@@ -295,7 +295,7 @@ const BLVD_BOOK_STEPS: Array<{
 	{ label: 'Location', name: 'location' },
 	{ label: 'Schedule', name: 'schedule' },
 	{ label: 'Details', name: 'details' },
-	{ label: 'Reserve', name: 'reserve' },
+	{ label: 'Book', name: 'reserve' },
 ]
 
 const CLIENT_HISTORY_OPTIONS: Array<{
@@ -3049,8 +3049,21 @@ export default function BlvdBookRoute() {
 								) : currentStep === 'reserve' ? (
 									<div className="flex w-full flex-col items-center space-y-6">
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
-											Reserve
+											Confirm & Book
 										</h2>
+										<div
+											className="w-full rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-center"
+											role="status"
+										>
+											<p className="font-semibold text-amber-900">
+												One more step — your appointment is not booked yet.
+											</p>
+											<p className="mt-1 text-sm text-amber-800">
+												Tap{' '}
+												<span className="font-semibold">Book Appointment</span>{' '}
+												below to lock in your time.
+											</p>
+										</div>
 										<div className="w-full space-y-6">
 											<form className="space-y-8" onSubmit={handleCheckout}>
 												<div className="space-y-2">
@@ -3210,7 +3223,7 @@ export default function BlvdBookRoute() {
 													</div>
 												) : null}
 
-												<div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+												<div className="flex flex-col gap-4 border-t pt-6">
 													<div className="text-sm text-muted-foreground">
 														{patientName ? (
 															<p>
@@ -3232,12 +3245,17 @@ export default function BlvdBookRoute() {
 													<Button
 														type="submit"
 														size="lg"
+														className="h-14 w-full text-lg font-bold"
 														disabled={submittingBooking}
 													>
 														{submittingBooking
-															? 'Submitting Booking...'
+															? 'Booking Your Appointment...'
 															: 'Book Appointment'}
 													</Button>
+													<p className="text-center text-xs text-muted-foreground">
+														Your time is not reserved until you tap Book
+														Appointment.
+													</p>
 												</div>
 											</form>
 										</div>
