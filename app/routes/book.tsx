@@ -692,10 +692,6 @@ export default function BlvdBookRoute() {
 	const canShowOwnershipCodeEntry = Boolean(
 		ownershipCodeId && canRequestOwnershipCode,
 	)
-	const patientName = formatClientName({
-		firstName: cart?.clientInformation?.firstName ?? clientForm.firstName,
-		lastName: cart?.clientInformation?.lastName ?? clientForm.lastName,
-	})
 	const selectedExistingPaymentMethod =
 		selectedPaymentMethodId === 'new'
 			? null
@@ -947,7 +943,15 @@ export default function BlvdBookRoute() {
 		selectedService,
 		selectedTime,
 	})
-	const currentStep = activeStep ?? derivedStep
+	// Dev-only: jump straight to any step for design review, e.g.
+	// /book?preview_step=reserve — inert in production builds.
+	const previewStep =
+		typeof window !== 'undefined' && window.ENV?.MODE === 'development'
+			? (new URLSearchParams(window.location.search).get(
+					'preview_step',
+				) as BlvdBookStepName | null)
+			: null
+	const currentStep = previewStep ?? activeStep ?? derivedStep
 	const stepAvailability: Record<BlvdBookStepName, boolean> = {
 		reserve: detailsSubmitted,
 		details: Boolean(selectedTime),
@@ -2579,7 +2583,7 @@ export default function BlvdBookRoute() {
 																	}}
 																	className="w-full p-5 text-left"
 																>
-																	<div className="flex items-start justify-between gap-4">
+																	<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
 																		<div>
 																			<h3 className="text-xl font-semibold">
 																				{location.name}
@@ -2588,7 +2592,7 @@ export default function BlvdBookRoute() {
 																				{formatBlvdAddress(location)}
 																			</p>
 																		</div>
-																		<span className="whitespace-nowrap pt-1 text-right text-sm font-medium text-muted-foreground">
+																		<span className="text-sm font-medium text-muted-foreground sm:whitespace-nowrap sm:pt-1 sm:text-right">
 																			{previewDays === undefined
 																				? '…'
 																				: previewDays.length === 0
@@ -3069,19 +3073,6 @@ export default function BlvdBookRoute() {
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
 											Confirm & Book
 										</h2>
-										<div className="pointer-events-none flex w-full justify-center">
-											<BlvdAppointmentDetails
-												appointmentDate={appointmentDate}
-												appointmentEndTime={appointmentEndTime}
-												appointmentStartTime={appointmentStartTime}
-												cart={cart}
-												selectedLocation={selectedLocation}
-												selectedService={selectedService}
-												selectedSiteLocation={selectedSiteLocation}
-												servicePendingConfirmation={false}
-												sourceHint={null}
-											/>
-										</div>
 										<div className="w-full space-y-6">
 											<form className="space-y-8" onSubmit={handleCheckout}>
 												<div className="space-y-2">
@@ -3245,16 +3236,15 @@ export default function BlvdBookRoute() {
 													<Button
 														type="submit"
 														size="lg"
-														className="h-14 w-full text-lg font-bold"
+														className="h-14 w-full bg-blue-700 text-lg font-bold text-white hover:bg-blue-800"
 														disabled={submittingBooking}
 													>
 														{submittingBooking
-															? 'Booking Your Appointment...'
-															: 'Book Appointment'}
+															? 'Confirming Your Appointment...'
+															: 'Click to Confirm Appointment'}
 													</Button>
 													<p className="text-center text-xs text-muted-foreground">
-														Your time is not reserved until you tap Book
-														Appointment.
+														Your time is not reserved until you confirm.
 													</p>
 												</div>
 											</form>
@@ -4723,18 +4713,6 @@ function redactSensitiveBookingErrorText(value: string) {
 		.slice(0, 1000)
 }
 
-function formatClientName({
-	firstName,
-	lastName,
-}: {
-	firstName?: string | null
-	lastName?: string | null
-}) {
-	return [firstName, lastName]
-		.map(part => part?.trim())
-		.filter(Boolean)
-		.join(' ')
-}
 
 function allRequiredBookingQuestionsAnswered(
 	cart: Pick<BlvdCart, 'bookingQuestions'>,
