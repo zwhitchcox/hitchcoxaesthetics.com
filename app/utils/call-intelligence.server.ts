@@ -1,45 +1,65 @@
 /**
- * AI analysis of CallRail call recordings via OpenRouter.
+ * AI analysis of phone calls via OpenRouter.
  *
- * CallRail's plan does not include transcription, so we pull the raw
- * recording audio and send it to an audio-capable model (Gemini) through
- * OpenRouter, getting back a structured read on why the person called and
- * whether/why they did not book.
+ * Preferred source is the Retell transcript when the call was handled by the
+ * AI receptionist (free, exact, includes both sides). For calls without one
+ * (human-answered, voicemail), CallRail has no transcription on our plan, so
+ * we pull the raw recording audio and send it to an audio-capable model.
+ *
+ * The tag vocabulary comes from the CallTagGroup/CallTag tables (see
+ * call-tags.server.ts), so the taxonomy is editable from /admin/call-tags
+ * without touching this prompt.
  */
+
+import {
+	buildTaxonomyPromptSection,
+	validateTagSelections,
+	type CallTaxonomy,
+} from '#app/utils/call-tags.server.ts'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const DEFAULT_MODEL = 'google/gemini-2.5-flash'
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024 // ~30+ min of mp3; guardrail
+const RETELL_API_URL = 'https://api.retellai.com'
+
+export type CallAnalysisInput =
+	| { kind: 'audio'; audio: { base64: string; format: string } }
+	| { kind: 'transcript'; transcript: string }
 
 export type CallAnalysis = {
 	reason: string | null
-	caller_intent:
-		| 'appointment'
-		| 'reschedule'
-		| 'cancel'
-		| 'question'
-		| 'vendor'
-		| 'spam'
-		| 'other'
 	service_interest: string | null
-	outcome: 'booked' | 'callback' | 'info_only' | 'lost' | 'voicemail' | 'other'
-	not_booked_reason: string | null
 	follow_up_recommended: boolean
 	summary: string
+	lost_reason: string | null
+	frustration_reason: string | null
+	agent_fix_suggestion: string | null
+	tags: Record<string, string | string[] | null>
 }
 
-const ANALYSIS_PROMPT = `You are analyzing a recorded inbound phone call to Sarah Hitchcox Aesthetics, a med spa in Knoxville, TN (Botox, fillers, laser treatments, weight loss). The call may be answered by an AI receptionist, a human, or go to voicemail.
+function buildAnalysisPrompt(taxonomy: CallTaxonomy, input: CallAnalysisInput) {
+	const { instructions, shape } = buildTaxonomyPromptSection(taxonomy)
+	const sourceLine =
+		input.kind === 'transcript'
+			? 'Below is the transcript of an inbound phone call ("Agent" is the AI receptionist, "User" is the caller).'
+			: 'You are given the recorded audio of an inbound phone call. It may be answered by an AI receptionist, a human, or go to voicemail.'
+	return `${sourceLine} The business is Sarah Hitchcox Aesthetics, a med spa in Knoxville, TN (Botox, fillers, laser treatments, weight loss).
+
+Tag the call using these groups:
+${instructions}
 
 Reply with ONLY a JSON object, no markdown fence, matching exactly:
 {
   "reason": string | null,            // one sentence: why they called
-  "caller_intent": "appointment" | "reschedule" | "cancel" | "question" | "vendor" | "spam" | "other",
   "service_interest": string | null,  // e.g. "Botox", "lip filler", "weight loss" if mentioned
-  "outcome": "booked" | "callback" | "info_only" | "lost" | "voicemail" | "other",
-  "not_booked_reason": string | null, // if a real prospective customer did NOT book: why (price, availability, just researching, call dropped, told to book online, etc.)
   "follow_up_recommended": boolean,   // true when a warm prospect left without booking
-  "summary": string                   // 2-3 sentences covering the call
-}`
+  "summary": string,                  // 2-3 sentences covering the call
+  "lost_reason": string | null,       // if the caller hung up unsatisfied or gave up: a specific sentence on WHY (what they wanted and what blocked them). null otherwise
+  "frustration_reason": string | null,// if the caller got frustrated with the AI receptionist: what specifically frustrated them (quote them when possible). null otherwise
+  "agent_fix_suggestion": string | null, // if the AI receptionist made a mistake or frustrated the caller: one concrete suggestion to change its prompt/behavior to prevent it. null otherwise
+${shape}
+}${input.kind === 'transcript' ? `\n\nTranscript:\n${input.transcript}` : ''}`
+}
 
 export function getCallIntelligenceConfig() {
 	const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim()
@@ -79,16 +99,52 @@ export async function fetchCallRecordingAudio({
 	return { base64: bytes.toString('base64'), format }
 }
 
-export async function analyzeCallAudio({
-	audio,
+/** Pulls the full transcript for a Retell call, or null if unavailable. */
+export async function fetchRetellTranscript({
+	retellCallId,
+	apiKey = process.env.RETELL_API_KEY?.trim(),
+	fetchImpl = fetch,
+}: {
+	retellCallId: string
+	apiKey?: string
+	fetchImpl?: typeof fetch
+}): Promise<string | null> {
+	if (!apiKey) return null
+	const response = await fetchImpl(
+		`${RETELL_API_URL}/v2/get-call/${retellCallId}`,
+		{ headers: { Authorization: `Bearer ${apiKey}` } },
+	)
+	if (!response.ok) return null
+	const data = (await response.json().catch(() => null)) as {
+		transcript?: string
+	} | null
+	const transcript = data?.transcript?.trim()
+	return transcript ? transcript : null
+}
+
+export async function analyzeCall({
+	input,
+	taxonomy,
 	config = getCallIntelligenceConfig(),
 	fetchImpl = fetch,
 }: {
-	audio: { base64: string; format: string }
+	input: CallAnalysisInput
+	taxonomy: CallTaxonomy
 	config?: ReturnType<typeof getCallIntelligenceConfig>
 	fetchImpl?: typeof fetch
-}): Promise<{ ok: true; analysis: CallAnalysis } | { ok: false; error: string }> {
+}): Promise<
+	{ ok: true; analysis: CallAnalysis } | { ok: false; error: string }
+> {
 	if (!config) return { ok: false, error: 'missing_open_router_api_key' }
+
+	const prompt = buildAnalysisPrompt(taxonomy, input)
+	const content: unknown[] = [{ type: 'text', text: prompt }]
+	if (input.kind === 'audio') {
+		content.push({
+			type: 'input_audio',
+			input_audio: { data: input.audio.base64, format: input.audio.format },
+		})
+	}
 
 	const response = await fetchImpl(OPENROUTER_URL, {
 		method: 'POST',
@@ -98,18 +154,7 @@ export async function analyzeCallAudio({
 		},
 		body: JSON.stringify({
 			model: config.model,
-			messages: [
-				{
-					role: 'user',
-					content: [
-						{ type: 'text', text: ANALYSIS_PROMPT },
-						{
-							type: 'input_audio',
-							input_audio: { data: audio.base64, format: audio.format },
-						},
-					],
-				},
-			],
+			messages: [{ role: 'user', content }],
 		}),
 	})
 
@@ -119,51 +164,31 @@ export async function analyzeCallAudio({
 	const data = (await response.json().catch(() => null)) as {
 		choices?: { message?: { content?: string } }[]
 	} | null
-	const content = data?.choices?.[0]?.message?.content
-	if (!content) return { ok: false, error: 'openrouter_empty_response' }
+	const text = data?.choices?.[0]?.message?.content
+	if (!text) return { ok: false, error: 'openrouter_empty_response' }
 
-	const parsed = parseAnalysisJson(content)
+	const parsed = parseAnalysisJson(text, taxonomy)
 	if (!parsed) return { ok: false, error: 'openrouter_unparseable_response' }
 	return { ok: true, analysis: parsed }
 }
 
-const INTENTS = new Set([
-	'appointment',
-	'reschedule',
-	'cancel',
-	'question',
-	'vendor',
-	'spam',
-	'other',
-])
-const OUTCOMES = new Set([
-	'booked',
-	'callback',
-	'info_only',
-	'lost',
-	'voicemail',
-	'other',
-])
-
-function parseAnalysisJson(content: string): CallAnalysis | null {
+function parseAnalysisJson(
+	content: string,
+	taxonomy: CallTaxonomy,
+): CallAnalysis | null {
 	const match = content.match(/\{[\s\S]*\}/)
 	if (!match) return null
 	try {
 		const raw = JSON.parse(match[0]) as Record<string, unknown>
-		const intent = String(raw.caller_intent ?? 'other')
-		const outcome = String(raw.outcome ?? 'other')
 		return {
 			reason: optionalText(raw.reason),
-			caller_intent: (INTENTS.has(intent)
-				? intent
-				: 'other') as CallAnalysis['caller_intent'],
 			service_interest: optionalText(raw.service_interest),
-			outcome: (OUTCOMES.has(outcome)
-				? outcome
-				: 'other') as CallAnalysis['outcome'],
-			not_booked_reason: optionalText(raw.not_booked_reason),
 			follow_up_recommended: Boolean(raw.follow_up_recommended),
 			summary: optionalText(raw.summary) ?? '',
+			lost_reason: optionalText(raw.lost_reason),
+			frustration_reason: optionalText(raw.frustration_reason),
+			agent_fix_suggestion: optionalText(raw.agent_fix_suggestion),
+			tags: validateTagSelections(taxonomy, raw),
 		}
 	} catch {
 		return null

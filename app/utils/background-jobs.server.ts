@@ -4,6 +4,7 @@ import { promisify } from 'node:util'
 
 import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
 import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
+import { syncFollowUpContacts } from '#app/utils/follow-ups.server.ts'
 import { syncCallRailPhoneConversionsToGa4 } from '#app/utils/ga4-phone-conversions.server.ts'
 
 // Background job types and interfaces
@@ -49,6 +50,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	callRailGa4ConversionSync: {
 		id: 'callRailGa4ConversionSync',
 		name: 'CallRail GA4 Conversion Sync',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	followUpContactSync: {
+		id: 'followUpContactSync',
+		name: 'Follow-up Contact Sync',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -205,6 +215,34 @@ export async function runBlvdRealRevenueSyncJob(): Promise<void> {
 	}
 }
 
+export async function runFollowUpContactSyncJob(): Promise<void> {
+	const job = jobStatuses['followUpContactSync']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+
+	try {
+		const result = await syncFollowUpContacts()
+		console.log('Follow-up contact sync completed:', result)
+		job.status = 'completed'
+		job.lastError = result.google_voice_error
+			? `google_voice: ${result.google_voice_error}`
+			: null
+	} catch (error) {
+		console.error('Follow-up contact sync failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getCallRailPostHogSyncIntervalMs(),
+		).toISOString()
+	}
+}
+
 // Initialize the background jobs scheduler
 export function initializeBackgroundJobs() {
 	if (isInitialized) return
@@ -257,6 +295,22 @@ export function initializeBackgroundJobs() {
 		setTimeout(() => {
 			runCallRailGa4ConversionSyncJob().catch(console.error)
 		}, 105_000)
+	}
+
+	if (shouldAutoRunCallRailPostHogSync()) {
+		const intervalMs = getCallRailPostHogSyncIntervalMs()
+		jobIntervals.followUpContactSync = setInterval(() => {
+			runFollowUpContactSyncJob().catch(console.error)
+		}, intervalMs)
+
+		const followUpSync = jobStatuses['followUpContactSync']
+		if (followUpSync) {
+			followUpSync.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		}
+
+		setTimeout(() => {
+			runFollowUpContactSyncJob().catch(console.error)
+		}, 135_000)
 	}
 
 	if (shouldAutoRunBlvdRevenueSync()) {

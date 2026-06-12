@@ -3,11 +3,14 @@ import {
 	isExcludedBookingAnalyticsIdentity,
 } from '#app/utils/analytics-exclusions.ts'
 import {
-	analyzeCallAudio,
+	analyzeCall,
 	fetchCallRecordingAudio,
+	fetchRetellTranscript,
 	getCallIntelligenceConfig,
 	type CallAnalysis,
+	type CallAnalysisInput,
 } from '#app/utils/call-intelligence.server.ts'
+import { getCallTaxonomy } from '#app/utils/call-tags.server.ts'
 import {
 	CALLRAIL_CALL_FIELDS,
 	callRailFetch,
@@ -63,9 +66,7 @@ type SyncCallRailPhoneConversionsOptions = {
 	until?: Date
 }
 
-type LookupClientByPhone = (
-	phone: string,
-) => Promise<{
+type LookupClientByPhone = (phone: string) => Promise<{
 	email?: string | null
 	firstName?: string | null
 	id: string
@@ -287,9 +288,8 @@ async function identifyPhoneConversionPerson(
 }
 
 async function defaultLookupClientByPhone(phone: string) {
-	const { findAdminClientByPhone } = await import(
-		'#app/utils/blvd-voice-booking.server.ts'
-	)
+	const { findAdminClientByPhone } =
+		await import('#app/utils/blvd-voice-booking.server.ts')
 	return findAdminClientByPhone(phone)
 }
 
@@ -353,7 +353,9 @@ export async function syncCallRailPhoneConversionsToPostHog(
 	const now = options.now ?? new Date()
 	const since =
 		options.since ??
-		new Date(now.getTime() - DEFAULT_INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
+		new Date(
+			now.getTime() - DEFAULT_INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+		)
 	const until = options.until ?? now
 	const accountIds =
 		options.accountIds && options.accountIds.length > 0
@@ -468,18 +470,19 @@ export async function syncCallRailPhoneConversionsToPostHog(
 				})
 			}
 
-			// 3. AI analysis of the recording (newest calls first, capped per run)
+			// 3. AI analysis of the call (newest calls first, capped per run).
+			// Source is the Retell transcript when the AI receptionist handled
+			// the call, otherwise the CallRail recording audio.
 			if (
 				analysisConfig &&
 				analyzedThisRun < analyzeLimit &&
 				!record.analyzedAt &&
 				!record.analysisError &&
 				call.answered === true &&
-				Number(call.duration) >= 25 &&
-				pickOptionalString(call.recording)
+				Number(call.duration) >= 25
 			) {
 				analyzedThisRun += 1
-				const outcome = await analyzeCallRecordingToPostHog({
+				const outcome = await analyzeCallToPostHog({
 					accountId,
 					apiKey,
 					call,
@@ -498,7 +501,7 @@ export async function syncCallRailPhoneConversionsToPostHog(
 	}
 }
 
-async function analyzeCallRecordingToPostHog({
+async function analyzeCallToPostHog({
 	accountId,
 	apiKey,
 	call,
@@ -512,18 +515,21 @@ async function analyzeCallRecordingToPostHog({
 	db: DbLike
 }): Promise<'analyzed' | 'failed'> {
 	try {
-		const audio = await fetchCallRecordingAudio({
-			recordingUrl: String(call.recording),
-			callRailApiKey: apiKey,
+		const { input, source } = await resolveAnalysisInput({
+			apiKey,
+			call,
+			callId,
+			db,
 		})
-		if (!audio) {
+		if (!input || !source) {
 			await db.callRailCall.update({
 				where: { callrailCallId: callId },
-				data: { analysisError: 'recording_unavailable' },
+				data: { analysisError: 'no_analysis_source' },
 			})
 			return 'failed'
 		}
-		const result = await analyzeCallAudio({ audio })
+		const taxonomy = await getCallTaxonomy()
+		const result = await analyzeCall({ input, taxonomy })
 		if (!result.ok) {
 			await db.callRailCall.update({
 				where: { callrailCallId: callId },
@@ -540,17 +546,58 @@ async function analyzeCallRecordingToPostHog({
 			properties: {
 				...event.properties,
 				...prefixAnalysis(result.analysis),
+				call_analysis_source: source,
 			},
 			timestamp: event.timestamp,
 		})
+		const analysis = result.analysis
+		const exclusiveTag = (group: string) => {
+			const value = analysis.tags[group]
+			return typeof value === 'string' ? value : null
+		}
 		await db.callRailCall.update({
 			where: { callrailCallId: callId },
 			data: {
 				analyzedAt: new Date(),
-				analysisJson: JSON.stringify(result.analysis),
+				analysisJson: JSON.stringify(analysis),
 				analysisError: null,
+				analysisSource: source,
+				outcome: exclusiveTag('outcome'),
+				disposition: exclusiveTag('disposition'),
+				lostReason: analysis.lost_reason,
+				frustrationReason: analysis.frustration_reason,
+				agentFixSuggestion: analysis.agent_fix_suggestion,
+				followUpNeeded: analysis.follow_up_recommended,
 			},
 		})
+
+		if (analysis.follow_up_recommended) {
+			const customerPhone =
+				normalizePhoneNumber(call.customer_phone_number) ??
+				pickOptionalString(call.customer_phone_number)
+			if (customerPhone) {
+				await db.followUp.upsert({
+					where: { callrailCallId: callId },
+					create: {
+						callrailCallId: callId,
+						customerPhone,
+						customerName: pickOptionalString(call.customer_name),
+						reason: analysis.lost_reason ?? analysis.reason ?? analysis.summary,
+					},
+					update: {},
+				})
+			}
+		}
+
+		await writeAnalysisBackToCallRail({
+			accountId,
+			analysis,
+			apiKey,
+			call,
+			callId,
+			db,
+		})
+
 		return 'analyzed'
 	} catch (error) {
 		await db.callRailCall.update({
@@ -563,15 +610,162 @@ async function analyzeCallRecordingToPostHog({
 	}
 }
 
+/**
+ * Pushes the AI read on the call back into CallRail so it is visible right in
+ * the CallRail UI: tags become CallRail tags (merged with whatever is already
+ * on the call, never removing human tags) and the summary plus lost/
+ * frustration reasons become the call note.
+ */
+async function writeAnalysisBackToCallRail({
+	accountId,
+	analysis,
+	apiKey,
+	call,
+	callId,
+	db,
+}: {
+	accountId: string
+	analysis: CallAnalysis
+	apiKey: string
+	call: CallRailConversionCall
+	callId: string
+	db: DbLike
+}) {
+	try {
+		const existingTags = getStringArray(call.tags)
+		const aiTags = buildCallRailTags(analysis)
+		const mergedTags = [...existingTags]
+		for (const tag of aiTags) {
+			if (
+				!mergedTags.some(
+					existing => existing.toLowerCase() === tag.toLowerCase(),
+				)
+			) {
+				mergedTags.push(tag)
+			}
+		}
+
+		const noteLines = [
+			`AI: ${analysis.summary}`,
+			analysis.lost_reason ? `Lost because: ${analysis.lost_reason}` : null,
+			analysis.frustration_reason
+				? `AI frustration: ${analysis.frustration_reason}`
+				: null,
+			analysis.agent_fix_suggestion
+				? `Suggested fix: ${analysis.agent_fix_suggestion}`
+				: null,
+			analysis.follow_up_recommended ? 'Follow up recommended.' : null,
+		].filter(Boolean)
+
+		await callRailFetch(apiKey, `/a/${accountId}/calls/${callId}.json`, {
+			method: 'PUT',
+			body: {
+				tags: mergedTags,
+				note: noteLines.join('\n'),
+			},
+		})
+		await db.callRailCall.update({
+			where: { callrailCallId: callId },
+			data: { callrailTagsSyncedAt: new Date() },
+		})
+	} catch (error) {
+		// Writeback is best-effort: the analysis itself already succeeded.
+		console.warn('CallRail tag writeback failed for call', callId, error)
+	}
+}
+
+/** Human-readable CallRail tags from the analysis, e.g. "AI: Lost". */
+export function buildCallRailTags(analysis: CallAnalysis) {
+	const tags: string[] = []
+	const add = (value: string | string[] | null | undefined) => {
+		for (const item of Array.isArray(value) ? value : value ? [value] : []) {
+			tags.push(`AI: ${humanizeTag(item)}`)
+		}
+	}
+	add(analysis.tags.outcome)
+	add(analysis.tags.disposition)
+	add(analysis.tags.why_not_booked)
+	add(analysis.tags.agent_mistake)
+	if (analysis.follow_up_recommended) tags.push('AI: Follow Up')
+	return tags
+}
+
+function humanizeTag(value: string) {
+	return value
+		.split('_')
+		.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ')
+}
+
+/**
+ * Picks the best analysis source for a call: the Retell transcript when the
+ * AI receptionist handled it (linked through RetellCallOutcome.callrailCallId),
+ * otherwise the CallRail recording audio.
+ */
+async function resolveAnalysisInput({
+	apiKey,
+	call,
+	callId,
+	db,
+}: {
+	apiKey: string
+	call: CallRailConversionCall
+	callId: string
+	db: DbLike
+}): Promise<{
+	input: CallAnalysisInput | null
+	source: 'retell_transcript' | 'callrail_audio' | null
+}> {
+	const retellOutcome = await db.retellCallOutcome.findFirst({
+		where: { callrailCallId: callId, retellCallId: { not: null } },
+		orderBy: { createdAt: 'desc' },
+		select: { retellCallId: true },
+	})
+	if (retellOutcome?.retellCallId) {
+		const transcript = await fetchRetellTranscript({
+			retellCallId: retellOutcome.retellCallId,
+		}).catch(() => null)
+		if (transcript) {
+			return {
+				input: { kind: 'transcript', transcript },
+				source: 'retell_transcript',
+			}
+		}
+	}
+
+	const recordingUrl = pickOptionalString(call.recording)
+	if (recordingUrl) {
+		const audio = await fetchCallRecordingAudio({
+			recordingUrl,
+			callRailApiKey: apiKey,
+		})
+		if (audio) {
+			return { input: { kind: 'audio', audio }, source: 'callrail_audio' }
+		}
+	}
+
+	return { input: null, source: null }
+}
+
 function prefixAnalysis(analysis: CallAnalysis) {
+	const tagProperties = Object.fromEntries(
+		Object.entries(analysis.tags).map(([group, value]) => [
+			`call_tag_${group}`,
+			value ?? undefined,
+		]),
+	)
 	return {
 		call_reason: analysis.reason ?? undefined,
-		call_intent: analysis.caller_intent,
 		call_service_interest: analysis.service_interest ?? undefined,
-		call_outcome: analysis.outcome,
-		call_not_booked_reason: analysis.not_booked_reason ?? undefined,
 		call_follow_up_recommended: analysis.follow_up_recommended,
 		call_summary: analysis.summary,
+		call_lost_reason: analysis.lost_reason ?? undefined,
+		call_frustration_reason: analysis.frustration_reason ?? undefined,
+		call_agent_fix_suggestion: analysis.agent_fix_suggestion ?? undefined,
+		// aliases kept for existing PostHog insights
+		call_outcome: analysis.tags.outcome ?? undefined,
+		call_not_booked_reason: analysis.tags.why_not_booked ?? undefined,
+		...tagProperties,
 	}
 }
 

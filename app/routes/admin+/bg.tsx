@@ -13,6 +13,7 @@ import {
 	type JobStatus,
 	runBlvdRealRevenueSyncJob,
 	runCallRailGa4ConversionSyncJob,
+	runFollowUpContactSyncJob,
 	runCallRailPostHogConversionSyncJob,
 	runReviewsFetchJob,
 	getJobStatuses,
@@ -78,6 +79,14 @@ export async function action({ request }: Route['ActionArgs']) {
 		return json({
 			success: true,
 			message: 'CallRail GA4 conversion sync job started',
+		})
+	}
+
+	if (intent === 'run-followUpContactSync') {
+		runFollowUpContactSyncJob().catch(console.error)
+		return json({
+			success: true,
+			message: 'Follow-up contact sync job started',
 		})
 	}
 

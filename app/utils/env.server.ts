@@ -29,6 +29,9 @@ const schema = z.object({
 	REACT_APP_PUBLIC_POSTHOG_KEY: z.string().optional(),
 	REACT_APP_PUBLIC_POSTHOG_HOST: z.string().optional(),
 	GOOGLE_MAPS_API_KEY: z.string().optional(),
+	// Server-only — Google Voice follow-up sync
+	GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+	GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
 })
 
 declare global {

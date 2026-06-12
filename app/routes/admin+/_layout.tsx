@@ -23,6 +23,8 @@ const adminMenuItems = [
 	{ path: '/admin/boulevard', label: 'Boulevard', icon: 'calendar' as const },
 	{ path: '/admin/bg', label: 'Background Jobs', icon: 'clock' as const },
 	{ path: '/admin/google-ads', label: 'Google Ads', icon: 'update' as const },
+	{ path: '/admin/call-tags', label: 'Call Tags', icon: 'phone' as const },
+	{ path: '/admin/follow-ups', label: 'Follow-ups', icon: 'check' as const },
 ]
 
 export async function loader({ request }: LoaderFunctionArgs) {
