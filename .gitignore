@@ -48,3 +48,6 @@ processing-images-archive/
 .visited-urls
 /candidates
 .playwright-mcp
+
+# Claude Code local preview config (machine-specific paths)
+/.claude/

@@ -415,6 +415,9 @@ export default function BlvdBookRoute() {
 	const [locationDayPreviews, setLocationDayPreviews] = useState<
 		Record<string, string[]>
 	>({})
+	const [openMapLocationId, setOpenMapLocationId] = useState<string | null>(
+		null,
+	)
 	const [scheduleOptions, setScheduleOptions] = useState<LocationScheduleOption[]>(
 		[],
 	)
@@ -2559,34 +2562,83 @@ export default function BlvdBookRoute() {
 													{serviceLocations.map(location => {
 														const previewDays =
 															locationDayPreviews[location.id]
+														const siteLocation =
+															getSiteLocationForBlvdLocation(location)
+														const isMapOpen =
+															openMapLocationId === location.id
 
 														return (
-															<button
+															<div
 																key={location.id}
-																type="button"
-																onClick={() => {
-																	void handleSelectLocationChoice(location)
-																}}
-																className="rounded-xl border bg-white p-5 text-left transition hover:border-primary hover:shadow-md"
+																className="overflow-hidden rounded-xl border bg-white transition hover:border-primary hover:shadow-md"
 															>
-																<div className="flex items-start justify-between gap-4">
-																	<div>
-																		<h3 className="text-xl font-semibold">
-																			{location.name}
-																		</h3>
-																		<p className="mt-2 text-sm text-muted-foreground">
-																			{formatBlvdAddress(location)}
-																		</p>
+																<button
+																	type="button"
+																	onClick={() => {
+																		void handleSelectLocationChoice(location)
+																	}}
+																	className="w-full p-5 text-left"
+																>
+																	<div className="flex items-start justify-between gap-4">
+																		<div>
+																			<h3 className="text-xl font-semibold">
+																				{location.name}
+																			</h3>
+																			<p className="mt-2 text-sm text-muted-foreground">
+																				{formatBlvdAddress(location)}
+																			</p>
+																		</div>
+																		<span className="whitespace-nowrap pt-1 text-right text-sm font-medium text-muted-foreground">
+																			{previewDays === undefined
+																				? '…'
+																				: previewDays.length === 0
+																					? 'No openings soon'
+																					: previewDays.join(' · ')}
+																		</span>
 																	</div>
-																	<span className="whitespace-nowrap pt-1 text-right text-sm font-medium text-muted-foreground">
-																		{previewDays === undefined
-																			? '…'
-																			: previewDays.length === 0
-																				? 'No openings soon'
-																				: previewDays.join(' · ')}
-																	</span>
-																</div>
-															</button>
+																</button>
+																{siteLocation ? (
+																	<>
+																		<div className="flex items-center gap-4 border-t px-5 py-2">
+																			<button
+																				type="button"
+																				onClick={() =>
+																					setOpenMapLocationId(
+																						isMapOpen ? null : location.id,
+																					)
+																				}
+																				className="text-sm font-medium text-primary hover:underline"
+																			>
+																				{isMapOpen ? 'Hide map' : 'View map'}
+																			</button>
+																			<a
+																				href={
+																					siteLocation.googleMapsDirectionsUrl
+																				}
+																				target="_blank"
+																				rel="noreferrer"
+																				className="text-sm font-medium text-primary hover:underline"
+																			>
+																				Directions
+																			</a>
+																		</div>
+																		{isMapOpen ? (
+																			<div className="h-64 w-full border-t">
+																				<iframe
+																					src={siteLocation.googleMapsEmbedUrl}
+																					width="100%"
+																					height="100%"
+																					allowFullScreen={false}
+																					loading="lazy"
+																					referrerPolicy="no-referrer-when-downgrade"
+																					title={`Map of ${location.name}`}
+																					style={{ border: 0 }}
+																				/>
+																			</div>
+																		) : null}
+																	</>
+																) : null}
+															</div>
 														)
 													})}
 
