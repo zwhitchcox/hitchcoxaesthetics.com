@@ -136,6 +136,9 @@ test('ingests a direct Retell call: received event, transcript analysis, follow-
 	vi.stubEnv('RETELL_API_KEY', 'key_test')
 	vi.stubEnv('REACT_APP_PUBLIC_POSTHOG_KEY', 'test-posthog-key')
 	vi.stubEnv('OPEN_ROUTER_API_KEY', 'or-test-key')
+	// CI copies .env.example, whose placeholder agent ids would otherwise
+	// override the real defaults and break the agent-name lookup
+	vi.stubEnv('RETELL_BOTOX_KNOX_AGENT_ID', 'agent_2d6a0de3088f3066a2081539c0')
 
 	const db = makeDb()
 	const fetchMock = makeFetch()
