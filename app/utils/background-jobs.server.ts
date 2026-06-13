@@ -5,6 +5,7 @@ import { promisify } from 'node:util'
 import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
 import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
 import { syncFollowUpContacts } from '#app/utils/follow-ups.server.ts'
+import { syncRetellDirectCallsToPostHog } from '#app/utils/retell-direct-calls.server.ts'
 import { syncCallRailPhoneConversionsToGa4 } from '#app/utils/ga4-phone-conversions.server.ts'
 
 // Background job types and interfaces
@@ -135,10 +136,17 @@ export async function runCallRailPostHogConversionSyncJob(): Promise<void> {
 			job.lastError = result.error ?? 'Unknown CallRail/PostHog sync error'
 			return
 		}
-
 		console.log('CallRail PostHog conversion sync completed:', result)
+
+		// Also pick up calls dialed straight to the Retell agent numbers,
+		// which never pass through CallRail.
+		const retellResult = await syncRetellDirectCallsToPostHog()
+		console.log('Retell direct call sync completed:', retellResult)
+
 		job.status = 'completed'
-		job.lastError = null
+		job.lastError = retellResult.ok
+			? null
+			: `retell_direct: ${retellResult.error}`
 	} catch (error) {
 		console.error('CallRail PostHog conversion sync failed:', error)
 		job.status = 'failed'
