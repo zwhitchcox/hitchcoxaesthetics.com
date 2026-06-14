@@ -212,7 +212,7 @@ test('new clients can verify their phone and complete a mocked booking', async (
 	await user.type(await screen.findByLabelText(/First name/i), 'Jane')
 	await user.type(screen.getByLabelText(/Last name/i), 'Smith')
 	await user.type(screen.getByLabelText(/Email/i), 'jane@example.com')
-	await user.click(screen.getByRole('button', { name: /Confirm Details/i }))
+	await user.click(screen.getByRole('button', { name: /^Next$/i }))
 
 	await screen.findByRole('heading', { name: /Confirm & Book/i })
 	await user.click(screen.getByRole('button', { name: 'Confirm' }))
