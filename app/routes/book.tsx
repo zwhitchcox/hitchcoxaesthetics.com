@@ -2849,16 +2849,46 @@ export default function BlvdBookRoute() {
 											Client Details
 										</h2>
 										<p className="-mt-4 mb-4 text-center text-sm text-muted-foreground">
-											{selectedService
-												? selectedService.displayName
-												: 'Service'}{' '}
-											at {selectedLocation?.name} on{' '}
-											{selectedTime
-												? formatTimeLabel(selectedTime.startTime)
-												: ''}
-											. Verify your mobile number to continue.
+											Verify your mobile number to continue.
 										</p>
 										<div className="w-full space-y-6">
+											<div className="space-y-3 rounded-xl border bg-white p-5">
+												<h3 className="text-lg font-semibold">
+													Appointment details
+												</h3>
+												<dl className="space-y-1.5 text-sm">
+													<div className="flex justify-between gap-4">
+														<dt className="text-muted-foreground">Service</dt>
+														<dd className="text-right font-medium text-foreground">
+															{selectedService
+																? selectedService.displayName
+																: 'Service'}
+														</dd>
+													</div>
+													<div className="flex justify-between gap-4">
+														<dt className="text-muted-foreground">Location</dt>
+														<dd className="text-right font-medium text-foreground">
+															{selectedLocation?.name}
+														</dd>
+													</div>
+													<div className="flex justify-between gap-4">
+														<dt className="text-muted-foreground">Time</dt>
+														<dd className="text-right font-medium text-foreground">
+															{selectedTime
+																? formatTimeLabel(selectedTime.startTime)
+																: ''}
+														</dd>
+													</div>
+													<div className="flex justify-between gap-4">
+														<dt className="text-muted-foreground">
+															Card required
+														</dt>
+														<dd className="text-right font-medium text-foreground">
+															{requiresCard ? 'Yes' : 'No'}
+														</dd>
+													</div>
+												</dl>
+											</div>
 											<form
 												className="space-y-8"
 												onSubmit={handleDetailsSubmit}
@@ -3050,27 +3080,13 @@ export default function BlvdBookRoute() {
 													</div>
 												) : null}
 
-												<div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
-													<div className="text-sm text-muted-foreground">
-														<p>
-															Selected time:{' '}
-															<span className="font-medium text-foreground">
-																{selectedTime
-																	? formatTimeLabel(selectedTime.startTime)
-																	: ''}
-															</span>
-														</p>
-														<p>
-															Card required:{' '}
-															<span className="font-medium text-foreground">
-																{requiresCard ? 'Yes' : 'No'}
-															</span>
-														</p>
-													</div>
-													<Button type="submit" size="lg">
-														{requiresCard
-															? 'Continue to Reserve'
-															: 'Confirm Details'}
+												<div className="flex border-t pt-6">
+													<Button
+														type="submit"
+														size="lg"
+														className="w-full sm:ml-auto sm:w-auto"
+													>
+														Next
 													</Button>
 												</div>
 											</form>
