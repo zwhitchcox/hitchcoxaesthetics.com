@@ -1,9 +1,9 @@
 import {
 	json,
-	redirect,
 	type LoaderFunctionArgs,
 	type MetaFunction,
 } from '@remix-run/node'
+import { redirectPreservingQuery } from '#app/utils/redirect.server.ts'
 import { Link, useLoaderData, useLocation } from '@remix-run/react'
 import { useEffect } from 'react'
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
@@ -79,19 +79,21 @@ function getTreatmentLabel(pageName: string) {
 	}
 }
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
 	const splat = params['*'] ?? ''
 
 	if (splat === 'microneedling/face') {
-		return redirect('/microneedling/facial', { status: 301 })
+		return redirectPreservingQuery(request, '/microneedling/facial', {
+			status: 301,
+		})
 	}
 
 	if (splat === 'telehealth-weight-loss') {
-		return redirect('/weight-loss', { status: 301 })
+		return redirectPreservingQuery(request, '/weight-loss', { status: 301 })
 	}
 
 	if (splat === 'medical-weight-loss-telehealth') {
-		return redirect('/weight-loss', { status: 301 })
+		return redirectPreservingQuery(request, '/weight-loss', { status: 301 })
 	}
 
 	// 301 redirect: old location-prefixed service URLs → base service URLs
@@ -101,9 +103,11 @@ export async function loader({ params }: LoaderFunctionArgs) {
 		// Special case: knoxville-med-spa and farragut-med-spa redirect to location pages
 		if (stripped.basePath === 'med-spa') {
 			const locId = splat.startsWith('knoxville') ? 'bearden' : 'farragut'
-			return redirect(`/${locId}`, { status: 301 })
+			return redirectPreservingQuery(request, `/${locId}`, { status: 301 })
 		}
-		return redirect(`/${stripped.basePath}`, { status: 301 })
+		return redirectPreservingQuery(request, `/${stripped.basePath}`, {
+			status: 301,
+		})
 	}
 
 	// 301 redirect: old hierarchical URLs → canonical root slugs
@@ -115,7 +119,9 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			const candidate = segments.slice(i).join('/')
 			const candidatePage = getPage(candidate)
 			if (candidatePage?.enabled) {
-				return redirect(`/${candidate}`, { status: 301 })
+				return redirectPreservingQuery(request, `/${candidate}`, {
+					status: 301,
+				})
 			}
 		}
 	}
