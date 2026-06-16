@@ -1,7 +1,6 @@
 import crypto from 'crypto'
 import { createRequestHandler as _createRequestHandler } from '@remix-run/express'
 import { installGlobals, type ServerBuild } from '@remix-run/node'
-import * as Sentry from '@sentry/remix'
 import { ip as ipAddress } from 'address'
 import chalk from 'chalk'
 import closeWithGrace from 'close-with-grace'
@@ -18,9 +17,7 @@ const MODE = process.env.NODE_ENV ?? 'development'
 const IS_PROD = MODE === 'production'
 const IS_DEV = MODE === 'development'
 
-const createRequestHandler = IS_PROD
-	? Sentry.wrapExpressCreateRequestHandler(_createRequestHandler)
-	: _createRequestHandler
+const createRequestHandler = _createRequestHandler
 
 const viteDevServer = IS_PROD
 	? undefined
@@ -107,9 +104,6 @@ app.use(compression())
 // http://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 app.disable('x-powered-by')
 
-app.use(Sentry.Handlers.requestHandler())
-app.use(Sentry.Handlers.tracingHandler())
-
 if (viteDevServer) {
 	app.use(viteDevServer.middlewares)
 } else {
@@ -157,7 +151,6 @@ app.use(
 			directives: {
 				'connect-src': [
 					MODE === 'development' ? 'ws:' : null,
-					process.env.SENTRY_DSN ? '*.sentry.io' : null,
 					'https://*.googleapis.com',
 					'*.google.com',
 					'https://*.gstatic.com',

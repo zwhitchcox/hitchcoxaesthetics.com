@@ -4,7 +4,7 @@ import {
 	useParams,
 	useRouteError,
 } from '@remix-run/react'
-import { captureRemixErrorBoundaryError } from '@sentry/remix'
+import posthog from 'posthog-js'
 import { getErrorMessage } from '#app/utils/misc.tsx'
 
 type StatusHandler = (info: {
@@ -26,11 +26,17 @@ export function GeneralErrorBoundary({
 	unexpectedErrorHandler?: (error: unknown) => JSX.Element | null
 }) {
 	const error = useRouteError()
-	captureRemixErrorBoundaryError(error)
 	const params = useParams()
 
 	if (typeof document !== 'undefined') {
 		console.error(error)
+		// PostHog error tracking: React render/route errors don't reach the
+		// global handler, so report them explicitly.
+		if (posthog.__loaded) {
+			posthog.captureException(
+				error instanceof Error ? error : new Error(getErrorMessage(error)),
+			)
+		}
 	}
 
 	return (

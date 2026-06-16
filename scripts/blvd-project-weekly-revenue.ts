@@ -19,6 +19,7 @@ const DEFAULT_MIN_SAMPLE_SIZE = 3
 
 type AppointmentServiceSegment = {
 	appointmentId: string
+	bookedAt: Date | null
 	cancelled: boolean
 	clientName: string
 	durationMinutes: number | null
@@ -41,12 +42,14 @@ type AppointmentNode = {
 		} | null
 		startAt?: string | null
 	}> | null
+	bookedAt?: string | null
 	cancelled?: boolean | null
 	client?: {
 		firstName?: string | null
 		lastName?: string | null
 		name?: string | null
 	} | null
+	createdAt?: string | null
 	endAt?: string | null
 	id?: string | null
 	startAt?: string | null
@@ -128,6 +131,7 @@ type CliOptions = {
 	fromDate: string | null
 	historyDays: number
 	includeCancelled: boolean
+	includeFill: boolean
 	json: boolean
 	locationQuery: string | null
 	minSampleSize: number
@@ -158,8 +162,10 @@ async function main(options: CliOptions) {
 		throw new Error(`No Boulevard locations matched ${options.locationQuery}`)
 	}
 
+	// One appointment pass covers both the target week and all history (Boulevard
+	// has no date filter on the query and our data only spans ~3 months anyway).
 	const [appointmentSegments, revenueSamples] = await Promise.all([
-		listAppointmentServiceSegments({ end, locations, start }),
+		listAppointmentServiceSegments({ from: historyStart, locations, to: end }),
 		listHistoricalRevenueSamples({
 			end: historyEnd,
 			locations,
@@ -167,7 +173,13 @@ async function main(options: CliOptions) {
 		}),
 	])
 	const serviceAverages = buildServiceAverages(revenueSamples)
-	const rows = appointmentSegments
+	const targetSegments = appointmentSegments.filter(
+		segment => segment.startAt >= start && segment.startAt < end,
+	)
+	const historySegments = appointmentSegments.filter(
+		segment => segment.startAt < historyEnd,
+	)
+	const rows = targetSegments
 		.filter(segment => options.includeCancelled || !segment.cancelled)
 		.map(segment =>
 			buildProjectionRow({
@@ -179,7 +191,33 @@ async function main(options: CliOptions) {
 		.sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
 
 	const totalProjectedUsd = rows.reduce((sum, row) => sum + row.projectedUsd, 0)
+	const expectedFill = options.includeFill
+		? buildArrivalForecast({
+				end,
+				historyEnd,
+				historySegments,
+				minSampleSize: options.minSampleSize,
+				now,
+				rows,
+				serviceAverages,
+				start,
+			})
+		: null
 	const result = {
+		expected_fill: expectedFill
+			? {
+					history_observed_start: expectedFill.observedStart.toISOString(),
+					history_observed_end: expectedFill.observedEnd.toISOString(),
+					history_appointment_count: expectedFill.historyAppointmentCount,
+					median_lead_days: expectedFill.medianLeadDays,
+					same_day_share: expectedFill.sameDayShare,
+					days: expectedFill.days,
+					top_services: expectedFill.topServices,
+					total_booked_usd: expectedFill.totalBookedUsd,
+					total_fill_usd: expectedFill.totalFillUsd,
+					total_expected_usd: expectedFill.totalExpectedUsd,
+				}
+			: null,
 		history: {
 			end: historyEnd.toISOString(),
 			revenue_sample_count: revenueSamples.length,
@@ -196,6 +234,9 @@ async function main(options: CliOptions) {
 			cancelled_appointment_service_segments: rows.filter(row => row.cancelled)
 				.length,
 			total_projected_revenue_usd: roundCurrency(totalProjectedUsd),
+			expected_total_revenue_usd: expectedFill
+				? expectedFill.totalExpectedUsd
+				: roundCurrency(totalProjectedUsd),
 		},
 		window: {
 			end: end.toISOString(),
@@ -210,7 +251,51 @@ async function main(options: CliOptions) {
 		return
 	}
 
-	printReport(rows, result)
+	printReport(rows, result, expectedFill)
+}
+
+/**
+ * Values one appointment of a given service at its historical average sale,
+ * falling back to a composite (tox+filler) average or the configured price.
+ * Shared by the booked-appointment rows and the expected-fill arrival model so
+ * both value a service identically.
+ */
+function valueForService({
+	minSampleSize,
+	serviceAverages,
+	serviceId,
+	serviceName,
+}: {
+	minSampleSize: number
+	serviceAverages: Map<string, ServiceAverage>
+	serviceId: string | null
+	serviceName: string
+}) {
+	const average = getServiceAverage(serviceAverages, serviceId, serviceName)
+	const fallbackUsd = getProjectedRevenueForBlvdService(serviceName)
+	const hasEnoughHistory = Boolean(
+		average && average.sampleSize >= minSampleSize,
+	)
+	const compositeAverage = hasEnoughHistory
+		? null
+		: getCompositeServiceAverage(serviceName, serviceAverages, minSampleSize)
+	const projectedUsd = hasEnoughHistory
+		? average!.averageUsd
+		: compositeAverage
+			? compositeAverage.averageUsd
+			: fallbackUsd
+
+	return {
+		averageUsd: average?.averageUsd ?? compositeAverage?.averageUsd ?? null,
+		fallbackUsd,
+		projectedUsd,
+		sampleSize: average?.sampleSize ?? compositeAverage?.sampleSize ?? 0,
+		source: (hasEnoughHistory
+			? 'historical_average'
+			: compositeAverage
+				? 'composite_historical_average'
+				: 'configured_fallback') as ProjectionRow['source'],
+	}
 }
 
 function buildProjectionRow({
@@ -222,38 +307,13 @@ function buildProjectionRow({
 	segment: AppointmentServiceSegment
 	serviceAverages: Map<string, ServiceAverage>
 }): ProjectionRow {
-	const average = getServiceAverage(
+	const valuation = valueForService({
+		minSampleSize,
 		serviceAverages,
-		segment.serviceId,
-		segment.serviceName,
-	)
-	const fallbackUsd = getProjectedRevenueForBlvdService(segment.serviceName)
-	const hasEnoughHistory = average && average.sampleSize >= minSampleSize
-	const compositeAverage = hasEnoughHistory
-		? null
-		: getCompositeServiceAverage(
-				segment.serviceName,
-				serviceAverages,
-				minSampleSize,
-			)
-	const projectedUsd = hasEnoughHistory
-		? average.averageUsd
-		: compositeAverage
-			? compositeAverage.averageUsd
-			: fallbackUsd
-
-	return {
-		...segment,
-		averageUsd: average?.averageUsd ?? compositeAverage?.averageUsd ?? null,
-		fallbackUsd,
-		projectedUsd,
-		sampleSize: average?.sampleSize ?? compositeAverage?.sampleSize ?? 0,
-		source: hasEnoughHistory
-			? 'historical_average'
-			: compositeAverage
-				? 'composite_historical_average'
-				: 'configured_fallback',
-	}
+		serviceId: segment.serviceId,
+		serviceName: segment.serviceName,
+	})
+	return { ...segment, ...valuation }
 }
 
 function getCompositeServiceAverage(
@@ -362,13 +422,13 @@ function getServiceAverage(
 }
 
 async function listAppointmentServiceSegments({
-	end,
+	from,
 	locations,
-	start,
+	to,
 }: {
-	end: Date
+	from: Date
 	locations: BlvdAdminLocation[]
-	start: Date
+	to: Date
 }) {
 	const segments: AppointmentServiceSegment[] = []
 
@@ -387,6 +447,7 @@ async function listAppointmentServiceSegments({
 							node {
 								id
 								cancelled
+								createdAt
 								startAt
 								endAt
 								state
@@ -428,11 +489,14 @@ async function listAppointmentServiceSegments({
 					latestAppointmentStart,
 					appointmentStart.getTime(),
 				)
-				if (appointmentStart < start || appointmentStart >= end) continue
+				if (appointmentStart < from || appointmentStart >= to) continue
 
+				const bookedAt =
+					parseDate(appointment.bookedAt) ?? parseDate(appointment.createdAt)
 				for (const service of appointment.appointmentServices ?? []) {
 					segments.push({
 						appointmentId: appointment.id ?? '',
+						bookedAt,
 						cancelled: appointment.cancelled === true,
 						clientName: getClientName(appointment.client),
 						durationMinutes: service.duration ?? null,
@@ -446,7 +510,7 @@ async function listAppointmentServiceSegments({
 				}
 			}
 
-			if (latestAppointmentStart >= end.getTime()) break
+			if (latestAppointmentStart >= to.getTime()) break
 
 			const pageInfo = response.appointments?.pageInfo
 			if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break
@@ -625,11 +689,267 @@ function getReportWindow(options: CliOptions) {
 	return { end, start }
 }
 
+type ForecastDay = {
+	dateLabel: string
+	weekday: string
+	daysOut: number
+	bookedUsd: number
+	bookedCount: number
+	expectedNewCount: number
+	fillUsd: number
+	expectedUsd: number
+}
+
+type ServiceArrival = {
+	serviceName: string
+	expectedNewCount: number
+	expectedNewUsd: number
+}
+
+type ArrivalForecast = {
+	days: ForecastDay[]
+	topServices: ServiceArrival[]
+	observedStart: Date
+	observedEnd: Date
+	historyAppointmentCount: number
+	medianLeadDays: number
+	sameDayShare: number
+	totalBookedUsd: number
+	totalFillUsd: number
+	totalExpectedUsd: number
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+// Below this many historical bookings for a service, its lead-time curve is too
+// noisy, so we borrow the pooled all-service curve instead.
+const MIN_LEADS_FOR_OWN_CURVE = 8
+
+type TypeStats = {
+	serviceId: string | null
+	serviceName: string
+	leads: number[]
+	weekdayCounts: Map<string, number>
+}
+
+/**
+ * Forecasts revenue still to be booked this week from each service's own
+ * historical behavior: how often that service runs on each weekday, and how
+ * far ahead it is typically booked (its lead-time curve). For a target day
+ * `d` days out, the bookings still to come are the share of that service's
+ * weekly volume that historically books with less than `d` days of lead time.
+ * Each expected new booking is valued at that service's average sale, then
+ * added on top of what is already on the calendar.
+ */
+function buildArrivalForecast({
+	end,
+	historyEnd,
+	historySegments,
+	minSampleSize,
+	now,
+	rows,
+	serviceAverages,
+	start,
+}: {
+	end: Date
+	historyEnd: Date
+	historySegments: AppointmentServiceSegment[]
+	minSampleSize: number
+	now: Date
+	rows: ProjectionRow[]
+	serviceAverages: Map<string, ServiceAverage>
+	start: Date
+}): ArrivalForecast {
+	const completed = historySegments.filter(
+		segment => !segment.cancelled && segment.startAt < historyEnd,
+	)
+
+	// Per-service weekday volume and lead-time samples.
+	const typeStats = new Map<string, TypeStats>()
+	const pooledLeads: number[] = []
+	let observedStartMs = Infinity
+	for (const segment of completed) {
+		observedStartMs = Math.min(observedStartMs, segment.startAt.getTime())
+		const key = getServiceAverageKey(segment.serviceId, segment.serviceName)
+		const stats =
+			typeStats.get(key) ??
+			({
+				serviceId: segment.serviceId,
+				serviceName: segment.serviceName,
+				leads: [],
+				weekdayCounts: new Map<string, number>(),
+			} satisfies TypeStats)
+		const weekday = localWeekday(segment.startAt)
+		stats.weekdayCounts.set(
+			weekday,
+			(stats.weekdayCounts.get(weekday) ?? 0) + 1,
+		)
+		if (segment.bookedAt) {
+			const leadMs = segment.startAt.getTime() - segment.bookedAt.getTime()
+			// Drop appointments "created" after they occurred: those are Jane ->
+			// Boulevard migration imports (import-date createdAt), not real
+			// bookings, and would otherwise collapse the lead-time curve to
+			// same-day.
+			if (leadMs >= -12 * 60 * 60 * 1000) {
+				const leadDays = Math.max(0, Math.round(leadMs / DAY_MS))
+				stats.leads.push(leadDays)
+				pooledLeads.push(leadDays)
+			}
+		}
+		typeStats.set(key, stats)
+	}
+
+	const observedStart = new Date(
+		Number.isFinite(observedStartMs) ? observedStartMs : historyEnd.getTime(),
+	)
+
+	// How many of each weekday occurred in the observed history span; this is
+	// the denominator that turns counts into "appointments per Monday", etc.
+	const weekdayOccurrences = new Map<string, number>()
+	for (
+		let cursor = observedStart.getTime() + DAY_MS / 2;
+		cursor < historyEnd.getTime();
+		cursor += DAY_MS
+	) {
+		const weekday = localWeekday(new Date(cursor))
+		weekdayOccurrences.set(weekday, (weekdayOccurrences.get(weekday) ?? 0) + 1)
+	}
+
+	// Fraction of bookings made with strictly less than `d` days of lead time
+	// (i.e. not yet booked when a day is `d` days away).
+	const shareBookedWithin = (leads: number[], d: number) => {
+		const sample = leads.length >= MIN_LEADS_FOR_OWN_CURVE ? leads : pooledLeads
+		if (sample.length === 0) return 0
+		const within = sample.filter(lead => lead < d).length
+		return within / sample.length
+	}
+
+	const bookedByDate = new Map<string, { usd: number; count: number }>()
+	for (const row of rows) {
+		if (row.cancelled) continue
+		const key = localDateKey(row.startAt)
+		const entry = bookedByDate.get(key) ?? { usd: 0, count: 0 }
+		entry.usd += row.projectedUsd
+		entry.count += 1
+		bookedByDate.set(key, entry)
+	}
+
+	const todayStartMs = startOfLocalDay(now)
+	const serviceArrivals = new Map<string, ServiceArrival>()
+	const days: ForecastDay[] = []
+	for (
+		let cursor = start.getTime() + DAY_MS / 2;
+		cursor < end.getTime();
+		cursor += DAY_MS
+	) {
+		const instant = new Date(cursor)
+		const key = localDateKey(instant)
+		const weekday = localWeekday(instant)
+		const daysOut = Math.round(
+			(startOfLocalDay(instant) - todayStartMs) / DAY_MS,
+		)
+		const booked = bookedByDate.get(key) ?? { usd: 0, count: 0 }
+
+		let fillUsd = 0
+		let expectedNewCount = 0
+		if (daysOut > 0) {
+			for (const stats of typeStats.values()) {
+				const weekdayCount = stats.weekdayCounts.get(weekday) ?? 0
+				if (weekdayCount === 0) continue
+				const occurrences = weekdayOccurrences.get(weekday) ?? 0
+				if (occurrences === 0) continue
+				const ratePerWeekday = weekdayCount / occurrences
+				const stillToCome =
+					ratePerWeekday * shareBookedWithin(stats.leads, daysOut)
+				if (stillToCome <= 0) continue
+				const value = valueForService({
+					minSampleSize,
+					serviceAverages,
+					serviceId: stats.serviceId,
+					serviceName: stats.serviceName,
+				}).projectedUsd
+				const usd = stillToCome * value
+				fillUsd += usd
+				expectedNewCount += stillToCome
+				const arrival = serviceArrivals.get(stats.serviceName) ?? {
+					serviceName: stats.serviceName,
+					expectedNewCount: 0,
+					expectedNewUsd: 0,
+				}
+				arrival.expectedNewCount += stillToCome
+				arrival.expectedNewUsd += usd
+				serviceArrivals.set(stats.serviceName, arrival)
+			}
+		}
+
+		days.push({
+			dateLabel: formatInTimeZone(instant, BUSINESS_TIMEZONE, 'EEE, MMM d'),
+			weekday,
+			daysOut,
+			bookedUsd: roundCurrency(booked.usd),
+			bookedCount: booked.count,
+			expectedNewCount: roundTo(expectedNewCount, 1),
+			fillUsd: roundCurrency(fillUsd),
+			expectedUsd: roundCurrency(booked.usd + fillUsd),
+		})
+	}
+
+	const sortedLeads = [...pooledLeads].sort((a, b) => a - b)
+	const medianLeadDays =
+		sortedLeads.length > 0
+			? (sortedLeads[Math.floor((sortedLeads.length - 1) / 2)] ?? 0)
+			: 0
+	const sameDayShare =
+		sortedLeads.length > 0
+			? sortedLeads.filter(lead => lead === 0).length / sortedLeads.length
+			: 0
+
+	const totalBookedUsd = days.reduce((sum, day) => sum + day.bookedUsd, 0)
+	const totalFillUsd = days.reduce((sum, day) => sum + day.fillUsd, 0)
+	return {
+		days,
+		topServices: [...serviceArrivals.values()]
+			.map(arrival => ({
+				serviceName: arrival.serviceName,
+				expectedNewCount: roundTo(arrival.expectedNewCount, 1),
+				expectedNewUsd: roundCurrency(arrival.expectedNewUsd),
+			}))
+			.filter(arrival => arrival.expectedNewUsd > 0)
+			.sort((a, b) => b.expectedNewUsd - a.expectedNewUsd),
+		observedStart,
+		observedEnd: historyEnd,
+		historyAppointmentCount: completed.length,
+		medianLeadDays,
+		sameDayShare: roundTo(sameDayShare, 3),
+		totalBookedUsd: roundCurrency(totalBookedUsd),
+		totalFillUsd: roundCurrency(totalFillUsd),
+		totalExpectedUsd: roundCurrency(totalBookedUsd + totalFillUsd),
+	}
+}
+
+function startOfLocalDay(date: Date) {
+	const key = formatInTimeZone(date, BUSINESS_TIMEZONE, 'yyyy-MM-dd')
+	return fromZonedTime(`${key}T00:00:00`, BUSINESS_TIMEZONE).getTime()
+}
+
+function roundTo(value: number, digits: number) {
+	const factor = 10 ** digits
+	return Math.round(value * factor) / factor
+}
+
+function localDateKey(date: Date) {
+	return formatInTimeZone(date, BUSINESS_TIMEZONE, 'yyyy-MM-dd')
+}
+
+function localWeekday(date: Date) {
+	return formatInTimeZone(date, BUSINESS_TIMEZONE, 'EEEE')
+}
+
 function parseArgs(args: string[]): CliOptions {
 	const options: CliOptions = {
 		fromDate: null,
 		historyDays: DEFAULT_HISTORY_DAYS,
 		includeCancelled: false,
+		includeFill: true,
 		json: false,
 		locationQuery: null,
 		minSampleSize: DEFAULT_MIN_SAMPLE_SIZE,
@@ -653,6 +973,8 @@ function parseArgs(args: string[]): CliOptions {
 			index += 1
 		} else if (arg === '--include-cancelled') {
 			options.includeCancelled = true
+		} else if (arg === '--no-fill') {
+			options.includeFill = false
 		} else if (arg === '--json') {
 			options.json = true
 		} else if (arg === '--location') {
@@ -700,6 +1022,7 @@ function printReport(
 			start_local: string
 		}
 	},
+	expectedFill: ArrivalForecast | null,
 ) {
 	console.log(
 		`Projected Boulevard revenue: ${result.window.start_local} through ${result.window.end_local}`,
@@ -749,6 +1072,49 @@ function printReport(
 	printSummary('By day', byDay)
 	printSummary('By location', byLocation)
 	printSummary('By service', byService)
+
+	if (expectedFill) {
+		printExpectedFill(expectedFill)
+	}
+}
+
+function printExpectedFill(fill: ArrivalForecast) {
+	const spanDays = Math.max(
+		1,
+		Math.round(
+			(fill.observedEnd.getTime() - fill.observedStart.getTime()) / DAY_MS,
+		),
+	)
+	console.log('')
+	console.log(
+		`Expected still-to-book this week (per-service lead times from ${fill.historyAppointmentCount} appts over ${spanDays} days; median lead ${fill.medianLeadDays}d, ${Math.round(fill.sameDayShare * 100)}% same-day)`,
+	)
+	for (const day of fill.days) {
+		const tail =
+			day.daysOut <= 0
+				? 'already here'
+				: `+${day.expectedNewCount} appts ${formatUsd(day.fillUsd)} → ${formatUsd(day.expectedUsd)}`
+		console.log(
+			[
+				day.dateLabel,
+				`${day.bookedCount} booked ${formatUsd(day.bookedUsd)}`,
+				tail,
+			].join(' | '),
+		)
+	}
+	if (fill.topServices.length > 0) {
+		console.log('')
+		console.log('Expected new bookings by service')
+		for (const service of fill.topServices.slice(0, 10)) {
+			console.log(
+				`${service.serviceName}: ${service.expectedNewCount} | ${formatUsd(service.expectedNewUsd)}`,
+			)
+		}
+	}
+	console.log('')
+	console.log(`Already booked: ${formatUsd(fill.totalBookedUsd)}`)
+	console.log(`Expected still to book: ${formatUsd(fill.totalFillUsd)}`)
+	console.log(`Expected total: ${formatUsd(fill.totalExpectedUsd)}`)
 }
 
 function printSummary(
@@ -914,6 +1280,7 @@ Options:
   --location NAME            Limit appointments and history to a location. "bearden" maps to Knoxville.
   --history-days N           Historical closed-order lookback. Default: ${DEFAULT_HISTORY_DAYS}.
   --min-sample-size N        Use historical average only after N samples. Default: ${DEFAULT_MIN_SAMPLE_SIZE}.
+  --no-fill                  Only count appointments already on the books; skip the expected still-to-book estimate.
   --include-cancelled        Include cancelled appointment service segments.
   --json                     Print JSON.
 

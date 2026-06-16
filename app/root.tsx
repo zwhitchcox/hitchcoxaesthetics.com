@@ -19,7 +19,6 @@ import {
 	useLoaderData,
 	useLocation,
 } from '@remix-run/react'
-import { withSentry } from '@sentry/remix'
 import { useEffect, useState } from 'react'
 import { HoneypotProvider } from 'remix-utils/honeypot/react'
 import { z } from 'zod'
@@ -596,6 +595,8 @@ function Footer() {
 
 const posthogOptions = {
 	api_host: ENV.REACT_APP_PUBLIC_POSTHOG_HOST,
+	// PostHog error tracking: autocapture unhandled exceptions and rejections.
+	capture_exceptions: true,
 }
 
 function AppWithProviders() {
@@ -616,7 +617,7 @@ function AppWithProviders() {
 	)
 }
 
-export default withSentry(AppWithProviders)
+export default AppWithProviders
 
 /**
  * @returns the user's theme preference, or the client hint theme if the user

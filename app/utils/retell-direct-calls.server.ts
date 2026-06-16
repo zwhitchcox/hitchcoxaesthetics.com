@@ -120,10 +120,15 @@ export async function syncRetellDirectCallsToPostHog({
 		if (call.direction === 'outbound') continue
 		const recordId = `retell:${call.call_id}`
 		const callerPhone = normalizePhoneNumber(call.from_number)
-		const startedAt = call.start_timestamp ? new Date(call.start_timestamp) : null
+		const startedAt = call.start_timestamp
+			? new Date(call.start_timestamp)
+			: null
 
 		if (
-			getBookingAnalyticsExclusionReason({ emails: [], phones: [callerPhone] }) ||
+			getBookingAnalyticsExclusionReason({
+				emails: [],
+				phones: [callerPhone],
+			}) ||
 			isExcludedBookingAnalyticsIdentity({ phone: callerPhone })
 		) {
 			stats.excluded += 1

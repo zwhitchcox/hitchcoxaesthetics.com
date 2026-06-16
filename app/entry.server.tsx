@@ -7,7 +7,6 @@ import {
 	type LoaderFunctionArgs,
 } from '@remix-run/node'
 import { RemixServer } from '@remix-run/react'
-import * as Sentry from '@sentry/remix'
 import chalk from 'chalk'
 import { isbot } from 'isbot'
 import { renderToPipeableStream } from 'react-dom/server'
@@ -23,10 +22,6 @@ const ABORT_DELAY = 5000
 
 init()
 global.ENV = getEnv()
-
-if (ENV.MODE === 'production' && ENV.SENTRY_DSN) {
-	import('./utils/monitoring.server.ts').then(({ init }) => init())
-}
 
 type DocRequestArgs = Parameters<HandleDocumentRequestFunction>
 
@@ -102,10 +97,35 @@ export function handleError(
 ): void {
 	if (error instanceof Error) {
 		console.error(chalk.red(error.stack))
-		Sentry.captureRemixServerException(error, 'remix.server', request)
-	} else {
-		Sentry.captureException(error)
 	}
+
+	// PostHog error tracking: send every server route error as an $exception.
+	void captureServerPostHogEvent({
+		distinctId: `server-error:${hashValue(
+			request.headers.get('x-request-id') ?? request.url,
+		)}`,
+		event: '$exception',
+		insertId: `server-exception:${Date.now()}:${Math.random()
+			.toString(36)
+			.slice(2)}`,
+		properties: {
+			$exception_list: [
+				{
+					type: error instanceof Error ? error.name : 'Error',
+					value: redactServerErrorText(getServerErrorMessage(error)),
+					stacktrace:
+						error instanceof Error && error.stack
+							? { type: 'raw', frames: [], raw: error.stack }
+							: undefined,
+					mechanism: { handled: false, synthetic: false },
+				},
+			],
+			$exception_message: redactServerErrorText(getServerErrorMessage(error)),
+			$exception_type: error instanceof Error ? error.name : 'Error',
+			request_url: redactServerErrorText(request.url),
+			request_method: request.method,
+		},
+	})
 
 	if (isBookingErrorRequest(request)) {
 		void captureServerPostHogEvent({

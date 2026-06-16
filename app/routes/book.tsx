@@ -2852,43 +2852,6 @@ export default function BlvdBookRoute() {
 											Verify your mobile number to continue.
 										</p>
 										<div className="w-full space-y-6">
-											<div className="space-y-3 rounded-xl border bg-white p-5">
-												<h3 className="text-lg font-semibold">
-													Appointment details
-												</h3>
-												<dl className="space-y-1.5 text-sm">
-													<div className="flex justify-between gap-4">
-														<dt className="text-muted-foreground">Service</dt>
-														<dd className="text-right font-medium text-foreground">
-															{selectedService
-																? selectedService.displayName
-																: 'Service'}
-														</dd>
-													</div>
-													<div className="flex justify-between gap-4">
-														<dt className="text-muted-foreground">Location</dt>
-														<dd className="text-right font-medium text-foreground">
-															{selectedLocation?.name}
-														</dd>
-													</div>
-													<div className="flex justify-between gap-4">
-														<dt className="text-muted-foreground">Time</dt>
-														<dd className="text-right font-medium text-foreground">
-															{selectedTime
-																? formatTimeLabel(selectedTime.startTime)
-																: ''}
-														</dd>
-													</div>
-													<div className="flex justify-between gap-4">
-														<dt className="text-muted-foreground">
-															Card required
-														</dt>
-														<dd className="text-right font-medium text-foreground">
-															{requiresCard ? 'Yes' : 'No'}
-														</dd>
-													</div>
-												</dl>
-											</div>
 											<form
 												className="space-y-8"
 												onSubmit={handleDetailsSubmit}
@@ -2915,95 +2878,92 @@ export default function BlvdBookRoute() {
 															}}
 														/>
 													</div>
-													<div className="space-y-4 rounded-xl border bg-white p-5 md:col-span-2">
-														<div className="space-y-1">
-															<h3 className="text-lg font-semibold">
-																Verify your mobile number
-															</h3>
-														</div>
+													<div className="space-y-3 md:col-span-2">
+														{ownershipStepError ? (
+															<div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+																{ownershipStepError}
+															</div>
+														) : null}
 														{hasVerifiedMobile ? (
 															<div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
 																Mobile number verified.
 															</div>
-														) : (
-															<div className="space-y-3">
-																{ownershipStepError ? (
-																	<div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-																		{ownershipStepError}
-																	</div>
-																) : null}
-																<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+														) : canShowOwnershipCodeEntry ? (
+															<div className="space-y-2">
+																<p className="text-sm text-muted-foreground">
+																	Enter the code from your text.
+																</p>
+																<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+																	<Input
+																		ref={ownershipCodeInputRef}
+																		className="placeholder:text-muted-foreground/45"
+																		value={ownershipCodeValue}
+																		onChange={event => {
+																			setOwnershipCodeValue(
+																				event.currentTarget.value
+																					.replace(/[^a-zA-Z0-9]/g, '')
+																					.toUpperCase()
+																					.slice(0, 6),
+																			)
+																		}}
+																		onKeyDown={event => {
+																			if (event.key !== 'Enter') return
+																			event.preventDefault()
+																			if (!verifyingOwnershipCode) {
+																				void handleVerifyOwnershipCode()
+																			}
+																		}}
+																		autoCapitalize="characters"
+																		autoComplete="one-time-code"
+																		inputMode="text"
+																		maxLength={6}
+																		placeholder={
+																			ownershipCodeId ===
+																			BOOKING_PHONE_VERIFICATION_CODE_ID
+																				? 'ABC123'
+																				: '123456'
+																		}
+																	/>
 																	<Button
 																		type="button"
-																		variant="outline"
+																		className="w-full whitespace-nowrap sm:w-auto"
 																		onClick={() => {
-																			void handleSendOwnershipCode()
+																			void handleVerifyOwnershipCode()
 																		}}
-																		disabled={
-																			sendingOwnershipCode ||
-																			!canRequestOwnershipCode
-																		}
+																		disabled={verifyingOwnershipCode}
 																	>
-																		{sendingOwnershipCode
-																			? 'Sending Code...'
-																			: ownershipCodeId
-																				? 'Send A New Code'
-																				: 'Text Me A Code'}
+																		{verifyingOwnershipCode
+																			? 'Verifying...'
+																			: 'Verify Code'}
 																	</Button>
-																	{canShowOwnershipCodeEntry ? (
-																		<p className="text-sm text-muted-foreground">
-																			Enter the code from your text.
-																		</p>
-																	) : null}
 																</div>
-																{canShowOwnershipCodeEntry ? (
-																	<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-																		<Input
-																			ref={ownershipCodeInputRef}
-																			className="placeholder:text-muted-foreground/45"
-																			value={ownershipCodeValue}
-																			onChange={event => {
-																				setOwnershipCodeValue(
-																					event.currentTarget.value
-																						.replace(/[^a-zA-Z0-9]/g, '')
-																						.toUpperCase()
-																						.slice(0, 6),
-																				)
-																			}}
-																			onKeyDown={event => {
-																				if (event.key !== 'Enter') return
-																				event.preventDefault()
-																				if (!verifyingOwnershipCode) {
-																					void handleVerifyOwnershipCode()
-																				}
-																			}}
-																			autoCapitalize="characters"
-																			autoComplete="one-time-code"
-																			inputMode="text"
-																			maxLength={6}
-																			placeholder={
-																				ownershipCodeId ===
-																				BOOKING_PHONE_VERIFICATION_CODE_ID
-																					? 'ABC123'
-																					: '123456'
-																			}
-																		/>
-																		<Button
-																			type="button"
-																			className="w-full whitespace-nowrap sm:w-auto"
-																			onClick={() => {
-																				void handleVerifyOwnershipCode()
-																			}}
-																			disabled={verifyingOwnershipCode}
-																		>
-																			{verifyingOwnershipCode
-																				? 'Verifying...'
-																				: 'Verify Code'}
-																		</Button>
-																	</div>
-																) : null}
+																<button
+																	type="button"
+																	className="text-sm text-muted-foreground underline underline-offset-2 disabled:opacity-50"
+																	onClick={() => {
+																		void handleSendOwnershipCode()
+																	}}
+																	disabled={sendingOwnershipCode}
+																>
+																	{sendingOwnershipCode
+																		? 'Sending...'
+																		: 'Send a new code'}
+																</button>
 															</div>
-														)}
+														) : canRequestOwnershipCode ? (
+															<Button
+																type="button"
+																variant="outline"
+																onClick={() => {
+																	void handleSendOwnershipCode()
+																}}
+																disabled={sendingOwnershipCode}
+															>
+																{sendingOwnershipCode
+																	? 'Sending Code...'
+																	: 'Text Me A Code'}
+															</Button>
+														) : null}
 													</div>
 													{hasVerifiedClient ? (
 														<div className="rounded-xl border bg-white p-5 text-sm text-muted-foreground md:col-span-2">

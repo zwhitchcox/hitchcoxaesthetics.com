@@ -173,7 +173,6 @@ test('either-location shows merged availability and reserves at the picked offic
 
 	// flow advances to details with the chosen location
 	expect(await screen.findByLabelText(/Mobile phone/i)).toBeVisible()
-	expect(screen.getByText(/Appointment details/i)).toBeVisible()
 	expect(screen.getAllByText(/Farragut/i).length).toBeGreaterThan(0)
 })
 

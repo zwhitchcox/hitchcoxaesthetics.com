@@ -8,7 +8,6 @@ const schema = z.object({
 	INTERNAL_COMMAND_TOKEN: z.string(),
 	HONEYPOT_SECRET: z.string(),
 	CACHE_DATABASE_PATH: z.string(),
-	// SENTRY_DSN: z.string(),
 	RESEND_API_KEY: z.string(),
 	TWILIO_AUTH_TOKEN: z.string(),
 	TWILIO_ACCOUNT_SID: z.string(),
@@ -67,7 +66,6 @@ export function init() {
 export function getEnv() {
 	return {
 		MODE: process.env.NODE_ENV,
-		SENTRY_DSN: process.env.SENTRY_DSN,
 		DEFAULT_PROVIDER: process.env.DEFAULT_PROVIDER,
 		GA_TRACKING_ID: process.env.GA_TRACKING_ID,
 		GTM_ID: process.env.GTM_ID,
