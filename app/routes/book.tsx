@@ -1632,12 +1632,32 @@ export default function BlvdBookRoute() {
 			})
 
 			if (posthog) {
+				const bookingClientName =
+					[
+						cart?.clientInformation?.firstName ?? clientForm.firstName,
+						cart?.clientInformation?.lastName ?? clientForm.lastName,
+					]
+						.map(part => part?.trim())
+						.filter(Boolean)
+						.join(' ') || undefined
+				const bookingClientPhone =
+					ownershipVerifiedPhone ?? clientForm.phone ?? undefined
+				const bookingClientEmail =
+					cart?.clientInformation?.email ?? clientForm.email ?? undefined
+				const bookingAppointmentStart = selectedTime?.startTime ?? undefined
+				const clientProperties = {
+					booking_client_name: bookingClientName,
+					booking_client_phone: bookingClientPhone,
+					booking_client_email: bookingClientEmail,
+					booking_appointment_start: bookingAppointmentStart,
+				}
 				captureBookingPostHogEvent('booking_step_viewed', {
 					...bookingAnalyticsPropertiesRef.current,
 					step: 'success',
 				})
 				captureBookingPostHogEvent('booking_completed', {
 					...bookingAnalyticsPropertiesRef.current,
+					...clientProperties,
 					$insert_id: `booking-completed:website:${checkoutPayload.cart.id}`,
 					appointment_count: checkoutPayload.appointments.length,
 					booking_selected_payment_method_type: selectedPaymentMethodType,
@@ -1648,6 +1668,7 @@ export default function BlvdBookRoute() {
 				})
 				captureBookingPostHogEvent('booking_conversion_completed', {
 					...bookingAnalyticsPropertiesRef.current,
+					...clientProperties,
 					$insert_id: `booking-conversion:website:${checkoutPayload.cart.id}`,
 					appointment_count: checkoutPayload.appointments.length,
 					booking_channel: 'website_booking',
