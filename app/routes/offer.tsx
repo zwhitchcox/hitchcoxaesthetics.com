@@ -1,5 +1,6 @@
-import { redirect } from '@remix-run/node'
+import { type LoaderFunctionArgs } from '@remix-run/node'
+import { redirectPreservingQuery } from '#app/utils/redirect.server.ts'
 
-export async function loader() {
-	return redirect('/lp/botox', 301)
+export async function loader({ request }: LoaderFunctionArgs) {
+	return redirectPreservingQuery(request, '/lp/botox', 301)
 }
