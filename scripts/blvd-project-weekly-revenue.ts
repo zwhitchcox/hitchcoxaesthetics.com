@@ -663,6 +663,32 @@ function buildRevenueSamplesForOrder(order: OrderNode, occurredAt: Date) {
 	return samples
 }
 
+function resolveWeekAnchor(weekArg: string | null): Date {
+	if (!weekArg) return new Date()
+	const value = weekArg.trim().toLowerCase()
+	if (value === 'this' || value === 'current' || value === 'now') {
+		return new Date()
+	}
+	if (value === 'next') return addWeeks(new Date(), 1)
+	if (value === 'last' || value === 'prev' || value === 'previous') {
+		return addWeeks(new Date(), -1)
+	}
+	// relative week count: +2, -1, 2, +0, optionally suffixed with w (e.g. +3w)
+	const relative = value.match(/^([+-]?\d+)w?$/)
+	if (relative) return addWeeks(new Date(), Number(relative[1]))
+	const date = parseLocalDate(weekArg)
+	if (date) return date
+	throw new Error(
+		`Unrecognized week "${weekArg}". Use: this | next | last | +N | -N | YYYY-MM-DD.`,
+	)
+}
+
+function addWeeks(date: Date, weeks: number) {
+	const next = new Date(date)
+	next.setUTCDate(next.getUTCDate() + weeks * 7)
+	return next
+}
+
 function getReportWindow(options: CliOptions) {
 	if (options.fromDate || options.toDate) {
 		if (!options.fromDate || !options.toDate) {
@@ -674,7 +700,7 @@ function getReportWindow(options: CliOptions) {
 		}
 	}
 
-	const anchor = parseLocalDate(options.weekDate) ?? new Date()
+	const anchor = resolveWeekAnchor(options.weekDate)
 	const anchorDay = Number(formatInTimeZone(anchor, BUSINESS_TIMEZONE, 'i'))
 	const monday = new Date(anchor)
 	monday.setUTCDate(anchor.getUTCDate() - (anchorDay - 1))
@@ -989,6 +1015,9 @@ function parseArgs(args: string[]): CliOptions {
 		} else if (arg === '--week') {
 			options.weekDate = requireNextValue(arg, next)
 			index += 1
+		} else if (!arg.startsWith('--') && options.weekDate === null) {
+			// positional week shorthand, e.g. `next`, `+2`, `2026-06-22`
+			options.weekDate = arg
 		} else {
 			throw new Error(`Unknown argument: ${arg}`)
 		}
@@ -1274,7 +1303,10 @@ function printHelp() {
 	console.log(`Usage: pnpm blvd:project-revenue [options]
 
 Options:
-  --week YYYY-MM-DD          Project the Monday-Sunday week containing this date.
+  --week <when>              Which Mon-Sun week to project. Accepts:
+                               this (default) | next | last | +N | -N | YYYY-MM-DD
+                             Also works as a bare arg: "pnpm blvd:project-revenue next",
+                             "pnpm blvd:project-revenue +2", "pnpm blvd:project-revenue 2026-06-22".
   --from YYYY-MM-DD          Inclusive Eastern start date. Requires --to.
   --to YYYY-MM-DD            Exclusive Eastern end date. Requires --from.
   --location NAME            Limit appointments and history to a location. "bearden" maps to Knoxville.
