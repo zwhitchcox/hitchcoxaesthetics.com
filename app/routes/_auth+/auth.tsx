@@ -26,7 +26,6 @@ import { PhoneSchema } from '#app/utils/user-validation.js'
 const AuthSchema = z.object({
 	phone: PhoneSchema,
 	redirectTo: z.string().optional(),
-	remember: z.string().optional(),
 })
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -45,7 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		)
 	}
 
-	const { phone, redirectTo, remember } = submission.value
+	const { phone, redirectTo } = submission.value
 	await prisma.user.upsert({
 		where: {
 			phone: phone,
@@ -66,9 +65,6 @@ export async function action({ request }: ActionFunctionArgs) {
 	})
 	if (redirectTo) {
 		verifyRedirectTo.searchParams.set('redirectTo', redirectTo)
-	}
-	if (remember) {
-		verifyRedirectTo.searchParams.set('remember', 'true')
 	}
 
 	const response = await sendSMS({
@@ -146,15 +142,6 @@ export default function AuthRoute() {
 						errors={fields.phone.errors}
 						id={`${fields.phone.id}-error`}
 					/>
-					<label className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-						<input
-							type="checkbox"
-							name="remember"
-							defaultChecked={Boolean(fields.remember.value)}
-							className="h-4 w-4"
-						/>
-						Remember me for 7 days
-					</label>
 					<StatusButton
 						className="mt-6 w-full"
 						status={isPending ? 'pending' : (form.status ?? 'idle')}

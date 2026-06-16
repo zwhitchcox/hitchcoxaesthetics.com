@@ -15,7 +15,7 @@ export async function handleVerification({
 		submission.status === 'success',
 		'Submission should be successful by now',
 	)
-	const { redirectTo, target, remember } = submission.value
+	const { redirectTo, target } = submission.value
 	const authSession = await authSessionStorage.getSession(
 		request.headers.get('cookie'),
 	)
@@ -31,19 +31,11 @@ export async function handleVerification({
 		},
 	})
 	authSession.set(sessionKey, session.id)
-
-	// "Remember me" -> persistent cookie for 7 days. Otherwise a session cookie
-	// that clears when the browser closes.
-	const REMEMBER_ME_COOKIE_MS = 1000 * 60 * 60 * 24 * 7
-	if (!remember) authSession.unset('expires')
 	return redirect(safeRedirect(redirectTo ?? '/'), {
 		headers: {
-			'set-cookie': await authSessionStorage.commitSession(
-				authSession,
-				remember
-					? { expires: new Date(Date.now() + REMEMBER_ME_COOKIE_MS) }
-					: {},
-			),
+			'set-cookie': await authSessionStorage.commitSession(authSession, {
+				expires: session.expirationDate,
+			}),
 		},
 	})
 }
