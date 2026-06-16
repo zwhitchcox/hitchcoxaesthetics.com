@@ -17,6 +17,7 @@ export const codeQueryParam = 'code'
 export const targetQueryParam = 'target'
 export const typeQueryParam = 'type'
 export const redirectToQueryParam = 'redirectTo'
+export const rememberQueryParam = 'remember'
 const types = ['booking-phone', 'login'] as const
 const VerificationTypeSchema = z.enum(types)
 export type VerificationTypes = z.infer<typeof VerificationTypeSchema>
@@ -26,6 +27,7 @@ export const VerifySchema = z.object({
 	[typeQueryParam]: VerificationTypeSchema,
 	[targetQueryParam]: z.string(),
 	[redirectToQueryParam]: z.string().optional(),
+	[rememberQueryParam]: z.string().optional(),
 })
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -69,6 +71,7 @@ export default function VerifyRoute() {
 			type: type,
 			target: searchParams.get(targetQueryParam),
 			redirectTo: searchParams.get(redirectToQueryParam),
+			remember: searchParams.get(rememberQueryParam),
 		},
 	})
 
@@ -106,6 +109,11 @@ export default function VerifyRoute() {
 						/>
 						<input
 							{...getInputProps(fields[redirectToQueryParam], {
+								type: 'hidden',
+							})}
+						/>
+						<input
+							{...getInputProps(fields[rememberQueryParam], {
 								type: 'hidden',
 							})}
 						/>

@@ -9,6 +9,7 @@ import {
 	type MetaFunction,
 } from '@remix-run/node'
 import {
+	Form,
 	Link,
 	Links,
 	Meta,
@@ -532,6 +533,17 @@ function Header({
 				} fixed`}
 			>
 				<ListWithDot links={links} className="px-3 py-16 text-2xl" />
+				{data.user ? (
+					<Form method="post" action="/logout">
+						<button
+							type="submit"
+							className="text-2xl text-muted-foreground hover:text-foreground"
+							onClick={() => setIsMenuOpen(false)}
+						>
+							Log out
+						</button>
+					</Form>
+				) : null}
 			</nav>
 		</>
 	)
