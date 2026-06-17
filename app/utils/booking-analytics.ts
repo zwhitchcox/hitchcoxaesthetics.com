@@ -567,6 +567,17 @@ function getGoogleClickIdFromDecodedLinkerValue(value: string | null) {
 	return parts.length >= 3 ? parts[parts.length - 1]?.trim() || null : trimmed
 }
 
+// Our own domain. A referrer pointing here is an internal navigation or a
+// landing-page self-navigation, not a real external referral.
+const OWN_REFERRER_DOMAIN = 'hitchcoxaesthetics.com'
+
+function isOwnDomainReferrer(referrerDomain: string) {
+	return (
+		referrerDomain === OWN_REFERRER_DOMAIN ||
+		referrerDomain.endsWith(`.${OWN_REFERRER_DOMAIN}`)
+	)
+}
+
 export function inferTrafficAttribution({
 	fbclid,
 	gbraid,
@@ -711,6 +722,18 @@ export function inferTrafficAttribution({
 		return {
 			channel: 'direct',
 			detail: 'direct',
+			platform: null,
+		}
+	}
+
+	// Self-referral: the referrer is our own domain (an internal navigation or a
+	// landing-page self-navigation). This is not a real referral. Without a click
+	// id or campaign the original source is genuinely unknown, so it must not
+	// inflate the referral channel.
+	if (isOwnDomainReferrer(referrerDomain)) {
+		return {
+			channel: 'unknown',
+			detail: 'unknown',
 			platform: null,
 		}
 	}

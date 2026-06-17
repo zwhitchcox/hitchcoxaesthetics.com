@@ -51,6 +51,63 @@ test('classifies Google ad click ids as paid search before GMB campaign labels',
 	})
 })
 
+test('classifies self-referrals from our own domain as unknown, not referral', () => {
+	expect(
+		inferTrafficAttribution({
+			fbclid: null,
+			gbraid: null,
+			gclid: null,
+			initialReferrer:
+				'https://hitchcoxaesthetics.com/lp/weight-loss-semaglutide',
+			initialReferringDomain: 'hitchcoxaesthetics.com',
+			msclkid: null,
+			utm_campaign: null,
+			utm_medium: null,
+			utm_source: null,
+			wbraid: null,
+		}),
+	).toEqual({ channel: 'unknown', detail: 'unknown', platform: null })
+})
+
+test('a self-referral that still carries a gclid stays google_ads', () => {
+	expect(
+		inferTrafficAttribution({
+			fbclid: null,
+			gbraid: null,
+			gclid: 'EAIaIQobChMI4tmli_PmlAMVTirUAR39ZybWEBAYASABEgLOUfD_BwE',
+			initialReferrer:
+				'https://hitchcoxaesthetics.com/lp/weight-loss-semaglutide',
+			initialReferringDomain: 'hitchcoxaesthetics.com',
+			msclkid: null,
+			utm_campaign: null,
+			utm_medium: null,
+			utm_source: null,
+			wbraid: null,
+		}),
+	).toEqual({
+		channel: 'paid_search',
+		detail: 'google_ads',
+		platform: 'google',
+	})
+})
+
+test('classifies a genuine external (non-social, non-search) referrer as referral', () => {
+	expect(
+		inferTrafficAttribution({
+			fbclid: null,
+			gbraid: null,
+			gclid: null,
+			initialReferrer: 'https://somepartnerblog.com/post',
+			initialReferringDomain: 'somepartnerblog.com',
+			msclkid: null,
+			utm_campaign: null,
+			utm_medium: null,
+			utm_source: null,
+			wbraid: null,
+		}),
+	).toEqual({ channel: 'referral', detail: 'referral', platform: null })
+})
+
 test('extracts Google click ids from linker params', () => {
 	expect(
 		getMarketingParamsFromSearch(
