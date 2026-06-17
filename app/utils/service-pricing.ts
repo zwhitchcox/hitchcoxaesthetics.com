@@ -225,6 +225,7 @@ export const BLVD_PROJECTED_REVENUE_USD: Record<string, number> = {
 	'Existing Client Tox (Botox/Dysport/Jeuveau/Xeomin)': 0,
 	'Existing Client Tox & Filler': 0,
 	'Hair Restoration I PDGF Injection': 600,
+	'Hair Restoration | Microneedling w/ PDGF': 699,
 	'Hylenex® - Filler Dissolve': 200,
 	'KYBELLA®': 0,
 	'KYBELLA® - New Patient': 800,
@@ -232,7 +233,8 @@ export const BLVD_PROJECTED_REVENUE_USD: Record<string, number> = {
 	'Laser Hair Reduction - Large Area': 900,
 	'Laser Hair Reduction - Medium Area': 800,
 	'Laser Hair Reduction - Small Area': 600,
-	'Lip Flip': 150,
+	'Lip Flip': 129,
+	'Lip Flip - New Patient': 129,
 	'Lipotropic B12 Injection': 0,
 	'Microneedling w/ PDGF': 600,
 	'Microneedling w/ PRP': 600,
@@ -284,9 +286,10 @@ export function getProjectedRevenueForBlvdService(serviceName: string): number {
 
 	const lower = serviceName.toLowerCase()
 
-	// EVERESSE is a prepaid skin-tightening package; value the booking at the
-	// package price for ad/analytics conversion reporting.
-	if (lower.includes('everesse')) return 2500
+	// EVERESSE (a.k.a. Non-Surgical Skin Tightening) is a prepaid package; value
+	// the booking at the package price for ad/analytics conversion reporting.
+	if (lower.includes('everesse') || lower.includes('skin tightening'))
+		return 2500
 
 	if (
 		lower.includes('existing') ||

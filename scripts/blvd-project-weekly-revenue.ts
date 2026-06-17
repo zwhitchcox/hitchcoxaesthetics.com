@@ -139,7 +139,8 @@ const SERVICE_VALUE_OVERRIDES_USD: Array<{
 }> = [
 	{
 		label: 'EVERESSE',
-		matches: name => name.includes('everesse'),
+		matches: name =>
+			name.includes('everesse') || name.includes('skin tightening'),
 		usd: 2500,
 	},
 ]
