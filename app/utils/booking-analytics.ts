@@ -97,6 +97,7 @@ export function trackBookingAnalyticsPageView({
 		readStoredBookingAnalytics() ??
 		createStoredBookingAnalytics({ now, pathname, referrer, search })
 	mergeMarketingParamsIntoStoredAnalytics(stored, search)
+	savePersistedClickIds(stored)
 	const callrailTracking = getCallRailTrackingFromBrowser(search)
 
 	const previousPageviewCount = stored.pageviewCount
@@ -136,7 +137,8 @@ export function getBookingAnalyticsEventProperties() {
 	const stored = readStoredBookingAnalytics()
 	if (!stored) return {}
 	syncPostHogAttributionCookies()
-	const trafficAttribution = getStoredTrafficAttribution(stored)
+	const { trafficAttribution, gclid, gbraid, wbraid, recovered } =
+		resolveClickAttribution(stored)
 	const callrailTracking = getStoredCallRailAttribution(stored)
 	const bookEntryPathname = getPathnameFromStoredPath(stored.bookEntryFromPath)
 	const initialLandingPathname = getPathnameFromStoredPath(
@@ -174,9 +176,10 @@ export function getBookingAnalyticsEventProperties() {
 			typeof stored.preBookDurationMs === 'number'
 				? roundToOneDecimal(stored.preBookDurationMs / 1000)
 				: undefined,
-		traffic_channel: stored.trafficChannel || trafficAttribution.channel,
+		traffic_channel: trafficAttribution.channel,
 		traffic_platform: trafficAttribution.platform,
 		traffic_source_detail: trafficAttribution.detail,
+		traffic_recovered_from_prior_click: recovered || undefined,
 		posthog_distinct_id: getPostHogDistinctId(),
 		posthog_session_id: getPostHogSessionId(),
 		callrail_session_id: callrailTracking.sessionId,
@@ -188,10 +191,10 @@ export function getBookingAnalyticsEventProperties() {
 		utm_source: stored.utm_source,
 		utm_term: stored.utm_term,
 		fbclid: stored.fbclid,
-		gclid: stored.gclid,
-		gbraid: stored.gbraid,
+		gclid: gclid,
+		gbraid: gbraid,
 		msclkid: stored.msclkid,
-		wbraid: stored.wbraid,
+		wbraid: wbraid,
 	})
 }
 
@@ -242,7 +245,8 @@ export function getMarketingPageEventProperties({
 	search: string
 }) {
 	const stored = readStoredBookingAnalytics()
-	const trafficAttribution = stored ? getStoredTrafficAttribution(stored) : null
+	const resolved = stored ? resolveClickAttribution(stored) : null
+	const trafficAttribution = resolved?.trafficAttribution ?? null
 	if (stored) syncPostHogAttributionCookies()
 	const callrailTracking = stored ? getStoredCallRailAttribution(stored) : null
 
@@ -275,9 +279,10 @@ export function getMarketingPageEventProperties({
 		pre_book_duration_bucket: getDurationBucket(
 			stored?.preBookDurationMs ?? null,
 		),
-		traffic_channel: stored?.trafficChannel || trafficAttribution?.channel,
+		traffic_channel: trafficAttribution?.channel,
 		traffic_platform: trafficAttribution?.platform,
 		traffic_source_detail: trafficAttribution?.detail,
+		traffic_recovered_from_prior_click: resolved?.recovered || undefined,
 		callrail_session_id: callrailTracking?.sessionId,
 		callrail_visitor_id: callrailTracking?.visitorId,
 		utm_campaign: stored?.utm_campaign,
@@ -286,10 +291,10 @@ export function getMarketingPageEventProperties({
 		utm_source: stored?.utm_source,
 		utm_term: stored?.utm_term,
 		fbclid: stored?.fbclid,
-		gclid: stored?.gclid,
-		gbraid: stored?.gbraid,
+		gclid: resolved?.gclid,
+		gbraid: resolved?.gbraid,
 		msclkid: stored?.msclkid,
-		wbraid: stored?.wbraid,
+		wbraid: resolved?.wbraid,
 	})
 }
 
@@ -881,6 +886,109 @@ function getStoredTrafficAttribution(stored: StoredBookingAnalytics) {
 		utm_medium: stored.utm_medium,
 		utm_source: stored.utm_source,
 		wbraid: stored.wbraid,
+	})
+}
+
+const PERSISTED_CLICK_IDS_KEY = 'sha.click-ids-v1'
+// Google's click-through attribution window is up to 90 days; do not credit a
+// persisted click id older than that.
+const CLICK_ID_TTL_MS = 1000 * 60 * 60 * 24 * 90
+
+type ClickIds = {
+	gclid: string | null
+	gbraid: string | null
+	wbraid: string | null
+}
+
+type PersistedClickIds = ClickIds & { savedAt: number }
+
+function loadPersistedClickIds(): PersistedClickIds | null {
+	if (typeof window === 'undefined') return null
+	try {
+		const raw = window.localStorage.getItem(PERSISTED_CLICK_IDS_KEY)
+		if (!raw) return null
+		const parsed = JSON.parse(raw) as PersistedClickIds
+		if (typeof parsed?.savedAt !== 'number') return null
+		if (Date.now() - parsed.savedAt > CLICK_ID_TTL_MS) return null
+		return parsed
+	} catch {
+		return null
+	}
+}
+
+// Persist a Google click id across sessions. sessionStorage is per-visit, so a
+// gclid from an earlier visit would otherwise be lost by the time the visitor
+// returns and books. Keeps the most recent click id seen.
+function savePersistedClickIds(stored: StoredBookingAnalytics) {
+	if (typeof window === 'undefined') return
+	if (!stored.gclid && !stored.gbraid && !stored.wbraid) return
+	try {
+		const existing = loadPersistedClickIds()
+		const next: PersistedClickIds = {
+			gclid: stored.gclid ?? existing?.gclid ?? null,
+			gbraid: stored.gbraid ?? existing?.gbraid ?? null,
+			wbraid: stored.wbraid ?? existing?.wbraid ?? null,
+			savedAt: Date.now(),
+		}
+		window.localStorage.setItem(PERSISTED_CLICK_IDS_KEY, JSON.stringify(next))
+	} catch {
+		// Ignore localStorage failures.
+	}
+}
+
+/**
+ * Combine this session's attribution + click ids with any click id persisted
+ * from an earlier session. Last touch still wins for the channel, but a
+ * persisted click id is (a) retained on the event so it is never lost, and
+ * (b) recovers google_ads attribution when this session has no click id of its
+ * own AND no real last-touch source (direct/unknown) - i.e. an ad click from a
+ * prior visit that came back directly to convert. Pure; exported for testing.
+ */
+export function combineTouchAttribution({
+	sessionAttribution,
+	session,
+	persisted,
+}: {
+	sessionAttribution: {
+		channel: string
+		detail: string
+		platform: string | null
+	}
+	session: ClickIds
+	persisted: ClickIds | null
+}) {
+	const gclid = session.gclid ?? persisted?.gclid ?? null
+	const gbraid = session.gbraid ?? persisted?.gbraid ?? null
+	const wbraid = session.wbraid ?? persisted?.wbraid ?? null
+
+	const sessionHasClickId = Boolean(
+		session.gclid || session.gbraid || session.wbraid,
+	)
+	const persistedHasClickId = Boolean(
+		persisted?.gclid || persisted?.gbraid || persisted?.wbraid,
+	)
+	const channelUnattributed =
+		sessionAttribution.detail === 'direct' ||
+		sessionAttribution.detail === 'unknown'
+	const recovered =
+		!sessionHasClickId && persistedHasClickId && channelUnattributed
+
+	const trafficAttribution = recovered
+		? { channel: 'paid_search', detail: 'google_ads', platform: 'google' }
+		: sessionAttribution
+
+	return { trafficAttribution, gclid, gbraid, wbraid, recovered }
+}
+
+function resolveClickAttribution(stored: StoredBookingAnalytics) {
+	return combineTouchAttribution({
+		sessionAttribution: getStoredTrafficAttribution(stored),
+		session: {
+			gclid: stored.gclid,
+			gbraid: stored.gbraid,
+			wbraid: stored.wbraid,
+		},
+		persisted: loadPersistedClickIds(),
 	})
 }
 

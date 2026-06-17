@@ -1,10 +1,67 @@
 import { expect, test } from 'vitest'
 
 import {
+	combineTouchAttribution,
 	getBookingTemporalEventProperties,
 	getMarketingParamsFromSearch,
 	inferTrafficAttribution,
 } from '#app/utils/booking-analytics.ts'
+
+const NO_CLICK = { gclid: null, gbraid: null, wbraid: null }
+const UNKNOWN = { channel: 'unknown', detail: 'unknown', platform: null }
+const GOOGLE_ADS = {
+	channel: 'paid_search',
+	detail: 'google_ads',
+	platform: 'google',
+}
+
+test('recovers google_ads from a prior-session click id when this session is unattributed', () => {
+	const result = combineTouchAttribution({
+		sessionAttribution: UNKNOWN,
+		session: NO_CLICK,
+		persisted: { gclid: 'PRIOR_GCLID', gbraid: null, wbraid: null },
+	})
+	expect(result.trafficAttribution).toEqual(GOOGLE_ADS)
+	expect(result.gclid).toBe('PRIOR_GCLID')
+	expect(result.recovered).toBe(true)
+})
+
+test('does not override a real last-touch channel, but still retains the prior click id', () => {
+	const gmb = {
+		channel: 'gmb',
+		detail: 'google_business_profile',
+		platform: 'google',
+	}
+	const result = combineTouchAttribution({
+		sessionAttribution: gmb,
+		session: NO_CLICK,
+		persisted: { gclid: 'PRIOR_GCLID', gbraid: null, wbraid: null },
+	})
+	expect(result.trafficAttribution).toEqual(gmb)
+	expect(result.gclid).toBe('PRIOR_GCLID')
+	expect(result.recovered).toBe(false)
+})
+
+test('keeps this session’s own click id and does not flag recovery', () => {
+	const result = combineTouchAttribution({
+		sessionAttribution: GOOGLE_ADS,
+		session: { gclid: 'THIS_GCLID', gbraid: null, wbraid: null },
+		persisted: { gclid: 'OLD_GCLID', gbraid: null, wbraid: null },
+	})
+	expect(result.gclid).toBe('THIS_GCLID')
+	expect(result.recovered).toBe(false)
+})
+
+test('no click id anywhere leaves attribution untouched', () => {
+	const result = combineTouchAttribution({
+		sessionAttribution: UNKNOWN,
+		session: NO_CLICK,
+		persisted: null,
+	})
+	expect(result.trafficAttribution).toEqual(UNKNOWN)
+	expect(result.gclid).toBeNull()
+	expect(result.recovered).toBe(false)
+})
 
 test('formats booking temporal analytics buckets in Knoxville time', () => {
 	expect(
