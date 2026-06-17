@@ -125,6 +125,31 @@ type ProjectionRow = AppointmentServiceSegment & {
 		| 'historical_average'
 		| 'composite_historical_average'
 		| 'configured_fallback'
+		| 'manual_override'
+}
+
+// Fixed per-booking revenue for services where the historical per-appointment
+// average is misleading. EVERESSE is sold as a prepaid package, so its $0
+// follow-up visits drag the average down; value each EVERESSE booking at the
+// full package price instead.
+const SERVICE_VALUE_OVERRIDES_USD: Array<{
+	label: string
+	matches: (normalizedServiceName: string) => boolean
+	usd: number
+}> = [
+	{
+		label: 'EVERESSE',
+		matches: name => name.includes('everesse'),
+		usd: 2500,
+	},
+]
+
+function getServiceValueOverrideUsd(serviceName: string) {
+	const normalized = normalizeServiceName(serviceName)
+	const override = SERVICE_VALUE_OVERRIDES_USD.find(entry =>
+		entry.matches(normalized),
+	)
+	return override ? override.usd : null
 }
 
 type CliOptions = {
@@ -271,6 +296,17 @@ function valueForService({
 	serviceId: string | null
 	serviceName: string
 }) {
+	const overrideUsd = getServiceValueOverrideUsd(serviceName)
+	if (overrideUsd !== null) {
+		return {
+			averageUsd: overrideUsd,
+			fallbackUsd: overrideUsd,
+			projectedUsd: overrideUsd,
+			sampleSize: 0,
+			source: 'manual_override' as ProjectionRow['source'],
+		}
+	}
+
 	const average = getServiceAverage(serviceAverages, serviceId, serviceName)
 	const fallbackUsd = getProjectedRevenueForBlvdService(serviceName)
 	const hasEnoughHistory = Boolean(
@@ -1078,7 +1114,9 @@ function printReport(
 				? `avg ${formatUsd(row.projectedUsd)} from ${row.sampleSize} historical`
 				: row.source === 'composite_historical_average'
 					? `composite avg ${formatUsd(row.projectedUsd)} from historical`
-					: `fallback ${formatUsd(row.projectedUsd)}`
+					: row.source === 'manual_override'
+						? `override ${formatUsd(row.projectedUsd)}`
+						: `fallback ${formatUsd(row.projectedUsd)}`
 		const cancelled = row.cancelled ? ' CANCELLED' : ''
 		console.log(
 			[
@@ -1316,6 +1354,6 @@ Options:
   --include-cancelled        Include cancelled appointment service segments.
   --json                     Print JSON.
 
-Historical averages use exact Boulevard service IDs when possible. Laser hair reduction and EVERESSE include $0 package follow-up visits, so package revenue is amortized instead of projected again for every prepaid follow-up.
+Historical averages use exact Boulevard service IDs when possible. Laser hair reduction includes $0 package follow-up visits, so package revenue is amortized instead of projected again for every prepaid follow-up. EVERESSE bookings are valued at a fixed ${SERVICE_VALUE_OVERRIDES_USD.find(o => o.label === 'EVERESSE')?.usd ?? 0} package price (manual override) rather than the amortized average.
 `)
 }

@@ -51,3 +51,7 @@ processing-images-archive/
 
 # Claude Code local preview config (machine-specific paths)
 /.claude/
+
+# Local command runner (machine-specific, see ./play)
+/play
+/commands.local.sh

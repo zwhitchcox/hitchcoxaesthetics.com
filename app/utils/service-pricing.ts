@@ -284,6 +284,10 @@ export function getProjectedRevenueForBlvdService(serviceName: string): number {
 
 	const lower = serviceName.toLowerCase()
 
+	// EVERESSE is a prepaid skin-tightening package; value the booking at the
+	// package price for ad/analytics conversion reporting.
+	if (lower.includes('everesse')) return 2500
+
 	if (
 		lower.includes('existing') ||
 		lower.includes('follow-up') ||
