@@ -240,5 +240,12 @@ function isToxServiceName(normalizedName: string) {
 }
 
 function isReturningClientOnlyServiceName(normalizedName: string) {
-	return /\bweight loss injection\b/.test(normalizedName)
+	// Services that only make sense for an existing client: weight-loss
+	// injections (need a prior consult/Rx), laser touch-ups (follow a completed
+	// package), and any follow-up visit. New clients should never see these.
+	return (
+		/\bweight loss injection\b/.test(normalizedName) ||
+		/\btouch up\b/.test(normalizedName) ||
+		/\bfollow up\b/.test(normalizedName)
+	)
 }

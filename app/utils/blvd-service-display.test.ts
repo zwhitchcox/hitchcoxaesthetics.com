@@ -177,3 +177,32 @@ test('maps the single customer-facing tox group to the right Boulevard service i
 		)?.id,
 	).toBe('tox')
 })
+
+test('hides existing-client-only services (touch-ups, follow-ups) from new clients', () => {
+	const laserTouchUp = {
+		categoryName: 'Laser Treatments',
+		name: 'Touch Up Laser Treatment - Medium Area',
+	}
+	const followUp = {
+		categoryName: 'Existing Patient - Injectables',
+		name: 'Tox/Filler Follow-Up',
+	}
+	expect(getBlvdServiceClientFit(laserTouchUp)).toBe('returning_client')
+	expect(getBlvdServiceClientFit(followUp)).toBe('returning_client')
+	// New clients must not see them...
+	expect(isBlvdServiceVisibleForClientHistory(laserTouchUp, 'new')).toBe(false)
+	// ...but returning clients still can (touch-up is bookable for them).
+	expect(isBlvdServiceVisibleForClientHistory(laserTouchUp, 'returning')).toBe(
+		true,
+	)
+	// A laser treatment a new client CAN book stays visible.
+	expect(
+		isBlvdServiceVisibleForClientHistory(
+			{
+				categoryName: 'Laser Treatments',
+				name: 'Laser Hair Reduction - Medium Area',
+			},
+			'new',
+		),
+	).toBe(true)
+})

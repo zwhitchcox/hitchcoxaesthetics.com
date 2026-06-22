@@ -35,25 +35,6 @@ feature_flags:
             name: No popular services section
             rollout_percentage: 50
 
-  - key: booking-client-history-gate
-    name: Booking service page client history question
-    active: true
-    tags:
-      - booking
-      - experiments
-    filters:
-      groups:
-        - properties: []
-          rollout_percentage: 100
-      multivariate:
-        variants:
-          - key: ask_client_history
-            name: Ask client history question
-            rollout_percentage: 50
-          - key: show_all_services
-            name: Show all customer-bookable services
-            rollout_percentage: 50
-
 dashboards:
   - name: Booking Overview - Source & Revenue
     description:
@@ -817,6 +798,28 @@ dashboards:
           us before?"
         breakdown: booking_client_history_selection
         steps: *full_booking_steps
+
+      - kind: funnel
+        name: Full Booking Step Funnel - Device
+        description:
+          Full booking step funnel broken down by device type. Mobile is the
+          large majority of booking starts and drops far more in the early
+          steps, so this is the highest-signal view for booking UX work.
+        breakdown: $device_type
+        steps: *full_booking_steps
+
+      - kind: funnel
+        name: Site Entry To Booking Start - Device
+        description:
+          Top of funnel only. The share of site visitors who start the booking
+          flow, broken down by device. Kept as its own two-step card so total
+          site entry does not dwarf the per-step booking funnel.
+        breakdown: $device_type
+        steps:
+          - event: site_entered
+            custom_name: Entered Website
+          - event: booking_funnel_entered
+            custom_name: Started Booking
 
   - name: Booking Types - Source Breakdown
     description:

@@ -36,7 +36,6 @@ import {
 	getBookingClientTypeFromHistory,
 	getCustomerFacingBlvdCategoryName,
 	getCustomerFacingBlvdServiceName,
-	isBlvdServiceCustomerBookable,
 	isBlvdServiceVisibleForClientHistory,
 } from '#app/utils/blvd-service-display.ts'
 import { getBookingAnalyticsEventProperties } from '#app/utils/booking-analytics.ts'
@@ -302,28 +301,22 @@ const CLIENT_HISTORY_OPTIONS: Array<{
 }> = [
 	{ label: 'Yes', value: 'returning' },
 	{ label: 'No', value: 'new' },
-	{ label: "Don't Remember", value: 'unsure' },
+	{ label: 'Unsure', value: 'unsure' },
 ]
 
 const DEFAULT_BOOKING_LOCATION_ID: SiteLocation['id'] = 'bearden'
 const BOOKING_PHONE_VERIFICATION_CODE_ID = 'booking-phone'
 const BOOKING_POPULAR_SERVICES_EXPERIMENT_KEY =
 	'booking-popular-services-layout'
-const BOOKING_CLIENT_HISTORY_EXPERIMENT_KEY = 'booking-client-history-gate'
 
 type BookingPopularServicesVariant = 'popular_top' | 'no_popular_top'
-type BookingClientHistoryGateVariant =
-	| 'ask_client_history'
-	| 'show_all_services'
 
 type BookingExperimentVariants = {
-	clientHistoryGate: BookingClientHistoryGateVariant
 	loaded: boolean
 	popularServicesLayout: BookingPopularServicesVariant
 }
 
 const DEFAULT_BOOKING_EXPERIMENT_VARIANTS: BookingExperimentVariants = {
-	clientHistoryGate: 'ask_client_history',
 	loaded: false,
 	popularServicesLayout: 'popular_top',
 }
@@ -500,9 +493,6 @@ export default function BlvdBookRoute() {
 		const updateBookingExperimentVariants = () => {
 			setBookingExperimentVariants(currentVariants => {
 				const nextVariants = {
-					clientHistoryGate: normalizeBookingClientHistoryGateVariant(
-						posthog.getFeatureFlag(BOOKING_CLIENT_HISTORY_EXPERIMENT_KEY),
-					),
 					loaded: true,
 					popularServicesLayout: normalizeBookingPopularServicesVariant(
 						posthog.getFeatureFlag(BOOKING_POPULAR_SERVICES_EXPERIMENT_KEY),
@@ -511,8 +501,6 @@ export default function BlvdBookRoute() {
 
 				if (
 					currentVariants.loaded === nextVariants.loaded &&
-					currentVariants.clientHistoryGate ===
-						nextVariants.clientHistoryGate &&
 					currentVariants.popularServicesLayout ===
 						nextVariants.popularServicesLayout
 				) {
@@ -859,20 +847,9 @@ export default function BlvdBookRoute() {
 		})
 	}
 
-	const shouldSkipClientHistoryGate =
-		bookingExperimentVariants.clientHistoryGate === 'show_all_services'
-	const shouldShowClientHistoryGate =
-		bookingExperimentVariants.clientHistoryGate === 'ask_client_history'
-	const canBrowseServices =
-		shouldSkipClientHistoryGate || Boolean(clientHistory)
+	const canBrowseServices = Boolean(clientHistory)
 	const filteredServices = useMemo(() => {
-		const visibleServices = buildDisplayServiceEntries(
-			services,
-			clientHistory,
-			{
-				showAllClientFits: shouldSkipClientHistoryGate,
-			},
-		)
+		const visibleServices = buildDisplayServiceEntries(services, clientHistory)
 		const trimmedSearch = search.trim()
 		if (trimmedSearch.length === 0) {
 			return [...visibleServices].sort(compareServiceEntriesForDisplay)
@@ -900,7 +877,7 @@ export default function BlvdBookRoute() {
 				return a.service.item.name.localeCompare(b.service.item.name)
 			})
 			.map(result => result.service)
-	}, [clientHistory, search, services, shouldSkipClientHistoryGate])
+	}, [clientHistory, search, services])
 	const showPopularServices = Boolean(
 		canBrowseServices &&
 		bookingExperimentVariants.popularServicesLayout === 'popular_top' &&
@@ -2430,7 +2407,7 @@ export default function BlvdBookRoute() {
 										<h2 className="mb-2 text-center text-2xl font-semibold tracking-widest text-foreground">
 											Service
 										</h2>
-										{shouldShowClientHistoryGate && !clientHistorySelection ? (
+										{!clientHistorySelection ? (
 											<div className="-mt-2 flex w-full max-w-2xl flex-col items-center gap-3">
 												<h3 className="text-center text-lg font-semibold">
 													Have you been with us before?
@@ -2453,9 +2430,7 @@ export default function BlvdBookRoute() {
 											</div>
 										) : null}
 
-										{shouldShowClientHistoryGate &&
-										clientHistorySelection === 'unsure' &&
-										!clientHistory ? (
+										{clientHistorySelection === 'unsure' && !clientHistory ? (
 											<form
 												className="w-full max-w-2xl space-y-3 rounded-xl border bg-white p-4"
 												onSubmit={handleLookupClientHistory}
@@ -2487,9 +2462,7 @@ export default function BlvdBookRoute() {
 											</form>
 										) : null}
 
-										{shouldShowClientHistoryGate &&
-										clientHistoryLookupMessage &&
-										clientHistory ? (
+										{clientHistoryLookupMessage && clientHistory ? (
 											<p className="text-sm text-muted-foreground">
 												{clientHistoryLookupMessage}
 											</p>
@@ -2519,8 +2492,7 @@ export default function BlvdBookRoute() {
 											</div>
 										) : null}
 
-										{shouldShowClientHistoryGate &&
-										!clientHistory &&
+										{!clientHistory &&
 										!clientHistorySelection ? null : !canBrowseServices ? null : filteredServices.length ===
 										  0 ? (
 											<div className="space-y-3 text-center">
@@ -3641,54 +3613,42 @@ function buildServiceEntries(categories: BlvdCategory[]) {
 function buildDisplayServiceEntries(
 	services: ServiceEntry[],
 	clientHistory: BookingClientHistory | null,
-	options: { showAllClientFits?: boolean } = {},
 ) {
-	const showAllClientFits = Boolean(options.showAllClientFits)
-	if (!clientHistory && !showAllClientFits) return []
+	if (!clientHistory) return []
 
 	const servicesById = new Map(services.map(service => [service.id, service]))
 	const groupedServiceIds = new Set<string>()
 	const displayServices: ServiceEntry[] = []
 
-	if (!showAllClientFits && clientHistory) {
-		for (const group of BLVD_SERVICE_DISPLAY_GROUPS) {
-			const groupServiceIds = getBlvdServiceDisplayGroupServiceIds(group)
-			for (const serviceId of groupServiceIds) {
-				groupedServiceIds.add(serviceId)
-			}
-
-			const preferredService =
-				servicesById.get(
-					getBlvdServiceDisplayGroupServiceIdForClientHistory(
-						group,
-						clientHistory,
-					),
-				) ?? null
-
-			if (!preferredService) continue
-
-			displayServices.push(
-				buildGroupedServiceEntry({
-					group,
-					preferredService,
-					servicesById,
-				}),
-			)
+	for (const group of BLVD_SERVICE_DISPLAY_GROUPS) {
+		const groupServiceIds = getBlvdServiceDisplayGroupServiceIds(group)
+		for (const serviceId of groupServiceIds) {
+			groupedServiceIds.add(serviceId)
 		}
+
+		const preferredService =
+			servicesById.get(
+				getBlvdServiceDisplayGroupServiceIdForClientHistory(
+					group,
+					clientHistory,
+				),
+			) ?? null
+
+		if (!preferredService) continue
+
+		displayServices.push(
+			buildGroupedServiceEntry({
+				group,
+				preferredService,
+				servicesById,
+			}),
+		)
 	}
 
-	const visibleUngroupedServices = services
-		.filter(service => {
-			if (groupedServiceIds.has(service.id)) return false
-			return showAllClientFits
-				? isServiceEntryCustomerBookable(service)
-				: isServiceEntryVisibleForClientHistory(service, clientHistory!)
-		})
-		.map(service =>
-			showAllClientFits
-				? buildClientHistoryExplicitServiceEntry(service)
-				: service,
-		)
+	const visibleUngroupedServices = services.filter(service => {
+		if (groupedServiceIds.has(service.id)) return false
+		return isServiceEntryVisibleForClientHistory(service, clientHistory)
+	})
 
 	for (const serviceOptionGroup of buildServiceOptionGroupEntries(
 		visibleUngroupedServices,
@@ -3706,40 +3666,6 @@ function buildDisplayServiceEntries(
 	}
 
 	return displayServices
-}
-
-function buildClientHistoryExplicitServiceEntry(service: ServiceEntry) {
-	const displayName = getClientHistoryExplicitBlvdServiceName(service.item.name)
-
-	return {
-		...service,
-		displayName,
-		searchText: normalizeText(
-			[
-				service.categoryName,
-				service.displayCategoryName,
-				service.item.name,
-				displayName,
-				service.item.description ?? '',
-			].join(' '),
-		),
-	}
-}
-
-function getClientHistoryExplicitBlvdServiceName(name: string) {
-	return name
-		.replace(/\s*\|\s*\*?In Person\*?/gi, '')
-		.replace(/\s*\((?:In[-\s]?Person|In Person)\)\s*/gi, '')
-		.replace(/\s+/g, ' ')
-		.trim()
-}
-
-function isServiceEntryCustomerBookable(service: ServiceEntry) {
-	return isBlvdServiceCustomerBookable({
-		categoryName: service.categoryName,
-		id: service.id,
-		name: service.item.name,
-	})
 }
 
 function isServiceEntryVisibleForClientHistory(
@@ -4316,22 +4242,11 @@ function normalizeBookingPopularServicesVariant(
 	return 'popular_top'
 }
 
-function normalizeBookingClientHistoryGateVariant(
-	value: boolean | string | undefined,
-): BookingClientHistoryGateVariant {
-	if (value === 'show_all_services') return 'show_all_services'
-	return 'ask_client_history'
-}
-
 function getBookingExperimentAnalyticsProperties({
-	clientHistoryGate,
 	loaded,
 	popularServicesLayout,
 }: BookingExperimentVariants) {
 	return {
-		booking_experiment_client_history_gate: clientHistoryGate,
-		booking_experiment_client_history_gate_flag_key:
-			BOOKING_CLIENT_HISTORY_EXPERIMENT_KEY,
 		booking_experiment_flags_loaded: loaded,
 		booking_experiment_popular_services_layout: popularServicesLayout,
 		booking_experiment_popular_services_layout_flag_key:
