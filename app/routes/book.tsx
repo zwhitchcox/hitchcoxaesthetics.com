@@ -2357,7 +2357,7 @@ export default function BlvdBookRoute() {
 
 				{checkoutSuccess ? (
 					<div className="flex min-h-full w-full flex-col items-center justify-center py-12">
-						<Card className="mx-auto flex w-full max-w-xl flex-col items-center space-y-8 border-none px-6 py-10 shadow-none sm:px-12">
+						<Card className="mx-auto flex w-full max-w-xl flex-col items-center space-y-8 bg-white px-6 py-10 sm:px-12">
 							<div className="flex flex-col items-center space-y-2 text-center">
 								<h2 className="flex items-center gap-2 text-4xl font-bold tracking-tight">
 									Success! <span className="text-3xl">🎉</span>
@@ -2660,28 +2660,50 @@ export default function BlvdBookRoute() {
 																		) : null}
 																	</>
 																) : null}
+																<div className="border-t p-3">
+																	<Button
+																		type="button"
+																		onClick={() => {
+																			void handleSelectLocationChoice(location)
+																		}}
+																		className="w-full"
+																	>
+																		Select
+																	</Button>
+																</div>
 															</div>
 														)
 													})}
 
 													{serviceLocations.length > 1 ? (
-														<button
-															type="button"
-															onClick={() => {
-																void handleSelectLocationChoice('either')
-															}}
-															className="rounded-xl border border-dashed bg-white p-5 text-left transition hover:border-primary hover:shadow-md"
-														>
-															<div>
-																<h3 className="text-xl font-semibold">
-																	Either Location
-																</h3>
-																<p className="mt-2 text-sm text-muted-foreground">
-																	See every available date and time across both
-																	offices and pick whatever works best.
-																</p>
+														<div className="overflow-hidden rounded-xl border border-dashed bg-white transition hover:border-primary hover:shadow-md">
+															<button
+																type="button"
+																onClick={() => {
+																	void handleSelectLocationChoice('either')
+																}}
+																className="w-full p-5 text-left"
+															>
+																<div>
+																	<h3 className="text-xl font-semibold">Either Location</h3>
+																	<p className="mt-2 text-sm text-muted-foreground">
+																		See every available date and time across both offices and
+																		pick whatever works best.
+																	</p>
+																</div>
+															</button>
+															<div className="border-t p-3">
+																<Button
+																	type="button"
+																	onClick={() => {
+																		void handleSelectLocationChoice('either')
+																	}}
+																	className="w-full"
+																>
+																	Select
+																</Button>
 															</div>
-														</button>
+														</div>
 													) : null}
 												</div>
 											) : null}
