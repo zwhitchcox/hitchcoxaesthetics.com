@@ -1473,16 +1473,26 @@ export default function BlvdBookRoute() {
 				clientForm.phone,
 		})
 		setDetailsSubmitted(true)
-		setActiveStep('reserve')
-		queueCurrentBlvdBookingIntent({
-			status: 'reserve_started',
-			step: 'reserve',
-		})
+		// No separate confirm page: services that do not require a card book
+		// immediately once the client confirms their details. Card-required
+		// bookings still go to the payment step to collect the card.
+		if (requiresCard) {
+			setActiveStep('reserve')
+			queueCurrentBlvdBookingIntent({
+				status: 'reserve_started',
+				step: 'reserve',
+			})
+			return
+		}
+		await performBooking()
 	}
 
 	async function handleCheckout(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault()
+		await performBooking()
+	}
 
+	async function performBooking() {
 		if (!cart || !selectedService || !selectedLocation) return
 
 		if (!selectedTime) {
@@ -3038,8 +3048,13 @@ export default function BlvdBookRoute() {
 														type="submit"
 														size="lg"
 														className="w-full sm:ml-auto sm:w-auto"
+														disabled={submittingBooking}
 													>
-														Next
+														{requiresCard
+															? 'Continue to payment'
+															: submittingBooking
+																? 'Booking...'
+																: 'Book'}
 													</Button>
 												</div>
 											</form>
@@ -3054,7 +3069,7 @@ export default function BlvdBookRoute() {
 											<form className="space-y-8" onSubmit={handleCheckout}>
 												<div className="flex flex-col items-center gap-2">
 													<p className="text-center text-sm text-muted-foreground">
-														Click to confirm your appointment.
+														Add your card to book your appointment.
 													</p>
 													<Button
 														type="submit"
@@ -3062,7 +3077,7 @@ export default function BlvdBookRoute() {
 														className="font-bold"
 														disabled={submittingBooking}
 													>
-														{submittingBooking ? 'Confirming...' : 'Confirm'}
+														{submittingBooking ? 'Booking...' : 'Book'}
 													</Button>
 												</div>
 												<div className="space-y-2">
