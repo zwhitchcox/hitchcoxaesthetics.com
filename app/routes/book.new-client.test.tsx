@@ -212,9 +212,10 @@ test('new clients can verify their phone and complete a mocked booking', async (
 	await user.type(await screen.findByLabelText(/First name/i), 'Jane')
 	await user.type(screen.getByLabelText(/Last name/i), 'Smith')
 	await user.type(screen.getByLabelText(/Email/i), 'jane@example.com')
-	// No card required for this service, so confirming details books
-	// immediately — there is no separate "Confirm & Book" page.
-	await user.click(screen.getByRole('button', { name: /^Book$/i }))
+	await user.click(screen.getByRole('button', { name: /^Next$/i }))
+
+	await screen.findByRole('heading', { name: /Confirm & Book/i })
+	await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
 	await expect(
 		screen.findByText(/Your appointment is confirmed/i),
