@@ -1472,17 +1472,30 @@ export default function BlvdBookRoute() {
 				ownershipVerifiedPhone ??
 				clientForm.phone,
 		})
-		setDetailsSubmitted(true)
-		setActiveStep('reserve')
-		queueCurrentBlvdBookingIntent({
-			status: 'reserve_started',
-			step: 'reserve',
-		})
+		// No separate confirm page: services that do not require a card book
+		// immediately once the client confirms their details. Card-required
+		// bookings go to the payment step to collect the card. Only mark details
+		// submitted on the card path — detailsSubmitted forces the derived step
+		// to "reserve", which on the direct path would flash the payment page
+		// while the booking is in flight.
+		if (requiresCard) {
+			setDetailsSubmitted(true)
+			setActiveStep('reserve')
+			queueCurrentBlvdBookingIntent({
+				status: 'reserve_started',
+				step: 'reserve',
+			})
+			return
+		}
+		await performBooking()
 	}
 
 	async function handleCheckout(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault()
+		await performBooking()
+	}
 
+	async function performBooking() {
 		if (!cart || !selectedService || !selectedLocation) return
 
 		if (!selectedTime) {
@@ -1968,7 +1981,14 @@ export default function BlvdBookRoute() {
 				step: 'details',
 			})
 
-			if (allRequiredBookingQuestionsAnswered(nextCart, questionAnswers)) {
+			// Card-required bookings advance to the payment step. No-card bookings
+			// stay on the details step so the verified client books with the
+			// "Book" button (which books immediately) instead of landing on a
+			// confirm page that asks for a card it never needs.
+			if (
+				allRequiredBookingQuestionsAnswered(nextCart, questionAnswers) &&
+				nextCart.summary.paymentMethodRequired
+			) {
 				setDetailsSubmitted(true)
 				setActiveStep('reserve')
 				queueCurrentBlvdBookingIntent({
@@ -3038,8 +3058,13 @@ export default function BlvdBookRoute() {
 														type="submit"
 														size="lg"
 														className="w-full sm:ml-auto sm:w-auto"
+														disabled={submittingBooking}
 													>
-														Next
+														{requiresCard
+															? 'Continue to payment'
+															: submittingBooking
+																? 'Booking...'
+																: 'Book'}
 													</Button>
 												</div>
 											</form>
@@ -3052,19 +3077,6 @@ export default function BlvdBookRoute() {
 										</h2>
 										<div className="w-full space-y-6">
 											<form className="space-y-8" onSubmit={handleCheckout}>
-												<div className="flex flex-col items-center gap-2">
-													<p className="text-center text-sm text-muted-foreground">
-														Click to confirm your appointment.
-													</p>
-													<Button
-														type="submit"
-														size="lg"
-														className="font-bold"
-														disabled={submittingBooking}
-													>
-														{submittingBooking ? 'Confirming...' : 'Confirm'}
-													</Button>
-												</div>
 												<div className="space-y-2">
 													<Label htmlFor="notes">Optional note</Label>
 													<Textarea
@@ -3221,6 +3233,16 @@ export default function BlvdBookRoute() {
 														) : null}
 													</div>
 												) : null}
+												<div className="flex flex-col items-center gap-2">
+													<Button
+														type="submit"
+														size="lg"
+														className="font-bold"
+														disabled={submittingBooking}
+													>
+														{submittingBooking ? 'Booking...' : 'Book'}
+													</Button>
+												</div>
 											</form>
 										</div>
 									</div>
