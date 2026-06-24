@@ -214,8 +214,10 @@ async function bindPhoneNumberToAgent(phoneNumber: string, agentId: string) {
 		)
 	}
 
+	// Retell deprecated the single-agent `inbound_agent_id` field (2026-03-31) and
+	// now 400s when it is sent. Bind via the multi-agent `inbound_agents` array
+	// instead (a single agent at weight 1 is equivalent).
 	await retellFetch(`/update-phone-number/${encodeURIComponent(phoneNumber)}`, {
-		inbound_agent_id: agentId,
 		inbound_agents: [
 			{
 				agent_id: agentId,
