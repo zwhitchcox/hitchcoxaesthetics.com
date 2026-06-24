@@ -957,6 +957,10 @@ export default function BlvdBookRoute() {
 	}, [currentStep])
 
 	useEffect(() => {
+		// Once the booking completes, the derived step flips to "reserve" (the
+		// success screen renders over it). Don't emit a step view then — it fires
+		// a stray reserve *after* booking_completed and breaks ordered funnels.
+		if (checkoutSuccess) return
 		pendingBookingStepsRef.current.add(currentStep)
 		if (currentStep === 'service' && !canBrowseServices) return
 		if (!posthog || !bookingExperimentVariants.loaded) return
@@ -973,6 +977,7 @@ export default function BlvdBookRoute() {
 		bookingExperimentVariants.loaded,
 		canBrowseServices,
 		captureBookingPostHogEvent,
+		checkoutSuccess,
 		currentStep,
 		posthog,
 	])
@@ -1487,6 +1492,18 @@ export default function BlvdBookRoute() {
 			})
 			return
 		}
+		// The direct-book flow has no confirm page, but still record the reserve
+		// step + intent at the booking moment so the funnel sees
+		// details -> reserve -> success and these conversions are not counted as
+		// drops.
+		captureBookingPostHogEvent('booking_step_viewed', {
+			...bookingAnalyticsPropertiesRef.current,
+			step: 'reserve',
+		})
+		queueCurrentBlvdBookingIntent({
+			status: 'reserve_started',
+			step: 'reserve',
+		})
 		await performBooking()
 	}
 
