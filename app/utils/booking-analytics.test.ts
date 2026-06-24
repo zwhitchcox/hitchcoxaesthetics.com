@@ -1,11 +1,37 @@
-import { expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 
 import {
 	combineTouchAttribution,
 	getBookingTemporalEventProperties,
+	getGaClientId,
+	getGaSessionId,
 	getMarketingParamsFromSearch,
 	inferTrafficAttribution,
 } from '#app/utils/booking-analytics.ts'
+
+afterEach(() => {
+	vi.unstubAllGlobals()
+})
+
+test('getGaClientId parses the client id from the _ga cookie', () => {
+	vi.stubGlobal('document', {
+		cookie: 'foo=bar; _ga=GA1.1.1234567890.1700000000; baz=qux',
+	})
+	expect(getGaClientId()).toBe('1234567890.1700000000')
+})
+
+test('getGaClientId returns null when there is no _ga cookie', () => {
+	vi.stubGlobal('document', { cookie: 'foo=bar' })
+	expect(getGaClientId()).toBeNull()
+})
+
+test('getGaSessionId parses the session id from the _ga_<id> cookie', () => {
+	vi.stubGlobal('document', {
+		cookie: '_ga_XTX2CN9CP7=GS1.1.1700000123.5.1.1700000200.0.0.0',
+	})
+	vi.stubGlobal('window', { ENV: { GA_MEASUREMENT_ID: 'G-XTX2CN9CP7' } })
+	expect(getGaSessionId()).toBe('1700000123')
+})
 
 const NO_CLICK = { gclid: null, gbraid: null, wbraid: null }
 const UNKNOWN = { channel: 'unknown', detail: 'unknown', platform: null }

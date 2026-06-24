@@ -195,6 +195,8 @@ export function getBookingAnalyticsEventProperties() {
 		gbraid: gbraid,
 		msclkid: stored.msclkid,
 		wbraid: wbraid,
+		ga_client_id: getGaClientId() ?? undefined,
+		ga_session_id: getGaSessionId() ?? undefined,
 	})
 }
 
@@ -378,7 +380,37 @@ function getCallTrackingSessionAttributionPayload({
 
 const GA_TRACKING_ID_TIMEOUT_MS = 1000
 
+function readCookie(name: string) {
+	if (typeof document === 'undefined') return null
+	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	const match = document.cookie.match(
+		new RegExp('(?:^|;\\s*)' + escaped + '=([^;]*)'),
+	)
+	return match?.[1] ? decodeURIComponent(match[1]) : null
+}
+
+// GA stores the client id in the first-party `_ga` cookie as
+// `GA1.<depth>.<clientId>` (clientId = "<random>.<firstVisitTs>"), and the
+// session id in `_ga_<measurementSuffix>` as `GS1.<depth>.<sessionId>.…`.
+// Reading the cookie is reliable; gtag('get') often hasn't loaded in time, which
+// is why ga_client_id was empty on every booking event.
+export function getGaClientId() {
+	const raw = readCookie('_ga')
+	return raw?.match(/^GA\d+\.\d+\.(.+)$/)?.[1] ?? null
+}
+
+export function getGaSessionId() {
+	if (typeof window === 'undefined') return null
+	const measurementId = window.ENV?.GA_MEASUREMENT_ID
+	if (!measurementId) return null
+	const raw = readCookie(`_ga_${measurementId.replace(/^G-/, '')}`)
+	return raw ? (raw.split('.')[2] ?? null) : null
+}
+
 function getGaTagValue(field: 'client_id' | 'session_id') {
+	const fromCookie = field === 'client_id' ? getGaClientId() : getGaSessionId()
+	if (fromCookie) return Promise.resolve(fromCookie)
+
 	return new Promise<string | null>(resolve => {
 		const measurementId = window.ENV?.GA_MEASUREMENT_ID
 		if (!measurementId || typeof window.gtag !== 'function') {
