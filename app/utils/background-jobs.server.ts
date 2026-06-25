@@ -3,6 +3,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 
 import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
+import { syncReviewAppointments } from '#app/utils/review-link-sync.server.ts'
 import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
 import { syncFollowUpContacts } from '#app/utils/follow-ups.server.ts'
 import { syncRetellDirectCallsToPostHog } from '#app/utils/retell-direct-calls.server.ts'
@@ -60,6 +61,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	followUpContactSync: {
 		id: 'followUpContactSync',
 		name: 'Follow-up Contact Sync',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	reviewAppointmentSync: {
+		id: 'reviewAppointmentSync',
+		name: 'Review Appointment Sync',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -251,6 +261,32 @@ export async function runFollowUpContactSyncJob(): Promise<void> {
 	}
 }
 
+export async function runReviewAppointmentSyncJob(): Promise<void> {
+	const job = jobStatuses['reviewAppointmentSync']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+
+	try {
+		const result = await syncReviewAppointments()
+		console.log('Review appointment sync completed:', result)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Review appointment sync failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getReviewAppointmentSyncIntervalMs(),
+		).toISOString()
+	}
+}
+
 // Initialize the background jobs scheduler
 export function initializeBackgroundJobs() {
 	if (isInitialized) return
@@ -337,8 +373,40 @@ export function initializeBackgroundJobs() {
 		}, 120_000)
 	}
 
+	if (shouldAutoRunReviewAppointmentSync()) {
+		const intervalMs = getReviewAppointmentSyncIntervalMs()
+		jobIntervals.reviewAppointmentSync = setInterval(() => {
+			runReviewAppointmentSyncJob().catch(console.error)
+		}, intervalMs)
+
+		const reviewSync = jobStatuses['reviewAppointmentSync']
+		if (reviewSync) {
+			reviewSync.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		}
+
+		setTimeout(() => {
+			runReviewAppointmentSyncJob().catch(console.error)
+		}, 60_000)
+	}
+
 	isInitialized = true
 	console.log('Background jobs initialized')
+}
+
+function shouldAutoRunReviewAppointmentSync() {
+	return (
+		process.env.NODE_ENV === 'production' ||
+		process.env.ENABLE_DEV_BACKGROUND_JOBS === '1'
+	)
+}
+
+function getReviewAppointmentSyncIntervalMs() {
+	const minutes = Number.parseInt(
+		process.env.REVIEW_APPOINTMENT_SYNC_INTERVAL_MINUTES ?? '10',
+		10,
+	)
+	const safeMinutes = Number.isFinite(minutes) && minutes >= 3 ? minutes : 10
+	return safeMinutes * 60 * 1000
 }
 
 function shouldAutoRunCallRailPostHogSync() {
