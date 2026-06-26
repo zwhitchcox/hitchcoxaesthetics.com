@@ -2,6 +2,7 @@ import { useLocation } from '@remix-run/react'
 import { BeforeAfterResults } from '#app/components/before-after-results.js'
 import Logo from '#app/components/logo.js'
 import { Icon } from '#app/components/ui/icon.js'
+import Carousel from '#app/utils/carousel.js'
 import { CTA } from '#app/utils/cta.js'
 import { getLocationById, PHONE } from '#app/utils/locations.js'
 import { cn, scrollToId } from '#app/utils/misc.js'
@@ -219,12 +220,10 @@ export function ServiceLayout({
 							imgContainerClassName,
 						)}
 					>
-						<img
-							src="/img/sarah.jpg"
-							alt="Sarah Hitchcox"
-							className="z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] animate-fade-in object-contain"
-							loading="eager"
-							fetchPriority="high"
+						<Carousel
+							pairs={imgs}
+							leadingImage="/img/sarah.jpg"
+							leadingLabel="Sarah"
 						/>
 					</div>
 					<div className="z-10 flex w-full bg-white py-4 text-black sm:relative sm:my-0 sm:flex-1">

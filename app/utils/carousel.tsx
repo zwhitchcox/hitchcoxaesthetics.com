@@ -4,27 +4,36 @@ import { type HeroImagePair } from '#app/utils/section-types.js'
 
 const ImageCarousel = ({
 	pairs,
+	leadingImage,
+	leadingLabel = 'Sarah',
 	className,
 	interval = 4000,
 	transitionDuration = 2000,
 }: {
 	pairs: HeroImagePair[]
+	/** Optional single image (e.g. Sarah) shown as the first slide. */
+	leadingImage?: string
+	/** Nav label shown on the leading slide (no before/after toggle there). */
+	leadingLabel?: string
 	className?: string
 	transitionDuration?: number
 	interval?: number
 }) => {
-	// Flatten pairs into [before1, after1, before2, after2, ...]
-	const images = pairs.flatMap(p => [p.before, p.after])
-	const captions = pairs.flatMap(p => [p.caption, p.caption])
+	// Flatten pairs into [before1, after1, before2, after2, ...], optionally
+	// preceded by a single leading image (Sarah).
+	const pairImages = pairs.flatMap(p => [p.before, p.after])
+	const images = leadingImage ? [leadingImage, ...pairImages] : pairImages
+	const offset = leadingImage ? 1 : 0
 
 	const [currentIndex, setCurrentIndex] = useState(0)
 	const [hasMounted, setHasMounted] = useState(false)
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-	// Even indices = before, odd indices = after
-	const showAfter = currentIndex % 2 === 1
-	const pairIndex = Math.floor(currentIndex / 2)
-	const currentCaption = captions[currentIndex]
+	const isLeading = offset === 1 && currentIndex === 0
+	const flatIndex = currentIndex - offset // index into pairImages (negative on leading)
+	const showAfter = !isLeading && flatIndex % 2 === 1
+	const pairIndex = isLeading ? 0 : Math.floor(flatIndex / 2)
+	const currentCaption = isLeading ? undefined : pairs[pairIndex]?.caption
 
 	useEffect(() => {
 		setHasMounted(true)
@@ -61,11 +70,8 @@ const ImageCarousel = ({
 	}
 
 	const toggleBeforeAfter = () => {
-		if (showAfter) {
-			setCurrentIndex(pairIndex * 2)
-		} else {
-			setCurrentIndex(pairIndex * 2 + 1)
-		}
+		if (isLeading) return
+		setCurrentIndex(offset + pairIndex * 2 + (showAfter ? 0 : 1))
 		startTimer()
 	}
 
@@ -76,23 +82,27 @@ const ImageCarousel = ({
 				<link rel="preload" as="image" href={images[0]} fetchPriority="high" />
 			)}
 			{images.map((image, index) => {
-				// Eagerly load the first pair (before and after) to ensure the initial transition is smooth.
-				// Load the rest lazily after mount or when needed.
-				const shouldLoad = index === 0 || index === 1 || hasMounted
+				// Eagerly load the first two images so the initial fade is smooth.
+				const shouldLoad = index <= 1 || hasMounted
+				const lead = offset === 1 && index === 0
+				const fIdx = index - offset
+				const alt = lead
+					? leadingLabel
+					: `Treatment result ${Math.floor(fIdx / 2) + 1} ${fIdx % 2 === 0 ? 'before' : 'after'}`
 				return (
 					<img
 						key={index}
 						src={shouldLoad ? image : undefined}
-						alt={`Treatment result ${Math.floor(index / 2) + 1} ${index % 2 === 0 ? 'before' : 'after'}`}
-						className={`absolute left-0 top-0 w-full object-cover transition-opacity ${
+						alt={alt}
+						className={`absolute left-0 top-0 h-full w-full object-cover transition-opacity ${
 							index === currentIndex ? 'z-10 opacity-100' : 'z-0 opacity-0'
 						} ${cn(className)}`}
 						style={{
 							transitionDuration: `${transitionDuration}ms`,
 						}}
-						loading={index === 0 || index === 1 ? 'eager' : 'lazy'}
+						loading={index <= 1 ? 'eager' : 'lazy'}
 						fetchPriority={index === 0 ? 'high' : 'auto'}
-						decoding={index === 0 || index === 1 ? 'sync' : 'async'}
+						decoding={index <= 1 ? 'sync' : 'async'}
 					/>
 				)
 			})}
@@ -130,13 +140,19 @@ const ImageCarousel = ({
 						</svg>
 					</button>
 
-					{/* Before / After Toggle */}
-					<button
-						onClick={toggleBeforeAfter}
-						className="rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-white/20 hover:text-white"
-					>
-						{showAfter ? 'After' : 'Before'}
-					</button>
+					{/* Before / After toggle (leading slide shows a static label instead) */}
+					{isLeading ? (
+						<span className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white">
+							{leadingLabel}
+						</span>
+					) : (
+						<button
+							onClick={toggleBeforeAfter}
+							className="rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-white/20 hover:text-white"
+						>
+							{showAfter ? 'After' : 'Before'}
+						</button>
+					)}
 
 					{/* Next */}
 					<button
