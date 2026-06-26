@@ -1477,34 +1477,15 @@ export default function BlvdBookRoute() {
 				ownershipVerifiedPhone ??
 				clientForm.phone,
 		})
-		// No separate confirm page: services that do not require a card book
-		// immediately once the client confirms their details. Card-required
-		// bookings go to the payment step to collect the card. Only mark details
-		// submitted on the card path — detailsSubmitted forces the derived step
-		// to "reserve", which on the direct path would flash the payment page
-		// while the booking is in flight.
-		if (requiresCard) {
-			setDetailsSubmitted(true)
-			setActiveStep('reserve')
-			queueCurrentBlvdBookingIntent({
-				status: 'reserve_started',
-				step: 'reserve',
-			})
-			return
-		}
-		// The direct-book flow has no confirm page, but still record the reserve
-		// step + intent at the booking moment so the funnel sees
-		// details -> reserve -> success and these conversions are not counted as
-		// drops.
-		captureBookingPostHogEvent('booking_step_viewed', {
-			...bookingAnalyticsPropertiesRef.current,
-			step: 'reserve',
-		})
+		// Confirming details takes the client to the reserve/confirm step to
+		// review and book — it does not book immediately. The 'reserve' step view
+		// fires from the step-view effect when the derived step becomes 'reserve'.
+		setDetailsSubmitted(true)
+		setActiveStep('reserve')
 		queueCurrentBlvdBookingIntent({
 			status: 'reserve_started',
 			step: 'reserve',
 		})
-		await performBooking()
 	}
 
 	async function handleCheckout(event: React.FormEvent<HTMLFormElement>) {
@@ -1998,14 +1979,9 @@ export default function BlvdBookRoute() {
 				step: 'details',
 			})
 
-			// Card-required bookings advance to the payment step. No-card bookings
-			// stay on the details step so the verified client books with the
-			// "Book" button (which books immediately) instead of landing on a
-			// confirm page that asks for a card it never needs.
-			if (
-				allRequiredBookingQuestionsAnswered(nextCart, questionAnswers) &&
-				nextCart.summary.paymentMethodRequired
-			) {
+			// Once a verified existing client has answered all required questions,
+			// advance them to the reserve/confirm step to review and book.
+			if (allRequiredBookingQuestionsAnswered(nextCart, questionAnswers)) {
 				setDetailsSubmitted(true)
 				setActiveStep('reserve')
 				queueCurrentBlvdBookingIntent({
@@ -3097,13 +3073,8 @@ export default function BlvdBookRoute() {
 														type="submit"
 														size="lg"
 														className="w-full sm:ml-auto sm:w-auto"
-														disabled={submittingBooking}
 													>
-														{requiresCard
-															? 'Continue to payment'
-															: submittingBooking
-																? 'Booking...'
-																: 'Book'}
+														Next
 													</Button>
 												</div>
 											</form>
@@ -3116,6 +3087,19 @@ export default function BlvdBookRoute() {
 										</h2>
 										<div className="w-full space-y-6">
 											<form className="space-y-8" onSubmit={handleCheckout}>
+												<div className="flex flex-col items-center gap-2">
+													<p className="text-center text-sm text-muted-foreground">
+														Click to confirm your appointment.
+													</p>
+													<Button
+														type="submit"
+														size="lg"
+														className="font-bold"
+														disabled={submittingBooking}
+													>
+														{submittingBooking ? 'Confirming...' : 'Confirm'}
+													</Button>
+												</div>
 												<div className="space-y-2">
 													<Label htmlFor="notes">Optional note</Label>
 													<Textarea
@@ -3272,16 +3256,6 @@ export default function BlvdBookRoute() {
 														) : null}
 													</div>
 												) : null}
-												<div className="flex flex-col items-center gap-2">
-													<Button
-														type="submit"
-														size="lg"
-														className="font-bold"
-														disabled={submittingBooking}
-													>
-														{submittingBooking ? 'Booking...' : 'Book'}
-													</Button>
-												</div>
 											</form>
 										</div>
 									</div>
