@@ -172,6 +172,72 @@ void main(options).catch(error => {
 	process.exitCode = 1
 })
 
+/**
+ * True cancellation rate over the trailing window, used to haircut the forecast.
+ *
+ * Boulevard has no reschedule concept: moving a client (e.g. to the other
+ * location) cancels the original appointment and creates a new one. Those are
+ * not lost revenue, so a cancellation is treated as a reschedule (and excluded)
+ * when the same client has a kept appointment for an overlapping service within
+ * matchDays of the cancelled one.
+ */
+function computeCancellationRate(
+	segments: AppointmentServiceSegment[],
+	now: Date,
+	windowDays = 90,
+	matchDays = 30,
+) {
+	const dayMs = 24 * 60 * 60 * 1000
+	const cutoff = now.getTime() - windowDays * dayMs
+	const matchMs = matchDays * dayMs
+
+	type Appt = {
+		client: string
+		startMs: number
+		cancelled: boolean
+		services: Set<string>
+	}
+	const appointments = new Map<string, Appt>()
+	for (const segment of segments) {
+		const appt = appointments.get(segment.appointmentId) ?? {
+			client: segment.clientName,
+			startMs: segment.startAt.getTime(),
+			cancelled: false,
+			services: new Set<string>(),
+		}
+		appt.cancelled = appt.cancelled || segment.cancelled
+		if (segment.serviceId) appt.services.add(segment.serviceId)
+		appointments.set(segment.appointmentId, appt)
+	}
+	const all = [...appointments.values()]
+	const kept = all.filter(appt => !appt.cancelled)
+
+	const isReschedule = (cancelled: Appt) =>
+		kept.some(
+			keptAppt =>
+				keptAppt.client === cancelled.client &&
+				Math.abs(keptAppt.startMs - cancelled.startMs) <= matchMs &&
+				(cancelled.services.size === 0 ||
+					[...cancelled.services].some(s => keptAppt.services.has(s))),
+		)
+
+	const windowAppts = all.filter(
+		appt => appt.startMs >= cutoff && appt.startMs < now.getTime(),
+	)
+	const cancelledAppts = windowAppts.filter(appt => appt.cancelled)
+	const reschedules = cancelledAppts.filter(isReschedule).length
+	const trueCancelled = cancelledAppts.length - reschedules
+	// Reschedules are not lost demand: drop them from numerator and denominator.
+	const denominator = windowAppts.length - reschedules
+	return {
+		rate: denominator > 0 ? trueCancelled / denominator : 0,
+		total: windowAppts.length,
+		cancelled: trueCancelled,
+		rawCancelled: cancelledAppts.length,
+		reschedules,
+	}
+}
+
 async function main(options: CliOptions) {
 	const { start, end } = getReportWindow(options)
 	const now = new Date()
@@ -229,6 +295,22 @@ async function main(options: CliOptions) {
 				start,
 			})
 		: null
+
+	// Discount for cancellations: booked future appointments and still-to-book
+	// fill both shed revenue at the historical rate. Past appointments have
+	// already resolved, so only the future portion is cut.
+	const cancellation = computeCancellationRate(appointmentSegments, now)
+	const futureBookedUsd = rows
+		.filter(row => row.startAt >= now)
+		.reduce((sum, row) => sum + row.projectedUsd, 0)
+	const fillUsd = expectedFill?.totalFillUsd ?? 0
+	const expectedCancellationsUsd = roundCurrency(
+		(futureBookedUsd + fillUsd) * cancellation.rate,
+	)
+	const expectedNetRevenueUsd = roundCurrency(
+		totalProjectedUsd + fillUsd - expectedCancellationsUsd,
+	)
+
 	const result = {
 		expected_fill: expectedFill
 			? {
@@ -263,6 +345,13 @@ async function main(options: CliOptions) {
 			expected_total_revenue_usd: expectedFill
 				? expectedFill.totalExpectedUsd
 				: roundCurrency(totalProjectedUsd),
+			cancellation_rate: roundTo(cancellation.rate, 3),
+			cancellation_raw_count: cancellation.rawCancelled,
+			cancellation_reschedule_count: cancellation.reschedules,
+			cancellation_true_count: cancellation.cancelled,
+			cancellation_sample_appointments: cancellation.total,
+			expected_cancellations_usd: expectedCancellationsUsd,
+			expected_net_revenue_usd: expectedNetRevenueUsd,
 		},
 		window: {
 			end: end.toISOString(),
@@ -278,6 +367,14 @@ async function main(options: CliOptions) {
 	}
 
 	printReport(rows, result, expectedFill)
+	console.log('')
+	console.log(
+		`Cancellation rate (last 90d): ${(cancellation.rate * 100).toFixed(1)}% true (${cancellation.cancelled}/${cancellation.total - cancellation.reschedules} appts) — ${cancellation.reschedules} of ${cancellation.rawCancelled} raw cancellations were reschedules`,
+	)
+	console.log(`Expected cancellations: -${formatUsd(expectedCancellationsUsd)}`)
+	console.log(
+		`Cancellation-adjusted expected total: ${formatUsd(expectedNetRevenueUsd)}`,
+	)
 }
 
 /**
