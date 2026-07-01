@@ -179,6 +179,25 @@ export function writeReviewUrl(placeId: string) {
 	return `https://search.google.com/local/writereview?placeid=${placeId}`
 }
 
+// Classify a Google listing to its location from name + address. Bearden and
+// West Hills are both on Kingston Pike, so match the street number / area, not
+// just the city. Add a case here when a new location goes live.
+function classifyLocation(
+	name: string,
+	address: string,
+): { label: string; blvdMatch: RegExp } {
+	const hay = `${name} ${address}`.toLowerCase()
+	if (/farragut|campbell station|37934/.test(hay))
+		return { label: 'Farragut', blvdMatch: /farragut/i }
+	if (/cedar bluff|cross park|37923/.test(hay))
+		return { label: 'Cedar Bluff', blvdMatch: /cedar bluff/i }
+	if (/west hills|7600 kingston/.test(hay))
+		return { label: 'West Hills', blvdMatch: /west hills/i }
+	if (/bearden|5113 kingston/.test(hay))
+		return { label: 'Bearden', blvdMatch: /knox|bearden/i }
+	return { label: 'Bearden', blvdMatch: /knox|bearden/i }
+}
+
 export async function getReviewLocations(): Promise<ReviewLocation[]> {
 	const rows = await prisma.googleLocation.findMany({
 		select: { name: true, formattedAddress: true, json: true, url: true },
@@ -196,13 +215,13 @@ export async function getReviewLocations(): Promise<ReviewLocation[]> {
 		}
 		if (!placeId) continue
 		const address = row.formattedAddress ?? ''
-		const isFarragut = /campbell station|farragut|37934/i.test(address)
+		const { label, blvdMatch } = classifyLocation(row.name ?? '', address)
 		locations.push({
 			placeId,
-			label: isFarragut ? 'Farragut' : 'Bearden',
+			label,
 			address,
 			writeReviewUrl: writeReviewUrl(placeId),
-			blvdMatch: isFarragut ? /farragut/i : /knox|bearden/i,
+			blvdMatch,
 		})
 	}
 	// Stable default order; the page floats the visited location to the top.
@@ -214,7 +233,12 @@ export function matchLocationToAppointment(
 	appointmentLocationName: string | null | undefined,
 ): string | null {
 	if (!appointmentLocationName) return null
-	const hit = locations.find(l => l.blvdMatch.test(appointmentLocationName))
+	// Try specific locations before the broad Bearden/Knoxville match, so a
+	// "Knoxville (West Hills)" appointment isn't grabbed by Bearden's /knox/.
+	const ordered = [...locations].sort(
+		(a, b) => Number(a.label === 'Bearden') - Number(b.label === 'Bearden'),
+	)
+	const hit = ordered.find(l => l.blvdMatch.test(appointmentLocationName))
 	return hit?.placeId ?? null
 }
 

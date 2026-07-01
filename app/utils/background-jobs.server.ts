@@ -8,6 +8,7 @@ import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posth
 import { syncFollowUpContacts } from '#app/utils/follow-ups.server.ts'
 import { syncRetellDirectCallsToPostHog } from '#app/utils/retell-direct-calls.server.ts'
 import { syncCallRailPhoneConversionsToGa4 } from '#app/utils/ga4-phone-conversions.server.ts'
+import { syncGoogleReviewsToPostHog } from '#app/utils/reviews-posthog-sync.server.ts'
 
 // Background job types and interfaces
 export interface JobStatus {
@@ -117,6 +118,9 @@ export async function runReviewsFetchJob(): Promise<void> {
 			job.lastError = stderr
 		} else {
 			console.log('Reviews fetch completed:', stdout)
+			// DB is now current — push reviews into PostHog (idempotent via $insert_id).
+			const posthog = await syncGoogleReviewsToPostHog()
+			console.log('Google reviews → PostHog sync:', posthog)
 			job.status = 'completed'
 			job.lastError = null
 		}
