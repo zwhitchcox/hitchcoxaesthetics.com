@@ -1,5 +1,6 @@
 import { type LoaderFunctionArgs } from '@remix-run/node'
 import { getDomainUrl } from '#app/utils/misc.tsx'
+import { locations } from '#app/utils/locations.ts'
 import { sitePages } from '#app/utils/site-pages.server.js'
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -9,8 +10,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const staticPaths = [
 		'',
 		'about',
-		'bearden',
-		'farragut',
+		// every location landing page, including ghost (orphaned) ones, so search
+		// engines can discover them — they aren't linked anywhere in the site nav
+		...locations.map(location => location.id),
 		'book',
 		'support',
 		'privacy',

@@ -48,7 +48,7 @@ import { prisma } from '#/app/utils/db.server.ts'
 import { getEnv } from '#/app/utils/env.server.ts'
 import { honeypot } from '#/app/utils/honeypot.server.ts'
 import {
-	locations,
+	publicLocations,
 	formatAddress,
 	getLocationById,
 	PHONE,
@@ -546,7 +546,7 @@ function Footer() {
 		<div className="container py-12 pb-32">
 			<div className="mb-12 border-b pb-8">
 				<div className="grid gap-8 md:grid-cols-2">
-					{locations.map(location => (
+					{publicLocations.map(location => (
 						<div key={location.id} className="space-y-4">
 							<Link to={`/${location.id}`}>
 								<h3 className="text-xl font-semibold hover:text-primary hover:underline">

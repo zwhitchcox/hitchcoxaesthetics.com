@@ -35,10 +35,12 @@ export default function FarragutLocation() {
 	const jsonLd = {
 		'@context': 'https://schema.org',
 		'@type': 'MedicalBusiness',
-		name: 'Sarah Hitchcox Aesthetics - Farragut',
+		name: 'Sarah Hitchcox Aesthetics - Knoxville (Farragut)',
 		description:
 			'Medical spa in Farragut offering Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
 		url: 'https://hitchcoxaesthetics.com/farragut',
+		hasMap: 'https://maps.google.com/maps?cid=4802252091183573764',
+		sameAs: ['https://maps.google.com/maps?cid=4802252091183573764'],
 		telephone: location.phone,
 		email: 'sarah@hitchcoxaesthetics.com',
 		image: 'https://hitchcoxaesthetics.com/img/sarah.jpg',

@@ -10,9 +10,10 @@ import { getCategoryPages } from '#app/utils/site-pages.server.js'
 
 export const meta: MetaFunction = ({ location }) =>
 	getSocialMetas({
-		title: 'Bearden (West Knoxville) Med Spa | Sarah Hitchcox Aesthetics',
+		title:
+			'West Hills Med Spa | Botox, Fillers & Lasers | Sarah Hitchcox Aesthetics',
 		description:
-			'Visit Sarah Hitchcox Aesthetics in Bearden, Knoxville, TN (5113 Kingston Pike). Expert Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
+			'Sarah Hitchcox Aesthetics near West Hills, Knoxville (7600 Kingston Pike). Expert Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
 		pathname: location.pathname,
 	})
 
@@ -26,21 +27,21 @@ export async function loader() {
 	return json({ categories })
 }
 
-export default function BeardenLocation() {
+export default function WestHillsLocation() {
 	const { categories } = useLoaderData<typeof loader>()
-	const location = getLocationById('bearden')!
+	const location = getLocationById('west-hills')!
 	const blvdUrl = useBlvdUrl()
 
 	const jsonLd = {
 		'@context': 'https://schema.org',
 		'@type': 'MedicalBusiness',
-		name: 'Sarah Hitchcox Aesthetics - Knoxville (Bearden)',
+		name: 'Sarah Hitchcox Aesthetics - Knoxville (West Hills)',
 		description:
-			'Medical spa in the Bearden area of Knoxville offering Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
-		url: 'https://hitchcoxaesthetics.com/bearden',
-		hasMap: 'https://maps.google.com/maps?cid=3949897342669306315',
-		sameAs: ['https://maps.google.com/maps?cid=3949897342669306315'],
-		telephone: '(865) 489-8008',
+			'Medical spa near West Hills, Knoxville offering Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
+		url: 'https://hitchcoxaesthetics.com/west-hills',
+		hasMap: 'https://maps.google.com/maps?cid=4899187082724912434',
+		sameAs: ['https://maps.google.com/maps?cid=4899187082724912434'],
+		telephone: location.phone,
 		email: 'sarah@hitchcoxaesthetics.com',
 		image: 'https://hitchcoxaesthetics.com/img/sarah.jpg',
 		priceRange: '$$',
@@ -76,10 +77,10 @@ export default function BeardenLocation() {
 			<div className="font-poppins flex w-full flex-col bg-white">
 				<Hero
 					image="/img/sarah.jpg"
-					imageAlt="Sarah Hitchcox - Bearden Knoxville Med Spa"
+					imageAlt="Sarah Hitchcox - West Hills Med Spa"
 					topText="SARAH HITCHCOX"
 					bottomText="AESTHETICS"
-					subText="Knoxville Med Spa"
+					subText="West Hills Med Spa"
 					ctaText="Book Appointment"
 					ctaHref={blvdUrl}
 				/>
@@ -88,21 +89,20 @@ export default function BeardenLocation() {
 					<div className="space-y-12">
 						<div className="text-center">
 							<h2 className="mb-4 text-3xl font-bold text-gray-900">
-								Knoxville Med Spa | Bearden
+								Knoxville Med Spa | West Hills
 							</h2>
 							<p className="text-lg leading-relaxed text-gray-600">
-								Conveniently located on Kingston Pike in the Bearden area, Sarah
-								Hitchcox Aesthetics provides premier medical spa services to
-								Knoxville residents. Whether you are looking for preventative
-								Botox, volume restoration with fillers, or advanced laser skin
-								treatments, our Bearden location offers a private and luxurious
-								setting for your aesthetic journey.
+								Just off Kingston Pike, Sarah Hitchcox Aesthetics brings premier
+								medical spa services to the West Hills community. We specialize
+								in natural-looking results through expert Botox injections,
+								dermal fillers, and cutting-edge skin treatments. Visit us for a
+								personalized consultation tailored to your aesthetic goals.
 							</p>
 						</div>
 
 						<div>
 							<h2 className="text-center text-2xl font-bold text-gray-900">
-								Knoxville Med Spa Services
+								Knoxville Med Spa Services Available in West Hills
 							</h2>
 							<div className="mt-8">
 								<ServiceCardGrid services={categories} variant="thumbnail" />
@@ -111,20 +111,19 @@ export default function BeardenLocation() {
 
 						<div className="rounded-xl bg-gray-50 p-8 text-center">
 							<h3 className="mb-4 text-2xl font-semibold text-gray-900">
-								Visit Our Bearden Location
+								Visit Our West Hills Location
 							</h3>
 							<p className="mb-6 text-gray-600">
-								We are located at 5113 Kingston Pike, Suite 15, right in the
-								heart of the Bearden area in West Knoxville. Ample parking is
-								available.
+								We are located at {location.address}, near West Hills off
+								Kingston Pike. Ample parking is available.
 							</p>
 							<div className="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
 								<Link
-									to="tel:8654898008"
+									to={`tel:${location.phoneRaw}`}
 									reloadDocument
 									className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
 								>
-									Call (865) 489-8008
+									Call {location.phone}
 								</Link>
 								<a
 									href={location.googleMapsDirectionsUrl}
@@ -145,7 +144,7 @@ export default function BeardenLocation() {
 									allowFullScreen={false}
 									loading="lazy"
 									referrerPolicy="no-referrer-when-downgrade"
-									title="Map of Sarah Hitchcox Aesthetics Bearden"
+									title="Map of Sarah Hitchcox Aesthetics West Hills"
 									style={{ border: 0 }}
 								/>
 							</div>
@@ -155,12 +154,19 @@ export default function BeardenLocation() {
 							<p className="text-gray-600">
 								Also visit our{' '}
 								<Link
+									to="/bearden"
+									className="font-medium text-primary hover:underline"
+								>
+									Bearden
+								</Link>{' '}
+								and{' '}
+								<Link
 									to="/farragut"
 									className="font-medium text-primary hover:underline"
 								>
-									Farragut location
-								</Link>
-								.
+									Farragut
+								</Link>{' '}
+								locations.
 							</p>
 						</div>
 					</div>

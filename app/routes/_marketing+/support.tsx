@@ -1,7 +1,7 @@
 import { type MetaFunction } from '@remix-run/node'
 import { Link } from '@remix-run/react'
 import { Icon } from '#app/components/ui/icon.js'
-import { locations, formatAddress } from '#app/utils/locations.js'
+import { publicLocations, formatAddress } from '#app/utils/locations.js'
 import { PhoneLink } from '#app/utils/phone-context.tsx'
 import { getSocialMetas } from '#app/utils/seo.ts'
 
@@ -36,7 +36,7 @@ export default function SupportRoute() {
 				<PhoneLink className="text-lg hover:text-primary" />
 			</div>
 			<div className="grid gap-8 md:grid-cols-2">
-				{locations.map(location => (
+				{publicLocations.map(location => (
 					<div key={location.id} className="space-y-2">
 						<Link to={`/${location.id}`}>
 							<h2 className="text-xl font-semibold hover:text-primary hover:underline">
