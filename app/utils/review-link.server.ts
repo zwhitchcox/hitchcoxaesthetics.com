@@ -179,22 +179,23 @@ export function writeReviewUrl(placeId: string) {
 	return `https://search.google.com/local/writereview?placeid=${placeId}`
 }
 
-// Classify a Google listing to its location from name + address. Bearden and
-// West Hills are both on Kingston Pike, so match the street number / area, not
-// just the city. Add a case here when a new location goes live.
-function classifyLocation(
-	name: string,
-	address: string,
-): { label: string; blvdMatch: RegExp } {
-	const hay = `${name} ${address}`.toLowerCase()
-	if (/farragut|campbell station|37934/.test(hay))
+// Classify a Google listing to its location by ADDRESS ONLY. The listing/DB
+// name is untrustworthy (the Google titles were swapped for a while, and the
+// synced GoogleLocation.name can lag renames), but the street address is the
+// physical ground truth. Bearden and West Hills are both on Kingston Pike, so
+// match street numbers, not the road. Add a case here when a new location goes
+// live.
+function classifyLocation(address: string): {
+	label: string
+	blvdMatch: RegExp
+} {
+	const hay = address.toLowerCase()
+	if (/campbell station|37934/.test(hay))
 		return { label: 'Farragut', blvdMatch: /farragut/i }
-	if (/cedar bluff|cross park|37923/.test(hay))
+	if (/cross park|37923/.test(hay))
 		return { label: 'Cedar Bluff', blvdMatch: /cedar bluff/i }
-	if (/west hills|7600 kingston/.test(hay))
+	if (/7600 kingston/.test(hay))
 		return { label: 'West Hills', blvdMatch: /west hills/i }
-	if (/bearden|5113 kingston/.test(hay))
-		return { label: 'Bearden', blvdMatch: /knox|bearden/i }
 	return { label: 'Bearden', blvdMatch: /knox|bearden/i }
 }
 
@@ -215,7 +216,7 @@ export async function getReviewLocations(): Promise<ReviewLocation[]> {
 		}
 		if (!placeId) continue
 		const address = row.formattedAddress ?? ''
-		const { label, blvdMatch } = classifyLocation(row.name ?? '', address)
+		const { label, blvdMatch } = classifyLocation(address)
 		locations.push({
 			placeId,
 			label,
