@@ -305,12 +305,16 @@ export function initializeBackgroundJobs() {
 		24 * 60 * 60 * 1000,
 	) // 24 hours
 
+	// Also run shortly after boot: a bare 24h interval never fires in practice
+	// because every deploy/restart resets it before the first tick.
+	setTimeout(() => {
+		runReviewsFetchJob().catch(console.error)
+	}, 2 * 60_000)
+
 	// Set the next run time for reviews fetch
 	const reviewsFetch = jobStatuses['reviewsFetch']
 	if (reviewsFetch) {
-		reviewsFetch.nextRun = new Date(
-			Date.now() + 24 * 60 * 60 * 1000,
-		).toISOString()
+		reviewsFetch.nextRun = new Date(Date.now() + 2 * 60_000).toISOString()
 	}
 
 	if (shouldAutoRunCallRailPostHogSync()) {
