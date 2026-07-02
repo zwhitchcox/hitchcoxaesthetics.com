@@ -511,24 +511,36 @@ async function getLocations(accountId) {
 		version: 'v1',
 		auth: client,
 	})
-	var { data } = await business.accounts.locations.list({
-		parent: accountId,
-		readMask: [
-			'latlng',
-			'categories',
-			'storefrontAddress',
-			'languageCode',
-			'name',
-			'title',
-			'storeCode',
-			'phoneNumbers.primaryPhone',
-			'metadata.newReviewUri',
-			'metadata.placeId',
-			'metadata.mapsUri',
-			'websiteUri',
-		].join(','),
-	})
-	return data.locations
+	// Paginate: the API defaults to 10 locations per page and the account has
+	// more than that (multiple businesses), so a single unpaginated call
+	// silently drops listings.
+	const readMask = [
+		'latlng',
+		'categories',
+		'storefrontAddress',
+		'languageCode',
+		'name',
+		'title',
+		'storeCode',
+		'phoneNumbers.primaryPhone',
+		'metadata.newReviewUri',
+		'metadata.placeId',
+		'metadata.mapsUri',
+		'websiteUri',
+	].join(',')
+	const locations = []
+	let pageToken = undefined
+	do {
+		const { data } = await business.accounts.locations.list({
+			parent: accountId,
+			readMask,
+			pageSize: 100,
+			...(pageToken ? { pageToken } : {}),
+		})
+		locations.push(...(data.locations ?? []))
+		pageToken = data.nextPageToken
+	} while (pageToken)
+	return locations
 }
 
 async function fetchReviews(accountId, locationId) {
