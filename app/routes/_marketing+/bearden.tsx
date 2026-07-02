@@ -4,7 +4,7 @@ import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
 import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
-import { getLocationById } from '#app/utils/locations.js'
+import { getLocationById, mapsUrl } from '#app/utils/locations.js'
 import { getSocialMetas } from '#app/utils/seo.ts'
 import { getCategoryPages } from '#app/utils/site-pages.server.js'
 
@@ -34,12 +34,12 @@ export default function BeardenLocation() {
 	const jsonLd = {
 		'@context': 'https://schema.org',
 		'@type': 'MedicalBusiness',
-		name: 'Sarah Hitchcox Aesthetics - Knoxville (Bearden)',
+		name: location.gbp.title,
 		description:
 			'Medical spa in the Bearden area of Knoxville offering Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
 		url: 'https://hitchcoxaesthetics.com/bearden',
-		hasMap: 'https://maps.google.com/maps?cid=3949897342669306315',
-		sameAs: ['https://maps.google.com/maps?cid=3949897342669306315'],
+		hasMap: mapsUrl(location),
+		sameAs: [mapsUrl(location)],
 		telephone: '(865) 489-8008',
 		email: 'sarah@hitchcoxaesthetics.com',
 		image: 'https://hitchcoxaesthetics.com/img/sarah.jpg',

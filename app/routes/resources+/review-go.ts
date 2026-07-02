@@ -43,6 +43,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			place_id: chosen.placeId,
 			place_label: chosen.label,
 			chose_visited_location: matchedPlaceId === chosen.placeId,
+			client_first_name: appt?.clientFirstName ?? null,
 		},
 	})
 

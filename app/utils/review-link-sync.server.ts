@@ -130,6 +130,7 @@ export async function syncReviewAppointments({
 				service_category: profile.category,
 				location_id: appt.locationId,
 				location_name: appt.locationName,
+				client_first_name: appt.clientFirstName ?? null,
 			},
 		})
 		eligibleEmitted++

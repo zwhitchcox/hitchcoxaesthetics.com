@@ -74,6 +74,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			service_category: profile.category,
 			matched_location: appt?.locationName ?? null,
 			has_appointment: Boolean(appt),
+			client_first_name: appt?.clientFirstName ?? null,
 		},
 	})
 

@@ -1,0 +1,132 @@
+{
+	"_readme": "CANONICAL location config — the single source of truth for every per-location fact. The site (app/utils/locations.ts, JSON-LD), the GBP reconciler (scripts/gbp-reconcile.ts), and BrightLocal citations (scripts/brightlocal-citations.ts) all derive from this file. Rules: phones.real is the NAP line used on the site, JSON-LD, citations, and as the GBP additional phone; phones.tracking is the CallRail GMB number, used ONLY as the GBP primary phone. gbp.title must match the live listing title exactly. address.line1/line2 must match the GBP address exactly, suite included. description null = leave the live GBP description untouched.",
+	"brand": "Sarah Hitchcox Aesthetics",
+	"siteOrigin": "https://hitchcoxaesthetics.com",
+	"gbpCategories": {
+		"primary": "categories/gcid:medical_spa",
+		"additional": [
+			"categories/gcid:skin_care_clinic",
+			"categories/gcid:weight_loss_service",
+			"categories/gcid:laser_hair_removal_service",
+			"categories/gcid:facial_spa"
+		]
+	},
+	"locations": [
+		{
+			"id": "bearden",
+			"name": "Bearden",
+			"displayName": "Knoxville (Bearden)",
+			"ghost": false,
+			"address": {
+				"line1": "5113 Kingston Pike",
+				"line2": "Suite 15",
+				"city": "Knoxville",
+				"state": "TN",
+				"zip": "37919"
+			},
+			"phones": {
+				"real": "(865) 489-8008",
+				"realRaw": "8654898008",
+				"tracking": "(865) 419-4234"
+			},
+			"geo": { "lat": 35.9392, "lng": -83.9913 },
+			"gbp": {
+				"locationId": "locations/13581758717989522836",
+				"title": "Sarah Hitchcox Aesthetics - Knoxville (Bearden)",
+				"placeId": "ChIJT25n7649XIgRyzkQqbTa0DY",
+				"mapsCid": "3949897342669306315"
+			},
+			"brightlocal": { "locationId": 4101999, "campaignId": 980257 },
+			"description": null,
+			"googleMapsEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6460.633842232989!2d-83.99134928806535!3d35.93921647239054!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x885c3daeef676e4f%3A0x36d0dab4a91039cb!2sSarah%20Hitchcox%20Aesthetics!5e0!3m2!1sen!2sus!4v1753285704557!5m2!1sen!2sus",
+			"googleMapsDirectionsUrl": "https://maps.google.com/?q=5113+Kingston+Pike+Suite+15,+Knoxville,+TN+37919"
+		},
+		{
+			"id": "farragut",
+			"name": "Farragut",
+			"displayName": "Farragut",
+			"ghost": false,
+			"address": {
+				"line1": "102 S Campbell Station Rd",
+				"line2": "Suite 8",
+				"city": "Knoxville",
+				"state": "TN",
+				"zip": "37934"
+			},
+			"phones": {
+				"real": "(865) 489-8001",
+				"realRaw": "8654898001",
+				"tracking": "(865) 346-4512"
+			},
+			"geo": { "lat": 35.8804, "lng": -84.1616 },
+			"gbp": {
+				"locationId": "locations/7968858603211080242",
+				"title": "Sarah Hitchcox Aesthetics - Knoxville (Farragut)",
+				"placeId": "ChIJnRT1vOsvXIgRBKvfYNUGpUI",
+				"mapsCid": "4802252091183573764"
+			},
+			"brightlocal": { "locationId": 4102000, "campaignId": 980259 },
+			"description": null,
+			"googleMapsEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6465.438458287701!2d-84.16162298806765!3d35.88039687240895!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x885c2febbcf5149d%3A0x42a506d560dfab04!2sSarah%20Hitchcox%20Aesthetics!5e0!3m2!1sen!2sus!4v1753285747631!5m2!1sen!2sus",
+			"googleMapsDirectionsUrl": "https://maps.google.com/?q=102+S+Campbell+Station+Rd+Suite+8,+Knoxville,+TN+37934"
+		},
+		{
+			"id": "west-hills",
+			"name": "West Hills",
+			"displayName": "Knoxville (West Hills)",
+			"ghost": true,
+			"address": {
+				"line1": "7600 Kingston Pike",
+				"line2": "#1550 Suite 30",
+				"city": "Knoxville",
+				"state": "TN",
+				"zip": "37919"
+			},
+			"phones": {
+				"real": "(865) 489-8008",
+				"realRaw": "8654898008",
+				"tracking": "(865) 351-6951"
+			},
+			"geo": { "lat": 35.9266, "lng": -84.0036 },
+			"gbp": {
+				"locationId": "locations/18165056681856849543",
+				"title": "Sarah Hitchcox Aesthetics - Knoxville (West Hills)",
+				"placeId": "ChIJM5BJLf8lXIgRMi0A2rFo_UM",
+				"mapsCid": "4899187082724912434"
+			},
+			"brightlocal": { "locationId": 4101900, "campaignId": 980210 },
+			"description": "Sarah Hitchcox Aesthetics is a medical spa serving West Hills and West Knoxville, TN, offering Botox, dermal fillers, laser treatments, and medically supervised weight loss. Led by experienced injector Sarah Hitchcox, we focus on natural-looking results and personalized treatment plans. Our injectable services include Botox, Dysport, and Jeuveau wrinkle relaxers, dermal and lip fillers, and lip flips. For skin, we offer laser hair removal, laser skin treatments, RF microneedling, and non-surgical skin tightening. Our GLP-1 weight loss programs use semaglutide and tirzepatide under medical supervision. New and returning clients are welcome. Book a consultation to build a plan tailored to your goals.",
+			"googleMapsEmbedUrl": "https://www.google.com/maps?q=7600+Kingston+Pike,+Knoxville,+TN+37919&output=embed",
+			"googleMapsDirectionsUrl": "https://maps.google.com/?q=7600+Kingston+Pike,+Knoxville,+TN+37919"
+		},
+		{
+			"id": "cedar-bluff",
+			"name": "Cedar Bluff",
+			"displayName": "Knoxville (Cedar Bluff)",
+			"ghost": true,
+			"address": {
+				"line1": "9141 Cross Park Dr",
+				"line2": "Suite 30",
+				"city": "Knoxville",
+				"state": "TN",
+				"zip": "37923"
+			},
+			"phones": {
+				"real": "(865) 489-8008",
+				"realRaw": "8654898008",
+				"tracking": "(865) 401-8707"
+			},
+			"geo": { "lat": 35.9268, "lng": -84.0807 },
+			"gbp": {
+				"locationId": "locations/7823258395260652453",
+				"title": "Sarah Hitchcox Aesthetics (Cedar Bluff)",
+				"placeId": "ChIJUf4iYQ4lXIgRgbDLZ6xVz98",
+				"mapsCid": "16127202989601173633"
+			},
+			"brightlocal": { "locationId": 4102074, "campaignId": 980294 },
+			"description": "Sarah Hitchcox Aesthetics is a medical spa serving Cedar Bluff and West Knoxville, TN, offering Botox, dermal fillers, laser treatments, and medically supervised weight loss. Led by experienced injector Sarah Hitchcox, we focus on natural-looking results and personalized treatment plans. Our injectable services include Botox, Dysport, and Jeuveau wrinkle relaxers, dermal and lip fillers, and lip flips. For skin, we offer laser hair removal, laser skin treatments, RF microneedling, and non-surgical skin tightening. Our GLP-1 weight loss programs use semaglutide and tirzepatide under medical supervision. New and returning clients are welcome. Book a consultation to build a plan tailored to your goals.",
+			"googleMapsEmbedUrl": "https://www.google.com/maps?q=9141+Cross+Park+Dr,+Knoxville,+TN+37923&output=embed",
+			"googleMapsDirectionsUrl": "https://maps.google.com/?q=9141+Cross+Park+Dr,+Knoxville,+TN+37923"
+		}
+	]
+}
