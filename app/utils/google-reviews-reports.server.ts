@@ -16,7 +16,9 @@ const LOCATIONS: Array<{ id: string; label: string }> = [
 	{ id: 'locations/8814118436068854281', label: 'Botox Knox Med Spa (Bearden)' },
 	{ id: 'locations/8388106535416305139', label: 'Botox Knox Med Spa (Farragut)' },
 	{ id: 'locations/15016055128629417766', label: 'KWLC (Bearden)' },
-	{ id: 'locations/11750979648218741829', label: 'KWLC (Farragut)' },
+	// Re-created & verified 2026-07-13 with its own placeId; the old
+	// resource 11750979648218741829 is dead and always returns zero reviews.
+	{ id: 'locations/5772695199180090933', label: 'KWLC (Farragut)' },
 ]
 const STARS: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 }
 
