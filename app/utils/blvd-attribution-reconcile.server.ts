@@ -190,7 +190,7 @@ export async function reconcileMissingAttributionFromPostHog({
 			attribution: stringProps(p),
 		}
 		try {
-			await recordBoulevardBookingAttributionTouch(input, db)
+			await recordBoulevardBookingAttributionTouch(input, db, { skipCallRail: true })
 			reconciled++
 			console.log(
 				`[attribution-reconcile] healed ${appt.id} from PostHog (${String(p.traffic_channel ?? 'unknown channel')})`,

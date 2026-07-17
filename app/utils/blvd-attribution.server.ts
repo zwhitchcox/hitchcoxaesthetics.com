@@ -287,6 +287,9 @@ export async function resolveBlvdAttributionTouchForRevenueItem(
 export async function recordBoulevardBookingAttributionTouch(
 	input: BoulevardBookingAttributionInput,
 	db: DbLike = prisma,
+	// skipCallRail: reconciliation records touches hours after the booking —
+	// a late CallRail phone-lookup could tag an unrelated call as a booking.
+	opts: { skipCallRail?: boolean } = {},
 ) {
 	const parsed = boulevardBookingAttributionInputSchema.parse(input)
 	const appointmentClientIds = [
@@ -463,7 +466,7 @@ export async function recordBoulevardBookingAttributionTouch(
 		email: parsed.client.email,
 		phone: parsed.client.phone,
 	})
-	const callRailReport = excludeBookingAnalytics
+	const callRailReport = excludeBookingAnalytics || opts.skipCallRail
 		? null
 		: await reportCallRailBookingConversion({
 				appointmentIds: parsed.appointments.map(
