@@ -4,6 +4,7 @@ import { promisify } from 'node:util'
 import { getInstanceInfoSync } from 'litefs-js'
 
 import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
+import { reconcileMissingAttributionFromPostHog } from '#app/utils/blvd-attribution-reconcile.server.ts'
 import { syncReviewAppointments } from '#app/utils/review-link-sync.server.ts'
 import { sendReviewReminderTexts } from '#app/utils/review-reminder-sms.server.ts'
 import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
@@ -264,6 +265,12 @@ export async function runBlvdRealRevenueSyncJob(): Promise<void> {
 		}
 
 		console.log('Boulevard real revenue sync completed:', result)
+		// Heal unattributed bookings from PostHog; never fail the sync itself.
+		try {
+			await reconcileMissingAttributionFromPostHog()
+		} catch (reconcileError) {
+			console.error('Attribution reconcile failed:', reconcileError)
+		}
 		job.status = 'completed'
 		job.lastError = null
 	} catch (error) {
