@@ -79,7 +79,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		? `day >= $1::date AND day <= $2::date`
 		: `day >= ${LOCAL_NOW}::date - 29`
 
-	const [series, allBuckets, perListing, funnel, placeClicks] = await Promise.all([
+	const [series, allBuckets, perListing, funnel, reviewHours, placeClicks] = await Promise.all([
 		reportsQuery<{ bucket: string; listing: string; n: string }>(
 			`SELECT to_char(date_trunc('${g.trunc}', create_time AT TIME ZONE 'America/New_York'), '${g.fmt}') AS bucket,
 				listing, count(*) AS n
@@ -125,6 +125,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			 GROUP BY 1, 2, 3 ORDER BY 1`,
 			custom ? [fromParam, toParam] : [],
 		).catch(() => [] as Array<{ day: string; brand: string; event: string; n: string }>),
+		// Review times: hour-of-day histogram (local) over the window —
+		// single-day selections show that day's actual review times.
+		reportsQuery<{ hour: string; listing: string; n: string }>(
+			custom
+				? `SELECT extract(hour FROM create_time AT TIME ZONE 'America/New_York')::int AS hour,
+						listing, count(*) AS n
+					 FROM google_reviews
+					 WHERE (create_time AT TIME ZONE 'America/New_York')::date BETWEEN $1::date AND $2::date
+					 GROUP BY 1, 2 ORDER BY 1`
+				: `SELECT extract(hour FROM create_time AT TIME ZONE 'America/New_York')::int AS hour,
+						listing, count(*) AS n
+					 FROM google_reviews
+					 WHERE create_time >= now() - interval '30 days'
+					 GROUP BY 1, 2 ORDER BY 1`,
+			custom ? [fromParam, toParam] : [],
+		),
 		// Which Google listing each review click chose, per day (place_label
 		// lands with the next worker sync; empty until then).
 		reportsQuery<{ day: string; place: string; n: string }>(
@@ -149,6 +165,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			custom ? [fromParam, toParam] : [],
 		).catch(() => [] as Array<{ day: string }>)
 	).map(d => d.day)
+	// Single-day selection: every review that day with its exact local time.
+	const singleDay = custom && fromParam === toParam
+	const dayReviews = singleDay
+		? await reportsQuery<{ t: string; listing: string; reviewer: string | null; star: string | null }>(
+				`SELECT to_char(create_time AT TIME ZONE 'America/New_York', 'HH12:MI AM') AS t,
+					listing, reviewer, star::text AS star
+				 FROM google_reviews
+				 WHERE (create_time AT TIME ZONE 'America/New_York')::date = $1::date
+				 ORDER BY create_time`,
+				[fromParam],
+			)
+		: []
 	return json({
 		configured: true as const,
 		grain,
@@ -157,6 +185,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		perListing,
 		funnel,
 		funnelDays,
+		reviewHours,
+		dayReviews,
 		placeClicks,
 		from: custom ? fromParam : null,
 		to: custom ? toParam : null,
@@ -168,7 +198,32 @@ export default function Reviews() {
 	const submit = useSubmit()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { grain, series, buckets, perListing, funnel, funnelDays, placeClicks, from, to } = data
+	const {
+		grain,
+		series,
+		buckets,
+		perListing,
+		funnel,
+		funnelDays,
+		reviewHours,
+		dayReviews,
+		placeClicks,
+		from,
+		to,
+	} = data
+
+	// Hour-of-day histogram, stacked by brand.
+	const hourLabels = Array.from({ length: 24 }, (_, h) => {
+		const ampm = h < 12 ? 'AM' : 'PM'
+		const display = h % 12 === 0 ? 12 : h % 12
+		return `${display}${ampm.toLowerCase()}`
+	})
+	const hoursByBrand = new Map<string, number[]>()
+	for (const r of reviewHours) {
+		const b = brandOf(r.listing)
+		if (!hoursByBrand.has(b)) hoursByBrand.set(b, Array.from({ length: 24 }, () => 0))
+		hoursByBrand.get(b)![Number(r.hour)] = (hoursByBrand.get(b)![Number(r.hour)] ?? 0) + Number(r.n)
+	}
 
 	// Funnel: scans / copies / location clicks per day (all brands), plus a
 	// last-30d per-brand breakdown table.
@@ -247,6 +302,57 @@ export default function Reviews() {
 					height={200}
 					format={n => String(Math.round(n))}
 				/>
+			</section>
+
+			<section>
+				<h2>
+					Review times{' '}
+					<span className="mini">
+						{from && to
+							? from === to
+								? `each review's local time on ${from}`
+								: `accumulated by hour of day, ${from} to ${to}`
+							: 'accumulated by hour of day, last 30 days'}
+					</span>
+				</h2>
+				<BarChart
+					labels={hourLabels}
+					series={brands
+						.filter(b => hoursByBrand.has(b))
+						.map((b, i) => ({
+							name: b,
+							color: SERIES[i]!,
+							values: hoursByBrand.get(b)!,
+						}))}
+					stacked
+					height={180}
+					format={n => String(Math.round(n))}
+					tickEvery={3}
+				/>
+				{dayReviews.length ? (
+					<div className="rtable-wrap" style={{ marginTop: 10 }}>
+						<table className="rtable">
+							<thead>
+								<tr>
+									<th>Time</th>
+									<th>Listing</th>
+									<th>Reviewer</th>
+									<th className="num">★</th>
+								</tr>
+							</thead>
+							<tbody>
+								{dayReviews.map((r, i) => (
+									<tr key={i}>
+										<td>{r.t}</td>
+										<td>{r.listing}</td>
+										<td>{r.reviewer ?? '—'}</td>
+										<td className="num">{r.star ?? '—'}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				) : null}
 			</section>
 
 			<section>
