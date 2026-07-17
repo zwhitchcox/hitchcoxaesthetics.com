@@ -21,6 +21,12 @@ import {
 } from '#app/utils/review-link.server.ts'
 import { sendSMS } from '#app/utils/sms.server.ts'
 
+// Per-staff destination overrides — wins over the Boulevard profile number.
+const STAFF_PHONE_OVERRIDES: Record<string, string> = {
+	// Sarah Hitchcox: reminders go to the front-desk line, not her cell.
+	'urn:blvd:Staff:c0069cf2-aee2-4a2c-a6eb-5abe62192e89': '+18652489365',
+}
+
 const LEDGER_KEY = 'review-reminder-sms:ledger'
 // First-seen-FINAL appointments only text when scheduled to end this recently.
 const FIRST_SEEN_GRACE_MS = 60 * 60 * 1000
@@ -155,7 +161,8 @@ async function runReminderPass(
 			if (!Number.isFinite(end) || end < nowMs - firstSeenGraceMs) continue
 		}
 
-		const to = appt.staffPhone?.trim() || fallbackTo
+		const to =
+			STAFF_PHONE_OVERRIDES[appt.staffId] ?? (appt.staffPhone?.trim() || fallbackTo)
 		if (!to) continue
 		const result = await sendSMS({ to, body: reminderBody(appt) })
 		if (result.status !== 'success') {

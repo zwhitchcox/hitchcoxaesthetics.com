@@ -83,6 +83,32 @@ test('first sighting already FINAL: texts only when scheduled end is recent', as
 	expect(sendSMS.mock.calls[0]![0].body).toContain('Jessica')
 })
 
+test("Sarah's reminders go to the front-desk override, not her Boulevard cell", async () => {
+	const sarah = 'urn:blvd:Staff:c0069cf2-aee2-4a2c-a6eb-5abe62192e89'
+	await seedSnapshot([{ id: 'a1', state: 'ARRIVED' }])
+	// Re-seed with Sarah's real staff id on both passes.
+	const reseed = async (state: string) => {
+		const value = JSON.parse(
+			(await prisma.blvdSyncState.findUnique({
+				where: { key: REVIEW_RECENT_APPOINTMENTS_KEY },
+			}))!.value!,
+		) as { appointments: Array<{ staffId: string; state: string }> }
+		value.appointments[0].staffId = sarah
+		value.appointments[0].state = state
+		await prisma.blvdSyncState.update({
+			where: { key: REVIEW_RECENT_APPOINTMENTS_KEY },
+			data: { value: JSON.stringify(value) },
+		})
+	}
+	await reseed('ARRIVED')
+	await sendReviewReminderTexts(NOW)
+	await reseed('FINAL')
+	expect(await sendReviewReminderTexts(LATER)).toEqual({ sent: 1 })
+	expect(sendSMS).toHaveBeenCalledWith(
+		expect.objectContaining({ to: '+18652489365' }),
+	)
+})
+
 test('falls back to REVIEW_REMINDER_SMS_TO when the provider has no phone', async () => {
 	vi.stubEnv('REVIEW_REMINDER_SMS_TO', '+18655550000')
 	await seedSnapshot([{ id: 'a1', state: 'ARRIVED', staffPhone: null }])
