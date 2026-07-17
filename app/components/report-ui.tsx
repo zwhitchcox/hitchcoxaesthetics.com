@@ -197,6 +197,7 @@ export function BarChart({
 	colorBy,
 	format = usd,
 	tickEvery,
+	showTotal = true,
 }: {
 	labels: string[]
 	series: Series[]
@@ -205,6 +206,8 @@ export function BarChart({
 	colorBy?: (v: number) => string
 	format?: (n: number) => string
 	tickEvery?: number
+	/** Total row in the tooltip only makes sense when the series share a unit. */
+	showTotal?: boolean
 }) {
 	const { tip, setTip, ref } = useTip()
 	const H = height
@@ -250,7 +253,7 @@ export function BarChart({
 							color: s.color,
 							value: s.values[i] == null ? '—' : format(s.values[i]!),
 						}))
-						if (series.length > 1) {
+						if (series.length > 1 && showTotal) {
 							rows.push({
 								name: 'Total',
 								color: '',

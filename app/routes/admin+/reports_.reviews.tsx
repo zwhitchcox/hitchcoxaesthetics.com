@@ -59,20 +59,43 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		: 'week'
 	const g = GRAINS[grain]
 
-	const [series, allBuckets, perListing, funnel] = await Promise.all([
+	// Optional custom window (?from=YYYY-MM-DD&to=YYYY-MM-DD) — validated
+	// here and passed as SQL params, never interpolated.
+	const dateRe = /^\d{4}-\d{2}-\d{2}$/
+	const fromParam = dateRe.test(url.searchParams.get('from') ?? '')
+		? url.searchParams.get('from')!
+		: null
+	const toParam = dateRe.test(url.searchParams.get('to') ?? '')
+		? url.searchParams.get('to')!
+		: null
+	const custom = fromParam && toParam && fromParam <= toParam
+
+	const seriesStart = custom ? `date_trunc('${g.trunc}', $1::date)` : g.windowStartSql
+	const seriesEnd = custom
+		? `date_trunc('${g.trunc}', $2::date)`
+		: `date_trunc('${g.trunc}', ${LOCAL_NOW})`
+	const seriesParams = custom ? [fromParam, toParam] : []
+	const funnelWhere = custom
+		? `day >= $1::date AND day <= $2::date`
+		: `day >= ${LOCAL_NOW}::date - 29`
+
+	const [series, allBuckets, perListing, funnel, placeClicks] = await Promise.all([
 		reportsQuery<{ bucket: string; listing: string; n: string }>(
 			`SELECT to_char(date_trunc('${g.trunc}', create_time AT TIME ZONE 'America/New_York'), '${g.fmt}') AS bucket,
 				listing, count(*) AS n
 			 FROM google_reviews
-			 WHERE (create_time AT TIME ZONE 'America/New_York') >= ${g.windowStartSql}
+			 WHERE (create_time AT TIME ZONE 'America/New_York') >= ${seriesStart}
+				 AND date_trunc('${g.trunc}', create_time AT TIME ZONE 'America/New_York') <= ${seriesEnd}
 			 GROUP BY 1, listing`,
+			seriesParams,
 		),
 		// Every bucket from the window start through today, so quiet periods
 		// (including today) render as zero instead of vanishing.
 		reportsQuery<{ bucket: string }>(
 			`SELECT to_char(d, '${g.fmt}') AS bucket
-			 FROM generate_series(${g.windowStartSql}, date_trunc('${g.trunc}', ${LOCAL_NOW}), interval '1 ${g.trunc}') d
+			 FROM generate_series(${seriesStart}, ${seriesEnd}, interval '1 ${g.trunc}') d
 			 ORDER BY d`,
+			seriesParams,
 		),
 		reportsQuery<{
 			listing: string
@@ -97,22 +120,47 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		reportsQuery<{ day: string; brand: string; event: string; n: string }>(
 			`SELECT to_char(day, 'YYYY-MM-DD') AS day, brand, event, sum(n) AS n
 			 FROM review_funnel_daily
-			 WHERE day >= ${LOCAL_NOW}::date - 29
+			 WHERE ${funnelWhere}
 				 AND provider_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-'
 			 GROUP BY 1, 2, 3 ORDER BY 1`,
+			custom ? [fromParam, toParam] : [],
 		).catch(() => [] as Array<{ day: string; brand: string; event: string; n: string }>),
+		// Which Google listing each review click chose, per day (place_label
+		// lands with the next worker sync; empty until then).
+		reportsQuery<{ day: string; place: string; n: string }>(
+			`SELECT to_char(day, 'YYYY-MM-DD') AS day, place_label AS place, sum(n) AS n
+			 FROM review_funnel_daily
+			 WHERE ${funnelWhere}
+				 AND event = 'review_location_selected' AND place_label <> ''
+			 GROUP BY 1, 2 ORDER BY 1 DESC, 2`,
+			custom ? [fromParam, toParam] : [],
+		).catch(() => [] as Array<{ day: string; place: string; n: string }>),
 	])
 	const buckets = allBuckets.map(b => b.bucket)
 	// Last 30 local days through today, so a zero-scan day (like today before
 	// the first scan) shows as an explicit zero instead of disappearing.
 	const funnelDays = (
 		await reportsQuery<{ day: string }>(
-			`SELECT to_char(d, 'YYYY-MM-DD') AS day
-			 FROM generate_series(${LOCAL_NOW}::date - 29, ${LOCAL_NOW}::date, interval '1 day') d
-			 ORDER BY d`,
+			custom
+				? `SELECT to_char(d, 'YYYY-MM-DD') AS day
+					 FROM generate_series($1::date, $2::date, interval '1 day') d ORDER BY d`
+				: `SELECT to_char(d, 'YYYY-MM-DD') AS day
+					 FROM generate_series(${LOCAL_NOW}::date - 29, ${LOCAL_NOW}::date, interval '1 day') d ORDER BY d`,
+			custom ? [fromParam, toParam] : [],
 		).catch(() => [] as Array<{ day: string }>)
 	).map(d => d.day)
-	return json({ configured: true as const, grain, series, buckets, perListing, funnel, funnelDays })
+	return json({
+		configured: true as const,
+		grain,
+		series,
+		buckets,
+		perListing,
+		funnel,
+		funnelDays,
+		placeClicks,
+		from: custom ? fromParam : null,
+		to: custom ? toParam : null,
+	})
 }
 
 export default function Reviews() {
@@ -120,7 +168,7 @@ export default function Reviews() {
 	const submit = useSubmit()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { grain, series, buckets, perListing, funnel, funnelDays } = data
+	const { grain, series, buckets, perListing, funnel, funnelDays, placeClicks, from, to } = data
 
 	// Funnel: scans / copies / location clicks per day (all brands), plus a
 	// last-30d per-brand breakdown table.
@@ -167,6 +215,10 @@ export default function Reviews() {
 						</option>
 					))}
 				</select>
+				<label htmlFor="from">From</label>
+				<input id="from" type="date" name="from" defaultValue={from ?? ''} />
+				<label htmlFor="to">to</label>
+				<input id="to" type="date" name="to" defaultValue={to ?? ''} />
 			</Form>
 
 			<div className="tiles">
@@ -237,7 +289,10 @@ export default function Reviews() {
 				<section>
 					<h2>
 						QR scans &amp; review funnel{' '}
-						<span className="mini">last 30 days · refreshed every 15 min from PostHog</span>
+						<span className="mini">
+							{from && to ? `${from} to ${to}` : 'last 30 days'} · refreshed every 15 min from
+							PostHog
+						</span>
 					</h2>
 					<BarChart
 						labels={funnelDays.map(d => d.slice(5))}
@@ -249,7 +304,45 @@ export default function Reviews() {
 						height={200}
 						format={n => String(Math.round(n))}
 						tickEvery={2}
+						showTotal={false}
 					/>
+					{placeClicks.length ? (
+						<>
+							<h2 style={{ marginTop: 18 }}>
+								Listings clicked, by day{' '}
+								<span className="mini">which Google listing each review click chose</span>
+							</h2>
+							<div className="rtable-wrap">
+								<table className="rtable">
+									<thead>
+										<tr>
+											<th>Day</th>
+											{[...new Set(placeClicks.map(c => c.place))].sort().map(pl => (
+												<th key={pl} className="num">
+													{pl}
+												</th>
+											))}
+										</tr>
+									</thead>
+									<tbody>
+										{[...new Set(placeClicks.map(c => c.day))].map(day => (
+											<tr key={day}>
+												<td>{day}</td>
+												{[...new Set(placeClicks.map(c => c.place))].sort().map(pl => {
+													const n = placeClicks.find(c => c.day === day && c.place === pl)?.n
+													return (
+														<td key={pl} className={`num ${n ? 'good' : ''}`}>
+															{n ?? ''}
+														</td>
+													)
+												})}
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						</>
+					) : null}
 					<div className="rtable-wrap" style={{ marginTop: 10 }}>
 						<table className="rtable">
 							<thead>
