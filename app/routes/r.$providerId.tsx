@@ -52,19 +52,21 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	const serviceName = appt?.serviceName ?? 'your visit'
 	const profile = getServiceProfile(serviceName)
 
-	// Temporary review routing: while seeding the microsite listings, send
-	// tox/filler and weight-loss appointments to the brand review pages.
-	// Toggle without a deploy: fly secrets set REVIEW_MICROSITE_REDIRECTS=1
-	// (on) / fly secrets unset REVIEW_MICROSITE_REDIRECTS (off).
-	// Keys must exactly match getServiceProfile categories in review-link.server.ts
-	const MICROSITE_REVIEW_HOSTS: Record<string, string> = {
-		'Tox / Botox': 'https://botoxknoxvilletn.com',
-		'Weight Loss': 'https://weightlossknoxvilletn.com',
+	// Temporary review routing while seeding the microsite listings: weight
+	// loss reviews go to Weight Loss Knox, laser reviews stay on the SHA
+	// listing, and EVERYTHING else (tox, filler, skin, consults, ...) seeds
+	// Botox Knox. Toggle without a deploy: fly secrets set
+	// REVIEW_MICROSITE_REDIRECTS=1 (on) / unset (off).
+	// Category names come from getServiceProfile in review-link.server.ts.
+	const micrositeHostFor = (category: string) => {
+		if (category === 'Laser') return undefined // stays on SHA
+		if (category === 'Weight Loss') return 'https://weightlossknoxvilletn.com'
+		return 'https://botoxknoxvilletn.com'
 	}
 	const micrositeHost =
 		process.env.REVIEW_MICROSITE_REDIRECTS === '1' ||
 		process.env.REVIEW_MICROSITE_REDIRECTS === 'true'
-			? MICROSITE_REVIEW_HOSTS[profile.category]
+			? micrositeHostFor(profile.category)
 			: undefined
 	if (micrositeHost) {
 		// The microsite fires its own review_link_scanned on landing, so this

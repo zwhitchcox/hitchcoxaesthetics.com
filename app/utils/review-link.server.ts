@@ -141,7 +141,16 @@ const SERVICE_PROFILES: { match: RegExp; profile: ServiceProfile }[] = [
 		},
 	},
 	{
-		match: /facial|skin|microneedl|peel|hydrafacial|laser|ipl/i,
+		// Laser split from Skin/Facial: laser reviews stay on the SHA listing
+		// while everything else seeds the brand microsites.
+		match: /laser|ipl|bbl\b|hair removal|moxi|halo/i,
+		profile: {
+			category: 'Laser',
+			keywords: ['laser hair removal Knoxville', 'laser skin treatment', 'smooth skin'],
+		},
+	},
+	{
+		match: /facial|skin|microneedl|peel|hydrafacial/i,
 		profile: {
 			category: 'Skin / Facial',
 			keywords: ['facial Knoxville', 'skincare', 'glowing skin'],
