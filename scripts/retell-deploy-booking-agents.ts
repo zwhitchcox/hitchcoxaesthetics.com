@@ -53,7 +53,7 @@ const voiceId =
 const realtimeModel =
 	process.env.RETELL_DEPLOY_AGENT_S2S_MODEL?.trim() ??
 	process.env.RETELL_TEST_AGENT_S2S_MODEL?.trim() ??
-	'gpt-realtime-2'
+	'gpt-realtime-2.1'
 const textModel =
 	process.env.RETELL_DEPLOY_AGENT_MODEL?.trim() ??
 	process.env.RETELL_TEST_AGENT_MODEL?.trim() ??
