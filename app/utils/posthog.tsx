@@ -21,12 +21,27 @@ const PostHogProvider: React.FC<PostHogProviderProps> = ({
 	>(undefined)
 
 	useEffect(() => {
-		if (apiKey) {
-			const instance = posthog.init(apiKey, options)
-			setPosthogInstance(instance)
-		} else {
+		if (!apiKey) {
 			setPosthogInstance(undefined)
+			return
 		}
+		// Internal traffic filter: the local server often runs a production
+		// build, so MODE alone can't stop localhost events polluting the prod
+		// project. Opt back in for debugging with ENABLE_DEV_POSTHOG=1.
+		const host = typeof window === 'undefined' ? '' : window.location.hostname
+		const isInternalHost =
+			/^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.)/.test(host) ||
+			host.endsWith('.local') ||
+			host.endsWith('.internal')
+		const devOptIn =
+			typeof window !== 'undefined' &&
+			(window as any).ENV?.ENABLE_DEV_POSTHOG === '1'
+		if (isInternalHost && !devOptIn) {
+			setPosthogInstance(undefined)
+			return
+		}
+		const instance = posthog.init(apiKey, options)
+		setPosthogInstance(instance)
 	}, [apiKey, options])
 
 	useEffect(() => {

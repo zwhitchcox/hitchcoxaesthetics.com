@@ -19,6 +19,15 @@ export async function captureServerPostHogEvent({
 	properties: Record<string, unknown>
 	timestamp?: string
 }) {
+	// Internal traffic filter: local servers (even production builds) must
+	// not write to the prod project. Fly sets FLY_APP_NAME in real deploys.
+	if (
+		!process.env.FLY_APP_NAME &&
+		process.env.ENABLE_DEV_POSTHOG !== '1' &&
+		process.env.NODE_ENV !== 'test'
+	) {
+		return { ok: false as const, skipped: 'internal_traffic' as const }
+	}
 	if (isExcludedServerPostHogEvent({ distinctId, properties })) {
 		return {
 			ok: true,
