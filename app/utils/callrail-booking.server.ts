@@ -488,7 +488,7 @@ export async function callRailFetch(
 		params,
 	}: {
 		body?: Record<string, unknown>
-		method: 'GET' | 'PUT'
+		method: 'GET' | 'POST' | 'PUT'
 		params?: URLSearchParams
 	},
 ) {

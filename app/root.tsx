@@ -53,6 +53,7 @@ import {
 	getLocationById,
 	PHONE,
 } from '#/app/utils/locations.ts'
+import { getBrandIdFromRequest } from '#/app/utils/brand.server.ts'
 import { menuLinks } from '#/app/utils/menu-links.server.ts'
 import { combineHeaders, getDomainUrl } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
@@ -150,6 +151,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return json(
 		{
 			user,
+			// Microsite-proxied requests (X-Brand from their Caddy) render without
+			// the SHA site chrome — the route supplies its own brand header.
+			brandId: getBrandIdFromRequest(request),
 			requestInfo: {
 				hints: getHints(request),
 				origin: getDomainUrl(request),
@@ -419,12 +423,27 @@ function App() {
 			>
 				<PhoneProvider>
 					<div
-						className={`flex h-screen flex-col justify-between ${isMenuOpen ? 'overflow-hidden' : ''}`}
+						className={`flex min-h-screen flex-col ${isMenuOpen ? 'h-screen overflow-hidden' : ''}`}
 					>
-						<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
-						<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
-						<Footer />
-						<CTA />
+						{/* Report/tool pages render bare inside hub panes — no site header.
+					    Microsite brands (proxied /book) bring their own header. */}
+						{hidesSiteHeader(location.pathname) || data.brandId !== 'sha' ? null : (
+							<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
+						)}
+						{/* flex-1 grows the page so the footer sits at the bottom without
+						    justify-between (which strands short pages at the viewport
+						    bottom when the footer is hidden, e.g. /admin) */}
+						<div className="flex flex-1 flex-col">
+							<Outlet context={{ isMenuOpen, setIsMenuOpen }} />
+						</div>
+						{/* Marketing chrome (footer + sticky CTA) stays off admin + internal
+					    tools and off microsite-branded pages */}
+						{hidesMarketingChrome(location.pathname) || data.brandId !== 'sha' ? null : (
+							<>
+								<Footer />
+								<CTA />
+							</>
+						)}
 					</div>
 				</PhoneProvider>
 			</BlvdProvider>
@@ -436,6 +455,25 @@ function App() {
 
 // const noHeaderPages = ['/']
 const noHeaderPages: string[] = []
+
+// Internal, noindex tools that must render without any marketing chrome.
+const INTERNAL_TOOLS = ['/geo-rank']
+
+/** Hide the marketing site header (report hub panes + internal tools). */
+function hidesSiteHeader(pathname: string): boolean {
+	return (
+		pathname.startsWith('/admin/reports/') ||
+		INTERNAL_TOOLS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+	)
+}
+
+/** Hide the footer + sticky CTA (all admin screens + internal tools). */
+function hidesMarketingChrome(pathname: string): boolean {
+	return (
+		pathname.startsWith('/admin') ||
+		INTERNAL_TOOLS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+	)
+}
 
 function Header({
 	isMenuOpen,

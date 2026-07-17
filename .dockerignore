@@ -1,0 +1,33 @@
+# Never ship local installs/builds into the image — the Docker stages install
+# and build for Linux themselves. (Missing this file caused the 2026-07-06
+# outage: COPY . . overwrote Linux node_modules with macOS arm64 binaries.)
+node_modules
+**/node_modules
+build
+server-build
+.cache
+.env
+.env.*
+*.log
+test-results
+playwright-report
+coverage
+review-qr-codes*
+# Local working data — never needed in the image, and huge
+processing-images-archive
+processing-images
+google-ads
+candidates
+reviews
+downloads
+.playwright-mcp
+# Local financial credentials/data — must never ship in an image
+.plaid-tokens.json
+.plaid-vendor-categories.json
+.git
+.github
+.vscode
+.claude
+prisma/*.db
+tests
+mcp-test.log

@@ -234,7 +234,7 @@ export default function BoulevardAdminPage() {
 				</p>
 			</div>
 
-			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 				<SummaryCard
 					title="Clients"
 					description="Distinct Boulevard clients tracked for attribution."

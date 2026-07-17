@@ -55,3 +55,11 @@ processing-images-archive/
 # Local command runner (machine-specific, see ./play)
 /play
 /commands.local.sh
+
+# Plaid bank connection tokens (local finance tooling) — secrets, never commit
+.plaid-tokens.json
+# Vendor→category map built from real transaction data — personal, keep local
+.plaid-vendor-categories.json
+
+# Generated provider review QR codes
+review-qr-codes*/

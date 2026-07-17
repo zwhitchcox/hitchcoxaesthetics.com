@@ -173,6 +173,8 @@ app.use(
 					'https://*.google.com',
 					'https://*.googleusercontent.com',
 					'https://*.googletagmanager.com',
+					// OpenStreetMap tiles for the /geo-rank Leaflet map
+					'https://*.tile.openstreetmap.org',
 				],
 				'script-src': [
 					"'strict-dynamic'",
@@ -195,6 +197,9 @@ app.use(
 					'https://googleads.g.doubleclick.net',
 					'http://www.gstatic.com',
 					'https://*.posthog.com',
+					// Leaflet CDN (/geo-rank) + CallRail number-swap script
+					'https://unpkg.com',
+					'https://cdn.callrail.com',
 				],
 				'script-src-attr': [
 					// @ts-expect-error

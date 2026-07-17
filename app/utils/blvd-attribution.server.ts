@@ -126,6 +126,21 @@ function normalizeOptionalString(value?: string | null) {
 	return trimmed ? trimmed : null
 }
 
+/**
+ * Boulevard's public booking SDK returns bare UUIDs while the Admin API
+ * returns `urn:blvd:<Kind>:<uuid>`. Everything we persist uses the urn form
+ * so attribution touches (booking side) and revenue items (admin side) join.
+ */
+export function normalizeBlvdEntityId(
+	kind: 'Client' | 'Appointment',
+	value?: string | null,
+) {
+	const trimmed = normalizeOptionalString(value)
+	if (!trimmed) return null
+	if (trimmed.startsWith('urn:blvd:')) return trimmed
+	return `urn:blvd:${kind}:${trimmed}`
+}
+
 function normalizeOptionalEmail(value?: string | null) {
 	return normalizeOptionalString(value)?.toLowerCase() ?? null
 }
@@ -161,10 +176,17 @@ async function upsertBlvdClientRecord(
 		latestTouchAt?: Date | null
 	},
 ) {
+	const boulevardClientId = normalizeBlvdEntityId(
+		'Client',
+		input.boulevardClientId,
+	)
+	if (!boulevardClientId) {
+		throw new Error('Missing Boulevard client ID for client record')
+	}
 	return db.blvdClient.upsert({
-		where: { boulevardClientId: input.boulevardClientId },
+		where: { boulevardClientId },
 		create: {
-			boulevardClientId: input.boulevardClientId,
+			boulevardClientId,
 			email: normalizeOptionalEmail(input.email),
 			phone: normalizeOptionalPhone(input.phone),
 			firstName: normalizeOptionalString(input.firstName),
@@ -240,8 +262,13 @@ export async function resolveBlvdAttributionTouchForRevenueItem(
 		occurredAt: Date
 	},
 ) {
+	const boulevardClientId = normalizeBlvdEntityId(
+		'Client',
+		input.boulevardClientId,
+	)
+	if (!boulevardClientId) return null
 	const client = await db.blvdClient.findUnique({
-		where: { boulevardClientId: input.boulevardClientId },
+		where: { boulevardClientId },
 		select: { id: true },
 	})
 
@@ -263,11 +290,15 @@ export async function recordBoulevardBookingAttributionTouch(
 ) {
 	const parsed = boulevardBookingAttributionInputSchema.parse(input)
 	const appointmentClientIds = [
-		...new Set(parsed.appointments.map(a => a.clientId).filter(Boolean)),
+		...new Set(
+			parsed.appointments
+				.map(a => normalizeBlvdEntityId('Client', a.clientId))
+				.filter(Boolean),
+		),
 	]
 	const boulevardClientId =
-		normalizeOptionalString(parsed.client.boulevardClientId) ??
-		normalizeOptionalString(appointmentClientIds[0])
+		normalizeBlvdEntityId('Client', parsed.client.boulevardClientId) ??
+		appointmentClientIds[0]
 
 	if (!boulevardClientId) {
 		throw new Error('Missing Boulevard client ID for attribution touch')
@@ -397,13 +428,17 @@ export async function recordBoulevardBookingAttributionTouch(
 		: await db.blvdAttributionTouch.create({ data: touchData })
 
 	for (const appointment of parsed.appointments) {
+		const boulevardAppointmentId = normalizeBlvdEntityId(
+			'Appointment',
+			appointment.appointmentId,
+		)!
 		await db.blvdAttributedAppointment.upsert({
-			where: { boulevardAppointmentId: appointment.appointmentId },
+			where: { boulevardAppointmentId },
 			create: {
-				boulevardAppointmentId: appointment.appointmentId,
-				boulevardClientId: normalizeOptionalString(
-					appointment.clientId ?? boulevardClientId,
-				),
+				boulevardAppointmentId,
+				boulevardClientId:
+					normalizeBlvdEntityId('Client', appointment.clientId) ??
+					boulevardClientId,
 				startTime: appointment.startTime
 					? new Date(appointment.startTime)
 					: null,
@@ -411,9 +446,9 @@ export async function recordBoulevardBookingAttributionTouch(
 				touchId: touch.id,
 			},
 			update: {
-				boulevardClientId: normalizeOptionalString(
-					appointment.clientId ?? boulevardClientId,
-				),
+				boulevardClientId:
+					normalizeBlvdEntityId('Client', appointment.clientId) ??
+					boulevardClientId,
 				startTime: appointment.startTime
 					? new Date(appointment.startTime)
 					: null,
@@ -695,7 +730,10 @@ export async function upsertBlvdRevenueItem(
 	db: DbLike = prisma,
 ) {
 	const parsed = boulevardRevenueItemInputSchema.parse(input)
-	const boulevardClientId = normalizeOptionalString(parsed.boulevardClientId)
+	const boulevardClientId = normalizeBlvdEntityId(
+		'Client',
+		parsed.boulevardClientId,
+	)
 	const existingRevenueItem = await db.blvdRevenueItem.findUnique({
 		where: { externalId: parsed.externalId },
 		select: {
@@ -886,6 +924,137 @@ function hasRevenueItemMaterialChange(
 		existing.rawPayload !== next.rawPayload ||
 		existing.serviceCategory !== next.serviceCategory
 	)
+}
+
+const ID_NORMALIZATION_BACKFILL_STATE_KEY =
+	'blvd_id_normalization_backfilled_at'
+
+/**
+ * One-time repair for the bare-UUID vs urn client-id split (booking SDK vs
+ * Admin API): merges duplicate BlvdClient rows onto the urn form, normalizes
+ * attributed-appointment ids, then re-resolves attribution for every
+ * unattributed revenue item. Guarded by a BlvdSyncState key so it only runs
+ * once; safe to call from every scheduled revenue sync.
+ */
+export async function backfillBlvdAttributionIdNormalization(
+	db: DbLike = prisma,
+) {
+	const alreadyRan = await db.blvdSyncState.findUnique({
+		where: { key: ID_NORMALIZATION_BACKFILL_STATE_KEY },
+	})
+	if (alreadyRan) return null
+
+	let merged = 0
+	let renamed = 0
+	const bareClients = await db.blvdClient.findMany({
+		where: { NOT: { boulevardClientId: { startsWith: 'urn:blvd:' } } },
+	})
+	for (const client of bareClients) {
+		const urn = `urn:blvd:Client:${client.boulevardClientId}`
+		const canonical = await db.blvdClient.findUnique({
+			where: { boulevardClientId: urn },
+		})
+		if (canonical) {
+			await db.blvdAttributionTouch.updateMany({
+				where: { blvdClientId: client.id },
+				data: { blvdClientId: canonical.id },
+			})
+			await db.blvdRevenueItem.updateMany({
+				where: { blvdClientId: client.id },
+				data: { blvdClientId: canonical.id },
+			})
+			await db.blvdClient.update({
+				where: { id: canonical.id },
+				data: {
+					email: canonical.email ?? client.email ?? undefined,
+					phone: canonical.phone ?? client.phone ?? undefined,
+					firstName: canonical.firstName ?? client.firstName ?? undefined,
+					lastName: canonical.lastName ?? client.lastName ?? undefined,
+					latestTouchAt:
+						canonical.latestTouchAt ?? client.latestTouchAt ?? undefined,
+				},
+			})
+			await db.blvdClient.delete({ where: { id: client.id } })
+			merged += 1
+		} else {
+			await db.blvdClient.update({
+				where: { id: client.id },
+				data: { boulevardClientId: urn },
+			})
+			renamed += 1
+		}
+	}
+
+	const bareAppointments = await db.blvdAttributedAppointment.findMany({
+		where: { NOT: { boulevardAppointmentId: { startsWith: 'urn:blvd:' } } },
+	})
+	for (const appointment of bareAppointments) {
+		const urn = `urn:blvd:Appointment:${appointment.boulevardAppointmentId}`
+		const existing = await db.blvdAttributedAppointment.findUnique({
+			where: { boulevardAppointmentId: urn },
+			select: { id: true },
+		})
+		if (existing) {
+			await db.blvdAttributedAppointment.delete({
+				where: { id: appointment.id },
+			})
+		} else {
+			await db.blvdAttributedAppointment.update({
+				where: { id: appointment.id },
+				data: {
+					boulevardAppointmentId: urn,
+					boulevardClientId: normalizeBlvdEntityId(
+						'Client',
+						appointment.boulevardClientId,
+					),
+				},
+			})
+		}
+	}
+
+	let attributed = 0
+	const unattributed = await db.blvdRevenueItem.findMany({
+		where: {
+			attributionTouchId: null,
+			boulevardClientId: { not: null },
+		},
+		select: { id: true, boulevardClientId: true, occurredAt: true },
+	})
+	for (const item of unattributed) {
+		const touch = await resolveBlvdAttributionTouchForRevenueItem(db, {
+			boulevardClientId: item.boulevardClientId!,
+			occurredAt: item.occurredAt,
+		})
+		if (!touch) continue
+		await db.blvdRevenueItem.update({
+			where: { id: item.id },
+			data: {
+				attributionTouchId: touch.id,
+				attributionMethod: 'last_touch_before_revenue',
+				attributedAt: new Date(),
+			},
+		})
+		attributed += 1
+	}
+
+	await db.blvdSyncState.upsert({
+		where: { key: ID_NORMALIZATION_BACKFILL_STATE_KEY },
+		create: {
+			key: ID_NORMALIZATION_BACKFILL_STATE_KEY,
+			value: new Date().toISOString(),
+		},
+		update: { value: new Date().toISOString() },
+	})
+
+	const result = {
+		attributed,
+		bareAppointments: bareAppointments.length,
+		merged,
+		renamed,
+		unattributedScanned: unattributed.length,
+	}
+	console.log('[blvd-attribution] id normalization backfill', result)
+	return result
 }
 
 export async function reconcileBlvdRevenueItemAttribution(

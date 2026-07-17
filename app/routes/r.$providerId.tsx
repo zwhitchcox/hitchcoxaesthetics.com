@@ -1,5 +1,6 @@
 import {
 	json,
+	redirect,
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
 	type MetaFunction,
@@ -8,10 +9,12 @@ import { useFetcher, useLoaderData } from '@remix-run/react'
 import { useRef, useState } from 'react'
 import { Button } from '#app/components/ui/button.tsx'
 import { Textarea } from '#app/components/ui/textarea.tsx'
+import { ensurePrimary } from '#app/utils/litefs.server.ts'
 import { cn } from '#app/utils/misc.tsx'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
 	fallbackReview,
+	takeUniqueSamples,
 	generateSampleReview,
 	getReviewLocations,
 	getServiceProfile,
@@ -29,6 +32,8 @@ export const meta: MetaFunction = () => [
 ]
 
 export async function loader({ params }: LoaderFunctionArgs) {
+	// The sample-uniqueness ledger writes to SQLite — pin to the primary.
+	await ensurePrimary()
 	const providerId = params.providerId!
 	const staffUrn = toStaffUrn(providerId)
 	const [snapshot, locations] = await Promise.all([
@@ -46,13 +51,58 @@ export async function loader({ params }: LoaderFunctionArgs) {
 
 	const serviceName = appt?.serviceName ?? 'your visit'
 	const profile = getServiceProfile(serviceName)
-	const review = appt
-		? (await generateSampleReview({
+
+	// Temporary review routing: while seeding the microsite listings, send
+	// tox/filler and weight-loss appointments to the brand review pages.
+	// Toggle without a deploy: fly secrets set REVIEW_MICROSITE_REDIRECTS=1
+	// (on) / fly secrets unset REVIEW_MICROSITE_REDIRECTS (off).
+	// Keys must exactly match getServiceProfile categories in review-link.server.ts
+	const MICROSITE_REVIEW_HOSTS: Record<string, string> = {
+		'Tox / Botox': 'https://botoxknoxvilletn.com',
+		'Weight Loss': 'https://weightlossknoxvilletn.com',
+	}
+	const micrositeHost =
+		process.env.REVIEW_MICROSITE_REDIRECTS === '1' ||
+		process.env.REVIEW_MICROSITE_REDIRECTS === 'true'
+			? MICROSITE_REVIEW_HOSTS[profile.category]
+			: undefined
+	if (micrositeHost) {
+		// The microsite fires its own review_link_scanned on landing, so this
+		// hop must NOT use the scanned event or every redirected scan counts
+		// twice (once as sha, once as the brand).
+		await captureServerPostHogEvent({
+			distinctId: reviewDistinctId(appt?.id ?? null, providerId),
+			event: 'review_link_redirected',
+			insertId: `review-redirected:${appt?.id ?? providerId}:${Date.now()}`,
+			properties: {
+				appointment_id: appt?.id ?? null,
+				provider_id: providerId,
+				provider_name: providerName,
+				service_name: serviceName,
+				service_category: profile.category,
+				has_appointment: Boolean(appt),
+				redirected_to: micrositeHost,
+			},
+		})
+		throw redirect(`${micrositeHost}/r/${providerId}`)
+	}
+
+	// Every sample goes through the served-hash ledger so no two customers can
+	// ever copy identical text (duplicate reviews get listings flagged).
+	const generated = appt
+		? await generateSampleReview({
 				serviceName,
 				providerFirstName,
 				keywords: profile.keywords,
-			})) ?? fallbackReview(serviceName, providerFirstName, profile.keywords)
-		: fallbackReview('visit', providerFirstName, profile.keywords)
+			})
+		: null
+	const [uniqueSample] = await takeUniqueSamples([
+		generated,
+		fallbackReview(appt ? serviceName : 'visit', providerFirstName, profile.keywords),
+	])
+	const review =
+		uniqueSample ??
+		`${providerFirstName} and the team took wonderful care of me — sharing a couple of details about your visit helps others in Knoxville find us.`
 
 	const matchedPlaceId = matchLocationToAppointment(locations, appt?.locationName)
 	// Float the location they visited to the top.
@@ -75,6 +125,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			matched_location: appt?.locationName ?? null,
 			has_appointment: Boolean(appt),
 			client_first_name: appt?.clientFirstName ?? null,
+			brand: 'sha',
 		},
 	})
 

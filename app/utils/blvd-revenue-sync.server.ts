@@ -4,6 +4,7 @@ import {
 } from '#app/utils/blvd-admin.server.ts'
 import {
 	type BoulevardRevenueItemInput,
+	backfillBlvdAttributionIdNormalization,
 	boulevardRevenueItemInputSchema,
 	upsertBlvdRevenueItem,
 } from '#app/utils/blvd-attribution.server.ts'
@@ -123,6 +124,11 @@ export async function syncBoulevardRealRevenue(options: SyncOptions = {}) {
 	}
 
 	const now = options.now ?? new Date()
+	if (!options.dryRun) {
+		await backfillBlvdAttributionIdNormalization(db).catch(error => {
+			console.error('Boulevard attribution id backfill failed', error)
+		})
+	}
 	const syncWindow = await getSyncWindow({
 		db,
 		initialLookbackDays: DEFAULT_INITIAL_LOOKBACK_DAYS,
@@ -624,7 +630,7 @@ function centsToUsd(value: number) {
 	return Number((value / 100).toFixed(2))
 }
 
-function inferRevenueServiceCategory(name?: string | null) {
+export function inferRevenueServiceCategory(name?: string | null) {
 	const normalized = normalizeRevenueText(name)
 	if (!normalized) return undefined
 

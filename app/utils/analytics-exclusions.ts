@@ -6,7 +6,8 @@ export type BookingAnalyticsExclusionInput = {
 }
 
 const EXCLUDED_BOOKING_EMAIL_HASHES = new Set(['3319afc7', '016ed78c'])
-const EXCLUDED_BOOKING_PHONE_HASHES = new Set(['aa252484'])
+// aa252484 = Zane primary, f1b975e5 = Zane alt
+const EXCLUDED_BOOKING_PHONE_HASHES = new Set(['aa252484', 'f1b975e5'])
 
 export function isExcludedBookingAnalyticsIdentity(
 	input: BookingAnalyticsExclusionInput,

@@ -37,7 +37,12 @@ type ApptNode = {
 	client?: { firstName?: string | null } | null
 	appointmentServices?: Array<{
 		service?: { name?: string | null } | null
-		staff?: { id?: string | null; firstName?: string | null; lastName?: string | null } | null
+		staff?: {
+			id?: string | null
+			firstName?: string | null
+			lastName?: string | null
+			mobilePhone?: string | null
+		} | null
 	}> | null
 }
 
@@ -47,7 +52,7 @@ const APPOINTMENTS_QUERY = `query ReviewAppts($after: String, $locationId: ID!) 
 		edges { node {
 			id startAt endAt state
 			client { firstName }
-			appointmentServices { service { name } staff { id firstName lastName } }
+			appointmentServices { service { name } staff { id firstName lastName mobilePhone } }
 		} }
 	}
 }`
@@ -88,6 +93,7 @@ export async function syncReviewAppointments({
 					locationName: location.name ?? location.id,
 					staffId: svc.staff.id,
 					staffName: [svc.staff.firstName, svc.staff.lastName].filter(Boolean).join(' '),
+					staffPhone: svc.staff.mobilePhone ?? null,
 					clientFirstName: node.client?.firstName ?? null,
 					serviceName: svc.service?.name ?? 'Aesthetic treatment',
 				})

@@ -173,6 +173,7 @@ test('new clients can verify their phone and complete a mocked booking', async (
 			Component: BlvdBookRoute,
 			loader: () => ({
 				apiKey: 'test-api-key',
+				brandId: 'sha',
 				businessId: 'test-business-id',
 				sourceHint: null,
 			}),

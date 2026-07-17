@@ -56,6 +56,7 @@ export type CachedAppointment = {
 	locationName: string
 	staffId: string
 	staffName: string
+	staffPhone: string | null
 	clientFirstName: string | null
 	serviceName: string
 }
@@ -293,6 +294,116 @@ Write it in FIRST PERSON as the client, warm and specific, 2-4 sentences, soundi
 export function fallbackReview(serviceName: string, providerFirstName: string, keywords: string[]) {
 	const kw = keywords[0] ?? 'Knoxville med spa'
 	return `${providerFirstName} at Sarah Hitchcox Aesthetics took such great care of me for my ${serviceName.toLowerCase()}. Natural results and a wonderful experience. Highly recommend if you're looking for ${kw}.`
+}
+
+// ---------------------------------------------------------------------------
+// Sample uniqueness ledger — Google's spam filter clusters and removes
+// duplicate review text (2026-07-13: two customers posted the WLK microsite's
+// static sample verbatim). Every sample we hand a customer is hashed here and
+// never served again.
+// ---------------------------------------------------------------------------
+
+const SERVED_SAMPLES_KEY = 'review-samples-served-hashes'
+const SERVED_SAMPLES_CAP = 5000
+
+function sampleHash(text: string): string {
+	const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+	let hash = 0
+	for (let i = 0; i < normalized.length; i++) {
+		hash = (hash * 31 + normalized.charCodeAt(i)) | 0
+	}
+	return `${hash}:${normalized.length}`
+}
+
+/**
+ * Filter candidates down to texts never served before, and record the
+ * survivors so they can never be served again.
+ */
+export async function takeUniqueSamples(
+	candidates: Array<string | null | undefined>,
+): Promise<string[]> {
+	const texts = candidates.filter(
+		(t): t is string => typeof t === 'string' && t.trim().length > 0,
+	)
+	if (texts.length === 0) return []
+	const row = await prisma.blvdSyncState.findUnique({
+		where: { key: SERVED_SAMPLES_KEY },
+	})
+	const served: string[] = row?.value ? (JSON.parse(row.value) as string[]) : []
+	const servedSet = new Set(served)
+	const unique: string[] = []
+	for (const text of texts) {
+		const hash = sampleHash(text)
+		if (servedSet.has(hash)) continue
+		servedSet.add(hash)
+		served.push(hash)
+		unique.push(text)
+	}
+	if (unique.length > 0) {
+		const value = JSON.stringify(served.slice(-SERVED_SAMPLES_CAP))
+		await prisma.blvdSyncState.upsert({
+			where: { key: SERVED_SAMPLES_KEY },
+			create: { key: SERVED_SAMPLES_KEY, value },
+			update: { value },
+		})
+	}
+	return unique
+}
+
+const SAMPLE_ANGLES = [
+	'how the results made you feel week to week',
+	'how easy booking and scheduling was',
+	'the staff listening and adjusting the plan to you',
+	'being nervous at first and how the visit went',
+	'comparing this to other places you researched',
+	'the follow-up and check-ins between visits',
+	'how quick and convenient the visits are',
+	'recommending it to a specific kind of person (friend, coworker)',
+]
+const SAMPLE_TONES = ['warm and casual', 'matter-of-fact', 'enthusiastic', 'understated and sincere']
+
+/**
+ * Brand-aware sample generator for the microsites. Random angle/tone/length
+ * per call so outputs stay diverse even within a single page load.
+ */
+export async function generateBrandSampleReview({
+	businessName,
+	service,
+	keywords,
+}: {
+	businessName: string
+	service: string
+	keywords: string[]
+}): Promise<string | null> {
+	const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim()
+	if (!apiKey) return null
+	const model = process.env.REVIEW_GEN_MODEL?.trim() || DEFAULT_REVIEW_MODEL
+	const angle = SAMPLE_ANGLES[Math.floor(Math.random() * SAMPLE_ANGLES.length)]!
+	const tone = SAMPLE_TONES[Math.floor(Math.random() * SAMPLE_TONES.length)]!
+	const sentences = 2 + Math.floor(Math.random() * 3)
+	const prompt = `You are writing a sample 5-star Google review that a happy client can use as a starting point and edit before posting.
+Business: ${businessName}, in Knoxville, TN.
+Service the client received: ${service}.
+Angle to build the review around: ${angle}. Tone: ${tone}. Length: about ${sentences} sentences.
+Write in FIRST PERSON as the client, sounding like a real person (not marketing copy). Naturally weave in one or two of these phrases: ${keywords.map(k => `"${k}"`).join(', ')}. Do NOT invent the client's name, exact prices, specific pound counts, or medical claims. No hashtags, no emoji. Return ONLY the review text.`
+	try {
+		const res = await fetch(OPENROUTER_URL, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				model,
+				messages: [{ role: 'user', content: prompt }],
+				max_tokens: 300,
+				temperature: 1,
+			}),
+		})
+		if (!res.ok) return null
+		const json = (await res.json()) as any
+		const text = json?.choices?.[0]?.message?.content?.trim()
+		return typeof text === 'string' && text.length > 0 ? text : null
+	} catch {
+		return null
+	}
 }
 
 // ---------------------------------------------------------------------------

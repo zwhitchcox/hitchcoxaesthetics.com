@@ -89,4 +89,11 @@ RUN mkdir -p /data ${LITEFS_DIR}
 
 ADD . .
 
+# Build-time smoke tests on the FINAL filesystem: a broken native module or a
+# worker bundle that can't load fails the BUILD, so a bad image can never be
+# released. (Guards against the 2026-07-06 outage class: .dockerignore keeps
+# local node_modules out of the ADD above; this proves it.)
+RUN node -e "require('better-sqlite3')" \
+	&& TEMPORAL_SMOKE=1 node ./build/temporal/worker.js
+
 CMD ["litefs", "mount"]

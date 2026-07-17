@@ -16,6 +16,7 @@ import {
 	runFollowUpContactSyncJob,
 	runCallRailPostHogConversionSyncJob,
 	runReviewsFetchJob,
+	runFinanceReportsJob,
 	getJobStatuses,
 	clearJobError,
 } from '#app/utils/background-jobs.server'
@@ -35,6 +36,8 @@ const JOB_DESCRIPTIONS = {
 		'Syncs qualified CallRail phone-call conversions into PostHog with web session attribution when available.',
 	reviewsFetch:
 		'Fetches Google reviews and stores them in the database with statistical analysis.',
+	financeReports:
+		'Recomputes the household budget + 6-month revenue projection and loads them into the Metabase reports warehouse.',
 }
 
 // Maps the job status to the StatusButton status
@@ -64,6 +67,11 @@ export async function action({ request }: Route['ActionArgs']) {
 	if (intent === 'run-reviewsFetch') {
 		runReviewsFetchJob().catch(console.error)
 		return json({ success: true, message: 'Reviews fetch job started' })
+	}
+
+	if (intent === 'run-financeReports') {
+		runFinanceReportsJob().catch(console.error)
+		return json({ success: true, message: 'Finance reports job started' })
 	}
 
 	if (intent === 'run-callRailPostHogConversionSync') {

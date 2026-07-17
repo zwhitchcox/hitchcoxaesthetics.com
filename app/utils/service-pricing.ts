@@ -280,6 +280,68 @@ export function getBlvdBookingPriceDisplay({
 	}
 }
 
+// Measured 6-month expected value of a new-client booking conversion by entry
+// service category, cancellations already discounted (kept-rate ~94%). Values
+// are total client spend within 6 months of the first visit, cross-sell
+// included. Source: `client_value` table computed weekly by the sha-reports
+// client-value job ("Conversion value by entry service" card on the Metabase
+// dashboard); these constants snapshot the 2026-07-09 run — refresh them when
+// the measured numbers drift.
+const SIX_MONTH_CONVERSION_VALUE_USD = {
+	tox: 600,
+	filler: 734,
+	kybella: 1289,
+	laserHair: 608,
+	laserSkin: 872,
+	weightLoss: 744,
+	consult: 303,
+	all: 658,
+}
+
+/**
+ * What a booking conversion is worth for ads/analytics (Google Ads, PostHog,
+ * attribution touches). Distinct from getProjectedRevenueForBlvdService, which
+ * approximates the single visit's revenue for revenue projections.
+ */
+export function getConversionValueForBlvdService(serviceName: string): number {
+	const lower = serviceName.toLowerCase()
+
+	// Rebookings, follow-ups, and program continuations aren't new-client
+	// acquisition; keep them out of ad conversion value.
+	if (
+		lower.includes('existing') ||
+		lower.includes('follow-up') ||
+		lower.includes('touch up') ||
+		lower.includes('injection') ||
+		lower.includes('lab draw')
+	) {
+		return 0
+	}
+
+	// EVERESSE (Non-Surgical Skin Tightening) is a prepaid package collected at
+	// booking; the package price beats the category average.
+	if (lower.includes('everesse') || lower.includes('skin tightening')) {
+		return 2500
+	}
+
+	const value = SIX_MONTH_CONVERSION_VALUE_USD
+	if (/weight ?loss|semaglutide|tirzepatide|b12/.test(lower))
+		return value.weightLoss
+	if (lower.includes('kybella')) return value.kybella
+	if (lower.includes('laser hair')) return value.laserHair
+	if (/tox|botox|lip flip/.test(lower)) return value.tox
+	if (/filler|skinvive|hylenex|sculptra/.test(lower)) return value.filler
+	if (
+		/laser|lesion|microneedling|peel|prp|facial|dermaplane|hair restoration|skin revitalization/.test(
+			lower,
+		)
+	) {
+		return value.laserSkin
+	}
+	if (lower.includes('consultation')) return value.consult
+	return value.all
+}
+
 export function getProjectedRevenueForBlvdService(serviceName: string): number {
 	const configured = BLVD_PROJECTED_REVENUE_USD[serviceName]
 	if (configured != null) return configured

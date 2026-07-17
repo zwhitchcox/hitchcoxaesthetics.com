@@ -132,6 +132,7 @@ test('either-location shows merged availability and reserves at the picked offic
 			Component: BlvdBookRoute,
 			loader: () => ({
 				apiKey: 'test-api-key',
+				brandId: 'sha',
 				businessId: 'test-business-id',
 				sourceHint: null,
 			}),
@@ -189,6 +190,7 @@ test('switching the location pill narrows availability to that office', async ()
 			Component: BlvdBookRoute,
 			loader: () => ({
 				apiKey: 'test-api-key',
+				brandId: 'sha',
 				businessId: 'test-business-id',
 				sourceHint: null,
 			}),

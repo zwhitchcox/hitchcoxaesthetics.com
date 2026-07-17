@@ -55,8 +55,14 @@ import {
 } from '#app/utils/posthog-booking-identity.ts'
 import { usePostHog } from '#app/utils/posthog.tsx'
 import {
+	BRANDS,
+	type BrandConfig,
+	type BrandId,
+} from '#app/config/brands.ts'
+import { getBrandIdFromRequest } from '#app/utils/brand.server.ts'
+import {
 	getBlvdBookingPriceDisplay,
-	getProjectedRevenueForBlvdService,
+	getConversionValueForBlvdService,
 } from '#app/utils/service-pricing.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
 import { getAncestors, getPage } from '#app/utils/site-pages.server.ts'
@@ -70,6 +76,7 @@ type SourceHint = {
 
 type LoaderData = {
 	apiKey: string | null
+	brandId: BrandId
 	businessId: string | null
 	sourceHint: SourceHint | null
 }
@@ -325,16 +332,18 @@ export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
 }
 
-export const meta: MetaFunction = ({ location }) =>
-	getSocialMetas({
-		title: 'Book Online | Sarah Hitchcox Aesthetics',
-		description:
-			'Book your appointment online at Sarah Hitchcox Aesthetics in Knoxville or Farragut, TN. Botox, dermal fillers, laser treatments, and GLP-1 weight loss.',
+export const meta: MetaFunction<typeof loader> = ({ data, location }) => {
+	const brand = BRANDS[(data as LoaderData | undefined)?.brandId ?? 'sha']
+	return getSocialMetas({
+		title: brand.bookTitle,
+		description: brand.bookDescription,
 		pathname: location.pathname,
 	})
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const url = new URL(request.url)
+	const brandId = getBrandIdFromRequest(request)
 	const source =
 		normalizeSourcePath(
 			url.searchParams.get('source') ??
@@ -348,6 +357,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 	return json<LoaderData>({
 		apiKey: process.env['BLVD_API_KEY']?.trim() ?? null,
+		brandId,
 		businessId: process.env['BLVD_BUSINESS_ID']?.trim() ?? null,
 		sourceHint:
 			sourceHint ??
@@ -365,7 +375,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function BlvdBookRoute() {
-	const { apiKey, businessId, sourceHint } = useLoaderData<typeof loader>()
+	const { apiKey, brandId, businessId, sourceHint } =
+		useLoaderData<typeof loader>()
+	const brand = BRANDS[brandId]
 	const [client, setClient] = useState<BlvdClient | null>(null)
 	const [initializing, setInitializing] = useState(true)
 	const [initError, setInitError] = useState<string | null>(null)
@@ -558,7 +570,10 @@ export default function BlvdBookRoute() {
 				await business.getLocations()
 				const catalogCart = await nextClient.carts.create()
 				const categories = await catalogCart.getAvailableCategories()
-				const nextServices = buildServiceEntries(categories)
+				const nextServices = scopeServicesToBrand(
+					buildServiceEntries(categories),
+					brand,
+				)
 
 				if (cancelled) return
 
@@ -580,7 +595,7 @@ export default function BlvdBookRoute() {
 		return () => {
 			cancelled = true
 		}
-	}, [apiKey, businessId])
+	}, [apiKey, brand, businessId])
 
 	useEffect(() => {
 		if (sourceHint) {
@@ -735,9 +750,11 @@ export default function BlvdBookRoute() {
 			...bookingExperimentAnalyticsProperties,
 			...sourceHintAnalyticsProperties,
 			...selectionAnalyticsProperties,
+			booking_brand: brandId,
 		}
 	}, [
 		bookingExperimentAnalyticsProperties,
+		brandId,
 		selectionAnalyticsProperties,
 		sourceHintAnalyticsProperties,
 	])
@@ -1584,7 +1601,7 @@ export default function BlvdBookRoute() {
 					clientForm.phone,
 			})
 
-			const projectedRevenueUsd = getProjectedRevenueForBlvdService(
+			const projectedRevenueUsd = getConversionValueForBlvdService(
 				selectedService.item.name,
 			)
 			const selectedPaymentMethodType = nextCart.summary.paymentMethodRequired
@@ -2090,7 +2107,7 @@ export default function BlvdBookRoute() {
 				serviceGroupedServiceIds: selectedService.groupedServiceIds,
 				serviceId: selectedService.item.id,
 				serviceName: selectedService.item.name,
-				valueUsd: getProjectedRevenueForBlvdService(selectedService.item.name),
+				valueUsd: getConversionValueForBlvdService(selectedService.item.name),
 			},
 			client: {
 				boulevardClientId: clientInformation?.externalId ?? undefined,
@@ -2303,6 +2320,21 @@ export default function BlvdBookRoute() {
 	return (
 		<div className="container max-w-6xl py-4 sm:py-8 lg:py-16">
 			<div className="mx-auto flex max-w-5xl flex-col gap-4 sm:gap-8">
+				{/* Microsite brands get a minimal header here because the SHA site
+				    chrome is suppressed for them in root.tsx */}
+				{brand.id !== 'sha' ? (
+					<div className="flex items-center justify-between border-b pb-4">
+						<a
+							href={brand.homeUrl}
+							className="text-xl font-semibold tracking-wide"
+						>
+							{brand.businessName}
+						</a>
+						<a href={brand.homeUrl} className="text-sm text-muted-foreground">
+							&larr; Back to site
+						</a>
+					</div>
+				) : null}
 				{!apiKey || !businessId ? (
 					<Card>
 						<CardHeader>
@@ -3600,6 +3632,18 @@ function buildStoredServiceSourceHint(
 		preferredLocationId: normalizeLocationId(hint.preferredLocationId ?? null),
 		search,
 	}
+}
+
+/**
+ * Restrict the catalog to the brand's service scope (matched against the
+ * normalized searchText). Falls back to the full catalog if the scope matches
+ * nothing so catalog drift can never blank the booking page.
+ */
+function scopeServicesToBrand(services: ServiceEntry[], brand: BrandConfig) {
+	if (!brand.serviceScopePattern) return services
+	const scope = new RegExp(brand.serviceScopePattern, 'i')
+	const scoped = services.filter(service => scope.test(service.searchText))
+	return scoped.length > 0 ? scoped : services
 }
 
 function buildServiceEntries(categories: BlvdCategory[]) {

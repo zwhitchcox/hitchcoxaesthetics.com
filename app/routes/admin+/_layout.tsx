@@ -19,7 +19,15 @@ export const handle: SEOHandle = {
 // Define the admin menu items with valid icon names
 const adminMenuItems = [
 	{ path: '/admin', label: 'Dashboard', icon: 'dashboard' as const },
+	// The report hub serves its own full document — needs a real page load.
+	{
+		path: '/admin/reports',
+		label: 'Reports',
+		icon: 'dashboard' as const,
+		reloadDocument: true,
+	},
 	{ path: '/admin/reviews', label: 'Reviews', icon: 'star' as const },
+	{ path: '/admin/review-links', label: 'Review Links', icon: 'link-2' as const },
 	{ path: '/admin/boulevard', label: 'Boulevard', icon: 'calendar' as const },
 	{ path: '/admin/bg', label: 'Background Jobs', icon: 'clock' as const },
 	{ path: '/admin/google-ads', label: 'Google Ads', icon: 'update' as const },
@@ -36,6 +44,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function AdminLayout() {
 	const location = useLocation()
+
+	// Report pages render inside hub panes (iframes) — no admin chrome there.
+	if (location.pathname.startsWith('/admin/reports/')) {
+		return <Outlet />
+	}
 
 	return (
 		<div className="mx-auto w-full max-w-[2400px] px-4 py-8 sm:px-6 lg:px-8">
@@ -64,6 +77,7 @@ export default function AdminLayout() {
 								<Link
 									key={item.path}
 									to={item.path}
+									reloadDocument={'reloadDocument' in item && item.reloadDocument}
 									className={`flex items-center rounded-md px-3 py-2 transition-colors ${
 										isActive
 											? 'bg-primary text-primary-foreground'
@@ -81,8 +95,9 @@ export default function AdminLayout() {
 					</nav>
 				</div>
 
-				{/* Content area */}
-				<div>
+				{/* Content area — min-w-0 so wide tables scroll inside instead of
+				    stretching the page past the viewport */}
+				<div className="min-w-0 overflow-x-auto">
 					<Outlet />
 				</div>
 			</div>

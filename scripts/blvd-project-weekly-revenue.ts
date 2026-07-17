@@ -10,6 +10,8 @@ import {
 import { getProjectedRevenueForBlvdService } from '#app/utils/service-pricing.ts'
 
 const BUSINESS_TIMEZONE = 'America/New_York'
+// Owner/test bookings — never counted as revenue or appointments.
+const EXCLUDED_CLIENT_NAMES = new Set(['zane hitchcox'])
 const APPOINTMENT_PAGE_SIZE = 100
 const ORDER_PAGE_SIZE = 100
 const MAX_APPOINTMENT_PAGES_PER_LOCATION = 100
@@ -165,12 +167,46 @@ type CliOptions = {
 	weekDate: string | null
 }
 
-const options = parseArgs(process.argv.slice(2))
+export interface RevenueProjectionJson {
+	expected_fill: {
+		days: Array<{
+			dateLabel: string
+			weekday: string
+			daysOut: number
+			bookedUsd: number
+			bookedCount: number
+			expectedNewCount: number
+			fillUsd: number
+			expectedUsd: number
+		}>
+		[key: string]: unknown
+	} | null
+	history: unknown
+	locations: unknown
+	rows: unknown[]
+	summary: {
+		expected_total_revenue_usd: number
+		cancellation_rate: number
+		expected_cancellations_usd: number
+		expected_net_revenue_usd: number
+		[key: string]: unknown
+	}
+	window: { start: string; end: string; start_local: string; end_local: string }
+}
 
-void main(options).catch(error => {
-	console.error(error instanceof Error ? error.message : error)
-	process.exitCode = 1
-})
+/** Programmatic entry (Temporal worker). Overrides merge onto CLI defaults. */
+export async function runRevenueProjection(
+	overrides: Partial<CliOptions> = {},
+): Promise<RevenueProjectionJson> {
+	return await main({ ...parseArgs([]), ...overrides })
+}
+
+if (process.argv[1]?.includes('blvd-project-weekly-revenue')) {
+	void main(parseArgs(process.argv.slice(2))).catch(error => {
+		console.error(error instanceof Error ? error.message : error)
+		process.exitCode = 1
+	})
+}
 
 /**
  * True cancellation rate over the trailing window, used to haircut the forecast.
@@ -238,7 +274,7 @@ function computeCancellationRate(
 	}
 }
 
-async function main(options: CliOptions) {
+async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 	const { start, end } = getReportWindow(options)
 	const now = new Date()
 	const historyEnd = start < now ? start : now
@@ -363,7 +399,7 @@ async function main(options: CliOptions) {
 
 	if (options.json) {
 		console.log(JSON.stringify(result, null, 2))
-		return
+		return result
 	}
 
 	printReport(rows, result, expectedFill)
@@ -375,6 +411,7 @@ async function main(options: CliOptions) {
 	console.log(
 		`Cancellation-adjusted expected total: ${formatUsd(expectedNetRevenueUsd)}`,
 	)
+	return result
 }
 
 /**
@@ -563,14 +600,14 @@ async function listAppointmentServiceSegments({
 	from: Date
 	locations: BlvdAdminLocation[]
 	to: Date
-}) {
+}): Promise<AppointmentServiceSegment[]> {
 	const segments: AppointmentServiceSegment[] = []
 
 	for (const location of locations) {
 		let after: string | null = null
 
 		for (let page = 0; page < MAX_APPOINTMENT_PAGES_PER_LOCATION; page += 1) {
-			const response = await boulevardAdminFetch<AppointmentsResponse>(
+			const response: AppointmentsResponse = await boulevardAdminFetch<AppointmentsResponse>(
 				`query Appointments($after: String, $locationId: ID!) {
 					appointments(first: ${APPOINTMENT_PAGE_SIZE}, after: $after, locationId: $locationId) {
 						pageInfo {
@@ -627,12 +664,14 @@ async function listAppointmentServiceSegments({
 
 				const bookedAt =
 					parseDate(appointment.bookedAt) ?? parseDate(appointment.createdAt)
+				const clientName = getClientName(appointment.client)
+				if (EXCLUDED_CLIENT_NAMES.has(clientName.trim().toLowerCase())) continue
 				for (const service of appointment.appointmentServices ?? []) {
 					segments.push({
 						appointmentId: appointment.id ?? '',
 						bookedAt,
 						cancelled: appointment.cancelled === true,
-						clientName: getClientName(appointment.client),
+						clientName,
 						durationMinutes: service.duration ?? null,
 						locationId: location.id,
 						locationName: location.name ?? location.id,
@@ -663,14 +702,14 @@ async function listHistoricalRevenueSamples({
 	end: Date
 	locations: BlvdAdminLocation[]
 	start: Date
-}) {
+}): Promise<RevenueSample[]> {
 	const samples: RevenueSample[] = []
 
 	for (const location of locations) {
 		let after: string | null = null
 
 		for (let page = 0; page < MAX_ORDER_PAGES_PER_LOCATION; page += 1) {
-			const response = await boulevardAdminFetch<OrdersResponse>(
+			const response: OrdersResponse = await boulevardAdminFetch<OrdersResponse>(
 				`query Orders($after: String, $locationId: ID!) {
 					orders(first: ${ORDER_PAGE_SIZE}, after: $after, locationId: $locationId) {
 						pageInfo {

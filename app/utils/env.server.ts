@@ -21,6 +21,8 @@ const schema = z.object({
 	GA_MEASUREMENT_ID: z.string().optional(),
 	// Server-only — never expose through getEnv()
 	GA_MEASUREMENT_PROTOCOL_API_SECRET: z.string().optional(),
+	// Server-only — Sarah's cell for end-of-appointment review reminder texts
+	REVIEW_REMINDER_SMS_TO: z.string().optional(),
 	// Server-only — powers AI call analysis
 	OPEN_ROUTER_API_KEY: z.string().optional(),
 	OPENROUTER_CALL_MODEL: z.string().optional(),
@@ -31,6 +33,10 @@ const schema = z.object({
 	// Server-only — Google Voice follow-up sync
 	GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
 	GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+	// Server-only — Temporal background-job scheduling
+	TEMPORAL_ADDRESS: z.string().optional(),
+	TEMPORAL_NAMESPACE: z.string().optional(),
+	TEMPORAL_TASK_QUEUE: z.string().optional(),
 })
 
 declare global {

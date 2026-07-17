@@ -648,8 +648,8 @@ model Ga4PhoneConversion {
   callrailCallId    String  @unique
   callrailAccountId String?
 
-  gclid      String?
-  gaClientId String?
+  gclid       String?
+  gaClientId  String?
   gaSessionId String?
 
   attributionMatch String?
@@ -819,4 +819,33 @@ model RetellCallOutcome {
   @@index([callrailSessionId])
   @@index([posthogSessionId])
   @@index([createdAt])
+}
+
+// Raw bank/card transactions pulled from Plaid by the plaid-sync background
+// job. Permanent archive: institutions cap how far back Plaid can read
+// (Capital One: 90 days), so rows here are never deleted by the sync.
+model PlaidTransaction {
+  id           String  @id // Plaid transaction_id
+  itemId       String
+  owner        String?
+  institution  String
+  accountId    String
+  accountMask  String?
+  accountType  String?
+  accountOwner String? // e.g. "SARAH HITCHCOX 1026" — Amex tags the card member here
+  date         String // YYYY-MM-DD as reported by Plaid
+  amount       Float // positive = money out
+  name         String
+  merchant     String?
+  pfcPrimary   String?
+  pfcDetailed  String?
+  pending      Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([owner])
+  @@index([institution])
+  @@index([accountOwner])
 }
