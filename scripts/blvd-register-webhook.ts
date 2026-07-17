@@ -64,8 +64,8 @@ async function main() {
 
 	if (ping && hook?.id) {
 		const res = await boulevardAdminFetch<{ pingWebhook?: unknown }>(
-			`mutation Ping($input: PingWebhookInput!) { pingWebhook(input: $input) { clientMutationId } }`,
-			{ input: { webhookId: hook.id } },
+			`mutation Ping($input: PingWebhookInput!) { pingWebhook(input: $input) { webhook { id } } }`,
+			{ input: { id: hook.id } },
 		)
 		console.log('ping sent:', JSON.stringify(res))
 	}

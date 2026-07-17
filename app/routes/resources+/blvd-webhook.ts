@@ -61,15 +61,14 @@ export async function action({ request }: ActionFunctionArgs) {
 	const eventType: string = String(
 		body?.eventType ?? body?.event ?? body?.type ?? '',
 	).toUpperCase()
-	if (eventType === 'PING') {
-		console.log(`Boulevard webhook ping received (signature: ${signature})`)
-		return json({ ok: true, pong: true })
-	}
-	if (!eventType.includes('APPOINTMENT')) return json({ ok: true, ignored: true })
-
 	const appointmentId: string | null =
 		body?.node?.id ?? body?.data?.node?.id ?? body?.appointmentId ?? null
-	if (!appointmentId) return json({ ok: true, ignored: true })
+	console.log(
+		`Boulevard webhook: event=${eventType || `(keys: ${Object.keys(body ?? {}).join(',')})`} id=${appointmentId ?? '-'} signature=${signature}`,
+	)
+	if (eventType.includes('PING')) return json({ ok: true, pong: true })
+	if (!eventType.includes('APPOINTMENT') || !appointmentId)
+		return json({ ok: true, ignored: true })
 
 	try {
 		const result = await sendReviewReminderForAppointment(String(appointmentId))
