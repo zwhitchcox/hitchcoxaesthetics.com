@@ -56,15 +56,86 @@ const isCheckedOut = (state: string | null) =>
 export async function sendReviewReminderTexts(
 	now = new Date(),
 ): Promise<{ sent: number }> {
-	const fallbackTo = process.env.REVIEW_REMINDER_SMS_TO?.trim() || null
 	const snapshot = await readAppointmentSnapshot()
 	if (!snapshot) return { sent: 0 }
+	return runReminderPass(snapshot.appointments, now, FIRST_SEEN_GRACE_MS)
+}
 
+/**
+ * Instant path: the Boulevard APPOINTMENT_COMPLETED webhook hands us one
+ * appointment id the moment checkout happens. We re-fetch it from Boulevard
+ * (never trusting the webhook payload) and run the same ledger logic. No
+ * first-seen grace here: the webhook only fires at actual checkout, so a
+ * first sighting in FINAL state is a live checkout by definition.
+ */
+export async function sendReviewReminderForAppointment(
+	appointmentId: string,
+	now = new Date(),
+): Promise<{ sent: number }> {
+	const { boulevardAdminFetch } = await import('#app/utils/blvd-admin.server.ts')
+	const data = await boulevardAdminFetch<{
+		appointment?: {
+			id?: string | null
+			startAt?: string | null
+			endAt?: string | null
+			state?: string | null
+			client?: { firstName?: string | null } | null
+			location?: { id?: string | null; name?: string | null } | null
+			appointmentServices?: Array<{
+				service?: { name?: string | null } | null
+				staff?: {
+					id?: string | null
+					firstName?: string | null
+					lastName?: string | null
+					mobilePhone?: string | null
+				} | null
+			}> | null
+		} | null
+	}>(
+		`query ReviewReminderAppt($id: ID!) {
+			appointment(id: $id) {
+				id startAt endAt state
+				client { firstName }
+				location { id name }
+				appointmentServices { service { name } staff { id firstName lastName mobilePhone } }
+			}
+		}`,
+		{ id: appointmentId },
+	)
+	const node = data.appointment
+	const svc =
+		node?.appointmentServices?.find(s => s.staff?.id) ??
+		node?.appointmentServices?.[0]
+	if (!node?.id || !node.startAt || !svc?.staff?.id) return { sent: 0 }
+	const appt: CachedAppointment = {
+		id: node.id,
+		startAt: node.startAt,
+		endAt: node.endAt ?? null,
+		state: node.state ?? null,
+		locationId: node.location?.id ?? '',
+		locationName: node.location?.name ?? '',
+		staffId: svc.staff.id,
+		staffName: [svc.staff.firstName, svc.staff.lastName]
+			.filter(Boolean)
+			.join(' '),
+		staffPhone: svc.staff.mobilePhone ?? null,
+		clientFirstName: node.client?.firstName ?? null,
+		serviceName: svc.service?.name ?? 'Aesthetic treatment',
+	}
+	return runReminderPass([appt], now, Infinity)
+}
+
+async function runReminderPass(
+	appointments: CachedAppointment[],
+	now: Date,
+	firstSeenGraceMs: number,
+): Promise<{ sent: number }> {
+	const fallbackTo = process.env.REVIEW_REMINDER_SMS_TO?.trim() || null
 	const ledger = await readLedger()
 	const nowMs = now.getTime()
 	let sent = 0
 
-	for (const appt of snapshot.appointments) {
+	for (const appt of appointments) {
 		const prev = ledger[appt.id]
 		const entry: LedgerEntry = {
 			state: appt.state ?? null,
@@ -77,11 +148,11 @@ export async function sendReviewReminderTexts(
 		if (prev) {
 			// Watched appointment: text only on the transition into checkout.
 			if (isCheckedOut(prev.state)) continue
-		} else {
+		} else if (firstSeenGraceMs !== Infinity) {
 			// First sighting already checked out: only text if it was scheduled
 			// to end within the last hour (fast walk-in / first run after boot).
 			const end = appt.endAt ? new Date(appt.endAt).getTime() : NaN
-			if (!Number.isFinite(end) || end < nowMs - FIRST_SEEN_GRACE_MS) continue
+			if (!Number.isFinite(end) || end < nowMs - firstSeenGraceMs) continue
 		}
 
 		const to = appt.staffPhone?.trim() || fallbackTo
