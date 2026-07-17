@@ -21,6 +21,9 @@ export type BookingMobileVerificationCodeResult =
 			action:
 				| 'send_mobile_verification_code'
 				| 'send_new_client_mobile_verification_code'
+			/** returning client not found in Boulevard — offer a one-tap
+			 * "continue as a new client" instead of a dead-end error */
+			canContinueAsNewClient?: boolean
 			error: unknown
 			message: string
 			type: 'error'
@@ -74,6 +77,9 @@ export async function requestBookingMobileVerificationCode({
 
 		return {
 			action: 'send_mobile_verification_code',
+			canContinueAsNewClient:
+				isBlvdClientNotFoundByMobilePhoneError(error) &&
+				clientHistory === 'returning',
 			error,
 			message: getOwnershipCodeUserMessage(error, clientHistory),
 			type: 'error',

@@ -215,3 +215,35 @@ test('switching the location pill narrows availability to that office', async ()
 		screen.queryByRole('button', { name: /7:00 PM/i }),
 	).not.toBeInTheDocument()
 })
+
+test('/book?service=tox pre-selects the service and skips straight to location', async () => {
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => okResponse()),
+	)
+	vi.stubGlobal('scrollTo', vi.fn())
+	const user = userEvent.setup()
+
+	const RemixStub = createRemixStub([
+		{
+			Component: BlvdBookRoute,
+			loader: () => ({
+				apiKey: 'test-api-key',
+				brandId: 'sha',
+				businessId: 'test-business-id',
+				sourceHint: null,
+				serviceSlug: 'tox',
+			}),
+			path: '/book',
+		},
+	])
+	render(<RemixStub initialEntries={['/book?service=tox']} />)
+
+	// History question still runs — it decides the New/Existing variant.
+	await user.click(await screen.findByRole('button', { name: 'No' }))
+
+	// No service list: the slug resolved to New Client Tox and the wizard
+	// jumped straight to the location step.
+	await screen.findByRole('button', { name: /Knoxville/i })
+	expect(screen.getByRole('button', { name: /Farragut/ })).toBeVisible()
+})

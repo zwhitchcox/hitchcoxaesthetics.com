@@ -85,3 +85,25 @@ test('treats unsure clients as new clients when Boulevard has no matching profil
 	expect(shouldVerifyPhoneAsNewClient('unsure')).toBe(true)
 	expect(shouldVerifyPhoneAsNewClient('returning')).toBe(false)
 })
+
+test('returning client not found: error carries the continue-as-new offer', async () => {
+	const requestBlvdOwnershipCode = vi.fn(async () => {
+		throw clientNotFoundError
+	})
+	const requestBookingPhoneVerificationCode = vi.fn(async () => {})
+
+	const result = await requestBookingMobileVerificationCode({
+		clientHistory: 'returning',
+		normalizedPhone: '+18659780953',
+		requestBlvdOwnershipCode,
+		requestBookingPhoneVerificationCode,
+	})
+
+	expect(result.type).toBe('error')
+	if (result.type === 'error') {
+		expect(result.canContinueAsNewClient).toBe(true)
+		expect(result.message).toContain('continue as a new client')
+	}
+	// No silent fallback for returning clients — the user decides.
+	expect(requestBookingPhoneVerificationCode).not.toHaveBeenCalled()
+})

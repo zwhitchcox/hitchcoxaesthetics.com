@@ -65,6 +65,7 @@ import {
 	getConversionValueForBlvdService,
 } from '#app/utils/service-pricing.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
+import { resolveServiceBySlug } from '#app/utils/booking-service-slugs.ts'
 import { getAncestors, getPage } from '#app/utils/site-pages.server.ts'
 
 type SourceHint = {
@@ -79,6 +80,8 @@ type LoaderData = {
 	brandId: BrandId
 	businessId: string | null
 	sourceHint: SourceHint | null
+	/** /book?service=<slug> — pre-selects the service after the history answer */
+	serviceSlug: string | null
 }
 
 type BlvdLocation = {
@@ -344,12 +347,19 @@ export const meta: MetaFunction<typeof loader> = ({ data, location }) => {
 export async function loader({ request }: LoaderFunctionArgs) {
 	const url = new URL(request.url)
 	const brandId = getBrandIdFromRequest(request)
+	// ?q (and legacy ?source/?slug) is the soft hint: search prefill +
+	// preferred location. ?service now means a canonical service slug (see
+	// booking-service-slugs.ts) that pre-selects the service outright.
 	const source =
 		normalizeSourcePath(
 			url.searchParams.get('source') ??
-				url.searchParams.get('service') ??
+				url.searchParams.get('q') ??
 				url.searchParams.get('slug'),
 		) ?? null
+	const rawServiceSlug = url.searchParams.get('service')?.trim().toLowerCase() ?? ''
+	const serviceSlug = /^[a-z0-9][a-z0-9-]{1,79}$/.test(rawServiceSlug)
+		? rawServiceSlug
+		: null
 	const explicitLocation = normalizeLocationId(url.searchParams.get('location'))
 	const sourceHint = source
 		? buildServerSourceHint(source, explicitLocation)
@@ -359,6 +369,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		apiKey: process.env['BLVD_API_KEY']?.trim() ?? null,
 		brandId,
 		businessId: process.env['BLVD_BUSINESS_ID']?.trim() ?? null,
+		serviceSlug,
 		sourceHint:
 			sourceHint ??
 			(explicitLocation
@@ -375,13 +386,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function BlvdBookRoute() {
-	const { apiKey, brandId, businessId, sourceHint } =
+	const { apiKey, brandId, businessId, sourceHint, serviceSlug } =
 		useLoaderData<typeof loader>()
 	const brand = BRANDS[brandId]
 	const [client, setClient] = useState<BlvdClient | null>(null)
 	const [initializing, setInitializing] = useState(true)
 	const [initError, setInitError] = useState<string | null>(null)
 	const [services, setServices] = useState<ServiceEntry[]>([])
+	// /book?service=<slug> stays pending until the history answer picks the
+	// New/Existing variant; cleared after one attempt so the wizard never
+	// fights the user's own choices.
+	const pendingServiceSlugRef = useRef<string | null>(serviceSlug ?? null)
 	const [clientHistorySelection, setClientHistorySelection] =
 		useState<BookingClientHistory | null>(null)
 	const [clientHistory, setClientHistory] =
@@ -435,6 +450,7 @@ export default function BlvdBookRoute() {
 	const [ownershipStepError, setOwnershipStepError] = useState<string | null>(
 		null,
 	)
+	const [offerContinueAsNew, setOfferContinueAsNew] = useState(false)
 	const [checkoutSuccess, setCheckoutSuccess] =
 		useState<CheckoutSuccess | null>(null)
 	const [referrerHint, setReferrerHint] = useState<SourceHint | null>(null)
@@ -1210,6 +1226,22 @@ export default function BlvdBookRoute() {
 		}
 	}
 
+	// Ad deep-links: once the client-history answer exists, resolve the slug
+	// to the right variant and jump straight to the location step.
+	useEffect(() => {
+		if (!clientHistory) return
+		const slug = pendingServiceSlugRef.current
+		if (!slug || services.length === 0) return
+		pendingServiceSlugRef.current = null
+		const resolved = resolveServiceBySlug(
+			services,
+			slug,
+			clientHistory === 'unsure' ? null : clientHistory,
+		)
+		if (resolved) void handleSelectService(resolved)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [clientHistory, services])
+
 	async function handleSelectService(
 		service: ServiceEntry,
 		renderInstanceId?: string,
@@ -1825,7 +1857,9 @@ export default function BlvdBookRoute() {
 		}, 0)
 	}
 
-	async function handleSendOwnershipCode() {
+	async function handleSendOwnershipCode(options?: {
+		clientHistoryOverride?: BookingClientHistory
+	}) {
 		if (!cart) return
 
 		if (!looksLikePhoneNumber(clientForm.phone)) {
@@ -1842,8 +1876,9 @@ export default function BlvdBookRoute() {
 
 		try {
 			const normalizedPhone = normalizePhoneNumber(clientForm.phone)
+			setOfferContinueAsNew(false)
 			const result = await requestBookingMobileVerificationCode({
-				clientHistory,
+				clientHistory: options?.clientHistoryOverride ?? clientHistory,
 				normalizedPhone,
 				requestBlvdOwnershipCode: phone => cart.sendOwnershipCodeBySms(phone),
 				requestBookingPhoneVerificationCode: sendBookingPhoneVerificationCode,
@@ -1883,9 +1918,30 @@ export default function BlvdBookRoute() {
 				userMessage: result.message,
 			})
 			setOwnershipStepError(result.message)
+			setOfferContinueAsNew(Boolean(result.canContinueAsNewClient))
 		} finally {
 			setSendingOwnershipCode(false)
 		}
+	}
+
+	/**
+	 * Returning client whose number Boulevard doesn't know: one tap flips
+	 * them to the new-client path and sends our own verification code. The
+	 * selected service and slot are kept as-is (booking under the chosen
+	 * variant beats losing the booking).
+	 */
+	function handleContinueAsNewClient() {
+		setOfferContinueAsNew(false)
+		setOwnershipStepError(null)
+		setClientHistory('new')
+		setClientHistorySelection('new')
+		if (posthog) {
+			captureBookingPostHogEvent('booking_continue_as_new_tapped', {
+				...bookingAnalyticsPropertiesRef.current,
+				booking_client_type_source: 'continue_as_new_tap',
+			})
+		}
+		void handleSendOwnershipCode({ clientHistoryOverride: 'new' })
 	}
 
 	async function handleVerifyOwnershipCode() {
@@ -2942,6 +2998,17 @@ export default function BlvdBookRoute() {
 														{ownershipStepError ? (
 															<div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
 																{ownershipStepError}
+																{offerContinueAsNew ? (
+																	<Button
+																		type="button"
+																		variant="outline"
+																		className="mt-3 w-full sm:w-auto"
+																		onClick={handleContinueAsNewClient}
+																		disabled={sendingOwnershipCode}
+																	>
+																		Continue as a new client
+																	</Button>
+																) : null}
 															</div>
 														) : null}
 														{hasVerifiedMobile ? (
