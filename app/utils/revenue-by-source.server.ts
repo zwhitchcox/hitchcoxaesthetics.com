@@ -58,8 +58,15 @@ const CHANNEL_LABELS: Record<string, string> = {
 export function getSourceLabel(touch?: {
 	trafficChannel: string | null
 	utmContent: string | null
+	rawProperties?: string | null
+	callrailSource?: string | null
 }) {
 	if (!touch) return 'Untracked (phone / walk-in)'
+	// Retell voice bookings carry booking_channel: 'retell...' and no web
+	// traffic channel — label them as what they are, not 'Website (other)'.
+	if (!touch.trafficChannel && touch.rawProperties?.includes('"booking_channel":"retell')) {
+		return touch.callrailSource ? `AI phone · ${touch.callrailSource}` : 'AI phone call'
+	}
 	// utm_content on GBP website links names the specific listing
 	// (bearden / farragut / botox-knox-bearden / kwlc-farragut / ...).
 	if (touch.trafficChannel === 'gmb') {
@@ -365,6 +372,8 @@ async function getTouchesByAppointment(apptIds: string[]) {
 				select: {
 					trafficChannel: true,
 					utmContent: true,
+					rawProperties: true,
+					callrailSource: true,
 					posthogSessionId: true,
 					posthogDistinctId: true,
 				},
@@ -417,6 +426,8 @@ export async function loadRevenueBySource(request: Request) {
 					id: true,
 					trafficChannel: true,
 					utmContent: true,
+					rawProperties: true,
+					callrailSource: true,
 					posthogSessionId: true,
 					posthogDistinctId: true,
 				},
@@ -511,6 +522,8 @@ export async function loadBookingFunnel(request: Request) {
 				bookingValueUsd: true,
 				trafficChannel: true,
 				utmContent: true,
+				rawProperties: true,
+				callrailSource: true,
 				posthogSessionId: true,
 				posthogDistinctId: true,
 				blvdClient: {
