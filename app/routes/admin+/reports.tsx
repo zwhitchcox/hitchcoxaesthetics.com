@@ -30,6 +30,7 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 		entries: [
 			{ title: 'Revenue', desc: 'Actuals, this week, projections + P&L profitability, revenue by type/source/day with drill-down', path: '/admin/reports/revenue' },
 			{ title: 'Bookings funnel', desc: 'Bookings made by day × source, expected value, ads cost per booking', path: '/admin/reports/bookings' },
+			{ title: 'Appointment performance', desc: 'Expected vs actual per appointment, worst first, with the why', path: '/admin/reports/appointments' },
 			{ title: 'Household profit', desc: 'Biz revenue + take-home − expenses − taxes, monthly', path: '/admin/reports/household-profit' },
 			{ title: 'Household budget', desc: 'Personal spending by category, recurring, trends', path: '/admin/reports/household-budget' },
 		],
