@@ -65,7 +65,7 @@ import {
 	getConversionValueForBlvdService,
 } from '#app/utils/service-pricing.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
-import { resolveServiceBySlug } from '#app/utils/booking-service-slugs.ts'
+import { bookingServiceSlug } from '#app/utils/booking-service-slugs.ts'
 import { getAncestors, getPage } from '#app/utils/site-pages.server.ts'
 
 type SourceHint = {
@@ -393,10 +393,10 @@ export default function BlvdBookRoute() {
 	const [initializing, setInitializing] = useState(true)
 	const [initError, setInitError] = useState<string | null>(null)
 	const [services, setServices] = useState<ServiceEntry[]>([])
-	// /book?service=<slug> stays pending until the history answer picks the
-	// New/Existing variant; cleared after one attempt so the wizard never
-	// fights the user's own choices.
-	const pendingServiceSlugRef = useRef<string | null>(serviceSlug ?? null)
+	// /book?service=<slug>: after the history answer, the list collapses to
+	// the matching service for confirmation until the user asks for the full
+	// list ("Choose another service").
+	const [slugDismissed, setSlugDismissed] = useState(false)
 	const [clientHistorySelection, setClientHistorySelection] =
 		useState<BookingClientHistory | null>(null)
 	const [clientHistory, setClientHistory] =
@@ -881,7 +881,16 @@ export default function BlvdBookRoute() {
 	}
 
 	const canBrowseServices = Boolean(clientHistory)
+	const slugPreselectedService = useMemo(() => {
+		if (!serviceSlug || slugDismissed || !clientHistory) return null
+		return (
+			buildDisplayServiceEntries(services, clientHistory).find(
+				service => bookingServiceSlug(service.item.name) === serviceSlug,
+			) ?? null
+		)
+	}, [serviceSlug, slugDismissed, clientHistory, services])
 	const filteredServices = useMemo(() => {
+		if (slugPreselectedService) return [slugPreselectedService]
 		const visibleServices = buildDisplayServiceEntries(services, clientHistory)
 		const trimmedSearch = search.trim()
 		if (trimmedSearch.length === 0) {
@@ -910,8 +919,9 @@ export default function BlvdBookRoute() {
 				return a.service.item.name.localeCompare(b.service.item.name)
 			})
 			.map(result => result.service)
-	}, [clientHistory, search, services])
+	}, [clientHistory, search, services, slugPreselectedService])
 	const showPopularServices = Boolean(
+		!slugPreselectedService &&
 		canBrowseServices &&
 		bookingExperimentVariants.popularServicesLayout === 'popular_top' &&
 		search.trim().length === 0,
@@ -1225,22 +1235,6 @@ export default function BlvdBookRoute() {
 			setLookingUpClientHistory(false)
 		}
 	}
-
-	// Ad deep-links: once the client-history answer exists, resolve the slug
-	// to the right variant and jump straight to the location step.
-	useEffect(() => {
-		if (!clientHistory) return
-		const slug = pendingServiceSlugRef.current
-		if (!slug || services.length === 0) return
-		pendingServiceSlugRef.current = null
-		const resolved = resolveServiceBySlug(
-			services,
-			slug,
-			clientHistory === 'unsure' ? null : clientHistory,
-		)
-		if (resolved) void handleSelectService(resolved)
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [clientHistory, services])
 
 	async function handleSelectService(
 		service: ServiceEntry,
@@ -2569,7 +2563,7 @@ export default function BlvdBookRoute() {
 											</p>
 										) : null}
 
-										{canBrowseServices ? (
+										{canBrowseServices && !slugPreselectedService ? (
 											<div className="flex w-full max-w-full flex-col items-center gap-3 px-1 py-1 sm:flex-row">
 												<Input
 													ref={searchInputRef}
@@ -2612,6 +2606,12 @@ export default function BlvdBookRoute() {
 											</div>
 										) : (
 											<div className="w-full max-w-full space-y-8">
+												{slugPreselectedService ? (
+													<p className="text-center text-sm text-muted-foreground">
+														Confirm your service to continue, or browse everything
+														we offer.
+													</p>
+												) : null}
 												{popularServices.length > 0 ? (
 													<div className="w-full space-y-4">
 														<div className="border-b pb-3">
@@ -2641,6 +2641,17 @@ export default function BlvdBookRoute() {
 														)}
 													</div>
 												))}
+												{slugPreselectedService ? (
+													<div className="text-center">
+														<Button
+															type="button"
+															variant="outline"
+															onClick={() => setSlugDismissed(true)}
+														>
+															Choose another service
+														</Button>
+													</div>
+												) : null}
 											</div>
 										)}
 									</div>

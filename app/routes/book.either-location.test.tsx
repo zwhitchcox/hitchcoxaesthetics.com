@@ -242,8 +242,17 @@ test('/book?service=tox pre-selects the service and skips straight to location',
 	// History question still runs — it decides the New/Existing variant.
 	await user.click(await screen.findByRole('button', { name: 'No' }))
 
-	// No service list: the slug resolved to New Client Tox and the wizard
-	// jumped straight to the location step.
+	// Confirm view: only the slug's service is offered, with an escape hatch
+	// to the full list.
+	const chooseAnother = await screen.findByRole('button', {
+		name: /Choose another service/i,
+	})
+	const toxCards = screen.getAllByRole('button', { name: /Tox/i })
+	expect(toxCards.length).toBeGreaterThan(0)
+
+	// Tapping the card confirms and advances to the location step.
+	await user.click(toxCards[0]!)
 	await screen.findByRole('button', { name: /Knoxville/i })
 	expect(screen.getByRole('button', { name: /Farragut/ })).toBeVisible()
+	expect(chooseAnother).not.toBeInTheDocument()
 })
