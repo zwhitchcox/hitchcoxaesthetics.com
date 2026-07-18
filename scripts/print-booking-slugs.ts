@@ -1,56 +1,18 @@
 /**
- * Prints the canonical /book?service=<slug> list for ad deep-links, derived
- * from the live Boulevard service catalog (same derivation the booking
- * wizard uses, so this list can never drift from what the site accepts).
+ * Prints the canonical /book?service=<slug> list for ad deep-links. Same data
+ * as the hidden /booking-links page (app/utils/booking-service-slugs.server.ts).
  *
  *   pnpm tsx --env-file=.env scripts/print-booking-slugs.ts
  */
-import { boulevardAdminFetch } from '#app/utils/blvd-admin.server.ts'
-import {
-	bookingServiceSlug,
-	bookingServiceVariant,
-} from '#app/utils/booking-service-slugs.ts'
+import { listBookingSlugGroups } from '#app/utils/booking-service-slugs.server.ts'
 
 async function main() {
-	const names: string[] = []
-	let after: string | null = null
-	for (let page = 0; page < 20; page++) {
-		const data: any = await boulevardAdminFetch(
-			`query Services($after: String) {
-				services(first: 100, after: $after) {
-					pageInfo { endCursor hasNextPage }
-					edges { node { name active } }
-				}
-			}`,
-			{ after },
-		)
-		for (const e of data.services?.edges ?? []) {
-			if (e.node?.active !== false && e.node?.name) names.push(e.node.name)
-		}
-		if (!data.services?.pageInfo?.hasNextPage) break
-		after = data.services.pageInfo.endCursor
+	const groups = await listBookingSlugGroups()
+	for (const g of groups) {
+		const kind = g.hasVariants ? 'new+existing variants' : 'single service'
+		console.log(`${g.url}  (${kind}: ${g.serviceNames.join(' | ')})`)
 	}
-
-	const bySlug = new Map<string, string[]>()
-	for (const name of names) {
-		if (/telehealth/i.test(name)) continue
-		const slug = bookingServiceSlug(name)
-		if (!slug) continue
-		bySlug.set(slug, [...(bySlug.get(slug) ?? []), name])
-	}
-
-	const rows = [...bySlug.entries()].sort(([a], [b]) => a.localeCompare(b))
-	for (const [slug, serviceNames] of rows) {
-		const variants = serviceNames.map(bookingServiceVariant)
-		const kind =
-			variants.includes('new') && variants.includes('existing')
-				? 'new+existing variants'
-				: 'single service'
-		console.log(
-			`https://hitchcoxaesthetics.com/book?service=${slug}  (${kind}: ${serviceNames.join(' | ')})`,
-		)
-	}
-	console.log(`\n${rows.length} slugs from ${names.length} active services`)
+	console.log(`\n${groups.length} slugs`)
 }
 
 main().catch(e => {
