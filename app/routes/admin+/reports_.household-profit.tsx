@@ -1,5 +1,5 @@
 /**
- * Household profit — native replacement for Metabase dashboard 11.
+ * Household profit, native replacement for Metabase dashboard 11.
  * business revenue − business expenses + Zane take-home − household spending −
  * estimated taxes = what we kept, per month. Reads household_profit_monthly in
  * the reports Postgres (written by finance-reports sync).
@@ -159,7 +159,7 @@ export default function HouseholdProfit() {
 				</div>
 				<p className="note">
 					Reading a row left to right is the equation: revenue minus expenses is business
-					net; plus take-home, minus household spending, equals <strong>cash kept</strong> —
+					net; plus take-home, minus household spending, equals <strong>cash kept</strong> -
 					the money that actually moved. The tax column is an <strong>accrual</strong>, not a
 					payment: no quarterlies have been paid, so "net after taxes" is what's left once
 					the April bill is honestly set aside. Cash kept ≈ $0 is why the cards can be paid

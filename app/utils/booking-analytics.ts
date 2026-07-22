@@ -418,7 +418,7 @@ function getGaTagValue(field: 'client_id' | 'session_id') {
 			return
 		}
 		// gtag never invokes the callback until the GA library has loaded, so
-		// resolve null after a short wait — later pageviews will fill these in.
+		// resolve null after a short wait, later pageviews will fill these in.
 		const timeout = window.setTimeout(
 			() => resolve(null),
 			GA_TRACKING_ID_TIMEOUT_MS,

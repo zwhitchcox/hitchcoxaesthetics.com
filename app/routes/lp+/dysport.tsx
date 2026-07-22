@@ -4,9 +4,9 @@ import { useBlvdHtml } from '#app/utils/blvd-context.tsx'
 import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
 import { getEnv } from '#app/utils/env.server.ts'
 
-// Ad landing page — noindex to avoid duplicate content with the main service pages
+// Ad landing page, noindex to avoid duplicate content with the main service pages
 export const meta: MetaFunction = () => [
-	{ title: '20% Off Dysport — Knoxville | Sarah Hitchcox Aesthetics' },
+	{ title: '20% Off Dysport: Knoxville | Sarah Hitchcox Aesthetics' },
 	{ name: 'robots', content: 'noindex' },
 ]
 
@@ -45,7 +45,7 @@ const html = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#020817">
-    <title>20% Off Dysport — Knoxville | Sarah Hitchcox Aesthetics</title>
+    <title>20% Off Dysport, Knoxville | Sarah Hitchcox Aesthetics</title>
     <meta name="description" content="20% off your first Dysport treatment. Smooth, airbrushed results in as little as 2 days. Perfect 5.0 Google rating with 217+ reviews. RN-administered in Knoxville, TN. Book your appointment today.">
 
     
@@ -56,7 +56,7 @@ const html = `<!DOCTYPE html>
 
     <style>
         /* ============================================
-           SARAH HITCHCOX AESTHETICS — Version D
+           SARAH HITCHCOX AESTHETICS, Version D
            Hybrid B + C Landing Page
            ============================================ */
 
@@ -1010,7 +1010,7 @@ const html = `<!DOCTYPE html>
                         </div>
 
                         <h1>20% Off<br>Your First <span>Dysport Treatment</span></h1>
-                        <p class="b-hero-price">New clients save <strong>20% on their first Dysport treatment</strong>. A smooth, airbrushed finish — naturally.</p>
+                        <p class="b-hero-price">New clients save <strong>20% on their first Dysport treatment</strong>. A smooth, airbrushed finish, naturally.</p>
 
                         <div class="b-hero-rating">
                             <div class="b-hero-rating-score">5.0</div>
@@ -1039,7 +1039,7 @@ const html = `<!DOCTYPE html>
                     </div>
 
                     <div class="b-hero-photo">
-                        <img src="https://hitchcoxaesthetics.com/img/knoxville-med-spa.webp" alt="Sarah Hitchcox Aesthetics — Knoxville Med Spa" loading="eager">
+                        <img src="https://hitchcoxaesthetics.com/img/knoxville-med-spa.webp" alt="Sarah Hitchcox Aesthetics, Knoxville Med Spa" loading="eager">
                         <div class="b-hero-photo-badge">20% Off Your First Visit</div>
                     </div>
                 </div>
@@ -1132,7 +1132,7 @@ const html = `<!DOCTYPE html>
             <div class="container">
                 <p class="b-section-label">Real Results</p>
                 <h2 class="b-section-title">Real Dysport Results</h2>
-                <p class="b-section-sub">Real patients, real results — smooth, natural-looking skin.</p>
+                <p class="b-section-sub">Real patients, real results, smooth, natural-looking skin.</p>
 
                 <div class="b-ba-grid">
                     <div>
@@ -1281,7 +1281,7 @@ const html = `<!DOCTYPE html>
                         <div class="c-review-stars">
                             <svg viewBox="0 0 20 20"><path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.26 5.06 16.7l.94-5.49-4-3.9 5.53-.8z"/></svg><svg viewBox="0 0 20 20"><path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.26 5.06 16.7l.94-5.49-4-3.9 5.53-.8z"/></svg><svg viewBox="0 0 20 20"><path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.26 5.06 16.7l.94-5.49-4-3.9 5.53-.8z"/></svg><svg viewBox="0 0 20 20"><path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.26 5.06 16.7l.94-5.49-4-3.9 5.53-.8z"/></svg><svg viewBox="0 0 20 20"><path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.26 5.06 16.7l.94-5.49-4-3.9 5.53-.8z"/></svg>
                         </div>
-                        <p class="c-review-text">Love love love Sarah! I am having great success with the laser hair removal. Technology has come so far — no pain! She's incredibly indulgent with her time and knowledge. Highly recommend!</p>
+                        <p class="c-review-text">Love love love Sarah! I am having great success with the laser hair removal. Technology has come so far, no pain! She's incredibly indulgent with her time and knowledge. Highly recommend!</p>
                     </div>
                 </div>
             </div>
@@ -1296,7 +1296,7 @@ const html = `<!DOCTYPE html>
                         <p class="b-section-label">Your Provider</p>
                         <h2 class="b-provider-name">Sarah Hitchcox, RN</h2>
                         <p class="b-provider-cred">Registered Nurse · Aesthetic Injector · DNP Candidate</p>
-                        <p class="b-provider-bio">With a background in emergency nursing, Sarah brings precision and an eye for detail to every injection. Her philosophy? Subtle enhancements that let you look like the best version of yourself — refreshed, confident, and completely natural.</p>
+                        <p class="b-provider-bio">With a background in emergency nursing, Sarah brings precision and an eye for detail to every injection. Her philosophy? Subtle enhancements that let you look like the best version of yourself, refreshed, confident, and completely natural.</p>
                         <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-btn b-btn-dark" target="_blank" rel="noopener" style="display:inline-flex;">
                             Book with Sarah
                         </a>
@@ -1316,7 +1316,7 @@ const html = `<!DOCTYPE html>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div class="c-faq-a">
-                        <div class="c-faq-a-inner">Dysport is an FDA-approved neuromodulator that relaxes facial muscles to smooth wrinkles. It's known for spreading more evenly than other options, creating a smooth, airbrushed finish — especially on larger areas like the forehead.</div>
+                        <div class="c-faq-a-inner">Dysport is an FDA-approved neuromodulator that relaxes facial muscles to smooth wrinkles. It's known for spreading more evenly than other options, creating a smooth, airbrushed finish, especially on larger areas like the forehead.</div>
                     </div>
                 </div>
 
@@ -1336,7 +1336,7 @@ const html = `<!DOCTYPE html>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div class="c-faq-a">
-                        <div class="c-faq-a-inner">The needles are ultra-fine and the treatment takes just 10-20 minutes. Most patients describe a mild pinch. No downtime — you can return to normal activities immediately.</div>
+                        <div class="c-faq-a-inner">The needles are ultra-fine and the treatment takes just 10-20 minutes. Most patients describe a mild pinch. No downtime, you can return to normal activities immediately.</div>
                     </div>
                 </div>
 

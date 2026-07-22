@@ -46,7 +46,7 @@ function verifySignature(rawBody: string, request: Request): string {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-	// The reminder ledger writes to SQLite — pin to the litefs primary.
+	// The reminder ledger writes to SQLite, pin to the litefs primary.
 	await ensurePrimary()
 	const rawBody = await request.text()
 	const signature = verifySignature(rawBody, request)

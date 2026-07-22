@@ -306,7 +306,7 @@ export function fallbackReview(serviceName: string, providerFirstName: string, k
 }
 
 // ---------------------------------------------------------------------------
-// Sample uniqueness ledger — Google's spam filter clusters and removes
+// Sample uniqueness ledger, Google's spam filter clusters and removes
 // duplicate review text (2026-07-13: two customers posted the WLK microsite's
 // static sample verbatim). Every sample we hand a customer is hashed here and
 // never served again.

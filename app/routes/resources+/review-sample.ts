@@ -4,7 +4,7 @@
  *
  * Every returned text is AI-generated per request and checked against the
  * served-samples ledger (takeUniqueSamples), so no two visitors can ever copy
- * the same sample — duplicate review text gets listings flagged by Google.
+ * the same sample, duplicate review text gets listings flagged by Google.
  * May return fewer than `count` (or zero) if generation fails; the pages
  * degrade to write-your-own guidance rather than showing a reused sample.
  */
@@ -65,7 +65,7 @@ function corsHeaders(request: Request): Record<string, string> {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-	// The served-samples ledger writes to SQLite — only the primary can.
+	// The served-samples ledger writes to SQLite, only the primary can.
 	await ensurePrimary()
 	const url = new URL(request.url)
 	const brandId = url.searchParams.get('brand')

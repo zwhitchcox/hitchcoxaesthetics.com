@@ -52,7 +52,7 @@ export default function About() {
 							<p>
 								With a background primarily in the emergency department, Sarah
 								has developed a profound understanding of patient care and
-								empathy—skills she now applies daily in the field of aesthetics.
+								empathy-skills she now applies daily in the field of aesthetics.
 								She believes in the power of preventative treatments and focuses
 								on accentuating each client's unique features rather than
 								altering them.

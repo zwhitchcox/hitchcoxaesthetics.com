@@ -28,7 +28,7 @@ export type SyncCallRailPhoneConversionsToGa4Options = {
 
 /**
  * Sends converted CallRail phone calls (calls matched to a booking, whose
- * CallRail value holds the projected revenue) to GA4 as purchase events —
+ * CallRail value holds the projected revenue) to GA4 as purchase events -
  * the phone analog of the website booking's client-side gtag purchase.
  *
  * Attribution works by joining the call back onto the originating web
@@ -153,7 +153,7 @@ export async function sendCallRailPhoneConversionToGa4({
 		now.getTime() - callStartedAt.getTime() >
 		GA4_MEASUREMENT_PROTOCOL_MAX_EVENT_AGE_MS
 	) {
-		// GA4 drops events older than ~72h — nothing we send will attribute.
+		// GA4 drops events older than ~72h, nothing we send will attribute.
 		return { ok: true as const, unmatched: true as const }
 	}
 

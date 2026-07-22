@@ -1,5 +1,5 @@
 /**
- * Reach over time — for each tracked keyword: how many people are inside our
+ * Reach over time, for each tracked keyword: how many people are inside our
  * top-3 map-pack zone (homes-weighted across the 1,222-cell metro grid) and
  * what that reach is worth per month.
  *
@@ -141,7 +141,7 @@ export default function ReachReport() {
 	return (
 		<ReportPage
 			title="Reach over time"
-			subtitle={`People inside our top-3 map zone per keyword, and what that reach earns — metro grid of ${people(Number(reach[0]?.total_homes ?? 0))} households, ${volumes[0] ? `search volumes ${volumes[0].location} (${volumes[0].fetched_at})` : 'no search volumes yet'}`}
+			subtitle={`People inside our top-3 map zone per keyword, and what that reach earns, metro grid of ${people(Number(reach[0]?.total_homes ?? 0))} households, ${volumes[0] ? `search volumes ${volumes[0].location} (${volumes[0].fetched_at})` : 'no search volumes yet'}`}
 		>
 			<div className="tiles">
 				<StatTile
@@ -214,11 +214,11 @@ export default function ReachReport() {
 							{latest.map(l => (
 								<tr key={l.kw}>
 									<td>{l.kw}</td>
-									<td className="num">{l.reachPct != null ? `${l.reachPct}%` : '—'}</td>
-									<td className="num">{l.households != null ? people(l.households) : '—'}</td>
-									<td className="num">{l.people != null ? people(l.people) : '—'}</td>
+									<td className="num">{l.reachPct != null ? `${l.reachPct}%` : '-'}</td>
+									<td className="num">{l.households != null ? people(l.households) : '-'}</td>
+									<td className="num">{l.people != null ? people(l.people) : '-'}</td>
 									<td className="num">
-										{l.searches || '—'}
+										{l.searches || '-'}
 										{l.estimated ? '*' : ''}
 									</td>
 									<td className="num">{l.clients.toFixed(1)}</td>
@@ -253,7 +253,7 @@ export default function ReachReport() {
 					{Math.round(PACK_CLICK_SHARE * 100)}% pack click share ×{' '}
 					{Math.round(CLICK_TO_CLIENT * 100)}% click-to-booking. 6-mo value = expected revenue
 					per new client from our own Boulevard cohorts (client_value). These six terms are
-					proxies — total demand across all related searches ("botox knoxville", "lip filler",
+					proxies, total demand across all related searches ("botox knoxville", "lip filler",
 					…) is several times larger, so treat revenue as a floor that scales with reach.
 				</p>
 			</section>

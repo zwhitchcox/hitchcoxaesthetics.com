@@ -207,7 +207,7 @@ test('switching the location pill narrows availability to that office', async ()
 	)
 	await screen.findByRole('button', { name: /6:15 PM.*Knoxville/i })
 
-	// switch to Knoxville only — Farragut's slot disappears, label is dropped
+	// switch to Knoxville only, Farragut's slot disappears, label is dropped
 	await user.click(screen.getByRole('button', { name: /^Knoxville$/ }))
 	const knoxOnly = await screen.findByRole('button', { name: /6:15 PM/i })
 	expect(knoxOnly).not.toHaveTextContent(/Knoxville/)
@@ -239,7 +239,7 @@ test('/book?service=tox pre-selects the service and skips straight to location',
 	])
 	render(<RemixStub initialEntries={['/book?service=tox']} />)
 
-	// History question still runs — it decides the New/Existing variant.
+	// History question still runs, it decides the New/Existing variant.
 	await user.click(await screen.findByRole('button', { name: 'No' }))
 
 	// Confirm view: only the slug's service is offered, with an escape hatch

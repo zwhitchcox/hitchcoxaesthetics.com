@@ -80,7 +80,7 @@ type LoaderData = {
 	brandId: BrandId
 	businessId: string | null
 	sourceHint: SourceHint | null
-	/** /book?service=<slug> — pre-selects the service after the history answer */
+	/** /book?service=<slug>, pre-selects the service after the history answer */
 	serviceSlug: string | null
 }
 
@@ -837,7 +837,7 @@ export default function BlvdBookRoute() {
 
 		// PostHog cannot merge two already-identified persons. If this session
 		// was already identified under a different booking id, keep that person
-		// and just update its properties — re-identifying would split the
+		// and just update its properties, re-identifying would split the
 		// journey across two persons and break funnel insights.
 		const currentDistinctId = posthog.get_distinct_id?.()
 		const isAlreadyIdentified =
@@ -963,7 +963,7 @@ export default function BlvdBookRoute() {
 		selectedTime,
 	})
 	// Dev-only: jump straight to any step for design review, e.g.
-	// /book?preview_step=reserve — inert in production builds.
+	// /book?preview_step=reserve, inert in production builds.
 	const previewStep =
 		typeof window !== 'undefined' && window.ENV?.MODE === 'development'
 			? (new URLSearchParams(window.location.search).get(
@@ -1001,7 +1001,7 @@ export default function BlvdBookRoute() {
 
 	useEffect(() => {
 		// Once the booking completes, the derived step flips to "reserve" (the
-		// success screen renders over it). Don't emit a step view then — it fires
+		// success screen renders over it). Don't emit a step view then, it fires
 		// a stray reserve *after* booking_completed and breaks ordered funnels.
 		if (checkoutSuccess) return
 		pendingBookingStepsRef.current.add(currentStep)
@@ -1521,7 +1521,7 @@ export default function BlvdBookRoute() {
 				clientForm.phone,
 		})
 		// Confirming details takes the client to the reserve/confirm step to
-		// review and book — it does not book immediately. The 'reserve' step view
+		// review and book, it does not book immediately. The 'reserve' step view
 		// fires from the step-view effect when the derived step becomes 'reserve'.
 		setDetailsSubmitted(true)
 		setActiveStep('reserve')
@@ -1994,7 +1994,7 @@ export default function BlvdBookRoute() {
 				return
 			}
 
-			// Boulevard's API takes the ownership code as an Int — passing a
+			// Boulevard's API takes the ownership code as an Int, passing a
 			// string fails GraphQL validation before the code is even checked
 			const nextCart = await cart.takeOwnershipByCode(
 				ownershipCodeId,
@@ -2664,7 +2664,7 @@ export default function BlvdBookRoute() {
 											{selectedService
 												? selectedService.displayName
 												: 'Service'}{' '}
-											is selected. Pick an office — or see availability at both.
+											is selected. Pick an office, or see availability at both.
 										</p>
 										<div className="w-full max-w-2xl space-y-6">
 											{loadingLocations ? (
@@ -4494,6 +4494,9 @@ function getBookingClientTypeSource({
 	clientHistorySelection: BookingClientHistory | null
 	hasVerifiedClient: boolean
 }) {
+	if (clientHistorySelection === 'new' || clientHistorySelection === 'returning') {
+		return 'patient_self_selection'
+	}
 	if (hasVerifiedClient) return 'boulevard_sms_ownership'
 	if (clientHistorySelection === 'unsure' && clientHistory) {
 		return 'boulevard_phone_lookup'

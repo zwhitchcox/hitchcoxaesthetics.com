@@ -24,6 +24,14 @@ import {
 	hasGoogleReviewsReportsConfig,
 	syncGoogleReviewsToReports,
 } from '#app/utils/google-reviews-reports.server.ts'
+import {
+	hasAppointmentLedgerConfig,
+	syncAppointmentLedger,
+} from '#app/utils/appointment-ledger.server.ts'
+import {
+	hasLapsedPatientsConfig,
+	syncLapsedPatients,
+} from '#app/utils/lapsed-patients.server.ts'
 
 // Background job types and interfaces
 export interface JobStatus {
@@ -119,6 +127,24 @@ let jobStatuses: Record<string, JobStatus> = {
 		lastRunDuration: null,
 		lastError: null,
 	},
+	appointmentLedger: {
+		id: 'appointmentLedger',
+		name: 'Appointment Ledger (cancellations)',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	lapsedPatients: {
+		id: 'lapsedPatients',
+		name: 'Lapsed Patients (retention)',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
 }
 
 // Keep track of the interval IDs so we can clear them if needed
@@ -160,7 +186,7 @@ export async function runReviewsFetchJob(): Promise<void> {
 			job.lastError = stderr
 		} else {
 			console.log('Reviews fetch completed:', stdout)
-			// DB is now current — push reviews into PostHog (idempotent via $insert_id).
+			// DB is now current, push reviews into PostHog (idempotent via $insert_id).
 			const posthog = await syncGoogleReviewsToPostHog()
 			console.log('Google reviews → PostHog sync:', posthog)
 			job.status = 'completed'
@@ -404,8 +430,77 @@ export async function runGoogleReviewsReportsJob(): Promise<void> {
 export function getGoogleReviewsReportsIntervalMs() {
 	const raw = process.env.GOOGLE_REVIEWS_REPORTS_INTERVAL_MS?.trim()
 	const parsed = raw ? Number(raw) : NaN
-	// Every 6 hours by default — reviews arrive daily, staleness was the bug.
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : 6 * 60 * 60 * 1000
+	// Hourly, Sarah watches same-day reviews; 6h staleness read as "no
+	// reviews today" when four had already landed.
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 60 * 60 * 1000
+}
+
+export async function runAppointmentLedgerJob(): Promise<void> {
+	const job = jobStatuses['appointmentLedger']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+	try {
+		const result = await syncAppointmentLedger()
+		console.log(
+			`Appointment ledger: ${result.seen} appointments seen, ${result.changes} changes logged`,
+		)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Appointment ledger sync failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getAppointmentLedgerIntervalMs(),
+		).toISOString()
+	}
+}
+
+export async function runLapsedPatientsJob(): Promise<void> {
+	const job = jobStatuses['lapsedPatients']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+	try {
+		const result = await syncLapsedPatients()
+		console.log(
+			`Lapsed patients: ${result.clients} clients scored, ${result.lapsed} lapsed, ${result.neverConverted} never converted`,
+		)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Lapsed patients sync failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getLapsedPatientsIntervalMs(),
+		).toISOString()
+	}
+}
+
+export function getLapsedPatientsIntervalMs() {
+	const raw = process.env.LAPSED_PATIENTS_INTERVAL_MS?.trim()
+	const parsed = raw ? Number(raw) : NaN
+	// Daily, lapsing is a slow-moving state.
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 24 * 60 * 60 * 1000
+}
+
+export function getAppointmentLedgerIntervalMs() {
+	const raw = process.env.APPOINTMENT_LEDGER_INTERVAL_MS?.trim()
+	const parsed = raw ? Number(raw) : NaN
+	// Hourly, cancellations should surface the same day, not the next.
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 60 * 60 * 1000
 }
 
 export async function runFinanceReportsJob(): Promise<void> {
@@ -442,7 +537,7 @@ export function initializeBackgroundJobs() {
 	const temporalAddress = process.env.TEMPORAL_ADDRESS?.trim()
 	if (process.env.NODE_ENV === 'production' && temporalAddress) {
 		// The LiteFS primary lease MOVES between machines on every rolling
-		// deploy, so primary-ness cannot be a boot-time check — on 2026-07-15
+		// deploy, so primary-ness cannot be a boot-time check, on 2026-07-15
 		// the worker spent a morning failing every write on a machine that had
 		// become a replica after boot. Reconcile continuously instead: the
 		// worker runs while this machine holds the primary lease and pauses
@@ -465,7 +560,7 @@ export function initializeBackgroundJobs() {
 		const { currentIsPrimary } = getInstanceInfoSync()
 		if (!currentIsPrimary) {
 			console.log(
-				'Not the LiteFS primary — background jobs run on the primary machine only.',
+				'Not the LiteFS primary, background jobs run on the primary machine only.',
 			)
 			return
 		}
@@ -493,7 +588,7 @@ async function reconcileTemporalWorker(temporalAddress: string) {
 		const isPrimary = isLiteFsPrimary()
 		consecutivePrimaryReads = isPrimary ? consecutivePrimaryReads + 1 : 0
 		if (consecutivePrimaryReads >= 2 && !isTemporalWorkerRunning()) {
-			console.log('LiteFS primary — starting Temporal worker')
+			console.log('LiteFS primary, starting Temporal worker')
 			await startTemporalWorker(temporalAddress)
 			if (!temporalSchedulesEnsured) {
 				const { ensureSchedules } = await import(
@@ -663,7 +758,47 @@ function initializeIntervalScheduling() {
 		}, 90_000)
 	}
 
+	if (shouldAutoRunAppointmentLedger()) {
+		const intervalMs = getAppointmentLedgerIntervalMs()
+		jobIntervals.appointmentLedger = setInterval(() => {
+			runAppointmentLedgerJob().catch(console.error)
+		}, intervalMs)
+		const job = jobStatuses['appointmentLedger']
+		if (job) job.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		setTimeout(() => {
+			runAppointmentLedgerJob().catch(console.error)
+		}, 120_000)
+	}
+
+	if (shouldAutoRunLapsedPatients()) {
+		const intervalMs = getLapsedPatientsIntervalMs()
+		jobIntervals.lapsedPatients = setInterval(() => {
+			runLapsedPatientsJob().catch(console.error)
+		}, intervalMs)
+		const job = jobStatuses['lapsedPatients']
+		if (job) job.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		setTimeout(() => {
+			runLapsedPatientsJob().catch(console.error)
+		}, 300_000)
+	}
+
 	console.log('Background jobs initialized')
+}
+
+function shouldAutoRunLapsedPatients() {
+	return (
+		hasLapsedPatientsConfig() &&
+		(process.env.NODE_ENV === 'production' ||
+			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1')
+	)
+}
+
+function shouldAutoRunAppointmentLedger() {
+	return (
+		hasAppointmentLedgerConfig() &&
+		(process.env.NODE_ENV === 'production' ||
+			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1')
+	)
 }
 
 function shouldAutoRunGoogleReviewsReports() {
@@ -699,7 +834,10 @@ function shouldAutoRunFinanceReports() {
 export function getFinanceReportsIntervalMs() {
 	const raw = process.env.FINANCE_REPORTS_INTERVAL_MS?.trim()
 	const parsed = raw ? Number(raw) : NaN
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : 24 * 60 * 60 * 1000
+	// Every 4 hours: same-day bookings must reach today's expected-revenue
+	// number intraday. The frozen daily_v1 snapshot is unaffected, its first
+	// write of the day wins, so the morning baseline stays frozen.
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 4 * 60 * 60 * 1000
 }
 
 function shouldAutoRunReviewAppointmentSync() {

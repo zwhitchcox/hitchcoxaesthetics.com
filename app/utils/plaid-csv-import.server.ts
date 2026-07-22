@@ -1,5 +1,5 @@
 /**
- * Statement-CSV importers for cards whose history Plaid can't serve —
+ * Statement-CSV importers for cards whose history Plaid can't serve -
  * Capital One beyond its 90-day window, and Apple Card (no aggregator
  * support at all; the Wallet app's CSV export is the only feed).
  *
@@ -67,7 +67,7 @@ function isoDate(us: string) {
 }
 
 /**
- * Capital One "Transaction Download" CSVs — history beyond the 90-day Plaid
+ * Capital One "Transaction Download" CSVs, history beyond the 90-day Plaid
  * window. Rows on/after the earliest Plaid-delivered Capital One row are
  * skipped, so Plaid stays authoritative for its own window (the cutoff is
  * computed per database, which is what makes this safe to run on prod too).
@@ -166,7 +166,7 @@ export async function importAppleCardCsv(csv: string) {
 	for (const f of rows) {
 		const type = f[iType]?.trim()
 		// Payments are the checking-side transfer, already visible in the
-		// bank data — importing them here would double count.
+		// bank data, importing them here would double count.
 		if (type === 'Payment') {
 			skippedPayments++
 			continue

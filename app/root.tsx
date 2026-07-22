@@ -152,7 +152,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		{
 			user,
 			// Microsite-proxied requests (X-Brand from their Caddy) render without
-			// the SHA site chrome — the route supplies its own brand header.
+			// the SHA site chrome, the route supplies its own brand header.
 			brandId: getBrandIdFromRequest(request),
 			requestInfo: {
 				hints: getHints(request),
@@ -223,7 +223,7 @@ function Document({
 	const canonicalUrl = `${origin}${location.pathname}`
 
 	// JSON-LD: Knoxville-focused med spa. MedicalClinic is included because
-	// medicalSpecialty is only valid on MedicalClinic/MedicalOrganization —
+	// medicalSpecialty is only valid on MedicalClinic/MedicalOrganization -
 	// not on MedicalBusiness (schema.org vocabulary).
 	const bearden = getLocationById('bearden')!
 	const localBusinessJsonLd = {
@@ -425,7 +425,7 @@ function App() {
 					<div
 						className={`flex min-h-screen flex-col ${isMenuOpen ? 'h-screen overflow-hidden' : ''}`}
 					>
-						{/* Report/tool pages render bare inside hub panes — no site header.
+						{/* Report/tool pages render bare inside hub panes, no site header.
 					    Microsite brands (proxied /book) bring their own header. */}
 						{hidesSiteHeader(location.pathname) || data.brandId !== 'sha' ? null : (
 							<Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />

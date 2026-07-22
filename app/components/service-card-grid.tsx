@@ -57,7 +57,7 @@ export function BeforeAfterImage({
 			className={cn('relative h-full w-full overflow-hidden', className)}
 			onMouseEnter={() => setHasHovered(true)}
 		>
-			{/* Before — visible by default; hidden on hover (desktop) or when cycling (mobile) */}
+			{/* Before, visible by default; hidden on hover (desktop) or when cycling (mobile) */}
 			<img
 				src={beforeSrc}
 				alt={`${alt} before`}
@@ -69,7 +69,7 @@ export function BeforeAfterImage({
 				loading="lazy"
 				decoding="async"
 			/>
-			{/* After — hidden by default; visible on hover (desktop) or when cycling (mobile) */}
+			{/* After, hidden by default; visible on hover (desktop) or when cycling (mobile) */}
 			{/* Only load the after image if we're showing it or if we've been hovered (desktop eager load) */}
 			{showAfter || hasHovered || typeof window === 'undefined' ? (
 				<img

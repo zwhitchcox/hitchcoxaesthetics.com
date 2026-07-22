@@ -1,7 +1,7 @@
 /**
  * Canonical ad-ready slugs for bookable services. `/book?service=<slug>`
  * pre-selects the service so paid traffic skips the service list (the
- * history question still runs first — it decides which New/Existing variant
+ * history question still runs first, it decides which New/Existing variant
  * the slug resolves to).
  *
  * Slugs are DERIVED from Boulevard service names, so they track the catalog

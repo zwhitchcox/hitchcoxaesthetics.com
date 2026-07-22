@@ -5,7 +5,7 @@ const DEFAULT_OG_IMAGE = `${SITE_URL}/img/og-image.jpg`
 /**
  * Builds a complete set of meta descriptors (title, description, Open Graph,
  * Twitter Card) for a page. In Remix v2 only the leaf-most route's `meta`
- * is used, so every route that exports `meta` must return the full set —
+ * is used, so every route that exports `meta` must return the full set -
  * use this helper so social tags aren't silently dropped.
  */
 export function getSocialMetas({

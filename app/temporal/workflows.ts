@@ -52,11 +52,20 @@ export async function plaidSyncWorkflow(): Promise<void> {
 	await activities.plaidSyncActivity()
 }
 
-// Budget aggregation + a 6-month Boulevard projection — can run long.
+// Budget aggregation + a 6-month Boulevard projection, can run long.
 export async function financeReportsWorkflow(): Promise<void> {
 	await slowActivities.financeReportsActivity()
 }
 
+export async function appointmentLedgerWorkflow(): Promise<void> {
+	await activities.appointmentLedgerActivity()
+}
+
 export async function googleReviewsReportsWorkflow(): Promise<void> {
 	await activities.googleReviewsReportsActivity()
+}
+
+// Full appointment-history scan, can run long.
+export async function lapsedPatientsWorkflow(): Promise<void> {
+	await slowActivities.lapsedPatientsActivity()
 }

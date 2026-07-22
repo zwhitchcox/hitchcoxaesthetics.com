@@ -150,12 +150,14 @@ test('uses explicit client history before falling back to verification state', (
 			hasVerifiedClient: false,
 		}),
 	).toBe('unsure_client')
+	// Verification only proves phone ownership of a record the flow itself
+	// creates; it must never override an explicit "I'm new".
 	expect(
 		getBookingClientTypeFromHistory({
 			clientHistory: 'new',
 			hasVerifiedClient: true,
 		}),
-	).toBe('returning_client')
+	).toBe('new_client')
 })
 
 test('maps the single customer-facing tox group to the right Boulevard service id', () => {

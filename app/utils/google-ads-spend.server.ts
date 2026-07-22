@@ -1,7 +1,7 @@
 /**
  * Google Ads spend straight from the Ads API (v21) using the same OAuth
  * refresh token as the GBP tooling. Returns null when creds are missing or
- * the API errors — callers render "—" rather than a wrong number.
+ * the API errors, callers render "-" rather than a wrong number.
  */
 const ADS_API_VERSION = 'v21'
 

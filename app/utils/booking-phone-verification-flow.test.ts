@@ -104,6 +104,6 @@ test('returning client not found: error carries the continue-as-new offer', asyn
 		expect(result.canContinueAsNewClient).toBe(true)
 		expect(result.message).toContain('continue as a new client')
 	}
-	// No silent fallback for returning clients — the user decides.
+	// No silent fallback for returning clients, the user decides.
 	expect(requestBookingPhoneVerificationCode).not.toHaveBeenCalled()
 })

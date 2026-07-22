@@ -32,7 +32,7 @@ export function buildBookingPostHogIdentity({
 	// booking path and is the id phone-call conversions use too, so it keeps
 	// one PostHog person per client. Identifying with a second id mid-journey
 	// (e.g. email at checkout after phone at verification) would split the
-	// person — PostHog cannot merge two already-identified ids — and break
+	// person, PostHog cannot merge two already-identified ids, and break
 	// funnel insights. Email and Boulevard id become person properties.
 	const distinctId = normalizedPhone
 		? `phone:${normalizedPhone}`

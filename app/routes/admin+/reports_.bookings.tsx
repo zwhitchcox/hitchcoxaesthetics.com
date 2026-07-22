@@ -1,12 +1,13 @@
 /**
- * Bookings funnel — every booking MADE in the window, keyed by when it was
+ * Bookings funnel, every booking MADE in the window, keyed by when it was
  * booked (not when the appointment happens): counts, expected value, and the
  * source that produced each booking. Revenue by appointment date lives on the
  * Revenue report.
  */
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
-import { ReportPage, StatTile, usd } from '#app/components/report-ui'
+import { useState } from 'react'
+import { ReportPage, StatTile, usd, useSortable } from '#app/components/report-ui'
 import {
 	addTo,
 	ET_STAMP,
@@ -24,9 +25,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return json(await loadBookingFunnel(request))
 }
 
+type WhoFilter = 'all' | 'new' | 'returning'
+
 export default function BookingsFunnel() {
-	const { rows, windowKey, granularity, from, to, adsSpendUsd } =
+	const { rows: allRows, windowKey, granularity, from, to, adsSpendUsd } =
 		useLoaderData<typeof loader>()
+	const [who, setWho] = useState<WhoFilter>('all')
+	const newCount = allRows.filter(r => r.newClient === true).length
+	const newValue = allRows
+		.filter(r => r.newClient === true)
+		.reduce((s, r) => s + r.expectedUsd, 0)
+	const unknownCount = allRows.filter(r => r.newClient === null).length
+	const rows =
+		who === 'all'
+			? allRows
+			: allRows.filter(r => r.newClient === (who === 'new'))
 
 	const bySource = new Map<string, Agg & { n: number }>()
 	const byBucketSource = new Map<string, { n: number; usd: number }>()
@@ -56,13 +69,32 @@ export default function BookingsFunnel() {
 	const buckets = [...byBucket.keys()].sort().reverse()
 	const trackedCount = rows.filter(r => !isUnattributedSource(r.source)).length
 	const adsBookings = bySource.get('Google Ads')?.n ?? 0
+	const { rows: sortedRows, Th } = useSortable(rows)
 
 	return (
 		<ReportPage
 			title="Bookings funnel"
-			subtitle="Every booking made in the window, by booking time — tracked website/phone-agent bookings in real time, staff bookings live from Boulevard. Revenue by appointment date is on the Revenue report."
+			subtitle="Every booking made in the window, by booking time, tracked website/phone-agent bookings in real time, staff bookings live from Boulevard. Revenue by appointment date is on the Revenue report."
 		>
 			<WindowControls windowKey={windowKey} from={from} to={to} granularity={granularity} />
+			<div className="controls">
+				<label htmlFor="who">Clients</label>
+				<select
+					id="who"
+					value={who}
+					onChange={e => setWho(e.currentTarget.value as WhoFilter)}
+				>
+					<option value="all">All bookings</option>
+					<option value="new">New clients / first-time only</option>
+					<option value="returning">Returning only</option>
+				</select>
+				{who !== 'all' && unknownCount > 0 ? (
+					<span style={{ color: 'var(--muted)' }}>
+						{unknownCount} of {allRows.length} bookings have unknown client type and
+						are hidden by this filter
+					</span>
+				) : null}
+			</div>
 
 			<div className="tiles">
 				<StatTile
@@ -73,8 +105,13 @@ export default function BookingsFunnel() {
 					}% with a known source`}
 				/>
 				<StatTile
+					label="New clients"
+					value={String(newCount)}
+					whisper={`${usd(newValue)} expected value · of ${allRows.length} bookings in window`}
+				/>
+				<StatTile
 					label="Google Ads spend"
-					value={adsSpendUsd != null ? usd(adsSpendUsd) : '—'}
+					value={adsSpendUsd != null ? usd(adsSpendUsd) : '-'}
 					whisper={
 						adsSpendUsd && adsBookings
 							? `${adsBookings} ads bookings · ${usd(adsSpendUsd / adsBookings)} per booking`
@@ -138,7 +175,7 @@ export default function BookingsFunnel() {
 											const a = byBucketSource.get(`${b}|${s}`)
 											return (
 												<td key={s} className="num">
-													{a ? `${a.n} (${usd(a.usd)})` : '—'}
+													{a ? `${a.n} (${usd(a.usd)})` : '-'}
 												</td>
 											)
 										})}
@@ -159,26 +196,31 @@ export default function BookingsFunnel() {
 					<table className="rtable">
 						<thead>
 							<tr>
-								<th>Booked at</th>
-								<th>Appt date</th>
-								<th>Client</th>
-								<th>Service</th>
-								<th>Location</th>
-								<th>Source</th>
-								<th className="num">Est. value</th>
+								<Th k="bookedAt">Booked at</Th>
+								<Th k="apptAt">Appt date</Th>
+								<Th k="clientName">Client</Th>
+								<Th k="service">Service</Th>
+								<Th k="location">Location</Th>
+								<Th k="source">Source</Th>
+								<Th k="expectedUsd" num>Est. value</Th>
 								<th>Links</th>
 							</tr>
 						</thead>
 						<tbody>
-							{rows.slice(0, 200).map((b, i) => (
+							{sortedRows.slice(0, 200).map((b, i) => (
 								<tr key={i}>
 									<td>{new Date(b.bookedAt).toLocaleString('en-US', ET_STAMP)}</td>
 									<td>
-										{b.apptAt ? new Date(b.apptAt).toLocaleString('en-US', ET_STAMP) : '—'}
+										{b.apptAt ? new Date(b.apptAt).toLocaleString('en-US', ET_STAMP) : '-'}
 									</td>
-									<td>{b.clientName ?? '—'}</td>
+									<td>
+										{b.clientName ?? '-'}
+										{b.newClient === true ? (
+											<span className="pill" style={{ marginLeft: 6 }}>new</span>
+										) : null}
+									</td>
 									<td>{b.service}</td>
-									<td>{b.location ?? '—'}</td>
+									<td>{b.location ?? '-'}</td>
 									<td>{b.source}</td>
 									<td className="num">{usd(b.expectedUsd)}</td>
 									<td>
@@ -193,7 +235,7 @@ export default function BookingsFunnel() {
 												PostHog
 											</a>
 										) : null}
-										{!b.blvdUrl && !b.posthogUrl ? '—' : null}
+										{!b.blvdUrl && !b.posthogUrl ? '-' : null}
 									</td>
 								</tr>
 							))}

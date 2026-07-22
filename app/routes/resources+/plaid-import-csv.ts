@@ -1,5 +1,5 @@
 /**
- * Internal statement-CSV import endpoint — lets the local machine load
+ * Internal statement-CSV import endpoint, lets the local machine load
  * Apple Card CSV history into the production database (Plaid can't serve
  * Apple Card at all, so the Wallet export is the only source).
  *

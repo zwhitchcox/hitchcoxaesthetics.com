@@ -7,7 +7,7 @@ import {
 } from '#app/utils/site-pages.server.js'
 
 /**
- * llms.txt — a concise, link-rich summary of the site for AI assistants.
+ * llms.txt, a concise, link-rich summary of the site for AI assistants.
  * Spec: https://llmstxt.org
  */
 export function loader({ request }: LoaderFunctionArgs) {
@@ -34,7 +34,7 @@ export function loader({ request }: LoaderFunctionArgs) {
 	const locationLines = locations
 		.map(
 			location =>
-				`- ${location.displayName}: ${formatAddress(location)} — ${location.phone}`,
+				`- ${location.displayName}: ${formatAddress(location)}, ${location.phone}`,
 		)
 		.join('\n')
 

@@ -1,7 +1,7 @@
 import { type MetaFunction } from '@remix-run/node'
 import { Link } from '@remix-run/react'
 
-// Internal directory of ad landing pages — keep out of search results
+// Internal directory of ad landing pages, keep out of search results
 export const meta: MetaFunction = () => [
 	{ title: 'Landing Pages | Sarah Hitchcox Aesthetics' },
 	{ name: 'robots', content: 'noindex' },

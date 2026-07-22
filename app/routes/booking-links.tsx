@@ -2,7 +2,7 @@
  * Hidden, unlisted reference page for the ads contractor: every canonical
  * /book?service=<slug> deep-link, generated live from the Boulevard catalog
  * so it can never drift from what the booking wizard accepts. Not indexed
- * (robots noindex + excluded from the sitemap) and linked from nowhere —
+ * (robots noindex + excluded from the sitemap) and linked from nowhere -
  * share the URL directly.
  */
 import { type SEOHandle } from '@nasa-gcn/remix-seo'

@@ -2,11 +2,11 @@
  * Finance reports sync: computes the household budget (PlaidTransaction
  * archive) and the rolling 6-month revenue projection (Boulevard), and loads
  * both into the reports Postgres that Metabase reads
- * (https://hitchcox-metabase.fly.dev — "Household Budget" and "Projected
+ * (https://hitchcox-metabase.fly.dev, "Household Budget" and "Projected
  * Revenue" dashboards; cards were created once by
  * sha-reports/bin/setup-finance-dashboards.ts and read these tables).
  *
- * Runs on the Temporal worker (see app/temporal/) — the manual equivalent is
+ * Runs on the Temporal worker (see app/temporal/), the manual equivalent is
  * sha-reports/bin/load-finance-reports.ts fed by the two scripts' --json output.
  *
  * Requires REPORTS_DATABASE_URL, e.g.
@@ -54,7 +54,7 @@ export async function syncFinanceReports(): Promise<{
 	await client.connect()
 	const q = (sql: string, params?: unknown[]) => client.query(sql, params)
 	try {
-		// household_profit_monthly reads tables this sync recreates — drop it
+		// household_profit_monthly reads tables this sync recreates, drop it
 		// first so the table drops don't fail on the dependency.
 		await q(`drop view if exists household_profit_monthly`)
 		// ---- household budget (snapshot semantics) ----
@@ -99,6 +99,40 @@ export async function syncFinanceReports(): Promise<{
 			await q(`insert into revenue_projection_daily values ($1,$2,$3,$4,$5,$6,$7)`, [day, r.weekday, r.bookedUsd, r.bookedCount, r.fillUsd, r.expectedNewCount, r.expectedUsd])
 		}
 
+		// Frozen daily forecasts, APPEND-ONLY, one row per (compute_date, day,
+		// model). The first write each day wins (ON CONFLICT DO NOTHING), so a
+		// cancellation later that day is judged against the morning's frozen
+		// numbers instead of being silently absorbed by a regeneration.
+		// RULE (Zane): when the algorithm changes, write the new output under a
+		// NEW model label next to this one, never delete or overwrite a label.
+		// Since 2026-07-22 the live table carries daily_v2_cadence (per-client
+		// weight-loss valuation); daily_v1 keeps snapshotting from its own fields
+		// so the two models stay comparable day by day.
+		await q(`create table if not exists revenue_projection_daily_snapshots (
+			compute_date date not null,
+			day date not null,
+			model text not null,
+			weekday text, booked_usd numeric, booked_count int,
+			fill_usd numeric, expected_new_count numeric, expected_usd numeric,
+			primary key (compute_date, day, model))`)
+		for (let i = 0; i < days.length; i++) {
+			const day = new Date(winStart.getTime() + i * 86400_000).toISOString().slice(0, 10)
+			const r = days[i]!
+			await q(
+				`insert into revenue_projection_daily_snapshots
+				 values (current_date, $1, 'daily_v1', $2, $3, $4, $5, $6, $7)
+				 on conflict (compute_date, day, model) do nothing`,
+				[day, r.weekday, r.bookedUsdV1, r.bookedCount, r.fillUsdV1, r.expectedNewCount, r.expectedUsdV1],
+			)
+		}
+		await q(
+			`insert into revenue_projection_daily_snapshots
+			 select current_date, day, 'daily_v2_cadence', weekday, booked_usd,
+			   booked_count, fill_usd, expected_new_count, expected_usd
+			 from revenue_projection_daily
+			 on conflict (compute_date, day, model) do nothing`,
+		)
+
 		await q(`drop table if exists revenue_projection_summary`)
 		await q(`create table revenue_projection_summary (id int primary key, window_start date, window_end date, gross_expected_usd numeric, cancellation_rate numeric, expected_cancellations_usd numeric, net_expected_usd numeric, generated_at timestamptz)`)
 		const s = projection.summary
@@ -131,7 +165,7 @@ export async function syncFinanceReports(): Promise<{
 			   round(sum(expected_usd)),
 			   round(sum(expected_usd) * (1 - (select cancellation_rate from revenue_projection_summary where id = 1))),
 			   round(sum(expected_usd) * 1.05),
-			   'daily_fill'
+			   'daily_fill_v2'
 			 from revenue_projection_daily
 			 where date_trunc('week', day) >= date_trunc('week', now())
 			 group by 1 order by 1 limit 4`,
@@ -157,9 +191,9 @@ export async function syncFinanceReports(): Promise<{
 		// ---- household income (Zane's take-home: INCOME deposits on his accounts) ----
 		const { prisma } = await import('#app/utils/db.server.ts')
 		// Zane's paychecks are paper checks deposited by phone (often several
-		// weeks at once) — Plaid tags them TRANSFER_IN_DEPOSIT, not INCOME. So
+		// weeks at once), Plaid tags them TRANSFER_IN_DEPOSIT, not INCOME. So
 		// take-home = mobile deposits + INCOME rows, excluding tax refunds
-		// (lumpy, prior-year — taxes are handled by the accrual line instead).
+		// (lumpy, prior-year, taxes are handled by the accrual line instead).
 		const income = (await prisma.$queryRawUnsafe(
 			`SELECT substr(date, 1, 7) AS month, sum(-amount) AS takehome
 			 FROM PlaidTransaction
@@ -176,7 +210,7 @@ export async function syncFinanceReports(): Promise<{
 		// ---- total household profit: business net + take-home − household spend
 		// − estimated tax accrual. 30% of positive business net approximates the
 		// household's 2026 marginal rate on SHA profit (SE + income tax after
-		// QBI; from the 2025 return analysis) — W-2 tax is already withheld from
+		// QBI; from the 2025 return analysis), W-2 tax is already withheld from
 		// take-home. Adjust the 0.30 here if the CPA lands elsewhere.
 		await q(`create view household_profit_monthly as
 			select b.month,

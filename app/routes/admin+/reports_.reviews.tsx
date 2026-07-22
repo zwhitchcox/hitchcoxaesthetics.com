@@ -1,21 +1,23 @@
 /**
- * Reviews — Google review counts across every listing (all three brands),
+ * Reviews, Google review counts across every listing (all three brands),
  * with new-reviews-over-time at day / week / month granularity. Reads the
  * google_reviews table in the reports Postgres (written by the sha-reports
  * review fetcher, which covers all GBP listings).
  */
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
-import { Form, useLoaderData, useSubmit } from '@remix-run/react'
+import { useLoaderData } from '@remix-run/react'
 import {
 	BarChart,
 	ReportPage,
 	SERIES,
 	StatTile,
 } from '#app/components/report-ui'
+import { WindowControls } from '#app/components/revenue-by-source.tsx'
 import { requireUserWithRole } from '#app/utils/permissions.server'
+import { parseReportWindow } from '#app/utils/revenue-by-source.server.ts'
 import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
 
-// All bucketing happens in local (Knoxville) days — a 9pm review must not
+// All bucketing happens in local (Knoxville) days, a 9pm review must not
 // show up under tomorrow's UTC date. windowStartSql is the first bucket to
 // render; buckets are generated through today so empty days show as zero.
 const LOCAL_NOW = `(now() AT TIME ZONE 'America/New_York')`
@@ -56,30 +58,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		url.searchParams.get('grain') as Grain,
 	)
 		? (url.searchParams.get('grain') as Grain)
-		: 'week'
+		: 'day'
 	const g = GRAINS[grain]
 
-	// Optional custom window (?from=YYYY-MM-DD&to=YYYY-MM-DD) — validated
-	// here and passed as SQL params, never interpolated.
-	const dateRe = /^\d{4}-\d{2}-\d{2}$/
-	const fromParam = dateRe.test(url.searchParams.get('from') ?? '')
-		? url.searchParams.get('from')!
-		: null
-	const toParam = dateRe.test(url.searchParams.get('to') ?? '')
-		? url.searchParams.get('to')!
-		: null
-	const custom = fromParam && toParam && fromParam <= toParam
+	// The shared window filter resolves presets to a concrete [from, to]; grain
+	// picks a sensible default reach when no window was chosen. Legacy links
+	// pass bare from/to, treat those as a custom window.
+	if (url.searchParams.get('from') && !url.searchParams.get('window')) {
+		url.searchParams.set('window', 'custom')
+		request = new Request(url.toString(), request)
+	}
+	const defaultByGrain = { day: '90d', week: 'thisYear', month: 'all' } as const
+	const win = parseReportWindow(request, defaultByGrain[grain])
+	const fromParam = win.fromDay
+	const toParam = win.toDay
 
-	const seriesStart = custom ? `date_trunc('${g.trunc}', $1::date)` : g.windowStartSql
-	const seriesEnd = custom
-		? `date_trunc('${g.trunc}', $2::date)`
-		: `date_trunc('${g.trunc}', ${LOCAL_NOW})`
-	const seriesParams = custom ? [fromParam, toParam] : []
-	const funnelWhere = custom
-		? `day >= $1::date AND day <= $2::date`
-		: `day >= ${LOCAL_NOW}::date - 29`
+	const seriesStart = `date_trunc('${g.trunc}', $1::date)`
+	const seriesEnd = `date_trunc('${g.trunc}', $2::date)`
+	const seriesParams = [fromParam, toParam]
+	const funnelWhere = `day >= $1::date AND day <= $2::date`
 
-	const [series, allBuckets, perListing, funnel, reviewHours, placeClicks] = await Promise.all([
+	const [series, allBuckets, perListing, funnel, placeClicks] = await Promise.all([
 		reportsQuery<{ bucket: string; listing: string; n: string }>(
 			`SELECT to_char(date_trunc('${g.trunc}', create_time AT TIME ZONE 'America/New_York'), '${g.fmt}') AS bucket,
 				listing, count(*) AS n
@@ -123,33 +122,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			 WHERE ${funnelWhere}
 				 AND provider_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-'
 			 GROUP BY 1, 2, 3 ORDER BY 1`,
-			custom ? [fromParam, toParam] : [],
+			[fromParam, toParam],
 		).catch(() => [] as Array<{ day: string; brand: string; event: string; n: string }>),
-		// Review times: hour-of-day histogram (local) over the window —
-		// single-day selections show that day's actual review times.
-		reportsQuery<{ hour: string; listing: string; n: string }>(
-			custom
-				? `SELECT extract(hour FROM create_time AT TIME ZONE 'America/New_York')::int AS hour,
-						listing, count(*) AS n
-					 FROM google_reviews
-					 WHERE (create_time AT TIME ZONE 'America/New_York')::date BETWEEN $1::date AND $2::date
-					 GROUP BY 1, 2 ORDER BY 1`
-				: `SELECT extract(hour FROM create_time AT TIME ZONE 'America/New_York')::int AS hour,
-						listing, count(*) AS n
-					 FROM google_reviews
-					 WHERE create_time >= now() - interval '30 days'
-					 GROUP BY 1, 2 ORDER BY 1`,
-			custom ? [fromParam, toParam] : [],
-		),
-		// Which Google listing each review click chose, per day (place_label
-		// lands with the next worker sync; empty until then).
+		// Which Google listing each review click chose, per day. Microsites only
+		// say "Bearden"/"Farragut", so prefix the brand to disambiguate.
 		reportsQuery<{ day: string; place: string; n: string }>(
-			`SELECT to_char(day, 'YYYY-MM-DD') AS day, place_label AS place, sum(n) AS n
+			`SELECT to_char(day, 'YYYY-MM-DD') AS day,
+				(CASE brand WHEN 'botox-knox' THEN 'Botox Knox · '
+					WHEN 'weight-loss-knox' THEN 'Weight Loss Knox · '
+					ELSE 'SHA · ' END) || place_label AS place,
+				sum(n) AS n
 			 FROM review_funnel_daily
 			 WHERE ${funnelWhere}
 				 AND event = 'review_location_selected' AND place_label <> ''
 			 GROUP BY 1, 2 ORDER BY 1 DESC, 2`,
-			custom ? [fromParam, toParam] : [],
+			[fromParam, toParam],
 		).catch(() => [] as Array<{ day: string; place: string; n: string }>),
 	])
 	const buckets = allBuckets.map(b => b.bucket)
@@ -157,26 +144,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	// the first scan) shows as an explicit zero instead of disappearing.
 	const funnelDays = (
 		await reportsQuery<{ day: string }>(
-			custom
-				? `SELECT to_char(d, 'YYYY-MM-DD') AS day
-					 FROM generate_series($1::date, $2::date, interval '1 day') d ORDER BY d`
-				: `SELECT to_char(d, 'YYYY-MM-DD') AS day
-					 FROM generate_series(${LOCAL_NOW}::date - 29, ${LOCAL_NOW}::date, interval '1 day') d ORDER BY d`,
-			custom ? [fromParam, toParam] : [],
+			`SELECT to_char(d, 'YYYY-MM-DD') AS day
+			 FROM generate_series($1::date, $2::date, interval '1 day') d ORDER BY d`,
+			[fromParam, toParam],
 		).catch(() => [] as Array<{ day: string }>)
 	).map(d => d.day)
-	// Single-day selection: every review that day with its exact local time.
-	const singleDay = custom && fromParam === toParam
-	const dayReviews = singleDay
-		? await reportsQuery<{ t: string; listing: string; reviewer: string | null; star: string | null }>(
-				`SELECT to_char(create_time AT TIME ZONE 'America/New_York', 'HH12:MI AM') AS t,
-					listing, reviewer, star::text AS star
-				 FROM google_reviews
-				 WHERE (create_time AT TIME ZONE 'America/New_York')::date = $1::date
-				 ORDER BY create_time`,
-				[fromParam],
-			)
-		: []
 	return json({
 		configured: true as const,
 		grain,
@@ -185,17 +157,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		perListing,
 		funnel,
 		funnelDays,
-		reviewHours,
-		dayReviews,
 		placeClicks,
-		from: custom ? fromParam : null,
-		to: custom ? toParam : null,
+		windowKey: win.windowKey,
+		from: fromParam,
+		to: toParam,
 	})
 }
 
 export default function Reviews() {
 	const data = useLoaderData<typeof loader>()
-	const submit = useSubmit()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
 	const {
@@ -205,25 +175,11 @@ export default function Reviews() {
 		perListing,
 		funnel,
 		funnelDays,
-		reviewHours,
-		dayReviews,
 		placeClicks,
+		windowKey,
 		from,
 		to,
 	} = data
-
-	// Hour-of-day histogram, stacked by brand.
-	const hourLabels = Array.from({ length: 24 }, (_, h) => {
-		const ampm = h < 12 ? 'AM' : 'PM'
-		const display = h % 12 === 0 ? 12 : h % 12
-		return `${display}${ampm.toLowerCase()}`
-	})
-	const hoursByBrand = new Map<string, number[]>()
-	for (const r of reviewHours) {
-		const b = brandOf(r.listing)
-		if (!hoursByBrand.has(b)) hoursByBrand.set(b, Array.from({ length: 24 }, () => 0))
-		hoursByBrand.get(b)![Number(r.hour)] = (hoursByBrand.get(b)![Number(r.hour)] ?? 0) + Number(r.n)
-	}
 
 	// Funnel: scans / copies / location clicks per day (all brands), plus a
 	// last-30d per-brand breakdown table.
@@ -238,12 +194,19 @@ export default function Reviews() {
 	}
 	const funnelBrands = [...new Set(funnel.map(f => f.brand))].sort()
 
-	const brands = ['SHA', 'Botox Knox', 'Weight Loss Knox']
-	const byBrandBucket = new Map<string, Map<string, number>>()
+	// Stack by individual listing (grouped so each brand's listings sit
+	// together in the legend), not just by brand.
+	const listingOrder = perListing
+		.map(l => l.listing)
+		.sort((a, b) => {
+			const brandRank = (x: string) =>
+				x.startsWith('SHA') ? 0 : x.startsWith('Botox Knox') ? 1 : 2
+			return brandRank(a) - brandRank(b) || a.localeCompare(b)
+		})
+	const byListingBucket = new Map<string, Map<string, number>>()
 	for (const s of series) {
-		const b = brandOf(s.listing)
-		if (!byBrandBucket.has(b)) byBrandBucket.set(b, new Map())
-		const m = byBrandBucket.get(b)!
+		if (!byListingBucket.has(s.listing)) byListingBucket.set(s.listing, new Map())
+		const m = byListingBucket.get(s.listing)!
 		m.set(s.bucket, (m.get(s.bucket) ?? 0) + Number(s.n))
 	}
 
@@ -258,11 +221,16 @@ export default function Reviews() {
 
 	return (
 		<ReportPage
-			title="Reviews — all businesses"
-			subtitle="Google reviews across every listing (SHA, Botox Knox, Weight Loss Knox), from the weekly GBP review fetch"
+			title="Reviews, all businesses"
+			subtitle="Google reviews across every listing (SHA, Botox Knox, Weight Loss Knox), refreshed hourly from the GBP API"
 		>
-			<Form method="get" className="controls" onChange={e => submit(e.currentTarget)}>
-				<label htmlFor="grain">Granularity</label>
+			<WindowControls
+				windowKey={windowKey}
+				from={from}
+				to={to}
+				showGranularity={false}
+			>
+				<label htmlFor="grain">Group by</label>
 				<select id="grain" name="grain" defaultValue={grain}>
 					{Object.entries(GRAINS).map(([k, v]) => (
 						<option key={k} value={k}>
@@ -270,11 +238,7 @@ export default function Reviews() {
 						</option>
 					))}
 				</select>
-				<label htmlFor="from">From</label>
-				<input id="from" type="date" name="from" defaultValue={from ?? ''} />
-				<label htmlFor="to">to</label>
-				<input id="to" type="date" name="to" defaultValue={to ?? ''} />
-			</Form>
+			</WindowControls>
 
 			<div className="tiles">
 				<StatTile
@@ -287,16 +251,16 @@ export default function Reviews() {
 			<section>
 				<h2>
 					New reviews {GRAINS[grain].label.toLowerCase()}{' '}
-					<span className="mini">stacked by brand</span>
+					<span className="mini">stacked by listing</span>
 				</h2>
 				<BarChart
 					labels={buckets}
-					series={brands
-						.filter(b => byBrandBucket.has(b))
-						.map((b, i) => ({
-							name: b,
-							color: SERIES[i]!,
-							values: buckets.map(k => byBrandBucket.get(b)!.get(k) ?? 0),
+					series={listingOrder
+						.filter(l => byListingBucket.has(l))
+						.map((l, i) => ({
+							name: l,
+							color: SERIES[i % SERIES.length]!,
+							values: buckets.map(k => byListingBucket.get(l)!.get(k) ?? 0),
 						}))}
 					stacked
 					height={200}
@@ -304,56 +268,6 @@ export default function Reviews() {
 				/>
 			</section>
 
-			<section>
-				<h2>
-					Review times{' '}
-					<span className="mini">
-						{from && to
-							? from === to
-								? `each review's local time on ${from}`
-								: `accumulated by hour of day, ${from} to ${to}`
-							: 'accumulated by hour of day, last 30 days'}
-					</span>
-				</h2>
-				<BarChart
-					labels={hourLabels}
-					series={brands
-						.filter(b => hoursByBrand.has(b))
-						.map((b, i) => ({
-							name: b,
-							color: SERIES[i]!,
-							values: hoursByBrand.get(b)!,
-						}))}
-					stacked
-					height={180}
-					format={n => String(Math.round(n))}
-					tickEvery={3}
-				/>
-				{dayReviews.length ? (
-					<div className="rtable-wrap" style={{ marginTop: 10 }}>
-						<table className="rtable">
-							<thead>
-								<tr>
-									<th>Time</th>
-									<th>Listing</th>
-									<th>Reviewer</th>
-									<th className="num">★</th>
-								</tr>
-							</thead>
-							<tbody>
-								{dayReviews.map((r, i) => (
-									<tr key={i}>
-										<td>{r.t}</td>
-										<td>{r.listing}</td>
-										<td>{r.reviewer ?? '—'}</td>
-										<td className="num">{r.star ?? '—'}</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-				) : null}
-			</section>
 
 			<section>
 				<h2>By listing</h2>
@@ -376,17 +290,17 @@ export default function Reviews() {
 									<td>{l.listing}</td>
 									<td>{brandOf(l.listing)}</td>
 									<td className="num">{l.total}</td>
-									<td className="num">{l.avg_star ?? '—'}</td>
+									<td className="num">{l.avg_star ?? '-'}</td>
 									<td className={`num ${Number(l.last30) > 0 ? 'good' : ''}`}>{l.last30}</td>
 									<td className="num">{l.last7}</td>
-									<td className="num">{l.latest ?? '—'}</td>
+									<td className="num">{l.latest ?? '-'}</td>
 								</tr>
 							))}
 						</tbody>
 					</table>
 				</div>
 				<p className="note">
-					Listings with zero reviews are shown so the gaps stay visible — the sibling
+					Listings with zero reviews are shown so the gaps stay visible, the sibling
 					listings only earn reviews once their review-QR funnels start landing.
 				</p>
 			</section>

@@ -10,7 +10,7 @@ const PhoneContext = createContext<PhoneInfo>({
 })
 
 /**
- * PhoneProvider — provides the phone number via context.
+ * PhoneProvider, provides the phone number via context.
  * Always uses the Bearden (primary) number. CallRail handles dynamic swapping.
  */
 export function PhoneProvider({ children }: { children: React.ReactNode }) {

@@ -8,7 +8,7 @@
  * state in BlvdSyncState and text on the transition into FINAL. An appointment
  * we FIRST see already FINAL only texts when its scheduled end is recent
  * (walk-in checked out between two sync runs); anything older finished before
- * we started watching and stays silent — this also keeps the first run after a
+ * we started watching and stays silent, this also keeps the first run after a
  * deploy from blasting texts for the whole 2-day snapshot window.
  *
  * The text goes to the staff member's Boulevard mobilePhone, falling back to
@@ -21,7 +21,7 @@ import {
 } from '#app/utils/review-link.server.ts'
 import { sendSMS } from '#app/utils/sms.server.ts'
 
-// Per-staff destination overrides — wins over the Boulevard profile number.
+// Per-staff destination overrides, wins over the Boulevard profile number.
 const STAFF_PHONE_OVERRIDES: Record<string, string> = {
 	// Sarah Hitchcox: reminders go to the front-desk line, not her cell.
 	'urn:blvd:Staff:c0069cf2-aee2-4a2c-a6eb-5abe62192e89': '+18652489365',

@@ -1,6 +1,6 @@
 /**
  * Syncs review-level Google reviews (with createTime) for every listing we
- * own into the reports Postgres `google_reviews` table — the source for the
+ * own into the reports Postgres `google_reviews` table, the source for the
  * /admin/reports/reviews page. Ported from sha-reports/src/google-reviews.ts
  * so the site's own job scheduler keeps the table fresh daily (the worker's
  * copy of this sync had been silently stale for days).

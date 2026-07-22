@@ -10,6 +10,8 @@ import {
 	runPlaidSyncJob,
 	runFinanceReportsJob,
 	runGoogleReviewsReportsJob,
+	runAppointmentLedgerJob,
+	runLapsedPatientsJob,
 	runReviewAppointmentSyncJob,
 	runReviewsFetchJob,
 } from '#app/utils/background-jobs.server.ts'
@@ -63,11 +65,17 @@ export function createActivities() {
 		async financeReportsActivity() {
 			await runJobAndReport('financeReports', runFinanceReportsJob)
 		},
+		async appointmentLedgerActivity() {
+			await runJobAndReport('appointmentLedger', runAppointmentLedgerJob)
+		},
 		async googleReviewsReportsActivity() {
 			await runJobAndReport(
 				'googleReviewsReports',
 				runGoogleReviewsReportsJob,
 			)
+		},
+		async lapsedPatientsActivity() {
+			await runJobAndReport('lapsedPatients', runLapsedPatientsJob)
 		},
 	}
 }

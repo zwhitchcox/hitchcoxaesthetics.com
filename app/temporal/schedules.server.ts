@@ -11,11 +11,15 @@ import {
 	getCallRailPostHogSyncIntervalMs,
 	getFinanceReportsIntervalMs,
 	getGoogleReviewsReportsIntervalMs,
+	getAppointmentLedgerIntervalMs,
+	getLapsedPatientsIntervalMs,
 	getPlaidSyncIntervalMs,
 	getReviewAppointmentSyncIntervalMs,
 } from '#app/utils/background-jobs.server.ts'
 import { hasFinanceReportsConfig } from '#app/utils/finance-reports.server.ts'
 import { hasGoogleReviewsReportsConfig } from '#app/utils/google-reviews-reports.server.ts'
+import { hasAppointmentLedgerConfig } from '#app/utils/appointment-ledger.server.ts'
+import { hasLapsedPatientsConfig } from '#app/utils/lapsed-patients.server.ts'
 import { hasPlaidConfig } from '#app/utils/plaid-sync.server.ts'
 import { TEMPORAL_NAMESPACE, TEMPORAL_TASK_QUEUE } from './config.server.ts'
 
@@ -80,11 +84,25 @@ function getScheduleDefinitions(): Array<ScheduleDefinition> {
 			enabled: hasFinanceReportsConfig(),
 		},
 		{
+			scheduleId: 'appointment-ledger',
+			workflowType: 'appointmentLedgerWorkflow',
+			intervalMs: getAppointmentLedgerIntervalMs(),
+			// Needs REPORTS_DATABASE_URL + Boulevard admin creds.
+			enabled: hasAppointmentLedgerConfig(),
+		},
+		{
 			scheduleId: 'google-reviews-reports',
 			workflowType: 'googleReviewsReportsWorkflow',
 			intervalMs: getGoogleReviewsReportsIntervalMs(),
 			// Needs REPORTS_DATABASE_URL + Google OAuth creds.
 			enabled: hasGoogleReviewsReportsConfig(),
+		},
+		{
+			scheduleId: 'lapsed-patients',
+			workflowType: 'lapsedPatientsWorkflow',
+			intervalMs: getLapsedPatientsIntervalMs(),
+			// Needs REPORTS_DATABASE_URL + Boulevard admin creds.
+			enabled: hasLapsedPatientsConfig(),
 		},
 	]
 }

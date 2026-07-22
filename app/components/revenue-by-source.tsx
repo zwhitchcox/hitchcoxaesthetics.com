@@ -1,5 +1,5 @@
 /**
- * Revenue by source — the window-controlled slice of the Revenue report:
+ * Revenue by source, the window-controlled slice of the Revenue report:
  * paid + projected revenue by service type, booking source, and day, with a
  * per-appointment drill-down (Boulevard + PostHog links) and a manual sync
  * refresh. Data comes from loadRevenueBySource (revenue-by-source.server.ts).
@@ -8,11 +8,21 @@ import { Form, useFetcher, useSubmit } from '@remix-run/react'
 import { BarChart, SERIES, StatTile, usd } from '#app/components/report-ui'
 import { type RevenueBySourceData } from '#app/utils/revenue-by-source.server.ts'
 
+// The standard date presets (Google Ads style) used by every report page.
+// Trailing presets carry `days`; calendar presets are resolved in
+// parseReportWindow (revenue-by-source.server.ts).
 export const WINDOWS = {
 	today: { label: 'Today', days: 1 },
+	yesterday: { label: 'Yesterday', days: 0 },
 	'7d': { label: 'Last 7 days', days: 7 },
+	'14d': { label: 'Last 14 days', days: 14 },
 	'30d': { label: 'Last 30 days', days: 30 },
 	'90d': { label: 'Last 90 days', days: 90 },
+	thisWeek: { label: 'This week (Mon–Sun)', days: 0 },
+	lastWeek: { label: 'Last week', days: 0 },
+	thisMonth: { label: 'This month', days: 0 },
+	lastMonth: { label: 'Last month', days: 0 },
+	thisYear: { label: 'This year', days: 0 },
 	all: { label: 'All data', days: 3650 },
 	custom: { label: 'Custom range', days: 0 },
 } as const
@@ -21,7 +31,7 @@ export type WindowKey = keyof typeof WINDOWS
 export const GRANULARITIES = ['day', 'week', 'month'] as const
 export type Granularity = (typeof GRANULARITIES)[number]
 
-// Every listing's utm_content slug — these columns always render, even at $0,
+// Every listing's utm_content slug, these columns always render, even at $0,
 // so each GBP's contribution (or lack of one) is visible at a glance.
 export const GBP_LISTING_SLUGS = [
 	'bearden',
@@ -69,11 +79,17 @@ export function WindowControls({
 	from,
 	to,
 	granularity,
+	showGranularity = true,
+	children,
 }: {
 	windowKey: WindowKey
 	from: string
 	to: string
-	granularity: Granularity
+	granularity?: Granularity
+	/** Hide the group-by select on pages where grouping doesn't apply. */
+	showGranularity?: boolean
+	/** Extra page-specific filters rendered inside the same form. */
+	children?: React.ReactNode
 }) {
 	const submit = useSubmit()
 	function handleControlsChange(e: React.FormEvent<HTMLFormElement>) {
@@ -104,12 +120,17 @@ export function WindowControls({
 			<input id="from" name="from" type="date" defaultValue={from} />
 			<label htmlFor="to">To</label>
 			<input id="to" name="to" type="date" defaultValue={to} />
-			<label htmlFor="granularity">Group by</label>
-			<select id="granularity" name="granularity" defaultValue={granularity}>
-				<option value="day">Day</option>
-				<option value="week">Week</option>
-				<option value="month">Month</option>
-			</select>
+			{showGranularity ? (
+				<>
+					<label htmlFor="granularity">Group by</label>
+					<select id="granularity" name="granularity" defaultValue={granularity ?? 'day'}>
+						<option value="day">Day</option>
+						<option value="week">Week</option>
+						<option value="month">Month</option>
+					</select>
+				</>
+			) : null}
+			{children}
 		</Form>
 	)
 }
@@ -149,6 +170,9 @@ export function RevenueBySource({ data }: { data: RevenueBySourceData }) {
 		const label = `GBP · ${slug}`
 		if (!bySource.has(label)) bySource.set(label, makeAgg())
 	}
+	// Always show the paid channel, even (especially) when it drove $0 -
+	// invisible-when-zero hides exactly the question "is the ad spend working?"
+	if (!bySource.has('Google Ads')) bySource.set('Google Ads', makeAgg())
 	const buckets = [...byBucket.keys()].sort().reverse()
 	const types = [...byType.entries()].sort((a, b) => b[1].usd - a[1].usd)
 	const sources = [...bySource.entries()].sort((a, b) => b[1].usd - a[1].usd)
@@ -172,7 +196,7 @@ export function RevenueBySource({ data }: { data: RevenueBySourceData }) {
 					Revenue by source{' '}
 					<span className="mini">paid + projected for booked, unpaid appointments</span>
 				</h2>
-				<WindowControls windowKey={windowKey} from={from} to={to} granularity={granularity} />
+				{/* The page-level WindowControls (same URL params) drives this section. */}
 				<refresher.Form method="post" className="controls">
 					<button type="submit" name="intent" value="refresh" disabled={refreshing}>
 						{refreshing ? 'Refreshing…' : 'Refresh now'}
@@ -195,11 +219,13 @@ export function RevenueBySource({ data }: { data: RevenueBySourceData }) {
 					/>
 					<StatTile
 						label="Google Ads spend"
-						value={adsSpendUsd != null ? usd(adsSpendUsd) : '—'}
+						value={adsSpendUsd != null ? usd(adsSpendUsd) : '-'}
 						whisper={
 							adsSpendUsd
 								? `${usd(adsRevenue)} attributed revenue · ${(adsRevenue / adsSpendUsd).toFixed(1)}x ROAS (website-attributed only)`
-								: 'same date window, live from the Ads API'
+								: adsSpendUsd === 0
+									? 'no spend in this window (Ads API)'
+									: 'ADS API CALL FAILED, check GOOGLE_ADS_* secrets / API status'
 						}
 					/>
 				</div>
@@ -238,7 +264,7 @@ export function RevenueBySource({ data }: { data: RevenueBySourceData }) {
 			{drillType && drillRows ? (
 				<section id="type-detail">
 					<h2>
-						Appointments — {drillType}{' '}
+						Appointments, {drillType}{' '}
 						<span className="mini">
 							{drillRows.length} line item{drillRows.length === 1 ? '' : 's'} in window
 							{drillRows.length === 200 ? ' (showing latest 200)' : ''} ·{' '}
@@ -262,7 +288,7 @@ export function RevenueBySource({ data }: { data: RevenueBySourceData }) {
 								{drillRows.map((r, i) => (
 									<tr key={i}>
 										<td>{new Date(r.at).toLocaleString('en-US', ET_STAMP)}</td>
-										<td>{r.clientName ?? '—'}</td>
+										<td>{r.clientName ?? '-'}</td>
 										<td>{r.service}</td>
 										<td className="num">{usd(r.usd)}</td>
 										<td>{r.kind === 'projected' ? 'Booked (unpaid)' : 'Paid'}</td>
@@ -279,7 +305,7 @@ export function RevenueBySource({ data }: { data: RevenueBySourceData }) {
 													PostHog session
 												</a>
 											) : null}
-											{!r.blvdUrl && !r.posthogUrl ? '—' : null}
+											{!r.blvdUrl && !r.posthogUrl ? '-' : null}
 										</td>
 									</tr>
 								))}
@@ -348,7 +374,7 @@ export function RevenueBySource({ data }: { data: RevenueBySourceData }) {
 											const a = byBucketSource.get(`${b}|${s}`)
 											return (
 												<td key={s} className="num">
-													{a ? `${usd(a.usd)} (${a.appts.size})` : '—'}
+													{a ? `${usd(a.usd)} (${a.appts.size})` : '-'}
 												</td>
 											)
 										})}
@@ -360,7 +386,7 @@ export function RevenueBySource({ data }: { data: RevenueBySourceData }) {
 								<td>Total</td>
 								{sources.map(([s, a]) => (
 									<td key={s} className="num">
-										{a.items ? `${usd(a.usd)} (${a.appts.size})` : '—'}
+										{a.items ? `${usd(a.usd)} (${a.appts.size})` : '-'}
 									</td>
 								))}
 								<td className="num">{`${usd(total.usd)} (${total.appts.size})`}</td>

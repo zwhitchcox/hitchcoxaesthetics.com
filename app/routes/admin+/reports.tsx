@@ -1,5 +1,5 @@
 /**
- * Report hub — every SHA report in one page: a sidebar plus a tiling viewer
+ * Report hub, every SHA report in one page: a sidebar plus a tiling viewer
  * (any number of columns, each stacking panes, draggable dividers; the layout
  * lives in the URL hash so an arrangement can be bookmarked). Ported from the
  * hep-reports hub (reports2.hepisontheway.com).
@@ -18,10 +18,12 @@ const EMBED_TTL_S = 7 * 24 * 3600
 interface HubEntry {
 	title: string
 	desc: string
-	/** Metabase dashboard id (signed embed) — mutually exclusive with path. */
+	/** Metabase dashboard id (signed embed), mutually exclusive with path. */
 	dashboard?: number
 	/** Same-origin site path. */
 	path?: string
+	/** Collapsible sub-entries; the parent stays a clickable link itself. */
+	children?: HubEntry[]
 }
 
 const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
@@ -31,9 +33,18 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 			{ title: 'Revenue', desc: 'Actuals, this week, projections + P&L profitability, revenue by type/source/day with drill-down', path: '/admin/reports/revenue' },
 			{ title: 'Bookings funnel', desc: 'Bookings made by day × source, expected value, ads cost per booking', path: '/admin/reports/bookings' },
 			{ title: 'Appointment performance', desc: 'Expected vs actual per appointment, worst first, with the why', path: '/admin/reports/appointments' },
+			{ title: 'Retention: lapsed patients', desc: 'Who stopped coming: overdue vs their usual visit rhythm, win-back list by value', path: '/admin/reports/retention' },
 			{ title: 'Service trends', desc: 'Demand per category since 2024, seasonality, peak booking times', path: '/admin/reports/service-trends' },
-			{ title: 'Household profit', desc: 'Biz revenue + take-home − expenses − taxes, monthly', path: '/admin/reports/household-profit' },
-			{ title: 'Household budget', desc: 'Personal spending by category, recurring, trends', path: '/admin/reports/household-budget' },
+			{
+				title: 'Household',
+				desc: 'Profit, taxes outlook, and budget for the whole household',
+				path: '/admin/reports/household-profit',
+				children: [
+					{ title: 'Household profit', desc: 'Biz revenue + take-home − expenses − taxes, monthly', path: '/admin/reports/household-profit' },
+					{ title: 'Household profit & taxes outlook', desc: 'Break-even through Apr 15, the business-profit tax bill vs household cash', path: '/admin/reports/profit-outlook' },
+					{ title: 'Household budget', desc: 'Personal spending by category, recurring, trends', path: '/admin/reports/household-budget' },
+				],
+			},
 		],
 	},
 	{
@@ -82,28 +93,41 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const reports: Record<string, { href: string; title: string }> = {}
 	const visible = SECTIONS.map(sec => ({
 		heading: sec.heading,
-		entries: sec.entries.filter(e => e.path || secret),
+		entries: sec.entries
+			.filter(e => e.path || secret)
+			.map(e => ({
+				...e,
+				children: e.children?.filter(c => c.path || secret),
+			})),
 	}))
 	for (const sec of visible) {
 		for (const e of sec.entries) {
-			const key = (e.path ?? `mb-${e.dashboard}`).replace(/^\//, '')
-			reports[key] = {
-				href: e.path ?? embedUrl(e.dashboard!, secret!),
-				title: e.title,
+			for (const entry of [e, ...(e.children ?? [])]) {
+				const key = (entry.path ?? `mb-${entry.dashboard}`).replace(/^\//, '')
+				reports[key] = {
+					href: entry.path ?? embedUrl(entry.dashboard!, secret!),
+					title: entry.title,
+				}
 			}
 		}
 	}
 
+	const renderItem = (e: HubEntry) => {
+		const key = (e.path ?? `mb-${e.dashboard}`).replace(/^\//, '')
+		return `<a class="item" href="${esc(reports[key]!.href)}" data-key="${esc(key)}">
+			 <span class="t">${esc(e.title)}</span><span class="d">${esc(e.desc)}</span></a>`
+	}
 	const nav = visible
 		.map(
 			s => `
 		<div class="section">${esc(s.heading)}</div>
 		${s.entries
-			.map(e => {
-				const key = (e.path ?? `mb-${e.dashboard}`).replace(/^\//, '')
-				return `<a class="item" href="${esc(reports[key]!.href)}" data-key="${esc(key)}">
-					 <span class="t">${esc(e.title)}</span><span class="d">${esc(e.desc)}</span></a>`
-			})
+			.map(e =>
+				e.children?.length
+					? `<div class="group"><div class="grouphead">${renderItem(e)}<button class="caret" aria-label="show household reports">▸</button></div>
+						 <div class="kids" hidden>${e.children.map(renderItem).join('\n')}</div></div>`
+					: renderItem(e),
+			)
 			.join('\n')}`,
 		)
 		.join('\n')
@@ -138,6 +162,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	.item:hover { background: #1e293b; }
 	.item .t { display: block; font-weight: 600; color: #f1f5f9; }
 	.item .d { display: block; font-size: 12px; color: #94a3b8; }
+	.grouphead { display: flex; align-items: center; }
+	.grouphead .item { flex: 1; min-width: 0; }
+	.caret { background: none; border: 0; color: #64748b; cursor: pointer; font-size: 11px;
+					 padding: 6px 8px; border-radius: 6px; flex: none; }
+	.caret:hover { background: #1e293b; color: #e2e8f0; }
+	.kids { margin-left: 10px; border-left: 1px solid #1e293b; padding-left: 4px; }
 	main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 	#wm { flex: 1; display: flex; min-height: 0; }
 	.col { display: flex; flex-direction: column; min-width: 120px; }
@@ -200,7 +230,7 @@ function parseHash() {
 		var evenW = 100 / cols.length;
 		cols.forEach(function (c) { if (!c.w) c.w = evenW; });
 		if (cols.length) { L.cols = cols; return true; }
-	} catch (e) { /* bad hash — ignore */ }
+	} catch (e) { /* bad hash, ignore */ }
 	return false;
 }
 function saveHash() {
@@ -641,6 +671,14 @@ function setNavless(on) {
 }
 document.getElementById("navhide").addEventListener("click", function () { setNavless(true); });
 document.getElementById("navshow").addEventListener("click", function () { setNavless(false); });
+document.querySelectorAll(".caret").forEach(function (b) {
+	b.addEventListener("click", function (ev) {
+		ev.preventDefault(); ev.stopPropagation();
+		var kids = b.closest(".group").querySelector(".kids");
+		kids.hidden = !kids.hidden;
+		b.textContent = kids.hidden ? "\\u25B8" : "\\u25BE";
+	});
+});
 window.addEventListener("keydown", function (e) {
 	if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
 		e.preventDefault();

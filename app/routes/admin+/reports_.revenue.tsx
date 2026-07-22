@@ -1,15 +1,17 @@
 /**
- * Revenue — the single business money report: weekly actuals, this week
+ * Revenue, the single business money report: weekly actuals, this week
  * expected vs actual, the 4-week projection, projection accuracy, revenue by
  * type/source/day (paid + projected, with drill-down), the 6-month
  * projection, and business P&L / profitability.
  */
+import { useEffect, useState } from 'react'
 import {
 	json,
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
 } from '@remix-run/node'
-import { useLoaderData } from '@remix-run/react'
+import { Link, useFetcher, useLoaderData } from '@remix-run/react'
+import { type loader as appointmentsLoader } from './reports_.appointments.tsx'
 import {
 	BarChart,
 	LineChart,
@@ -17,14 +19,18 @@ import {
 	StatTile,
 	usd,
 } from '#app/components/report-ui'
-import { RevenueBySource } from '#app/components/revenue-by-source.tsx'
+import {
+	RevenueBySource,
+	WindowControls,
+} from '#app/components/revenue-by-source.tsx'
 import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
 import { ensurePrimary } from '#app/utils/litefs.server.ts'
-import { loadRevenueBySource } from '#app/utils/revenue-by-source.server.ts'
 import {
-	boulevardAdminFetch,
-	listBlvdAdminLocations,
-} from '#app/utils/blvd-admin.server.ts'
+	etMidnightUtc,
+	loadRevenueBySource,
+	parseReportWindow,
+	shiftDay,
+} from '#app/utils/revenue-by-source.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
@@ -55,13 +61,11 @@ function getCurrentWeekDays() {
 	})
 }
 
-/** Actual Boulevard revenue per ET day for the current week (past days + today only). */
-async function getActualRevenueByDayThisWeek(weekDays: string[]) {
+/** Actual Boulevard revenue per ET day (past days + today only; future null). */
+async function getActualRevenueByDays(days: string[], since: Date, until: Date) {
 	const today = toEtDay(new Date())
 	const items = await prisma.blvdRevenueItem.findMany({
-		where: {
-			occurredAt: { gte: new Date(Date.now() - 9 * 24 * 3600 * 1000) },
-		},
+		where: { occurredAt: { gte: since, lt: until } },
 		select: { occurredAt: true, grossAmountUsd: true },
 	})
 	const byDay = new Map<string, number>()
@@ -69,110 +73,54 @@ async function getActualRevenueByDayThisWeek(weekDays: string[]) {
 		const day = toEtDay(item.occurredAt)
 		byDay.set(day, (byDay.get(day) ?? 0) + item.grossAmountUsd)
 	}
-	return weekDays.map(day =>
-		day <= today ? Math.round(byDay.get(day) ?? 0) : null,
-	)
+	return days.map(day => (day <= today ? Math.round(byDay.get(day) ?? 0) : null))
 }
 
-/**
- * Booked value lost to cancellations / no-shows per ET day this week, from the
- * Boulevard Admin API. Only cancellations made AFTER the projection snapshot
- * (`cancelledAfter`) count — earlier ones were never in "expected", so they
- * can't explain the gap. Cancelled appointments come back with $0 prices, so
- * each lost service is valued at its average closed-order revenue (last 90d).
- */
-async function getLostRevenueByDayThisWeek(
-	weekDays: string[],
-	cancelledAfter: Date | null,
-) {
-	const today = toEtDay(new Date())
-	const prevDay = new Date(`${weekDays[0]}T12:00:00Z`)
-	prevDay.setUTCDate(prevDay.getUTCDate() - 1)
-	const nextDay = new Date(`${weekDays[6]}T12:00:00Z`)
-	nextDay.setUTCDate(nextDay.getUTCDate() + 1)
-	const query = `startAt >= '${prevDay.toISOString().slice(0, 10)}T00:00:00Z' AND startAt <= '${nextDay.toISOString().slice(0, 10)}T23:59:59Z'`
+const MAX_RANGE_DAYS = 400
+function enumerateDays(fromDay: string, toDay: string): string[] {
+	const days: string[] = []
+	let cursor = fromDay
+	while (cursor <= toDay && days.length < MAX_RANGE_DAYS) {
+		days.push(cursor)
+		cursor = shiftDay(cursor, 1)
+	}
+	return days
+}
 
-	const locations = await listBlvdAdminLocations()
-	const lostServices: Array<{ day: string; serviceName: string }> = []
-	for (const location of locations) {
-		let after: string | null = null
-		for (let page = 0; page < 5; page++) {
-			const res: any = await boulevardAdminFetch(
-				`query WeekAppointments($after: String, $locationId: ID!) {
-					appointments(first: 100, after: $after, locationId: $locationId, query: "${query}") {
-						pageInfo { endCursor hasNextPage }
-						edges { node { startAt state cancelled cancellation { cancelledAt reason } appointmentServices { service { name } } } }
-					}
-				}`,
-				{ after, locationId: location.id },
-			)
-			for (const edge of res.appointments?.edges ?? []) {
-				const appt = edge?.node
-				if (!appt) continue
-				if (!(appt.cancelled || appt.state === 'NO_SHOW')) continue
-				const isNoShow =
-					appt.state === 'NO_SHOW' || appt.cancellation?.reason === 'NO_SHOW'
-				const cancelledAt = appt.cancellation?.cancelledAt
-					? new Date(appt.cancellation.cancelledAt)
-					: null
-				// no-shows always count; plain cancellations only if they happened
-				// after the projection was computed
-				if (
-					!isNoShow &&
-					cancelledAfter &&
-					cancelledAt &&
-					cancelledAt < cancelledAfter
-				) {
-					continue
-				}
-				const day = toEtDay(new Date(appt.startAt))
-				if (!weekDays.includes(day) || day > today) continue
-				for (const s of appt.appointmentServices ?? []) {
-					if (s?.service?.name) {
-						lostServices.push({ day, serviceName: s.service.name })
-					}
-				}
-			}
-			if (!res.appointments?.pageInfo?.hasNextPage) break
-			after = res.appointments.pageInfo.endCursor
-		}
-	}
-
-	const names = [...new Set(lostServices.map(s => s.serviceName))]
-	const items = names.length
-		? await prisma.blvdRevenueItem.findMany({
-				where: {
-					itemName: { in: names },
-					grossAmountUsd: { gt: 0 },
-					occurredAt: { gte: new Date(Date.now() - 90 * 24 * 3600 * 1000) },
-				},
-				select: { itemName: true, grossAmountUsd: true },
-			})
-		: []
-	const avgByName = new Map<string, { total: number; n: number }>()
-	for (const item of items) {
-		const cur = avgByName.get(item.itemName) ?? { total: 0, n: 0 }
-		cur.total += item.grossAmountUsd
-		cur.n += 1
-		avgByName.set(item.itemName, cur)
-	}
-	const byDay = new Map<string, number>()
-	for (const s of lostServices) {
-		const avg = avgByName.get(s.serviceName)
-		const value = avg?.n ? avg.total / avg.n : 0
-		byDay.set(s.day, (byDay.get(s.day) ?? 0) + value)
-	}
-	return weekDays.map(day =>
-		day <= today ? Math.round(byDay.get(day) ?? 0) : null,
+/** Cancelled/no-show value per day from the append-only ledger. */
+async function getLostByDays(days: string[]) {
+	if (days.length === 0) return null
+	return reportsQuery<{ day: string; lost: string }>(
+		`SELECT to_char(start_at AT TIME ZONE 'America/New_York', 'YYYY-MM-DD') AS day,
+			round(sum(expected_usd)) AS lost
+		 FROM (
+			 SELECT DISTINCT ON (appointment_id) appointment_id, start_at, expected_usd
+			 FROM appointment_change_log
+			 WHERE kind IN ('cancelled', 'no_show', 'removed')
+			 ORDER BY appointment_id, detected_at DESC) events
+		 WHERE (start_at AT TIME ZONE 'America/New_York')::date
+			 BETWEEN $1::date AND $2::date
+		 GROUP BY 1`,
+		[days[0], days.at(-1)],
 	)
+		.then(rows => {
+			const byDay = new Map(rows.map(r => [r.day, Number(r.lost)]))
+			const today = toEtDay(new Date())
+			return days.map(day => (day > today ? null : (byDay.get(day) ?? 0)))
+		})
+		.catch(() => null)
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	if (!hasReportsDb()) return json({ configured: false as const })
 
+	const win = parseReportWindow(request, 'thisWeek')
+	const rangeDays = enumerateDays(win.fromDay, win.toDay)
 	const weekDays = getCurrentWeekDays()
-	const [weekly, next4, monthly, accuracy, pnl, summary, thisWeekExpected, actualByDay, avgExp, bySource] = await Promise.all([
+	const weekSince = etMidnightUtc(weekDays[0]!)
+	const weekUntil = etMidnightUtc(shiftDay(weekDays[6]!, 1))
+	const [weekly, next4, monthly, accuracy, pnl, summary, thisWeekExpected, actualByDay, avgExp, bySource, rangeExpected, rangeActual, rangeLost] = await Promise.all([
 		tryQuery<{ week: string; revenue: string; kept_appts: string }>(
 			`SELECT to_char(week, 'YYYY-MM-DD') AS week, revenue, kept_appts
 			 FROM weekly_revenue ORDER BY week`,
@@ -242,21 +190,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			 WHERE day >= '${weekDays[0]}'::date AND day <= '${weekDays[6]}'::date
 			 ORDER BY day`,
 		),
-		getActualRevenueByDayThisWeek(weekDays).catch(() => null),
+		getActualRevenueByDays(weekDays, weekSince, weekUntil).catch(() => null),
 		tryQuery<{ avg: string }>(
 			`SELECT round(avg(expenses)) AS avg FROM business_pnl_monthly
 			 WHERE month < to_char(current_date, 'YYYY-MM')`,
 		),
-		loadRevenueBySource(request),
+		loadRevenueBySource(request, 'thisWeek'),
+		tryQuery<{ day: string; expected: string }>(
+			`SELECT to_char(day, 'YYYY-MM-DD') AS day,
+				round(expected_usd * (1 - (SELECT cancellation_rate FROM revenue_projection_summary WHERE id = 1))) AS expected
+			 FROM revenue_projection_daily
+			 WHERE day >= '${win.fromDay}'::date AND day <= '${win.toDay}'::date
+			 ORDER BY day`,
+		),
+		getActualRevenueByDays(rangeDays, win.since, win.until).catch(() => null),
+		getLostByDays(rangeDays),
 	])
 
-	const projectionComputedAt = summary?.[0]?.generated_at_raw
-		? new Date(summary[0].generated_at_raw)
-		: null
-	const lostByDay = await getLostRevenueByDayThisWeek(
-		weekDays,
-		projectionComputedAt,
-	).catch(() => null)
+	// Lost value comes from the append-only appointment ledger, the single
+	// source of truth for cancellations/no-shows (valued at booked price or the
+	// service's 90-day average). Every cancellation for the day counts, whether
+	// it happened before or after the forecast was computed; the old
+	// only-after-the-snapshot filter is what made real cancellations invisible.
+	const lostByDay = await getLostByDays(weekDays)
 
 	const expectedByDay = new Map(
 		(thisWeekExpected ?? []).map(r => [r.day, Number(r.expected)]),
@@ -271,8 +227,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				}))
 			: null
 
+	// The window-controlled expected vs actual series (the chart follows the
+	// page's date filter; the tiles above stay pinned to the current week).
+	const rangeExpectedByDay = new Map(
+		(rangeExpected ?? []).map(r => [r.day, Number(r.expected)]),
+	)
+	const rangeDaily =
+		rangeExpected?.length || rangeActual?.some(v => v != null)
+			? rangeDays.map((day, i) => ({
+					day,
+					expected: rangeExpectedByDay.get(day) ?? null,
+					actual: rangeActual?.[i] ?? null,
+					lost: rangeLost?.[i] ?? null,
+				}))
+			: null
+
 	// The weekly_revenue table only refreshes with the weekly projection job,
-	// so the current week is missing (or stale) mid-week — replace it with the
+	// so the current week is missing (or stale) mid-week, replace it with the
 	// live week-to-date sum from Boulevard actuals.
 	const currentMonday = weekDays[0]!
 	const weekToDateActual = (actualByDay ?? []).reduce<number>(
@@ -301,13 +272,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		accuracy: accuracy?.slice(-12) ?? null,
 		summary: summary?.[0] ?? null,
 		thisWeekDaily,
+		rangeDaily,
+		window: {
+			windowKey: win.windowKey,
+			granularity: win.granularity,
+			fromDay: win.fromDay,
+			toDay: win.toDay,
+		},
 		bySource,
 	})
 }
 
 export async function action({ request }: ActionFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
-	// The sync writes revenue rows — SQLite writes only happen on the primary.
+	// The sync writes revenue rows, SQLite writes only happen on the primary.
 	await ensurePrimary()
 	const form = await request.formData()
 	if (form.get('intent') === 'refresh') {
@@ -319,12 +297,83 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Revenue() {
 	const data = useLoaderData<typeof loader>()
+	// Hooks must run unconditionally: the misses fetcher lives up here, ahead
+	// of the not-configured early return.
+	const missesFetcher = useFetcher<typeof appointmentsLoader>()
+	const [missesLoadedKey, setMissesLoadedKey] = useState<string | null>(null)
+	const winForMisses = data.configured ? data.window : null
+	const missesKey = winForMisses ? `${winForMisses.fromDay}|${winForMisses.toDay}` : ''
+	const missesSpanDays = winForMisses
+		? Math.round(
+				(Date.parse(winForMisses.toDay) - Date.parse(winForMisses.fromDay)) / 86400_000,
+			) + 1
+		: 0
+	const missesEnabled = missesSpanDays > 0 && missesSpanDays <= 35
+	useEffect(() => {
+		if (!missesEnabled || !winForMisses || missesLoadedKey === missesKey) return
+		setMissesLoadedKey(missesKey)
+		missesFetcher.load(
+			`/admin/reports/appointments?window=custom&from=${winForMisses.fromDay}&to=${winForMisses.toDay}`,
+		)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [missesEnabled, missesKey, missesLoadedKey])
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { weekly, currentMonday, next4, monthly, pnl, avgExpenses, accuracy, summary, thisWeekDaily, bySource } = data
+	const { weekly, currentMonday, next4, monthly, pnl, avgExpenses, accuracy, summary, thisWeekDaily, rangeDaily, window: win, bySource } = data
 	const thisWeek = next4?.[0]
 	const lastFullWeek = weekly?.filter(w => w.week < currentMonday).at(-1)
 	const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+	// Group the window's daily series by the selected granularity (client-safe
+	// date math, no server imports here).
+	const mondayOfDay = (day: string) => {
+		const anchor = new Date(`${day}T12:00:00Z`)
+		const dow = (anchor.getUTCDay() + 6) % 7
+		anchor.setUTCDate(anchor.getUTCDate() - dow)
+		return anchor.toISOString().slice(0, 10)
+	}
+	const bucketMap = new Map<
+		string,
+		{ expected: number | null; actual: number | null; lost: number | null }
+	>()
+	for (const d of rangeDaily ?? []) {
+		const key =
+			win.granularity === 'month'
+				? d.day.slice(0, 7)
+				: win.granularity === 'week'
+					? mondayOfDay(d.day)
+					: d.day
+		const bucket = bucketMap.get(key) ?? { expected: null, actual: null, lost: null }
+		if (d.expected != null) bucket.expected = (bucket.expected ?? 0) + d.expected
+		if (d.actual != null) bucket.actual = (bucket.actual ?? 0) + d.actual
+		if (d.lost != null) bucket.lost = (bucket.lost ?? 0) + d.lost
+		bucketMap.set(key, bucket)
+	}
+	const rangeBuckets = [...bucketMap.entries()]
+		.sort((a, b) => a[0].localeCompare(b[0]))
+		.map(([key, v]) => ({ key, ...v }))
+	const bucketLabel = (key: string) => {
+		if (win.granularity === 'month') return key
+		if (win.granularity === 'week') return `wk ${key.slice(5)}`
+		if (rangeBuckets.length <= 21) {
+			const d = new Date(`${key}T12:00:00Z`)
+			return `${WEEKDAY_NAMES[(d.getUTCDay() + 6) % 7]} ${key.slice(5)}`
+		}
+		return key.slice(5)
+	}
+	const rangeToDate = rangeDaily
+		? rangeDaily.reduce(
+				(acc, d) => {
+					if (d.actual == null) return acc
+					return {
+						actual: acc.actual + d.actual,
+						expected: acc.expected + (d.expected ?? 0),
+						lost: acc.lost + (d.lost ?? 0),
+					}
+				},
+				{ actual: 0, expected: 0, lost: 0 },
+			)
+		: null
 	const weekToDate = thisWeekDaily
 		? thisWeekDaily.reduce(
 				(acc, d) => {
@@ -338,6 +387,24 @@ export default function Revenue() {
 				{ actual: 0, expected: 0, lost: 0 },
 			)
 		: null
+	// Re-projection: keep what actually happened, keep the forecast for what
+	// hasn't. Today counts at whichever is higher (its partial actual may
+	// already beat its forecast).
+	const todayDay = thisWeekDaily?.filter(d => d.actual != null).at(-1)?.day ?? null
+	const nowTracking = thisWeekDaily
+		? Math.round(
+				thisWeekDaily.reduce((sum, d) => {
+					if (d.day === todayDay)
+						return sum + Math.max(d.actual ?? 0, d.expected ?? 0)
+					if (d.actual != null) return sum + d.actual
+					return sum + (d.expected ?? 0)
+				}, 0),
+			)
+		: null
+
+	const misses = (missesFetcher.data?.rows ?? [])
+		.filter(r => r.status !== 'upcoming' && r.deltaUsd < -25)
+		.slice(0, 8)
 
 	return (
 		<ReportPage
@@ -348,62 +415,180 @@ export default function Revenue() {
 					: undefined
 			}
 		>
+			<WindowControls
+				windowKey={win.windowKey}
+				from={win.fromDay}
+				to={win.toDay}
+				granularity={win.granularity}
+			/>
 			<div className="tiles">
 				<StatTile
 					label={`This week (${currentMonday})`}
 					value={`${usd(Number(weekly?.at(-1)?.revenue ?? 0))} of ${usd(Number(thisWeek?.net ?? 0))}`}
 					whisper={`actual so far vs projected net · ${usd(Number(thisWeek?.booked ?? 0))} booked on the calendar`}
 				/>
+				{weekToDate ? (
+					<StatTile
+						label="Expected by now"
+						value={usd(weekToDate.expected)}
+						whisper={`the projection's Mon–today share · actual is ${
+							weekToDate.expected > 0
+								? `${Math.round((100 * weekToDate.actual) / weekToDate.expected)}%`
+								: '-'
+						} of it`}
+					/>
+				) : null}
+				{nowTracking != null ? (
+					<StatTile
+						label="Now tracking"
+						value={usd(nowTracking)}
+						whisper="re-projected week: actual so far + forecast for the remaining days"
+					/>
+				) : null}
 				<StatTile
-					label="Last week — actual"
+					label="Last week, actual"
 					value={usd(Number(lastFullWeek?.revenue ?? 0))}
 					whisper={lastFullWeek?.week ?? ''}
 				/>
 			</div>
 
-			{thisWeekDaily ? (
+			{rangeDaily ? (
 				<section>
 					<h2>
-						This week — expected vs actual{' '}
-						<span className="mini">Mon–Sun · expected is the projection net of cancellations · actual from closed Boulevard orders</span>
+						Expected vs actual{' '}
+						<span className="mini">
+							{win.fromDay} → {win.toDay} · expected is the projection net of
+							cancellations · actual from closed Boulevard orders
+						</span>
 					</h2>
 					<BarChart
-						labels={thisWeekDaily.map(
-							(d, i) => `${WEEKDAY_NAMES[i]} ${d.day.slice(5)}`,
-						)}
+						labels={rangeBuckets.map(b => bucketLabel(b.key))}
 						series={[
 							{
 								name: 'Expected',
 								color: 'var(--series-3)',
-								values: thisWeekDaily.map(d => d.expected),
+								values: rangeBuckets.map(b => b.expected),
 							},
 							{
 								name: 'Actual',
 								color: 'var(--series-1)',
-								values: thisWeekDaily.map(d => d.actual),
+								values: rangeBuckets.map(b => b.actual),
 							},
 							{
 								name: 'Cancelled / no-show (est.)',
 								color: 'var(--series-6)',
-								values: thisWeekDaily.map(d => d.lost),
+								values: rangeBuckets.map(b => b.lost),
 							},
 						]}
 						height={220}
-						tickEvery={1}
+						tickEvery={rangeBuckets.length > 21 ? 7 : 1}
 					/>
-					{weekToDate ? (
+					{rangeToDate ? (
 						<p className="note">
-							Week to date: {usd(weekToDate.actual)} actual vs {usd(weekToDate.expected)} expected (
-							{weekToDate.expected > 0
-								? `${weekToDate.actual >= weekToDate.expected ? '+' : ''}${Math.round((100 * (weekToDate.actual - weekToDate.expected)) / weekToDate.expected)}%`
-								: '—'}
-							){weekToDate.lost > 0 ? `, with ${usd(weekToDate.lost)} lost to cancellations / no-shows` : ''}. Red
+							Window to date: {usd(rangeToDate.actual)} actual vs {usd(rangeToDate.expected)} expected (
+							{rangeToDate.expected > 0
+								? `${rangeToDate.actual >= rangeToDate.expected ? '+' : ''}${Math.round((100 * (rangeToDate.actual - rangeToDate.expected)) / rangeToDate.expected)}%`
+								: '-'}
+							){rangeToDate.lost > 0 ? `, with ${usd(rangeToDate.lost)} lost to cancellations / no-shows` : ''}. Red
 							= booked value lost after the projection was computed (no-shows + late
 							cancellations), valued at each service's average ticket over the last 90
-							days — earlier cancellations were never in "expected". Actual bars stop
-							at today; today's is partial.
+							days, earlier cancellations were never in "expected". Expected only
+							exists inside the projection window; actual bars stop at today.
 						</p>
 					) : null}
+				</section>
+			) : null}
+
+			{rangeDaily ? (
+				<section>
+					<h2>
+						Where it fell short{' '}
+						<span className="mini">
+							appointment by appointment, worst first ·{' '}
+							<Link
+								to={`/admin/reports/appointments?window=custom&from=${win.fromDay}&to=${win.toDay}`}
+							>
+								full breakdown →
+							</Link>
+						</span>
+					</h2>
+					{!missesEnabled ? (
+						<p className="note">
+							Narrow the window to 5 weeks or less to see per-appointment detail
+							here (the full breakdown link still works for any range).
+						</p>
+					) : missesFetcher.state !== 'idle' && missesFetcher.data == null ? (
+						<p className="note">Loading appointment detail from Boulevard…</p>
+					) : misses.length === 0 ? (
+						<p className="note">
+							Nothing behind expectation in this window, every completed
+							appointment is at or above its expected value.
+						</p>
+					) : (
+						<div className="rtable-wrap">
+							<table className="rtable">
+								<thead>
+									<tr>
+										<th>When</th>
+										<th>Client</th>
+										<th>Service</th>
+										<th className="num">Expected</th>
+										<th className="num">Actual</th>
+										<th>Why</th>
+									</tr>
+								</thead>
+								<tbody>
+									{misses.map(r => (
+										<tr key={r.appointmentId}>
+											<td>
+												{new Date(r.startAt).toLocaleString('en-US', {
+													timeZone: 'America/New_York',
+													weekday: 'short',
+													hour: 'numeric',
+													minute: '2-digit',
+												})}
+											</td>
+											<td>
+												{r.manageUrl ? (
+													<a href={r.manageUrl} target="_blank" rel="noreferrer">
+														{r.clientName}
+													</a>
+												) : (
+													r.clientName
+												)}
+												{r.isNewPatient ? (
+													<span className="mini"> · new patient</span>
+												) : null}
+											</td>
+											<td>{r.services.join(', ')}</td>
+											<td className="num">{usd(r.expectedUsd)}</td>
+											<td className="num">{usd(r.actualUsd)}</td>
+											<td>
+												{r.reason}
+												<span className="mini">
+													{r.nextVisitAt
+														? ` · ${r.status === 'cancelled' || r.status === 'no_show' ? 'rescheduled' : 'next visit'} ${new Date(
+																r.nextVisitAt,
+															).toLocaleDateString('en-US', {
+																timeZone: 'America/New_York',
+																month: '2-digit',
+																day: '2-digit',
+															})}`
+														: r.status === 'cancelled' || r.status === 'no_show'
+															? ' · not rebooked'
+															: ''}
+												</span>
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+					)}
+					<p className="note">
+						Mid-cycle weight-loss visits are expected at $0 (their payment lands
+						on the monthly renewal), so they no longer show up here as misses.
+					</p>
 				</section>
 			) : null}
 
@@ -507,7 +692,7 @@ export default function Revenue() {
 			{pnl ? (
 				<section>
 					<h2>
-						Business P&amp;L — monthly actuals <span className="mini">bank-verified · profitability</span>
+						Business P&amp;L, monthly actuals <span className="mini">bank-verified · profitability</span>
 					</h2>
 					<BarChart
 						labels={pnl.map(m => m.month)}
@@ -547,11 +732,11 @@ export default function Revenue() {
 										<td>{a.week}</td>
 										<td className="num">{usd(Number(a.projected))}</td>
 										<td className="num">
-											{a.lo != null && a.hi != null ? `${usd(Number(a.lo))} – ${usd(Number(a.hi))}` : '—'}
+											{a.lo != null && a.hi != null ? `${usd(Number(a.lo))} – ${usd(Number(a.hi))}` : '-'}
 										</td>
-										<td className="num">{a.actual == null ? '—' : usd(Number(a.actual))}</td>
+										<td className="num">{a.actual == null ? '-' : usd(Number(a.actual))}</td>
 										<td className={`num ${a.err_pct == null ? '' : Math.abs(Number(a.err_pct)) > 15 ? 'bad' : 'good'}`}>
-											{a.err_pct == null ? '—' : `${Number(a.err_pct) > 0 ? '+' : ''}${a.err_pct}%`}
+											{a.err_pct == null ? '-' : `${Number(a.err_pct) > 0 ? '+' : ''}${a.err_pct}%`}
 										</td>
 									</tr>
 								))}

@@ -1,6 +1,6 @@
 /**
  * Typed access to the CANONICAL location config (app/config/locations.json).
- * Every per-location fact — NAP, GBP ids, tracking numbers, BrightLocal ids —
+ * Every per-location fact, NAP, GBP ids, tracking numbers, BrightLocal ids -
  * lives in that one file; edit it there, never here. This module derives the
  * shapes the app consumes and the URL schemes shared with the scripts.
  */
@@ -18,7 +18,7 @@ export const locations = config.locations.map(loc => ({
 	city: loc.address.city,
 	state: loc.address.state,
 	zip: loc.address.zip,
-	/** Real NAP line — shown on the site; CallRail swaps it dynamically. */
+	/** Real NAP line, shown on the site; CallRail swaps it dynamically. */
 	phone: loc.phones.real,
 	phoneRaw: loc.phones.realRaw,
 	lat: loc.geo.lat,
@@ -27,10 +27,10 @@ export const locations = config.locations.map(loc => ({
 
 export type Location = (typeof locations)[number]
 
-/** Public locations — shown in nav, footer, and the contact page (ghosts excluded). */
+/** Public locations, shown in nav, footer, and the contact page (ghosts excluded). */
 export const publicLocations = locations.filter(location => !location.ghost)
 
-/** Phone number — CallRail will swap this dynamically for tracking */
+/** Phone number, CallRail will swap this dynamically for tracking */
 export const PHONE = '(865) 489-8008'
 export const PHONE_RAW = '8654898008'
 
@@ -42,7 +42,7 @@ export function formatAddress(location: Location): string {
 	return `${location.address}, ${location.city}, ${location.state} ${location.zip}`
 }
 
-/** Canonical Google Maps URL for the listing — used as JSON-LD sameAs/hasMap. */
+/** Canonical Google Maps URL for the listing, used as JSON-LD sameAs/hasMap. */
 export function mapsUrl(location: Location): string {
 	return `https://maps.google.com/maps?cid=${location.gbp.mapsCid}`
 }

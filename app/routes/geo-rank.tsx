@@ -8,7 +8,6 @@
  */
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/node'
 import { useFetcher, useLoaderData, useSubmit } from '@remix-run/react'
-import pg from 'pg'
 import { useEffect, useMemo, useRef } from 'react'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
 import { LineChart, ReportPage, StatTile, usd } from '#app/components/report-ui'
@@ -17,6 +16,7 @@ import {
 	weeklyGmbWeightLossPhone,
 } from '#app/utils/gmb-bookings.server'
 import { requireUserWithRole } from '#app/utils/permissions.server'
+import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
 
 export const meta: MetaFunction = () => [
 	{ title: 'Geo Rank Explorer' },
@@ -35,7 +35,7 @@ const BRAND_CASE = `CASE WHEN m.listing LIKE 'SHA%' THEN 'Sarah Hitchcox Aesthet
 	WHEN m.listing LIKE 'KWLC%' THEN 'Weight Loss Knox' END`
 
 /**
- * Manual "Refresh reach" — starts a forced geoRankCapture on the sha-reports
+ * Manual "Refresh reach", starts a forced geoRankCapture on the sha-reports
  * Temporal worker (task queue "reports"). Force captures an ADDITIONAL
  * snapshot keyed to today's date (~$4.50 of DataForSEO tasks, ~1-2h); it
  * never deletes or replaces existing captures.
@@ -63,13 +63,25 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
-	const url = process.env.REPORTS_DATABASE_URL?.trim()
-	if (!url) return json({ configured: false as const })
+	if (!hasReportsDb()) return json({ configured: false as const })
 
 	const params = new URL(request.url).searchParams
-	const client = new pg.Client({ connectionString: url })
-	await client.connect()
-	try {
+	// All heavy aggregates read geo_point_week_mv (one row per grid point per
+	// week, ~46k rows instead of ~900k raw results). Refresh it lazily when a
+	// new capture has landed; the first page view after a capture pays once.
+	const stale = (
+		await reportsQuery<{ stale: boolean }>(
+			`SELECT coalesce((SELECT max(week) FROM geo_point_week_mv)
+			   < (SELECT max(week) FROM raw_dataforseo_region), true) AS stale`,
+		)
+	)[0]?.stale
+	if (stale) await reportsQuery(`REFRESH MATERIALIZED VIEW geo_point_week_mv`)
+	const client = {
+		query: async <T extends Record<string, any> = any>(sql: string, params?: unknown[]) => ({
+			rows: await reportsQuery<T>(sql, params ?? []),
+		}),
+	}
+	{
 		const weeks = (
 			await client.query<{ week: string }>(
 				`SELECT DISTINCT to_char(week, 'YYYY-MM-DD') AS week FROM raw_dataforseo_region ORDER BY 1 DESC`,
@@ -87,13 +99,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			: (keywords.find(k => k === 'med spa near me') ?? keywords[0])
 		const brand = (BRANDS as readonly string[]).includes(params.get('brand') ?? '')
 			? params.get('brand')!
-			: BRANDS[0] // default: All businesses — best rank across every listing
-		// "All businesses": any of our listings counts — best rank at each point.
+			: BRANDS[0] // default: All businesses, best rank across every listing
+		// "All businesses": any of our listings counts, best rank at each point.
 		const isAll = brand === ALL_BUSINESSES
+		const hitCol = isAll
+			? 'hit_all'
+			: brand === 'Sarah Hitchcox Aesthetics'
+				? 'hit_sha'
+				: brand === 'Botox Knox'
+					? 'hit_bk'
+					: 'hit_wlk'
 
 		const grid = (
 			await client.query(
-				`SELECT g.grid_lat AS lat, g.grid_lng AS lng, r.rank
+				`SELECT g.grid_lat AS lat, g.grid_lng AS lng, g."gridRow" AS row, g."gridCol" AS col, r.rank
 				 FROM (SELECT DISTINCT "gridRow", "gridCol", "gridLat" AS grid_lat, "gridLng" AS grid_lng
 				       FROM raw_dataforseo_region WHERE week = $1::date AND keyword = $2) g
 				 LEFT JOIN (SELECT "gridRow", "gridCol", min("rankAbsolute") AS rank
@@ -102,7 +121,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				            GROUP BY 1, 2) r USING ("gridRow", "gridCol")`,
 				isAll ? [week, keyword] : [week, keyword, brand],
 			)
-		).rows as Array<{ lat: number; lng: number; rank: number | null }>
+		).rows as Array<{ lat: number; lng: number; row: number; col: number; rank: number | null }>
 
 		const ranges = (
 			await client.query(
@@ -127,22 +146,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		// geo_grid_homes is empty, matching report_geo_reach semantics).
 		const trends = (
 			await client.query(
-				`WITH pts AS (
-				   SELECT week, keyword, "gridRow", "gridCol", "gridLat", "gridLng",
-				     bool_or(m.place_id IS NOT NULL AND r."rankAbsolute" <= 3${isAll ? '' : ` AND ${BRAND_CASE} = $1`}) AS hit
-				   FROM raw_dataforseo_region r LEFT JOIN geo_my_listing m ON m.place_id = r."placeId"
-				   GROUP BY 1, 2, 3, 4, 5, 6)
-				 SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
-				   round(100.0 * sum(COALESCE(h.homes, 1)) FILTER (WHERE hit)
-				     / nullif(sum(COALESCE(h.homes, 1)), 0), 2) AS reach_pct
-				 FROM pts LEFT JOIN geo_grid_homes h
-				   ON h.grid_lat = round(pts."gridLat"::numeric, 4) AND h.grid_lng = round(pts."gridLng"::numeric, 4)
+				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
+				   round(100.0 * sum(COALESCE(homes, 1)) FILTER (WHERE ${hitCol})
+				     / nullif(sum(COALESCE(homes, 1)), 0), 2) AS reach_pct
+				 FROM geo_point_week_mv
 				 GROUP BY week, keyword ORDER BY keyword, week`,
-				isAll ? [] : [brand],
 			)
 		).rows as Array<{ week: string; keyword: string; reach_pct: number | null }>
 
-		// Competitor leaderboard for the selected keyword+week — who owns the
+		// Competitor leaderboard for the selected keyword+week, who owns the
 		// map pack across the metro (replaces the Metabase geo-rank dashboard).
 		const leaderboard = (
 			await client.query(
@@ -173,46 +185,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		// Census-weighted household reach per keyword per week (brand-scoped).
 		const reachRows = (
 			await client.query(
-				`WITH pts AS (
-					SELECT week, keyword, "gridRow", "gridCol",
-						round(avg("gridLat")::numeric, 4) AS glat, round(avg("gridLng")::numeric, 4) AS glng,
-						bool_or(m.place_id IS NOT NULL AND r."rankAbsolute" <= 3${isAll ? '' : ` AND ${BRAND_CASE} = $1`}) AS hit
-					FROM raw_dataforseo_region r LEFT JOIN geo_my_listing m ON m.place_id = r."placeId"
-					GROUP BY 1, 2, 3, 4)
-				 SELECT to_char(pts.week, 'YYYY-MM-DD') AS week, pts.keyword,
-					 COALESCE(sum(COALESCE(h.homes, 0)) FILTER (WHERE hit), 0) AS reached,
-					 sum(COALESCE(h.homes, 0)) AS metro
-				 FROM pts LEFT JOIN geo_grid_homes h ON h.grid_lat = pts.glat AND h.grid_lng = pts.glng
+				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
+					 COALESCE(sum(COALESCE(homes, 0)) FILTER (WHERE ${hitCol}), 0) AS reached,
+					 sum(COALESCE(homes, 0)) AS metro
+				 FROM geo_point_week_mv
 				 GROUP BY 1, 2 ORDER BY 1, 2`,
-				isAll ? [] : [brand],
 			)
 		).rows as Array<{ week: string; keyword: string; reached: string; metro: string }>
 
 		// Reach → $ inputs (brand-independent: all our listings combined).
 		const rankHomes = (
 			await client.query(
-				`WITH pts AS (
-					SELECT week, keyword, "gridRow", "gridCol",
-						round(avg("gridLat")::numeric, 4) AS glat, round(avg("gridLng")::numeric, 4) AS glng,
-						min(r."rankAbsolute") FILTER (WHERE m.place_id IS NOT NULL AND r."rankAbsolute" <= 3) AS best_rank
-					FROM raw_dataforseo_region r LEFT JOIN geo_my_listing m ON m.place_id = r."placeId"
-					GROUP BY 1, 2, 3, 4)
-				 SELECT to_char(pts.week, 'YYYY-MM-DD') AS week, pts.keyword, pts.best_rank,
-					 sum(COALESCE(h.homes, 0)) AS homes
-				 FROM pts LEFT JOIN geo_grid_homes h ON h.grid_lat = pts.glat AND h.grid_lng = pts.glng
-				 WHERE pts.best_rank IS NOT NULL
+				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, best_rank,
+					 sum(COALESCE(homes, 0)) AS homes
+				 FROM geo_point_week_mv
+				 WHERE best_rank IS NOT NULL
 				 GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`,
 			)
 		).rows as Array<{ week: string; keyword: string; best_rank: number; homes: string }>
 		const totalsRv = (
 			await client.query(
-				`WITH pts AS (
-					SELECT week, keyword, "gridRow", "gridCol",
-						round(avg("gridLat")::numeric, 4) AS glat, round(avg("gridLng")::numeric, 4) AS glng
-					FROM raw_dataforseo_region GROUP BY 1, 2, 3, 4)
-				 SELECT to_char(pts.week, 'YYYY-MM-DD') AS week, pts.keyword,
-					 sum(COALESCE(h.homes, 0)) AS total_homes
-				 FROM pts LEFT JOIN geo_grid_homes h ON h.grid_lat = pts.glat AND h.grid_lng = pts.glng
+				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
+					 sum(COALESCE(homes, 0)) AS total_homes
+				 FROM geo_point_week_mv
 				 GROUP BY 1, 2`,
 			)
 		).rows as Array<{ week: string; keyword: string; total_homes: string }>
@@ -237,8 +232,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			valueByCategory: Object.fromEntries(clientValues.map(r => [r.category, Number(r.value)])),
 			actualWeb, actualPhone,
 		})
-	} finally {
-		await client.end().catch(() => {})
 	}
 }
 
@@ -271,12 +264,58 @@ function bucket(rank: number | null) {
  * JSX, so hydration reconciles away any panes an early inline script built
  * (the map "flashed" then went blank). An effect runs post-hydration only.
  */
-type GeoMarker = { lat: number; lng: number; rank: number | null; c: string; b: string }
+type GeoMarker = {
+	lat: number
+	lng: number
+	row: number
+	col: number
+	rank: number | null
+	c: string
+	b: string
+}
+type MapCtx = { week: string; keyword: string }
 
-function drawMarkers(L: any, layer: any, markers: GeoMarker[]) {
+const escapeHtml = (v: string) =>
+	v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** Click a dot → fetch and show the full local pack at that grid point. */
+async function pointPopupHtml(ctx: MapCtx, m: GeoMarker): Promise<string> {
+	const qs = new URLSearchParams({
+		week: ctx.week,
+		keyword: ctx.keyword,
+		row: String(m.row),
+		col: String(m.col),
+	})
+	const res = await fetch(`/resources/geo-rank-point?${qs}`)
+	const data = (await res.json()) as {
+		results: Array<{
+			rank: number | null
+			title: string | null
+			rating: string | null
+			votes: number | null
+			is_mine: boolean
+		}>
+	}
+	if (!data.results.length) return '<em>No results captured at this point.</em>'
+	const rows = data.results
+		.map(
+			r =>
+				`<tr${r.is_mine ? ' style="font-weight:700;background:#fdf2f8"' : ''}>
+					<td style="padding:1px 6px;text-align:right">${r.rank ?? '-'}</td>
+					<td style="padding:1px 6px">${escapeHtml(r.title ?? '?')}</td>
+					<td style="padding:1px 6px;white-space:nowrap">${r.rating ?? '-'}★ (${r.votes ?? 0})</td>
+				</tr>`,
+		)
+		.join('')
+	return `<div style="max-height:260px;overflow-y:auto">
+		<div style="font-weight:700;margin-bottom:4px">${escapeHtml(ctx.keyword)}, ${escapeHtml(ctx.week)}</div>
+		<table style="font-size:12px;border-collapse:collapse">${rows}</table></div>`
+}
+
+function drawMarkers(L: any, layer: any, markers: GeoMarker[], ctx: MapCtx) {
 	layer.clearLayers()
 	for (const p of markers) {
-		L.circleMarker([p.lat, p.lng], {
+		const marker = L.circleMarker([p.lat, p.lng], {
 			radius: p.b === 'none' ? 3 : 7,
 			color: p.c,
 			weight: 1,
@@ -285,17 +324,27 @@ function drawMarkers(L: any, layer: any, markers: GeoMarker[]) {
 			opacity: p.b === 'none' ? 0.3 : 1,
 		})
 			.addTo(layer)
-			.bindTooltip(p.rank == null ? 'not in top 20' : `rank #${p.rank}`)
+			.bindTooltip(p.rank == null ? 'not in top 20' : `rank #${p.rank}, click for full listing`)
+		marker.on('click', async () => {
+			marker.bindPopup('<em>Loading…</em>', { maxWidth: 340 }).openPopup()
+			try {
+				marker.setPopupContent(await pointPopupHtml(ctx, p))
+			} catch {
+				marker.setPopupContent('<em>Failed to load listing.</em>')
+			}
+		})
 	}
 }
 
-function useLeafletMap(markers: GeoMarker[]) {
+function useLeafletMap(markers: GeoMarker[], ctx: MapCtx) {
 	const mapRef = useRef<HTMLDivElement>(null)
 	const mapInstance = useRef<any>(null)
 	const layerRef = useRef<any>(null)
 	const fitted = useRef(false)
 	const markersRef = useRef(markers)
 	markersRef.current = markers
+	const ctxRef = useRef(ctx)
+	ctxRef.current = ctx
 
 	// Create the map ONCE; selector changes must never reset zoom/pan.
 	useEffect(() => {
@@ -306,7 +355,7 @@ function useLeafletMap(markers: GeoMarker[]) {
 			const L = (window as any).L
 			if (cancelled) return
 			// Wait for the CDN script AND a real container size (hub pane
-			// iframes lay out late — a 0-height init renders a blank map).
+			// iframes lay out late, a 0-height init renders a blank map).
 			if (!L || !el || el.clientHeight < 40) return void setTimeout(init, 60)
 			const map = L.map(el)
 			L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -315,13 +364,13 @@ function useLeafletMap(markers: GeoMarker[]) {
 			}).addTo(map)
 			mapInstance.current = map
 			layerRef.current = L.layerGroup().addTo(map)
-			drawMarkers(L, layerRef.current, markersRef.current)
+			drawMarkers(L, layerRef.current, markersRef.current, ctxRef.current)
 			const bounds = markersRef.current.map(p => [p.lat, p.lng] as [number, number])
 			if (bounds.length) {
 				map.fitBounds(bounds, { padding: [20, 20] })
 				fitted.current = true
 			}
-			// Re-measure (not re-fit — that would steal zoom/pan) on pane resize.
+			// Re-measure (not re-fit, that would steal zoom/pan) on pane resize.
 			if (window.ResizeObserver) {
 				ro = new ResizeObserver(() => map?.invalidateSize())
 				ro.observe(el)
@@ -342,7 +391,7 @@ function useLeafletMap(markers: GeoMarker[]) {
 	useEffect(() => {
 		const L = (window as any).L
 		if (!L || !layerRef.current) return
-		drawMarkers(L, layerRef.current, markers)
+		drawMarkers(L, layerRef.current, markers, ctxRef.current)
 		if (!fitted.current && markers.length && mapInstance.current) {
 			mapInstance.current.fitBounds(
 				markers.map(p => [p.lat, p.lng] as [number, number]),
@@ -366,7 +415,10 @@ export default function GeoRank() {
 				: [],
 		[data],
 	)
-	const mapRef = useLeafletMap(markers)
+	const mapRef = useLeafletMap(markers, {
+		week: data.configured ? data.week : '',
+		keyword: data.configured ? data.keyword : '',
+	})
 	if (!data.configured) {
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
 	}
@@ -395,7 +447,7 @@ export default function GeoRank() {
 				))}
 				<button type="button" disabled={refresher.state !== 'idle'}
 					onClick={() => {
-						if (confirm('Capture a fresh reach snapshot now? (~$4.50 of DataForSEO tasks; fresh ranks land in ~1-2h as a NEW date in the date dropdown — existing data is never touched.)'))
+						if (confirm('Capture a fresh reach snapshot now? (~$4.50 of DataForSEO tasks; fresh ranks land in ~1-2h as a NEW date in the date dropdown, existing data is never touched.)'))
 							refresher.submit({}, { method: 'post' })
 					}}
 					style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #2563eb', background: refresher.state !== 'idle' ? '#93c5fd' : '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 13 }}>
@@ -414,7 +466,7 @@ export default function GeoRank() {
 			<div id="geo-map" ref={mapRef} style={{ height: 'calc(100vh - 54px)', width: '100%' }} />
 
 			<section style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
-				<h2 style={{ fontSize: 18 }}>Ranges — {brand} ({week})</h2>
+				<h2 style={{ fontSize: 18 }}>Ranges, {brand} ({week})</h2>
 				<div style={{ overflowX: 'auto' }}>
 					<table style={{ borderCollapse: 'collapse', width: '100%', fontVariantNumeric: 'tabular-nums' }}>
 						<thead><tr>{['keyword', 'listing', 'points', '% of metro', 'top-3 pts', '4–10 pts', 'best', 'median'].map(h => (
@@ -435,7 +487,7 @@ export default function GeoRank() {
 					</table>
 				</div>
 
-				<h2 style={{ fontSize: 18, marginTop: 28 }}>Reach trends — {brand} (top-3 household reach %)</h2>
+				<h2 style={{ fontSize: 18, marginTop: 28 }}>Reach trends, {brand} (top-3 household reach %)</h2>
 				<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
 					{[...trendByKeyword.entries()].map(([kw, pts]) => {
 						const max = Math.max(1, ...pts.map(p => p.v))
@@ -484,7 +536,7 @@ function ConsolidatedSections({
 		rankHomes, totalsRv, valueByCategory, actualWeb, actualPhone,
 	} = data
 
-	// Household reach — latest week vs prior, per keyword (brand-scoped).
+	// Household reach, latest week vs prior, per keyword (brand-scoped).
 	const reachWeeks = [...new Set(reachRows.map(r => r.week))].sort()
 	const latestWeek = reachWeeks.at(-1)
 	const priorWeek = reachWeeks.at(-2)
@@ -605,12 +657,12 @@ function ConsolidatedSections({
 									<td>{r.title}{r.is_mine ? ' ★' : ''}</td>
 									<td className="num">{r.top3}</td>
 									<td className="num">
-										{totalPoints ? `${((100 * Number(r.top3)) / totalPoints).toFixed(1)}%` : '—'}
+										{totalPoints ? `${((100 * Number(r.top3)) / totalPoints).toFixed(1)}%` : '-'}
 									</td>
 									<td className="num">{r.mid}</td>
 									<td className="num">{r.best}</td>
-									<td className="num">{r.rating ?? '—'}</td>
-									<td className="num">{r.votes ?? '—'}</td>
+									<td className="num">{r.rating ?? '-'}</td>
+									<td className="num">{r.votes ?? '-'}</td>
 								</tr>
 							))}
 						</tbody>
@@ -620,7 +672,7 @@ function ConsolidatedSections({
 
 			<section>
 				<h2>
-					Household reach — {brand} <span className="mini">{latestWeek}{priorWeek ? ` vs ${priorWeek}` : ''} · census households in top-3 cells</span>
+					Household reach, {brand} <span className="mini">{latestWeek}{priorWeek ? ` vs ${priorWeek}` : ''} · census households in top-3 cells</span>
 				</h2>
 				<div className="rtable-wrap">
 					<table className="rtable">
@@ -637,10 +689,10 @@ function ConsolidatedSections({
 								<tr key={k.keyword}>
 									<td>{k.keyword}</td>
 									<td className="num">{k.reached.toLocaleString('en-US')}</td>
-									<td className="num">{k.metro ? `${((100 * k.reached) / k.metro).toFixed(1)}%` : '—'}</td>
+									<td className="num">{k.metro ? `${((100 * k.reached) / k.metro).toFixed(1)}%` : '-'}</td>
 									<td className={`num ${k.delta == null ? '' : k.delta < 0 ? 'bad' : 'good'}`}>
 										{k.delta == null
-											? '—'
+											? '-'
 											: `${k.delta >= 0 ? '+' : '−'}${Math.abs(k.delta).toLocaleString('en-US')}`}
 									</td>
 								</tr>

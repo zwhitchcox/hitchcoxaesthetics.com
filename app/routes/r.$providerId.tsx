@@ -32,7 +32,7 @@ export const meta: MetaFunction = () => [
 ]
 
 export async function loader({ params }: LoaderFunctionArgs) {
-	// The sample-uniqueness ledger writes to SQLite — pin to the primary.
+	// The sample-uniqueness ledger writes to SQLite, pin to the primary.
 	await ensurePrimary()
 	const providerId = params.providerId!
 	const staffUrn = toStaffUrn(providerId)
@@ -52,14 +52,14 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	const serviceName = appt?.serviceName ?? 'your visit'
 	const profile = getServiceProfile(serviceName)
 
-	// Temporary review routing while seeding the microsite listings: weight
-	// loss reviews go to Weight Loss Knox, laser reviews stay on the SHA
-	// listing, and EVERYTHING else (tox, filler, skin, consults, ...) seeds
-	// Botox Knox. Toggle without a deploy: fly secrets set
-	// REVIEW_MICROSITE_REDIRECTS=1 (on) / unset (off).
+	// Temporary review routing while seeding the microsite listings
+	// (2026-07-21: ALL reviews leave SHA, weight loss goes to Weight Loss
+	// Knox and EVERYTHING else, laser included, seeds Botox Knox; both
+	// microsites currently point every button at their Farragut listing).
+	// Toggle without a deploy: fly secrets set REVIEW_MICROSITE_REDIRECTS=1
+	// (on) / unset (off).
 	// Category names come from getServiceProfile in review-link.server.ts.
 	const micrositeHostFor = (category: string) => {
-		if (category === 'Laser') return undefined // stays on SHA
 		if (category === 'Weight Loss') return 'https://weightlossknoxvilletn.com'
 		return 'https://botoxknoxvilletn.com'
 	}
@@ -104,7 +104,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	])
 	const review =
 		uniqueSample ??
-		`${providerFirstName} and the team took wonderful care of me — sharing a couple of details about your visit helps others in Knoxville find us.`
+		`${providerFirstName} and the team took wonderful care of me, sharing a couple of details about your visit helps others in Knoxville find us.`
 
 	const matchedPlaceId = matchLocationToAppointment(locations, appt?.locationName)
 	// Float the location they visited to the top.

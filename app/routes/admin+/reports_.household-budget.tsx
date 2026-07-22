@@ -1,5 +1,5 @@
 /**
- * Household budget — native replacement for Metabase dashboard 7: monthly
+ * Household budget, native replacement for Metabase dashboard 7: monthly
  * spend trend, category breakdown (top 7 + Other, stacked), dining vs
  * groceries, category summary, top merchants, recurring charges.
  */

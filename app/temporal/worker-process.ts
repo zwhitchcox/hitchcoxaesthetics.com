@@ -1,7 +1,7 @@
 /**
  * Standalone Temporal worker process. Bundled by other/build-temporal.ts into
  * build/temporal/worker.js and spawned as a supervised CHILD PROCESS by
- * app/temporal/worker.server.ts — a worker crash can never take down the web
+ * app/temporal/worker.server.ts, a worker crash can never take down the web
  * server. Runs on the same machine as the web app because activities write to
  * SQLite through LiteFS, which only the primary machine can do.
  */
@@ -18,7 +18,7 @@ import {
 } from './config.server.ts'
 
 // Build-time smoke mode (Dockerfile RUN step): reaching this line means the
-// entire import graph — including native modules — loaded in this image.
+// entire import graph, including native modules, loaded in this image.
 if (process.env.TEMPORAL_SMOKE === '1') {
 	console.log('[temporal-worker] smoke OK: import graph loads')
 	process.exit(0)

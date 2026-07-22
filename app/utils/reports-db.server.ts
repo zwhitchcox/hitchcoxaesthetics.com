@@ -1,5 +1,5 @@
 /**
- * Read-only access to the reports Postgres (REPORTS_DATABASE_URL) — the same
+ * Read-only access to the reports Postgres (REPORTS_DATABASE_URL), the same
  * database the finance sync (finance-reports.server.ts) and the sha-reports
  * worker write to. Native report pages read it directly.
  */

@@ -3,7 +3,7 @@ const GA4_MEASUREMENT_PROTOCOL_ENDPOINT =
 
 /**
  * GA4 Measurement Protocol events can only be attributed to an ad click by
- * joining onto the originating web session (client_id + session_id) — the
+ * joining onto the originating web session (client_id + session_id), the
  * protocol has no gclid field. Events older than ~72 hours are dropped by
  * GA4, so callers must keep timestamps within that window.
  */

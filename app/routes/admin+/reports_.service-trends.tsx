@@ -1,5 +1,5 @@
 /**
- * Service trends — demand per category since Jun 2024 (trend + seasonality)
+ * Service trends, demand per category since Jun 2024 (trend + seasonality)
  * and weekday x hour peak times, from the worker-synced service_month_trend /
  * service_time_peak tables. Answers "is this month normal?" per service.
  */
@@ -47,7 +47,7 @@ export default function ServiceTrends() {
 		return (
 			<ReportPage title="Service trends" subtitle="Demand per service category since Jun 2024">
 				<p className="note">
-					No data yet — the worker sync (service-trends-daily) hasn't run. It
+					No data yet, the worker sync (service-trends-daily) hasn't run. It
 					fills this page automatically; check back shortly.
 				</p>
 			</ReportPage>
@@ -105,7 +105,7 @@ export default function ServiceTrends() {
 				/>
 				<StatTile
 					label={`Same month last year (${lastYearMonth})`}
-					value={String(lastYearTotal || '—')}
+					value={String(lastYearTotal || '-')}
 					whisper={
 						lastYearTotal
 							? `pace is ${Math.round((100 * pace) / lastYearTotal)}% of last year's total`
@@ -130,7 +130,7 @@ export default function ServiceTrends() {
 					tickEvery={3}
 				/>
 				<p className="note">
-					The last point is the current month in progress — read it with the
+					The last point is the current month in progress, read it with the
 					pace tile, not at face value.
 				</p>
 			</section>

@@ -232,7 +232,7 @@ export async function captureCallRailPhoneConversionToPostHog({
  * After a phone conversion, identify the caller so the PostHog person carries
  * real customer data (name/email from the call and the matched Boulevard
  * profile). When the conversion matched an anonymous web session, merge that
- * session into the caller's phone-first person — the same `phone:` identity
+ * session into the caller's phone-first person, the same `phone:` identity
  * the website booking flow uses.
  */
 async function identifyPhoneConversionPerson(

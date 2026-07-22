@@ -5,7 +5,7 @@
  * even though PostHog captured the full booking_completed event. This
  * reconciler finds client-booked Boulevard appointments with no touch, pulls
  * the matching booking_completed event from PostHog, and records the touch
- * from it — same code path as the live POST, so reports relabel automatically.
+ * from it, same code path as the live POST, so reports relabel automatically.
  *
  * Match rule: the appointment's Boulevard client phone equals the event's
  * phone identity AND the event fired within 30 minutes of the appointment
@@ -89,7 +89,7 @@ async function fetchClientContacts(clientIds: string[]) {
 	return contacts
 }
 
-/** Attribution properties are all optional strings — drop everything else. */
+/** Attribution properties are all optional strings, drop everything else. */
 function stringProps(props: Record<string, unknown>) {
 	const out: Record<string, string> = {}
 	for (const [k, v] of Object.entries(props)) {

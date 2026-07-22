@@ -4,9 +4,9 @@
  * hover layer. Palette follows the dataviz reference instance: categorical
  * slots in fixed order, diverging blue↔red, status colors reserved.
  */
-import { useId, useRef, useState, type ReactNode } from 'react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 
-/** Categorical slots, fixed order — never cycled. */
+/** Categorical slots, fixed order, never cycled. */
 export const SERIES = [
 	'var(--series-1)',
 	'var(--series-2)',
@@ -62,6 +62,8 @@ table.rtable { width: 100%; border-collapse: collapse; font-variant-numeric: tab
 .rtable td.num, .rtable th.num { text-align: right; white-space: nowrap; }
 .rtable tr:last-child td { border-bottom: none; }
 .rtable tbody tr:hover { background: var(--row-hover); }
+.rtable th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.rtable th.sortable:hover { color: var(--ink); }
 .rtable td.good { color: var(--good-text); }
 .rtable td.bad { color: var(--bad-text); }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-2); margin: 2px 0 6px; }
@@ -102,7 +104,7 @@ export function ReportPage({
 
 export const usd = (n: number | null | undefined, digits = 0) =>
 	n == null
-		? '—'
+		? '-'
 		: (n < 0 ? '−' : '') +
 			'$' +
 			Math.abs(n).toLocaleString('en-US', {
@@ -169,7 +171,63 @@ interface Tip {
 function useTip() {
 	const [tip, setTip] = useState<Tip | null>(null)
 	const ref = useRef<HTMLDivElement>(null)
-	return { tip, setTip, ref }
+	// Keep the tooltip inside the container, points near the right edge were
+	// rendering half off-page (clipped by the pane).
+	const clampX = (x: number) => {
+		const w = ref.current?.clientWidth ?? Number.MAX_SAFE_INTEGER
+		return Math.min(Math.max(x, 90), Math.max(90, w - 90))
+	}
+	return { tip, setTip, ref, clampX }
+}
+
+/**
+ * Click-to-sort for report tables. Returns sorted rows plus a Th component
+ * that renders a sortable header cell; first click sorts descending, second
+ * flips. Optional accessors compute the sort value for non-scalar fields.
+ */
+export function useSortable<T extends Record<string, any>>(
+	rows: T[],
+	accessors: Record<string, (row: T) => unknown> = {},
+) {
+	const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null)
+	const sorted = useMemo(() => {
+		if (!sort) return rows
+		const get = accessors[sort.key] ?? ((r: T) => r[sort.key])
+		return [...rows].sort((a, b) => {
+			const av = get(a)
+			const bv = get(b)
+			if (av == null && bv == null) return 0
+			if (av == null) return 1
+			if (bv == null) return -1
+			const cmp =
+				typeof av === 'number' && typeof bv === 'number'
+					? av - bv
+					: String(av).localeCompare(String(bv))
+			return cmp * sort.dir
+		})
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [rows, sort])
+	const Th = ({
+		k,
+		children,
+		num,
+	}: {
+		k: string
+		children: ReactNode
+		num?: boolean
+	}) => (
+		<th
+			className={`sortable${num ? ' num' : ''}`}
+			onClick={() =>
+				setSort(s => (s?.key === k ? { key: k, dir: s.dir === 1 ? -1 : 1 } : { key: k, dir: -1 }))
+			}
+			title="Click to sort"
+		>
+			{children}
+			{sort?.key === k ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}
+		</th>
+	)
+	return { rows: sorted, Th }
 }
 
 function niceMax(n: number) {
@@ -209,7 +267,7 @@ export function BarChart({
 	/** Total row in the tooltip only makes sense when the series share a unit. */
 	showTotal?: boolean
 }) {
-	const { tip, setTip, ref } = useTip()
+	const { tip, setTip, ref, clampX } = useTip()
 	const H = height
 	const plotH = H - PAD_T - 20
 	const all = stacked
@@ -251,7 +309,7 @@ export function BarChart({
 						const rows = series.map(s => ({
 							name: s.name,
 							color: s.color,
-							value: s.values[i] == null ? '—' : format(s.values[i]!),
+							value: s.values[i] == null ? '-' : format(s.values[i]!),
 						}))
 						if (series.length > 1 && showTotal) {
 							rows.push({
@@ -270,24 +328,30 @@ export function BarChart({
 						})
 					}
 					let stackY = zeroY
+					// topmost non-zero segment gets the rounded cap; the rest stay
+					// flat so the stack reads as one bar, and zero segments are
+					// skipped entirely (no phantom gaps).
+					const topSi = stacked
+						? series.reduce((acc, s, si) => ((s.values[i] ?? 0) > 0 ? si : acc), -1)
+						: -1
 					return (
 						<g key={i} onMouseMove={hover}>
 							<rect x={PAD_L + slot * i} y={PAD_T} width={slot} height={H - PAD_T - 16} fill="transparent" />
 							{series.map((s, si) => {
 								const v = s.values[i]
-								if (v == null) return null
+								if (v == null || (stacked && v === 0)) return null
 								const h = Math.abs(v) * scale
 								let x: number, y: number
 								if (stacked) {
 									x = cx - barW / 2
 									y = stackY - h
-									stackY -= h + 2
+									stackY -= h + 1
 								} else {
 									x = cx - (groupN * (barW + 2)) / 2 + si * (barW + 2)
 									y = v >= 0 ? zeroY - h : zeroY
 								}
 								const fill = colorBy && series.length === 1 ? colorBy(v) : s.color
-								const r = Math.min(4, barW / 2, h)
+								const r = stacked && si !== topSi ? 0 : Math.min(4, barW / 2, h)
 								const up = v >= 0 || stacked
 								// rounded corners only on the data end
 								const d = up
@@ -305,7 +369,7 @@ export function BarChart({
 				})}
 			</svg>
 			{tip ? (
-				<div className="chart-tip" style={{ left: tip.x, top: tip.y }}>
+				<div className="chart-tip" style={{ left: clampX(tip.x), top: tip.y }}>
 					<div style={{ fontWeight: 600 }}>{tip.title}</div>
 					{tip.rows.map(r => (
 						<div className="row" key={r.name}>
@@ -338,7 +402,7 @@ export function LineChart({
 	yMax?: number
 	tickEvery?: number
 }) {
-	const { tip, setTip, ref } = useTip()
+	const { tip, setTip, ref, clampX } = useTip()
 	const id = useId()
 	const H = height
 	const plotH = H - PAD_T - 20
@@ -419,7 +483,7 @@ export function LineChart({
 				</clipPath>
 			</svg>
 			{tip ? (
-				<div className="chart-tip" style={{ left: tip.x, top: tip.y }}>
+				<div className="chart-tip" style={{ left: clampX(tip.x), top: tip.y }}>
 					<div style={{ fontWeight: 600 }}>{tip.title}</div>
 					{tip.rows.map(r => (
 						<div className="row" key={r.name}>

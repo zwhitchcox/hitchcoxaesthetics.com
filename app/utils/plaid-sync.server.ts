@@ -4,7 +4,7 @@
  * Runs as the plaid-sync background job (Temporal schedule / legacy interval).
  * The table is a permanent archive: institutions cap how far back Plaid can
  * read (Capital One serves only the last 90 days), so we upsert everything we
- * see and never delete — data stays after Plaid's window slides past it.
+ * see and never delete, data stays after Plaid's window slides past it.
  *
  * Connections come from PLAID_TOKENS_JSON (Fly secret: the contents of
  * .plaid-tokens.json) or, when unset, from the local .plaid-tokens.json file
@@ -92,7 +92,7 @@ export async function syncPlaidTransactions(): Promise<{
 			}
 			for (const t of res.data.transactions) {
 				// A posted transaction gets a new id and references the pending row
-				// it replaces — drop the pending one so it doesn't double-count.
+				// it replaces, drop the pending one so it doesn't double-count.
 				if (t.pending_transaction_id) {
 					const removed = await prisma.plaidTransaction.deleteMany({
 						where: { id: t.pending_transaction_id },

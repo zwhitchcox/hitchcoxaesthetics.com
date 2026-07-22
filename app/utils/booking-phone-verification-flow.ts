@@ -21,7 +21,7 @@ export type BookingMobileVerificationCodeResult =
 			action:
 				| 'send_mobile_verification_code'
 				| 'send_new_client_mobile_verification_code'
-			/** returning client not found in Boulevard — offer a one-tap
+			/** returning client not found in Boulevard, offer a one-tap
 			 * "continue as a new client" instead of a dead-end error */
 			canContinueAsNewClient?: boolean
 			error: unknown

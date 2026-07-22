@@ -1,5 +1,5 @@
 /**
- * Review links — one page with every review link in the business, built for
+ * Review links, one page with every review link in the business, built for
  * Sarah: direct "leave a review" Google links per listing, and the per-
  * provider QR landing links for each brand (with scannable QR codes).
  */
@@ -26,7 +26,7 @@ const LISTING_LINKS = [
 	{ brand: 'Botox Knox Med Spa', label: 'Bearden (Suite 15b)', placeId: 'ChIJd1SN2ZQ9XIgRB5F_naTr2pM' },
 	{ brand: 'Botox Knox Med Spa', label: 'Farragut (Suite 8b)', placeId: 'ChIJ6_7_utMvXIgRpP1LXfKVvn4' },
 	{ brand: 'Knoxville Weight Loss Clinic', label: 'Bearden (Suite 15c)', placeId: 'ChIJkWEu2yk9XIgR0d0tkwaQ2ac' },
-	{ brand: 'Knoxville Weight Loss Clinic', label: 'Farragut (Suite 8c) — NEW, seed this one', placeId: 'ChIJn1HGW2YvXIgRoEaM1pxtrjg' },
+	{ brand: 'Knoxville Weight Loss Clinic', label: 'Farragut (Suite 8c), NEW, seed this one', placeId: 'ChIJn1HGW2YvXIgRoEaM1pxtrjg' },
 ].map(listing => ({
 	...listing,
 	url: `https://search.google.com/local/writereview?placeid=${listing.placeId}`,

@@ -21,7 +21,7 @@ export async function startTemporalWorker(address: string): Promise<void> {
 	const entry = path.join(process.cwd(), WORKER_ENTRY)
 	if (!existsSync(entry)) {
 		throw new Error(
-			`Temporal worker bundle missing at ${entry} — run the build (build:temporal).`,
+			`Temporal worker bundle missing at ${entry}, run the build (build:temporal).`,
 		)
 	}
 	spawnWorker(entry, address)
@@ -48,7 +48,7 @@ function spawnWorker(entry: string, address: string) {
 			return
 		}
 		console.error(
-			`Temporal worker child exited (code=${code}, signal=${signal}) — restarting in ${Math.round(backoffMs / 1000)}s. The web server is unaffected.`,
+			`Temporal worker child exited (code=${code}, signal=${signal}), restarting in ${Math.round(backoffMs / 1000)}s. The web server is unaffected.`,
 		)
 		const delay = backoffMs
 		backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS)
@@ -69,7 +69,7 @@ export function stopTemporalWorker() {
  */
 export function pauseTemporalWorker() {
 	if (!child) return
-	console.log('Pausing Temporal worker — no longer the LiteFS primary')
+	console.log('Pausing Temporal worker, no longer the LiteFS primary')
 	child.kill('SIGTERM')
 }
 

@@ -8,6 +8,15 @@ import {
 	type BlvdAdminLocation,
 } from '#app/utils/blvd-admin.server.ts'
 import { getProjectedRevenueForBlvdService } from '#app/utils/service-pricing.ts'
+import {
+	avgFirstPaymentUsd,
+	buildWlProfiles,
+	revenuePerKeptVisit,
+	valueWlVisit,
+	WL_ANY_RE,
+	WL_INJECTION_RE,
+	type WlSimState,
+} from '#app/utils/wl-cadence.server.ts'
 
 const BUSINESS_TIMEZONE = 'America/New_York'
 // Owner/test bookings — never counted as revenue or appointments.
@@ -23,6 +32,7 @@ type AppointmentServiceSegment = {
 	appointmentId: string
 	bookedAt: Date | null
 	cancelled: boolean
+	clientId: string | null
 	clientName: string
 	durationMinutes: number | null
 	locationId: string
@@ -48,6 +58,7 @@ type AppointmentNode = {
 	cancelled?: boolean | null
 	client?: {
 		firstName?: string | null
+		id?: string | null
 		lastName?: string | null
 		name?: string | null
 	} | null
@@ -86,6 +97,7 @@ type OrderLineGroup = {
 }
 
 type OrderNode = {
+	clientId?: string | null
 	closedAt?: string | null
 	createdAt?: string | null
 	id?: string | null
@@ -105,6 +117,7 @@ type OrdersResponse = {
 
 type RevenueSample = {
 	amountUsd: number
+	clientId: string | null
 	occurredAt: Date
 	serviceId: string | null
 	serviceName: string
@@ -122,6 +135,8 @@ type ProjectionRow = AppointmentServiceSegment & {
 	averageUsd: number | null
 	fallbackUsd: number
 	projectedUsd: number
+	/** daily_v2_cadence value — per-client for weight loss, = projectedUsd otherwise. */
+	projectedUsdV2: number
 	sampleSize: number
 	source:
 		| 'historical_average'
@@ -174,10 +189,13 @@ export interface RevenueProjectionJson {
 			weekday: string
 			daysOut: number
 			bookedUsd: number
+			bookedUsdV1: number
 			bookedCount: number
 			expectedNewCount: number
 			fillUsd: number
+			fillUsdV1: number
 			expectedUsd: number
+			expectedUsdV1: number
 		}>
 		[key: string]: unknown
 	} | null
@@ -307,6 +325,75 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 	const historySegments = appointmentSegments.filter(
 		segment => segment.startAt < historyEnd,
 	)
+
+	// ---- daily_v2_cadence: per-client weight-loss valuation ------------------
+	// Payments: one event per client per day (an order can split into several
+	// WL line samples — summing per day keeps "paid $500 on the 3rd" one event).
+	const wlPayByClientDay = new Map<string, { clientId: string; atMs: number; usd: number }>()
+	for (const sample of revenueSamples) {
+		if (!sample.clientId || sample.amountUsd <= 0) continue
+		if (!WL_ANY_RE.test(sample.serviceName)) continue
+		const dayKey = `${sample.clientId}|${localDateKey(sample.occurredAt)}`
+		const entry = wlPayByClientDay.get(dayKey) ?? {
+			clientId: sample.clientId,
+			atMs: sample.occurredAt.getTime(),
+			usd: 0,
+		}
+		entry.usd += sample.amountUsd
+		wlPayByClientDay.set(dayKey, entry)
+	}
+	// Visits: one per kept WL-injection appointment.
+	const wlVisitSeen = new Set<string>()
+	const wlVisits: Array<{ clientId: string; atMs: number }> = []
+	for (const segment of historySegments) {
+		if (segment.cancelled || !segment.clientId) continue
+		if (!WL_INJECTION_RE.test(segment.serviceName)) continue
+		if (wlVisitSeen.has(segment.appointmentId)) continue
+		wlVisitSeen.add(segment.appointmentId)
+		wlVisits.push({ clientId: segment.clientId, atMs: segment.startAt.getTime() })
+	}
+	const wlProfiles = buildWlProfiles([...wlPayByClientDay.values()], wlVisits)
+	// Fill fallback: WL-injection revenue per KEPT visit ($0 visits count).
+	const wlInjRevenueUsd = revenueSamples
+		.filter(sample => WL_INJECTION_RE.test(sample.serviceName))
+		.reduce((sum, sample) => sum + sample.amountUsd, 0)
+	const wlInjPerVisitUsd = roundCurrency(
+		revenuePerKeptVisit(wlInjRevenueUsd, wlVisitSeen.size),
+	)
+	// Booked-but-unknown clients are NEW patients: value them at what a new
+	// patient's first paying visit averages (start packages), per Zane.
+	const wlNewPatientUsd =
+		roundCurrency(avgFirstPaymentUsd([...wlPayByClientDay.values()])) ||
+		wlInjPerVisitUsd
+
+	// v2's second correction: services where most kept visits collect $0
+	// (consults, follow-ups) are valued at revenue per KEPT visit, not the
+	// average of the rare paying ones — the paid-only average is pure
+	// survivorship bias for those.
+	const keptVisitsByName = new Map<string, number>()
+	for (const segment of historySegments) {
+		if (segment.cancelled) continue
+		const key = normalizeServiceName(segment.serviceName)
+		keptVisitsByName.set(key, (keptVisitsByName.get(key) ?? 0) + 1)
+	}
+	const paidStatsByName = new Map<string, { count: number; totalUsd: number }>()
+	for (const sample of revenueSamples) {
+		const key = normalizeServiceName(sample.serviceName)
+		const entry = paidStatsByName.get(key) ?? { count: 0, totalUsd: 0 }
+		entry.count += 1
+		entry.totalUsd += sample.amountUsd
+		paidStatsByName.set(key, entry)
+	}
+	const perVisitValueUsd = (serviceName: string): number | null => {
+		if (getServiceValueOverrideUsd(serviceName) !== null) return null
+		const key = normalizeServiceName(serviceName)
+		const kept = keptVisitsByName.get(key) ?? 0
+		const paid = paidStatsByName.get(key)
+		if (kept < 10 || !paid) return null
+		if (paid.count / kept >= 0.5) return null
+		return roundCurrency(paid.totalUsd / kept)
+	}
+
 	const rows = targetSegments
 		.filter(segment => options.includeCancelled || !segment.cancelled)
 		.map(segment =>
@@ -318,7 +405,31 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 		)
 		.sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
 
-	const totalProjectedUsd = rows.reduce((sum, row) => sum + row.projectedUsd, 0)
+	// Chronological pass so a renewal payment lands on one visit per cycle,
+	// not every booked visit in the window.
+	const wlSim: WlSimState = new Map()
+	for (const row of rows) {
+		if (row.source === 'manual_override') continue
+		if (WL_INJECTION_RE.test(row.serviceName)) {
+			const { usd } = valueWlVisit({
+				clientId: row.clientId,
+				visitAtMs: row.startAt.getTime(),
+				profile: row.clientId ? wlProfiles.get(row.clientId) : undefined,
+				fallbackUsd: wlNewPatientUsd,
+				sim: wlSim,
+			})
+			row.projectedUsdV2 = roundCurrency(usd)
+			continue
+		}
+		const perVisit = perVisitValueUsd(row.serviceName)
+		if (perVisit !== null) row.projectedUsdV2 = perVisit
+	}
+
+	const totalProjectedUsdV1 = rows.reduce((sum, row) => sum + row.projectedUsd, 0)
+	const totalProjectedUsd = rows.reduce(
+		(sum, row) => sum + row.projectedUsdV2,
+		0,
+	)
 	const expectedFill = options.includeFill
 		? buildArrivalForecast({
 				end,
@@ -326,9 +437,11 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 				historySegments,
 				minSampleSize: options.minSampleSize,
 				now,
+				perVisitValueUsd,
 				rows,
 				serviceAverages,
 				start,
+				wlInjPerVisitUsd,
 			})
 		: null
 
@@ -338,13 +451,23 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 	const cancellation = computeCancellationRate(appointmentSegments, now)
 	const futureBookedUsd = rows
 		.filter(row => row.startAt >= now)
+		.reduce((sum, row) => sum + row.projectedUsdV2, 0)
+	const futureBookedUsdV1 = rows
+		.filter(row => row.startAt >= now)
 		.reduce((sum, row) => sum + row.projectedUsd, 0)
 	const fillUsd = expectedFill?.totalFillUsd ?? 0
+	const fillUsdV1 = expectedFill?.totalFillUsdV1 ?? 0
 	const expectedCancellationsUsd = roundCurrency(
 		(futureBookedUsd + fillUsd) * cancellation.rate,
 	)
+	const expectedCancellationsUsdV1 = roundCurrency(
+		(futureBookedUsdV1 + fillUsdV1) * cancellation.rate,
+	)
 	const expectedNetRevenueUsd = roundCurrency(
 		totalProjectedUsd + fillUsd - expectedCancellationsUsd,
+	)
+	const expectedNetRevenueUsdV1 = roundCurrency(
+		totalProjectedUsdV1 + fillUsdV1 - expectedCancellationsUsdV1,
 	)
 
 	const result = {
@@ -377,6 +500,7 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 				.length,
 			cancelled_appointment_service_segments: rows.filter(row => row.cancelled)
 				.length,
+			model: 'daily_v2_cadence',
 			total_projected_revenue_usd: roundCurrency(totalProjectedUsd),
 			expected_total_revenue_usd: expectedFill
 				? expectedFill.totalExpectedUsd
@@ -388,6 +512,12 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 			cancellation_sample_appointments: cancellation.total,
 			expected_cancellations_usd: expectedCancellationsUsd,
 			expected_net_revenue_usd: expectedNetRevenueUsd,
+			v1_total_projected_revenue_usd: roundCurrency(totalProjectedUsdV1),
+			v1_expected_total_revenue_usd: expectedFill
+				? expectedFill.totalExpectedUsdV1
+				: roundCurrency(totalProjectedUsdV1),
+			v1_expected_cancellations_usd: expectedCancellationsUsdV1,
+			v1_expected_net_revenue_usd: expectedNetRevenueUsdV1,
 		},
 		window: {
 			end: end.toISOString(),
@@ -484,7 +614,8 @@ function buildProjectionRow({
 		serviceId: segment.serviceId,
 		serviceName: segment.serviceName,
 	})
-	return { ...segment, ...valuation }
+	// projectedUsdV2 starts equal to v1; the weight-loss cadence pass overrides.
+	return { ...segment, ...valuation, projectedUsdV2: valuation.projectedUsd }
 }
 
 function getCompositeServiceAverage(
@@ -624,6 +755,7 @@ async function listAppointmentServiceSegments({
 								state
 								client {
 									firstName
+									id
 									lastName
 									name
 								}
@@ -671,6 +803,7 @@ async function listAppointmentServiceSegments({
 						appointmentId: appointment.id ?? '',
 						bookedAt,
 						cancelled: appointment.cancelled === true,
+						clientId: appointment.client?.id ?? null,
 						clientName,
 						durationMinutes: service.duration ?? null,
 						locationId: location.id,
@@ -719,6 +852,7 @@ async function listHistoricalRevenueSamples({
 						edges {
 							node {
 								id
+								clientId
 								closedAt
 								createdAt
 								updatedAt
@@ -796,6 +930,7 @@ function buildRevenueSamplesForOrder(order: OrderNode, occurredAt: Date) {
 				if (!isPackageLikeServiceName(serviceLine.name ?? '')) continue
 				samples.push({
 					amountUsd: 0,
+					clientId: order.clientId ?? null,
 					occurredAt,
 					serviceId: serviceLine.serviceId ?? null,
 					serviceName: serviceLine.name ?? 'Unknown service',
@@ -807,6 +942,7 @@ function buildRevenueSamplesForOrder(order: OrderNode, occurredAt: Date) {
 		if (serviceLines.length === 1) {
 			samples.push({
 				amountUsd: groupTotalUsd,
+				clientId: order.clientId ?? null,
 				occurredAt,
 				serviceId: serviceLines[0]?.serviceId ?? null,
 				serviceName: serviceLines[0]?.name ?? 'Unknown service',
@@ -826,6 +962,7 @@ function buildRevenueSamplesForOrder(order: OrderNode, occurredAt: Date) {
 					: groupTotalUsd / serviceLines.length
 			samples.push({
 				amountUsd: roundCurrency(amountUsd),
+				clientId: order.clientId ?? null,
 				occurredAt,
 				serviceId: serviceLine.serviceId ?? null,
 				serviceName: serviceLine.name ?? 'Unknown service',
@@ -892,11 +1029,16 @@ type ForecastDay = {
 	dateLabel: string
 	weekday: string
 	daysOut: number
+	/** Primary fields are the live model (daily_v2_cadence); *V1 fields keep the
+	 * original paid-average model for its frozen append-only snapshot. */
 	bookedUsd: number
+	bookedUsdV1: number
 	bookedCount: number
 	expectedNewCount: number
 	fillUsd: number
+	fillUsdV1: number
 	expectedUsd: number
+	expectedUsdV1: number
 }
 
 type ServiceArrival = {
@@ -916,6 +1058,9 @@ type ArrivalForecast = {
 	totalBookedUsd: number
 	totalFillUsd: number
 	totalExpectedUsd: number
+	totalBookedUsdV1: number
+	totalFillUsdV1: number
+	totalExpectedUsdV1: number
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -945,18 +1090,22 @@ function buildArrivalForecast({
 	historySegments,
 	minSampleSize,
 	now,
+	perVisitValueUsd,
 	rows,
 	serviceAverages,
 	start,
+	wlInjPerVisitUsd,
 }: {
 	end: Date
 	historyEnd: Date
 	historySegments: AppointmentServiceSegment[]
 	minSampleSize: number
 	now: Date
+	perVisitValueUsd: (serviceName: string) => number | null
 	rows: ProjectionRow[]
 	serviceAverages: Map<string, ServiceAverage>
 	start: Date
+	wlInjPerVisitUsd: number
 }): ArrivalForecast {
 	const completed = historySegments.filter(
 		segment => !segment.cancelled && segment.startAt < historyEnd,
@@ -1022,12 +1171,13 @@ function buildArrivalForecast({
 		return within / sample.length
 	}
 
-	const bookedByDate = new Map<string, { usd: number; count: number }>()
+	const bookedByDate = new Map<string, { usd: number; usdV1: number; count: number }>()
 	for (const row of rows) {
 		if (row.cancelled) continue
 		const key = localDateKey(row.startAt)
-		const entry = bookedByDate.get(key) ?? { usd: 0, count: 0 }
-		entry.usd += row.projectedUsd
+		const entry = bookedByDate.get(key) ?? { usd: 0, usdV1: 0, count: 0 }
+		entry.usd += row.projectedUsdV2
+		entry.usdV1 += row.projectedUsd
 		entry.count += 1
 		bookedByDate.set(key, entry)
 	}
@@ -1046,9 +1196,10 @@ function buildArrivalForecast({
 		const daysOut = Math.round(
 			(startOfLocalDay(instant) - todayStartMs) / DAY_MS,
 		)
-		const booked = bookedByDate.get(key) ?? { usd: 0, count: 0 }
+		const booked = bookedByDate.get(key) ?? { usd: 0, usdV1: 0, count: 0 }
 
 		let fillUsd = 0
+		let fillUsdV1 = 0
 		let expectedNewCount = 0
 		if (daysOut > 0) {
 			for (const stats of typeStats.values()) {
@@ -1060,14 +1211,21 @@ function buildArrivalForecast({
 				const stillToCome =
 					ratePerWeekday * shareBookedWithin(stats.leads, daysOut)
 				if (stillToCome <= 0) continue
-				const value = valueForService({
+				const valueV1 = valueForService({
 					minSampleSize,
 					serviceAverages,
 					serviceId: stats.serviceId,
 					serviceName: stats.serviceName,
 				}).projectedUsd
+				// v2: a still-to-book WL-injection slot is worth the per-kept-visit
+				// average ($0 mid-cycle visits included), not the paid-only average;
+				// mostly-$0 services (consults, follow-ups) likewise.
+				const value = WL_INJECTION_RE.test(stats.serviceName)
+					? wlInjPerVisitUsd
+					: (perVisitValueUsd(stats.serviceName) ?? valueV1)
 				const usd = stillToCome * value
 				fillUsd += usd
+				fillUsdV1 += stillToCome * valueV1
 				expectedNewCount += stillToCome
 				const arrival = serviceArrivals.get(stats.serviceName) ?? {
 					serviceName: stats.serviceName,
@@ -1085,10 +1243,13 @@ function buildArrivalForecast({
 			weekday,
 			daysOut,
 			bookedUsd: roundCurrency(booked.usd),
+			bookedUsdV1: roundCurrency(booked.usdV1),
 			bookedCount: booked.count,
 			expectedNewCount: roundTo(expectedNewCount, 1),
 			fillUsd: roundCurrency(fillUsd),
+			fillUsdV1: roundCurrency(fillUsdV1),
 			expectedUsd: roundCurrency(booked.usd + fillUsd),
+			expectedUsdV1: roundCurrency(booked.usdV1 + fillUsdV1),
 		})
 	}
 
@@ -1104,6 +1265,8 @@ function buildArrivalForecast({
 
 	const totalBookedUsd = days.reduce((sum, day) => sum + day.bookedUsd, 0)
 	const totalFillUsd = days.reduce((sum, day) => sum + day.fillUsd, 0)
+	const totalBookedUsdV1 = days.reduce((sum, day) => sum + day.bookedUsdV1, 0)
+	const totalFillUsdV1 = days.reduce((sum, day) => sum + day.fillUsdV1, 0)
 	return {
 		days,
 		topServices: [...serviceArrivals.values()]
@@ -1122,6 +1285,9 @@ function buildArrivalForecast({
 		totalBookedUsd: roundCurrency(totalBookedUsd),
 		totalFillUsd: roundCurrency(totalFillUsd),
 		totalExpectedUsd: roundCurrency(totalBookedUsd + totalFillUsd),
+		totalBookedUsdV1: roundCurrency(totalBookedUsdV1),
+		totalFillUsdV1: roundCurrency(totalFillUsdV1),
+		totalExpectedUsdV1: roundCurrency(totalBookedUsdV1 + totalFillUsdV1),
 	}
 }
 
@@ -1343,6 +1509,7 @@ function serializeProjectionRow(row: ProjectionRow) {
 		location_id: row.locationId,
 		location_name: row.locationName,
 		projected_usd: roundCurrency(row.projectedUsd),
+		projected_usd_v2: roundCurrency(row.projectedUsdV2),
 		projection_source: row.source,
 		service_id: row.serviceId,
 		service_name: row.serviceName,

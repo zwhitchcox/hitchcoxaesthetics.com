@@ -19,7 +19,7 @@ export const handle: SEOHandle = {
 // Define the admin menu items with valid icon names
 const adminMenuItems = [
 	{ path: '/admin', label: 'Dashboard', icon: 'dashboard' as const },
-	// The report hub serves its own full document — needs a real page load.
+	// The report hub serves its own full document, needs a real page load.
 	{
 		path: '/admin/reports',
 		label: 'Reports',
@@ -45,7 +45,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function AdminLayout() {
 	const location = useLocation()
 
-	// Report pages render inside hub panes (iframes) — no admin chrome there.
+	// Report pages render inside hub panes (iframes), no admin chrome there.
 	if (location.pathname.startsWith('/admin/reports/')) {
 		return <Outlet />
 	}
@@ -95,7 +95,7 @@ export default function AdminLayout() {
 					</nav>
 				</div>
 
-				{/* Content area — min-w-0 so wide tables scroll inside instead of
+				{/* Content area, min-w-0 so wide tables scroll inside instead of
 				    stretching the page past the viewport */}
 				<div className="min-w-0 overflow-x-auto">
 					<Outlet />

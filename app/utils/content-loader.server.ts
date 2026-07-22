@@ -133,10 +133,10 @@ function discoverChildren(
 	let dirToScan: string
 
 	if (urlPath === category) {
-		// Category page — scan the category directory for direct children
+		// Category page, scan the category directory for direct children
 		dirToScan = path.join(CONTENT_DIR, category)
 	} else {
-		// Service page — scan its subdirectory
+		// Service page, scan its subdirectory
 		dirToScan = path.join(CONTENT_DIR, category, urlPath)
 	}
 
@@ -157,7 +157,7 @@ function discoverChildren(
 			// Only treat as a child if it has an index.md (i.e., it's a service folder)
 			const indexPath = path.join(dirToScan, entry.name, 'index.md')
 			if (!fs.existsSync(indexPath)) {
-				// No index.md — scan for direct .md files as children instead
+				// No index.md, scan for direct .md files as children instead
 				const subDir = path.join(dirToScan, entry.name)
 				for (const sub of fs
 					.readdirSync(subDir)

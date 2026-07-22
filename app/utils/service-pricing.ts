@@ -285,7 +285,7 @@ export function getBlvdBookingPriceDisplay({
 // are total client spend within 6 months of the first visit, cross-sell
 // included. Source: `client_value` table computed weekly by the sha-reports
 // client-value job ("Conversion value by entry service" card on the Metabase
-// dashboard); these constants snapshot the 2026-07-09 run — refresh them when
+// dashboard); these constants snapshot the 2026-07-09 run, refresh them when
 // the measured numbers drift.
 const SIX_MONTH_CONVERSION_VALUE_USD = {
 	tox: 600,

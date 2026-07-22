@@ -219,10 +219,13 @@ export function getBookingClientTypeFromHistory({
 	clientHistory: BookingClientHistory | null
 	hasVerifiedClient: boolean
 }) {
-	if (hasVerifiedClient || clientHistory === 'returning') {
-		return 'returning_client'
-	}
+	// The client's own answer wins. SMS verification only proves phone
+	// ownership of a Boulevard record, which the booking flow itself creates -
+	// so it must never override an explicit "I'm new" (it silently reclassified
+	// every self-identified new client as returning for weeks).
 	if (clientHistory === 'new') return 'new_client'
+	if (clientHistory === 'returning') return 'returning_client'
+	if (hasVerifiedClient) return 'returning_client'
 	if (clientHistory === 'unsure') return 'unsure_client'
 	return 'unknown_client'
 }

@@ -4,9 +4,9 @@ import { useBlvdHtml } from '#app/utils/blvd-context.tsx'
 import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
 import { getEnv } from '#app/utils/env.server.ts'
 
-// Ad landing page — noindex to avoid duplicate content with the main service pages
+// Ad landing page, noindex to avoid duplicate content with the main service pages
 export const meta: MetaFunction = () => [
-	{ title: '20% Off Botox — Knoxville | Sarah Hitchcox Aesthetics' },
+	{ title: '20% Off Botox: Knoxville | Sarah Hitchcox Aesthetics' },
 	{ name: 'robots', content: 'noindex' },
 ]
 
@@ -45,7 +45,7 @@ const html = `<!doctype html>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="theme-color" content="#020817" />
-		<title>20% Off Botox — Knoxville | Sarah Hitchcox Aesthetics</title>
+		<title>20% Off Botox, Knoxville | Sarah Hitchcox Aesthetics</title>
 		<meta
 			name="description"
 			content="20% off your first Botox treatment. Perfect 5.0 Google rating with 217+ reviews. RN-administered Botox in Knoxville, TN. Book your appointment today."
@@ -82,7 +82,7 @@ const html = `<!doctype html>
 
 		<style>
 			/* ============================================
-           SARAH HITCHCOX AESTHETICS — Version D
+           SARAH HITCHCOX AESTHETICS, Version D
            Hybrid B + C Landing Page
            ============================================ */
 
@@ -1307,7 +1307,7 @@ const html = `<!doctype html>
 						<div class="b-hero-photo">
 							<img
 								src="https://hitchcoxaesthetics.com/img/knoxville-med-spa.webp"
-								alt="Sarah Hitchcox Aesthetics — Knoxville Med Spa"
+								alt="Sarah Hitchcox Aesthetics, Knoxville Med Spa"
 								loading="eager"
 							/>
 							<div class="b-hero-photo-badge">20% Off Your First Visit</div>
@@ -1471,7 +1471,7 @@ const html = `<!doctype html>
 					<p class="b-section-label">Real Results</p>
 					<h2 class="b-section-title">Before & After</h2>
 					<p class="b-section-sub">
-						Real patients, real results — no filters, no retouching.
+						Real patients, real results, no filters, no retouching.
 					</p>
 
 					<div class="b-ba-grid">
@@ -1967,7 +1967,7 @@ const html = `<!doctype html>
 							</div>
 							<p class="c-review-text">
 								Love love love Sarah! I am having great success with the laser
-								hair removal. Technology has come so far — no pain! She's
+								hair removal. Technology has come so far, no pain! She's
 								incredibly indulgent with her time and knowledge. Highly
 								recommend!
 							</p>
@@ -1997,7 +1997,7 @@ const html = `<!doctype html>
 								With a background in emergency nursing, Sarah brings precision
 								and an eye for detail to every injection. Her philosophy? Subtle
 								enhancements that let you look like the best version of yourself
-								— refreshed, confident, and completely natural.
+								- refreshed, confident, and completely natural.
 							</p>
 							<a
 								href="${DEFAULT_BLVD_BOOKING_URL}"

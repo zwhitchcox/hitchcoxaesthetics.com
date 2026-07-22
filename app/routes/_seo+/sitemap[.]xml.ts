@@ -11,7 +11,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		'',
 		'about',
 		// every location landing page, including ghost (orphaned) ones, so search
-		// engines can discover them — they aren't linked anywhere in the site nav
+		// engines can discover them, they aren't linked anywhere in the site nav
 		...locations.map(location => location.id),
 		'book',
 		'support',

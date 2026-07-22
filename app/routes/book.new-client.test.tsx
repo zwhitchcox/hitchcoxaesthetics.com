@@ -202,7 +202,7 @@ test('new clients can verify their phone and complete a mocked booking', async (
 		screen.queryByText(/could not find an existing profile/i),
 	).not.toBeInTheDocument()
 
-	// codes are alphanumeric (e.g. 368TQ8) — must not be treated as digits-only.
+	// codes are alphanumeric (e.g. 368TQ8), must not be treated as digits-only.
 	// Pressing Enter must verify the code, not submit the surrounding details
 	// form (which would complain the phone is not verified).
 	await user.type(verificationCodeInput, '368tq8{Enter}')
