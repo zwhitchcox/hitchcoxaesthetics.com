@@ -1,16 +1,15 @@
 /**
- * Server half of the revenue-by-source view (rendered on the Revenue report)
- * and the bookings funnel: window parsing, Boulevard appointment fetches,
- * source labeling, and the row builders. Revenue rows are keyed by when money
- * happened (appointment/checkout date); funnel rows are keyed by when the
- * BOOKING was made.
+ * Server half of the Revenue report chart and the bookings funnel: window
+ * parsing, Boulevard appointment fetches, source labeling (including the
+ * per-GBP-listing aggregation across web and phone), and the row builders.
+ * Chart cells are keyed by when money happened (appointment/checkout date);
+ * funnel rows are keyed by when the BOOKING was made.
  */
 import { normalizeBlvdEntityId } from '#app/utils/blvd-attribution.server.ts'
 import {
 	boulevardAdminFetch,
 	listBlvdAdminLocations,
 } from '#app/utils/blvd-admin.server.ts'
-import { inferRevenueServiceCategory } from '#app/utils/blvd-revenue-sync.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { getGoogleAdsSpendUsd } from '#app/utils/google-ads-spend.server.ts'
 import {
@@ -75,6 +74,78 @@ export function getSourceLabel(touch?: {
 			: 'Google Business Profile'
 	}
 	return CHANNEL_LABELS[touch.trafficChannel ?? ''] ?? 'Website (other)'
+}
+
+export type BookingChannel = 'phone' | 'online' | 'none'
+
+// CallRail tracker names for the GBP listings, keyed by the tracker name
+// normalized with normalizeTrackerName (lowercased, spaces/hyphens stripped)
+// so sloppy variants like 'GMB -Botox Knox - Farragut' still match.
+const GBP_TRACKER_TO_SLUG: Record<string, string> = {
+	gmbknoxville: 'bearden',
+	gmbfarragut: 'farragut',
+	gmbsarahhitchcoxaestheticscedarbluff: 'cedar-bluff',
+	gmbsarahhitchcoxaestheticswesthills: 'west-hills',
+	gmbbotoxknoxbearden: 'botox-knox-bearden',
+	gmbbotoxknoxfarragut: 'botox-knox-farragut',
+	gmbweightlossknoxbearden: 'kwlc-bearden',
+	gmbweightlossknoxfarragut: 'kwlc-farragut',
+}
+
+function normalizeTrackerName(name: string) {
+	return name.toLowerCase().replace(/[\s-]+/g, '')
+}
+
+/**
+ * One source per GBP listing regardless of whether the booking came from a
+ * web click (utm_content) or a phone call (CallRail tracker), with the
+ * channel preserved so the report can filter phone vs online. Non-GBP
+ * sources keep their getSourceLabel names. Rows with no touch are 'none'
+ * (staff / walk-in) and labeled by getUnattributedLabel.
+ */
+export function getAggregatedSource(
+	touch:
+		| {
+				trafficChannel: string | null
+				utmContent: string | null
+				rawProperties?: string | null
+				callrailSource?: string | null
+		  }
+		| null
+		| undefined,
+	bookedByType?: string | null,
+): { label: string; channel: BookingChannel } {
+	if (!touch) {
+		return { label: getUnattributedLabel(bookedByType), channel: 'none' }
+	}
+	const isPhone =
+		Boolean(touch.rawProperties?.includes('"booking_channel":"retell')) ||
+		(Boolean(touch.callrailSource) && !touch.trafficChannel)
+	if (isPhone) {
+		const normalized = normalizeTrackerName(touch.callrailSource ?? '')
+		const slug = GBP_TRACKER_TO_SLUG[normalized]
+		if (slug) return { label: `GBP · ${slug}`, channel: 'phone' }
+		// The legacy generic tracker can't say which listing took the call.
+		if (normalized === 'googlemybusiness') {
+			return { label: 'GBP (listing unknown)', channel: 'phone' }
+		}
+		// Retell bookings keep their 'AI phone · <tracker>' label; a staff-phone
+		// booking with a non-GBP tracker is labeled by its tracker.
+		if (touch.rawProperties?.includes('"booking_channel":"retell')) {
+			return { label: getSourceLabel(touch), channel: 'phone' }
+		}
+		return {
+			label: touch.callrailSource ? `Phone · ${touch.callrailSource}` : 'Phone call',
+			channel: 'phone',
+		}
+	}
+	if (touch.trafficChannel === 'gmb') {
+		return {
+			label: touch.utmContent ? `GBP · ${touch.utmContent}` : 'GBP (listing unknown)',
+			channel: 'online',
+		}
+	}
+	return { label: getSourceLabel(touch), channel: 'online' }
 }
 
 /** Source label for an appointment with no attribution touch. */
@@ -226,22 +297,6 @@ export function parseReportWindow(
 	}
 }
 
-export type ReportRow = {
-	month: string
-	bucket: string
-	type: string
-	usd: number
-	appt: string | null
-	source: string
-	kind: 'actual' | 'projected'
-	// Drill-down fields (the "Appointments, <x>" detail view)
-	at: string
-	service: string
-	clientName: string | null
-	blvdUrl: string | null
-	posthogUrl: string | null
-}
-
 export type BlvdAppointmentMeta = {
 	id: string
 	startAt: Date
@@ -354,108 +409,35 @@ async function getAvgTicketByName(names: string[]) {
 	return new Map(averages.map(a => [a.itemName, a._avg.grossAmountUsd ?? 0]))
 }
 
+export type RevenueChartCell = {
+	/** ET day the revenue landed (YYYY-MM-DD). */
+	day: string
+	/** Service category (blvdRevenueItem.serviceCategory, 'Uncategorized' if blank). */
+	cat: string
+	/** Aggregated source label from getAggregatedSource. */
+	source: string
+	channel: BookingChannel
+	usd: number
+	/** Distinct appointments, each counted once in the cell where it earned the most. */
+	appts: number
+}
+
 /**
- * Projected rows for appointments that are booked (not cancelled / no-show)
- * but whose order hasn't closed yet, today shows the day's expected numbers
- * immediately; each is replaced by the actual as it's paid.
+ * Actual revenue for the window as per-day cells keyed by service category,
+ * aggregated source, and channel. The main Revenue chart re-buckets these
+ * client-side by granularity and applies the service/channel filters.
  */
-async function getProjectedRows({
-	appointments,
-	fromDay,
-	toDay,
-	todayEt,
-	granularity,
-	paidApptIds,
-}: {
-	appointments: BlvdAppointmentMeta[]
-	fromDay: string
-	toDay: string
-	todayEt: string
-	granularity: Granularity
-	paidApptIds: Set<string>
-}): Promise<ReportRow[]> {
-	const startDay = fromDay > todayEt ? fromDay : todayEt
-	if (toDay < startDay) return []
-	const pending = appointments.filter(a => {
-		const day = toEtDay(a.startAt)
-		return day >= startDay && day <= toDay && !paidApptIds.has(a.id)
-	})
-	if (!pending.length) return []
-
-	const avgByName = await getAvgTicketByName([
-		...new Set(pending.flatMap(p => p.services.filter(s => !s.price).map(s => s.name))),
-	])
-	const touchByAppt = await getTouchesByAppointment(pending.map(p => p.id))
-
-	const rows: ReportRow[] = []
-	for (const p of pending) {
-		const touch = touchByAppt.get(p.id)
-		const source = touch ? getSourceLabel(touch) : getUnattributedLabel(p.bookedByType)
-		for (const s of p.services) {
-			const usdValue = s.price ? s.price / 100 : Math.round(avgByName.get(s.name) ?? 0)
-			rows.push({
-				month: toEtDay(p.startAt).slice(0, 7),
-				bucket: bucketFor(p.startAt, granularity),
-				type: inferRevenueServiceCategory(s.name) ?? 'Uncategorized',
-				usd: usdValue,
-				appt: p.id,
-				source,
-				kind: 'projected',
-				at: p.startAt.toISOString(),
-				service: s.name,
-				clientName: p.clientName,
-				blvdUrl: p.manageUrl ?? blvdClientUrl(p.clientId),
-				posthogUrl: posthogSessionUrl(touch ?? undefined),
-			})
-		}
-	}
-	return rows
-}
-
-async function getTouchesByAppointment(apptIds: string[]) {
-	if (!apptIds.length) {
-		return new Map<
-			string,
-			{
-				trafficChannel: string | null
-				utmContent: string | null
-				posthogSessionId: string | null
-				posthogDistinctId: string | null
-			}
-		>()
-	}
-	const attributed = await prisma.blvdAttributedAppointment.findMany({
-		where: { boulevardAppointmentId: { in: apptIds } },
-		select: {
-			boulevardAppointmentId: true,
-			touch: {
-				select: {
-					trafficChannel: true,
-					utmContent: true,
-					rawProperties: true,
-					callrailSource: true,
-					posthogSessionId: true,
-					posthogDistinctId: true,
-				},
-			},
-		},
-	})
-	return new Map(attributed.map(a => [a.boulevardAppointmentId, a.touch]))
-}
-
-/** Everything the revenue-by-source view renders, for the given URL params. */
-export async function loadRevenueBySource(
-	request: Request,
-	defaultWindow: WindowKey = 'today',
-) {
-	const w = parseReportWindow(request, defaultWindow)
-	const { windowKey, granularity, fromDay, toDay, todayEt, since, until } = w
-
+export async function loadRevenueChartCells(win: ReportWindow): Promise<{
+	cells: RevenueChartCell[]
+	categories: string[]
+	lastSyncedAt: string | null
+}> {
+	const { fromDay, toDay, todayEt, since, until } = win
 	// Booked-by metadata is capped at 120 days back, older revenue keeps the
 	// generic untracked label rather than paginating years of appointments.
 	const metaFromDay =
 		fromDay > shiftDay(todayEt, -120) ? fromDay : shiftDay(todayEt, -120)
-	const [items, syncState, rangeAppointments, adsSpendUsd] = await Promise.all([
+	const [items, syncState, rangeAppointments] = await Promise.all([
 		prisma.blvdRevenueItem.findMany({
 			where: { occurredAt: { gte: since, lt: until } },
 			select: {
@@ -463,10 +445,7 @@ export async function loadRevenueBySource(
 				serviceCategory: true,
 				grossAmountUsd: true,
 				boulevardAppointmentId: true,
-				boulevardClientId: true,
 				attributionTouchId: true,
-				itemName: true,
-				blvdClient: { select: { firstName: true, lastName: true } },
 			},
 		}),
 		prisma.blvdSyncState.findUnique({
@@ -477,7 +456,6 @@ export async function loadRevenueBySource(
 			console.error('Failed to load Boulevard appointment metadata', error)
 			return [] as BlvdAppointmentMeta[]
 		}),
-		getGoogleAdsSpendUsd(fromDay, toDay),
 	])
 	const touchIds = [
 		...new Set(items.map(i => i.attributionTouchId).filter(Boolean)),
@@ -491,66 +469,61 @@ export async function loadRevenueBySource(
 					utmContent: true,
 					rawProperties: true,
 					callrailSource: true,
-					posthogSessionId: true,
-					posthogDistinctId: true,
 				},
 			})
 		: []
 	const touchById = new Map(touches.map(t => [t.id, t]))
-	const apptMetaById = new Map(rangeAppointments.map(a => [a.id, a]))
-
-	const actualRows: ReportRow[] = items.map(i => {
-		const touch = i.attributionTouchId ? touchById.get(i.attributionTouchId) : undefined
-		const meta = i.boulevardAppointmentId
-			? apptMetaById.get(i.boulevardAppointmentId)
-			: undefined
-		return {
-			month: toEtDay(i.occurredAt).slice(0, 7),
-			bucket: bucketFor(i.occurredAt, granularity),
-			type: i.serviceCategory?.trim() || 'Uncategorized',
-			usd: i.grossAmountUsd,
-			appt: i.boulevardAppointmentId,
-			source: touch ? getSourceLabel(touch) : getUnattributedLabel(meta?.bookedByType),
-			kind: 'actual',
-			at: i.occurredAt.toISOString(),
-			service: i.itemName,
-			clientName:
-				meta?.clientName ??
-				([i.blvdClient?.firstName, i.blvdClient?.lastName].filter(Boolean).join(' ') ||
-					null),
-			blvdUrl: meta?.manageUrl ?? blvdClientUrl(i.boulevardClientId),
-			posthogUrl: posthogSessionUrl(touch),
-		}
-	})
-	const paidApptIds = new Set(
-		items.map(i => i.boulevardAppointmentId).filter(Boolean) as string[],
+	const bookedByTypeByAppt = new Map(
+		rangeAppointments.map(a => [a.id, a.bookedByType]),
 	)
-	const projectedRows = await getProjectedRows({
-		appointments: rangeAppointments,
-		fromDay,
-		toDay,
-		todayEt,
-		granularity,
-		paidApptIds,
-	}).catch(error => {
-		console.error('Failed to load projected appointments', error)
-		return [] as ReportRow[]
-	})
-	const rows = [...actualRows, ...projectedRows]
 
+	const cellByKey = new Map<string, RevenueChartCell>()
+	// usd per (appointment, cell) so each appointment can be counted exactly
+	// once, in the cell where it earned the most.
+	const apptUsdByCell = new Map<string, Map<string, number>>()
+	for (const item of items) {
+		const touch = item.attributionTouchId
+			? touchById.get(item.attributionTouchId)
+			: undefined
+		const { label, channel } = getAggregatedSource(
+			touch,
+			item.boulevardAppointmentId
+				? bookedByTypeByAppt.get(item.boulevardAppointmentId)
+				: undefined,
+		)
+		const day = toEtDay(item.occurredAt)
+		const cat = item.serviceCategory?.trim() || 'Uncategorized'
+		const key = `${day}|${cat}|${label}|${channel}`
+		let cell = cellByKey.get(key)
+		if (!cell) {
+			cell = { day, cat, source: label, channel, usd: 0, appts: 0 }
+			cellByKey.set(key, cell)
+		}
+		cell.usd += item.grossAmountUsd
+		if (item.boulevardAppointmentId) {
+			let perCell = apptUsdByCell.get(item.boulevardAppointmentId)
+			if (!perCell) apptUsdByCell.set(item.boulevardAppointmentId, (perCell = new Map()))
+			perCell.set(key, (perCell.get(key) ?? 0) + item.grossAmountUsd)
+		}
+	}
+	for (const perCell of apptUsdByCell.values()) {
+		let bestKey: string | null = null
+		let bestUsd = -Infinity
+		for (const [key, usdValue] of perCell) {
+			if (usdValue > bestUsd) {
+				bestKey = key
+				bestUsd = usdValue
+			}
+		}
+		if (bestKey) cellByKey.get(bestKey)!.appts++
+	}
+	const cells = [...cellByKey.values()].map(c => ({ ...c, usd: Math.round(c.usd) }))
 	return {
-		rows,
-		windowKey,
-		granularity,
-		from: fromDay,
-		to: toDay,
-		drillType: new URL(request.url).searchParams.get('type'),
+		cells,
+		categories: [...new Set(cells.map(c => c.cat))].sort(),
 		lastSyncedAt: syncState?.value ?? null,
-		adsSpendUsd,
 	}
 }
-
-export type RevenueBySourceData = Awaited<ReturnType<typeof loadRevenueBySource>>
 
 export type FunnelRow = {
 	bookedAt: string

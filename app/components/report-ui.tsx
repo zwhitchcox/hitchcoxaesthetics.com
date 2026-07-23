@@ -256,6 +256,7 @@ export function BarChart({
 	format = usd,
 	tickEvery,
 	showTotal = true,
+	onBarClick,
 }: {
 	labels: string[]
 	series: Series[]
@@ -266,6 +267,11 @@ export function BarChart({
 	tickEvery?: number
 	/** Total row in the tooltip only makes sense when the series share a unit. */
 	showTotal?: boolean
+	/**
+	 * Makes buckets clickable. Clicking a bar segment reports its series name;
+	 * clicking elsewhere in the bucket (the hover rect) reports ''.
+	 */
+	onBarClick?: (seriesName: string, labelIndex: number) => void
 }) {
 	const { tip, setTip, ref, clampX } = useTip()
 	const H = height
@@ -335,7 +341,12 @@ export function BarChart({
 						? series.reduce((acc, s, si) => ((s.values[i] ?? 0) > 0 ? si : acc), -1)
 						: -1
 					return (
-						<g key={i} onMouseMove={hover}>
+						<g
+							key={i}
+							onMouseMove={hover}
+							onClick={onBarClick ? () => onBarClick('', i) : undefined}
+							style={onBarClick ? { cursor: 'pointer' } : undefined}
+						>
 							<rect x={PAD_L + slot * i} y={PAD_T} width={slot} height={H - PAD_T - 16} fill="transparent" />
 							{series.map((s, si) => {
 								const v = s.values[i]
@@ -357,7 +368,21 @@ export function BarChart({
 								const d = up
 									? `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + barW - r},${y} Q${x + barW},${y} ${x + barW},${y + r} L${x + barW},${y + h} Z`
 									: `M${x},${y} L${x + barW},${y} L${x + barW},${y + h - r} Q${x + barW},${y + h} ${x + barW - r},${y + h} L${x + r},${y + h} Q${x},${y + h} ${x},${y + h - r} Z`
-								return <path key={si} d={d} fill={fill} />
+								return (
+									<path
+										key={si}
+										d={d}
+										fill={fill}
+										onClick={
+											onBarClick
+												? evt => {
+														evt.stopPropagation()
+														onBarClick(s.name, i)
+													}
+												: undefined
+										}
+									/>
+								)
 							})}
 							{i % every === 0 ? (
 								<text x={cx} y={H - 4} textAnchor="middle" fontSize={10} fill="var(--muted)">
