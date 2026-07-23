@@ -143,7 +143,9 @@ function presetRange(
 			return { fromDay: yesterday, toDay: yesterday }
 		}
 		case 'thisWeek':
-			return { fromDay: mondayOf(todayEt), toDay: todayEt }
+			// Through Sunday, not today: Expected covers the whole week as a
+			// projection; actual/cancelled series simply stop at today.
+			return { fromDay: mondayOf(todayEt), toDay: shiftDay(mondayOf(todayEt), 6) }
 		case 'lastWeek': {
 			const monday = shiftDay(mondayOf(todayEt), -7)
 			return { fromDay: monday, toDay: shiftDay(monday, 6) }

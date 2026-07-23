@@ -491,7 +491,9 @@ function removeRow(ci, ri) {
 	return false;
 }
 var navEl = document.querySelector("nav");
-var NAV_KEY = "sha-hub-nav-order-v1";
+// v2: v1 orders predate the Household group and would hoist its children
+// back to the top level when applied.
+var NAV_KEY = "sha-hub-nav-order-v2";
 function navGap(y) {
 	var items = navEl.querySelectorAll("a.item");
 	for (var i = 0; i < items.length; i++) {
@@ -522,7 +524,7 @@ function applyNavOrder() {
 		var after = heads[0];
 		sec.keys.forEach(function (k) {
 			var a = byKey[k];
-			if (!a) return;
+			if (!a || a.closest(".kids") || a.closest(".group")) return;
 			after.after(a);
 			after = a;
 		});

@@ -553,8 +553,10 @@ function buildAttributionResult({
 		callrail_session_id: pickOptionalString(call.session_uuid),
 		callrail_person_id: pickOptionalString(call.person_id),
 		callrail_timeline_url: pickOptionalString(call.timeline_url),
+		// Tracker name first: it identifies WHICH listing/campaign number rang
+		// (e.g. "GMB Farragut"), while call.source is just the generic channel.
 		callrail_source:
-			pickOptionalString(call.source) ?? pickOptionalString(call.source_name),
+			pickOptionalString(call.source_name) ?? pickOptionalString(call.source),
 		callrail_medium: pickOptionalString(call.medium),
 		callrail_landing_page_url: pickOptionalString(call.landing_page_url),
 		callrail_last_requested_url: pickOptionalString(call.last_requested_url),
