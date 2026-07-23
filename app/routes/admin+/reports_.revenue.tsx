@@ -10,7 +10,7 @@ import {
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
 } from '@remix-run/node'
-import { Link, useFetcher, useLoaderData } from '@remix-run/react'
+import { useFetcher, useLoaderData } from '@remix-run/react'
 import { type loader as appointmentsLoader } from './reports_.appointments.tsx'
 import {
 	BarChart,
@@ -18,6 +18,7 @@ import {
 	ReportPage,
 	StatTile,
 	usd,
+	useSortable,
 } from '#app/components/report-ui'
 import {
 	RevenueBySource,
@@ -309,14 +310,20 @@ export default function Revenue() {
 			) + 1
 		: 0
 	const missesEnabled = missesSpanDays > 0 && missesSpanDays <= 35
+	const [missesShown, setMissesShown] = useState(25)
 	useEffect(() => {
 		if (!missesEnabled || !winForMisses || missesLoadedKey === missesKey) return
 		setMissesLoadedKey(missesKey)
+		setMissesShown(25)
 		missesFetcher.load(
 			`/admin/reports/appointments?window=custom&from=${winForMisses.fromDay}&to=${winForMisses.toDay}`,
 		)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [missesEnabled, missesKey, missesLoadedKey])
+	const missesAll = missesFetcher.data?.rows ?? []
+	const { rows: missesSorted, Th: MTh } = useSortable(missesAll, {
+		services: (r: (typeof missesAll)[number]) => r.services.join(' '),
+	})
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
 	const { weekly, currentMonday, next4, monthly, pnl, avgExpenses, accuracy, summary, thisWeekDaily, rangeDaily, window: win, bySource } = data
@@ -402,9 +409,6 @@ export default function Revenue() {
 			)
 		: null
 
-	const misses = (missesFetcher.data?.rows ?? [])
-		.filter(r => r.status !== 'upcoming' && r.deltaUsd < -25)
-		.slice(0, 8)
 
 	return (
 		<ReportPage
@@ -502,92 +506,153 @@ export default function Revenue() {
 			{rangeDaily ? (
 				<section>
 					<h2>
-						Where it fell short{' '}
+						Appointment performance{' '}
 						<span className="mini">
-							appointment by appointment, worst first ·{' '}
-							<Link
-								to={`/admin/reports/appointments?window=custom&from=${win.fromDay}&to=${win.toDay}`}
-							>
-								full breakdown →
-							</Link>
+							every appointment in the window, expected vs actual, worst first
 						</span>
 					</h2>
 					{!missesEnabled ? (
 						<p className="note">
-							Narrow the window to 5 weeks or less to see per-appointment detail
-							here (the full breakdown link still works for any range).
+							Narrow the window to 5 weeks or less to see per-appointment
+							detail (the live Boulevard walk gets expensive past that).
 						</p>
 					) : missesFetcher.state !== 'idle' && missesFetcher.data == null ? (
 						<p className="note">Loading appointment detail from Boulevard…</p>
-					) : misses.length === 0 ? (
-						<p className="note">
-							Nothing behind expectation in this window, every completed
-							appointment is at or above its expected value.
-						</p>
+					) : missesAll.length === 0 ? (
+						<p className="note">No appointments in this window.</p>
 					) : (
-						<div className="rtable-wrap">
-							<table className="rtable">
-								<thead>
-									<tr>
-										<th>When</th>
-										<th>Client</th>
-										<th>Service</th>
-										<th className="num">Expected</th>
-										<th className="num">Actual</th>
-										<th>Why</th>
-									</tr>
-								</thead>
-								<tbody>
-									{misses.map(r => (
-										<tr key={r.appointmentId}>
-											<td>
-												{new Date(r.startAt).toLocaleString('en-US', {
-													timeZone: 'America/New_York',
-													weekday: 'short',
-													hour: 'numeric',
-													minute: '2-digit',
-												})}
-											</td>
-											<td>
-												{r.manageUrl ? (
-													<a href={r.manageUrl} target="_blank" rel="noreferrer">
-														{r.clientName}
-													</a>
-												) : (
-													r.clientName
-												)}
-												{r.isNewPatient ? (
-													<span className="mini"> · new patient</span>
-												) : null}
-											</td>
-											<td>{r.services.join(', ')}</td>
-											<td className="num">{usd(r.expectedUsd)}</td>
-											<td className="num">{usd(r.actualUsd)}</td>
-											<td>
-												{r.reason}
-												<span className="mini">
-													{r.nextVisitAt
-														? ` · ${r.status === 'cancelled' || r.status === 'no_show' ? 'rescheduled' : 'next visit'} ${new Date(
-																r.nextVisitAt,
-															).toLocaleDateString('en-US', {
-																timeZone: 'America/New_York',
-																month: '2-digit',
-																day: '2-digit',
-															})}`
-														: r.status === 'cancelled' || r.status === 'no_show'
-															? ' · not rebooked'
-															: ''}
-												</span>
-											</td>
+						<>
+							<p className="note">
+								{(() => {
+									const exp = missesAll.reduce((t, r) => t + r.expectedUsd, 0)
+									const act = missesAll.reduce((t, r) => t + r.actualUsd, 0)
+									const lostRows = missesAll.filter(
+										r => r.status === 'cancelled' || r.status === 'no_show',
+									)
+									const lostUsd = lostRows.reduce((t, r) => t + r.expectedUsd, 0)
+									return `${missesAll.length} appointments · expected ${usd(exp)} · actual ${usd(act)} (${Math.round((100 * act) / Math.max(1, exp))}%) · ${usd(lostUsd)} lost to ${lostRows.length} cancels/no-shows`
+								})()}
+							</p>
+							<div className="rtable-wrap">
+								<table className="rtable">
+									<thead>
+										<tr>
+											<MTh k="startAt">When</MTh>
+											<MTh k="clientName">Client</MTh>
+											<MTh k="services">Service</MTh>
+											<MTh k="status">Status</MTh>
+											<MTh k="expectedUsd" num>Expected</MTh>
+											<MTh k="actualUsd" num>Actual</MTh>
+											<MTh k="deltaUsd" num>Δ</MTh>
+											<MTh k="nextVisitAt">Next visit</MTh>
+											<MTh k="reason">Why</MTh>
 										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
+									</thead>
+									<tbody>
+										{missesSorted.slice(0, missesShown).map(r => (
+											<tr key={r.appointmentId}>
+												<td>
+													{new Date(r.startAt).toLocaleString('en-US', {
+														timeZone: 'America/New_York',
+														month: '2-digit',
+														day: '2-digit',
+														hour: 'numeric',
+														minute: '2-digit',
+													})}
+												</td>
+												<td>
+													{r.manageUrl ? (
+														<a href={r.manageUrl} target="_blank" rel="noreferrer">
+															{r.clientName}
+														</a>
+													) : (
+														r.clientName
+													)}
+													{r.isNewPatient ? (
+														<span className="mini"> · new patient</span>
+													) : null}
+												</td>
+												<td>{r.services.join(' + ') || '-'}</td>
+												<td>
+													{r.status === 'no_show'
+														? 'No-show'
+														: r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+												</td>
+												<td className="num">{usd(r.expectedUsd)}</td>
+												<td className="num">{usd(r.actualUsd)}</td>
+												<td
+													className={`num ${r.deltaUsd < -50 ? 'bad' : r.deltaUsd > 50 ? 'good' : ''}`}
+												>
+													{usd(r.deltaUsd)}
+												</td>
+												<td>
+													{r.nextVisitAt ? (
+														`${r.status === 'cancelled' || r.status === 'no_show' ? 'rescheduled ' : ''}${new Date(
+															r.nextVisitAt,
+														).toLocaleDateString('en-US', {
+															timeZone: 'America/New_York',
+															month: '2-digit',
+															day: '2-digit',
+														})}`
+													) : (
+														<span
+															className={
+																r.status === 'cancelled' || r.status === 'no_show'
+																	? 'bad'
+																	: 'mini'
+															}
+														>
+															{r.status === 'cancelled' || r.status === 'no_show'
+																? 'not rebooked'
+																: 'none booked'}
+														</span>
+													)}
+												</td>
+												<td>
+													{r.reason}
+													{(r.status === 'cancelled' || r.status === 'no_show') &&
+													r.comms.length > 0 ? (
+														<div className="mini">
+															{r.comms.map((c, i) => (
+																<div key={i}>
+																	{c.kind === 'call' ? '📞' : '💬'}{' '}
+																	{c.direction === 'inbound'
+																		? 'from client'
+																		: 'to client'}{' '}
+																	{new Date(c.at).toLocaleString('en-US', {
+																		timeZone: 'America/New_York',
+																		month: '2-digit',
+																		day: '2-digit',
+																		hour: 'numeric',
+																	})}
+																	: {c.summary}
+																</div>
+															))}
+														</div>
+													) : null}
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+							{missesSorted.length > missesShown ? (
+								<p className="note" style={{ textAlign: 'center' }}>
+									<button
+										type="button"
+										onClick={() => setMissesShown(n => n + 50)}
+										style={{ cursor: 'pointer', textDecoration: 'underline' }}
+									>
+										Show more ({missesSorted.length - missesShown} remaining)
+									</button>
+								</p>
+							) : null}
+						</>
 					)}
 					<p className="note">
 						Mid-cycle weight-loss visits are expected at $0 (their payment lands
-						on the monthly renewal), so they no longer show up here as misses.
+						on the monthly renewal), and prepaid-package follow-ups expect $0,
+						so neither shows as a miss.
 					</p>
 				</section>
 			) : null}

@@ -32,7 +32,6 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 		entries: [
 			{ title: 'Revenue', desc: 'Actuals, this week, projections + P&L profitability, revenue by type/source/day with drill-down', path: '/admin/reports/revenue' },
 			{ title: 'Bookings funnel', desc: 'Bookings made by day × source, expected value, ads cost per booking', path: '/admin/reports/bookings' },
-			{ title: 'Appointment performance', desc: 'Expected vs actual per appointment, worst first, with the why', path: '/admin/reports/appointments' },
 			{ title: 'Retention: lapsed patients', desc: 'Who stopped coming: overdue vs their usual visit rhythm, win-back list by value', path: '/admin/reports/retention' },
 			{ title: 'Service trends', desc: 'Demand per category since 2024, seasonality, peak booking times', path: '/admin/reports/service-trends' },
 			{
