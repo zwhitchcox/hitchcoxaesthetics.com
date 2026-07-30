@@ -21,18 +21,21 @@
   the $100,000 per-jurisdiction threshold: no standard business tax
   filing, but it needs a minimal activity license from the Knox County
   Clerk (and check Town of Farragut). Owner errand, ~$15.
-- Franchise & Excise: single-member LLC status does NOT exempt the LLC.
-  VERIFIED 2026-07-30: the LLC has NO F&E account in TNTAP (only Business
-  Tax and Sales & Use). F&E has never been registered or filed. Estimated
-  2025 liability: excise 6.5% x ~$25,447 net = ~$1,654 + franchise (0.25%
-  of net worth, min $100), late since 2026-04-15. ESCALATE TO CPA: they
-  must confirm when the LLC became the operating entity, register the F&E
-  account, and file. Do not register it blind; registration date drives
-  which years owe. Checked 2026-07-30: NO F&E notice in the LLC's TNTAP
-  letters, DOR has not flagged it yet. If multiple years are open, use a
-  voluntary disclosure agreement via the CPA (3-year lookback, penalties
-  waived) instead of direct registration. Interest on ~$1,654 runs about
-  $4/week, so a short CPA delay is cheap.
+- Franchise & Excise: RESOLVED understanding (2026-07-30). The F&E
+  account EXISTS: 1002585758-FAE, registered under the OTHER TNTAP
+  customer (SARAH HITCHCOX AESTHETICS, SSN-based, 536 Noelton Dr), not
+  the LLC customer. TN operations began 01-Jan-2024 per the filed 2024
+  FAE170 (processed on time, confirmation 1-223-297-984, CPA-prepared).
+  Key mechanics for this business (individual-owned SMLLC, federal 1040):
+  the SE-taxed-income deduction (2024: $85,719 on Schedule J line 20)
+  makes the EXCISE base negative, 2024 closed at -$28,912, which also
+  carries forward. So excise is $0; only FRANCHISE tax bites: 0.25% of
+  net worth ($78,000 in 2024 = $195). NEVER estimate F&E as 6.5% of net
+  for this entity.
+  Open items: 2025 FAE170 is NOT FILED (due 2026-04-15; $15 penalty
+  already assessed). 2025 excise $0 via loss carryover; franchise needs
+  the 12/31/2025 net worth figure. Account balance $302.95 total
+  ($287.95 on 2024 + $15.00 on 2025), owner should pay.
 - TNTAP hygiene: the LLC has NO mailing address on file (Action Center
   alert), add one so notices arrive. 82 unread messages + letters exist;
   only sales-tax assessments found in the last 12 months.
