@@ -95,7 +95,9 @@ export default function ProfitOutlook() {
 	// ---- projected months (current month onward, through December) ----
 	const projected = projMonths.map(m => {
 		const net = m.rev - avgExpenses
-		const accrual = Math.max(0, net) * TAX_RATE
+		// Mirror household_profit_monthly: federal 30% of net + TN business
+		// tax 0.375% of gross + $17/mo franchise accrual.
+		const accrual = Math.max(0, net) * TAX_RATE + m.rev * 0.00375 + 17
 		return {
 			month: m.month,
 			rev: m.rev,
