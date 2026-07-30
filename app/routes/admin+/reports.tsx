@@ -47,10 +47,10 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 		],
 	},
 	{
-		heading: 'Maps & reach',
+		heading: 'Search & reach',
 		entries: [
 			{ title: 'Maps & reach', desc: 'Rank map + competitor leaderboard, household reach, reach → $, GMB clients', path: '/geo-rank' },
-			{ title: 'Reach over time', desc: 'People reached + expected revenue per keyword, week by week', path: '/admin/reports/reach' },
+			{ title: 'Reach over time', desc: 'People reached + expected revenue, organic Google rank per site, backlinks & authority, week by week', path: '/admin/reports/reach' },
 			{ title: 'Reach simulator (Metabase)', desc: 'What-if: listings, reviews, simulated rank/reach', dashboard: 4 },
 		],
 	},

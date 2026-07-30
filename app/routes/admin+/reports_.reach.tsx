@@ -21,6 +21,19 @@ export const meta: MetaFunction = () => [
 	{ name: 'robots', content: 'noindex, nofollow' },
 ]
 
+/** Organic ranks past this are functionally "not ranking"; chart at the floor. */
+const RANK_FLOOR = 50
+
+type SerpRankRow = {
+	week: string
+	keyword: string
+	target: string | null
+	rank_group: string | null
+	my_domain: string | null
+	my_url: string | null
+	top_domain: string | null
+}
+
 // Knox County average household size (US Census).
 const PERSONS_PER_HOUSEHOLD = 2.4
 // Of searchers whose local pack shows us top-3, the share who click our listing.
@@ -42,7 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	if (!hasReportsDb()) return json({ configured: false as const })
 
-	const [reach, volumes, values] = await Promise.all([
+	const [reach, volumes, values, serpRanks, serpRivals, backlinks] = await Promise.all([
 		// Homes-weighted combined reach (any of our listings top-3) per
 		// keyword per capture date. homes=1 fallback keeps cells without
 		// census data counted while geo_grid_homes back-fills.
@@ -79,8 +92,48 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			`SELECT category, expected_value_per_conversion AS expected_value, cohort_n
 			 FROM client_value WHERE horizon_months = 6`,
 		),
+		// Organic ("blue link") Google rank per keyword per week, from
+		// sha-reports src/serp.ts. Metro-wide, unlike the grid above.
+		reportsQuery<SerpRankRow>(
+			`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, target,
+			   rank_group, my_domain, my_url, top_domain
+			 FROM report_serp_rank ORDER BY week, keyword`,
+		),
+		// Who else keeps landing in the organic top 10 this week.
+		reportsQuery<{ domain: string; keywords: string; best: string; avg_rank: string }>(
+			`WITH latest AS (SELECT max(week) AS week FROM raw_serp_organic)
+			 SELECT domain, count(DISTINCT keyword)::int AS keywords,
+			   min(rank_group)::int AS best, round(avg(rank_group), 1) AS avg_rank
+			 FROM raw_serp_organic, latest
+			 WHERE raw_serp_organic.week = latest.week
+			   AND rank_group <= 10 AND domain <> ''
+			 GROUP BY domain ORDER BY keywords DESC, avg_rank ASC LIMIT 15`,
+		),
+		// Authority + backlink counts per site, every 3 days
+		// (sha-reports src/backlinks.ts).
+		reportsQuery<{
+			day: string
+			target: string
+			rank: string | null
+			backlinks: string | null
+			referring_domains: string | null
+			clean_referring_domains: string | null
+			spam_referring_domains: string | null
+		}>(
+			`SELECT to_char(day, 'YYYY-MM-DD') AS day, target, rank, backlinks,
+			   referring_domains, clean_referring_domains, spam_referring_domains
+			 FROM raw_backlink_summary ORDER BY day, target`,
+		),
 	])
-	return json({ configured: true as const, reach, volumes, values })
+	return json({
+		configured: true as const,
+		reach,
+		volumes,
+		values,
+		serpRanks,
+		serpRivals,
+		backlinks,
+	})
 }
 
 const people = (n: number) =>
@@ -90,7 +143,7 @@ export default function ReachReport() {
 	const data = useLoaderData<typeof loader>()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { reach, volumes, values } = data
+	const { reach, volumes, values, serpRanks, serpRivals, backlinks } = data
 
 	const volumeByKw = new Map(volumes.map(v => [v.keyword, v]))
 	const valueByCat = new Map(values.map(v => [v.category, Number(v.expected_value)]))
@@ -257,6 +310,278 @@ export default function ReachReport() {
 					…) is several times larger, so treat revenue as a floor that scales with reach.
 				</p>
 			</section>
+
+			<OrganicRankSections ranks={serpRanks} rivals={serpRivals} />
+			<BacklinkSections rows={backlinks} />
 		</ReportPage>
+	)
+}
+
+const site = (d: string | null) => (d ?? '').replace(/^www\./, '')
+
+/**
+ * Organic Google rank, the "blue links" below the map pack. Captured Mondays
+ * by sha-reports (src/serp.ts) for the Knoxville metro; every top-100 result
+ * is stored, so a drop can name who took the slot.
+ */
+function OrganicRankSections({
+	ranks,
+	rivals,
+}: {
+	ranks: SerpRankRow[]
+	rivals: Array<{ domain: string; keywords: string; best: string; avg_rank: string }>
+}) {
+	if (!ranks.length) return null
+	const weeks = [...new Set(ranks.map(r => r.week))].sort()
+	const latestWeek = weeks[weeks.length - 1]
+	const priorWeek = weeks[weeks.length - 2]
+	const cell = new Map(ranks.map(r => [`${r.week}|${r.keyword}`, r]))
+	const rankAt = (week: string | undefined, kw: string) => {
+		const v = week ? cell.get(`${week}|${kw}`)?.rank_group : null
+		return v == null ? null : Number(v)
+	}
+
+	const BRANDS = ['Sarah Hitchcox Aesthetics', 'Botox Knox', 'Weight Loss Knox']
+	const latestRows = ranks.filter(r => r.week === latestWeek)
+	const groups = BRANDS.map(brand => ({
+		brand,
+		keywords: latestRows
+			.filter(r => (r.target ?? BRANDS[0]) === brand)
+			.map(r => r.keyword)
+			.sort(
+				(a, b) => (rankAt(latestWeek, a) ?? 999) - (rankAt(latestWeek, b) ?? 999),
+			),
+	})).filter(g => g.keywords.length)
+
+	// Plot FLOOR+1-rank so better ranks sit higher; labels translate back.
+	const plot = (n: number | null) =>
+		n == null ? null : Math.max(1, RANK_FLOOR + 1 - n)
+	const asRank = (v: number) => `#${Math.round(RANK_FLOOR + 1 - v)}`
+
+	return (
+		<>
+			{groups.map(g => (
+				<section key={g.brand}>
+					<h2>
+						Organic Google rank: {g.brand}{' '}
+						<span className="mini">higher is better, captured Mondays</span>
+					</h2>
+					<LineChart
+						labels={weeks}
+						series={g.keywords.map((kw, i) => ({
+							name: kw,
+							color: SERIES[i % SERIES.length]!,
+							values: weeks.map(w => plot(rankAt(w, kw))),
+						}))}
+						height={220}
+						yMax={RANK_FLOOR}
+						format={asRank}
+					/>
+				</section>
+			))}
+
+			<section>
+				<h2>
+					Organic rank snapshot <span className="mini">{latestWeek}</span>
+				</h2>
+				<div className="rtable-wrap">
+					<table className="rtable">
+						<thead>
+							<tr>
+								<th>Keyword</th>
+								<th>Target site</th>
+								<th className="num">Rank</th>
+								<th className="num">Change</th>
+								<th>Ranking page</th>
+								<th>Who holds #1</th>
+							</tr>
+						</thead>
+						<tbody>
+							{groups.flatMap(g =>
+								g.keywords.map(kw => {
+									const row = cell.get(`${latestWeek}|${kw}`)
+									const now = rankAt(latestWeek, kw)
+									const was = rankAt(priorWeek, kw)
+									// A rank going DOWN in number is an improvement.
+									const delta = now != null && was != null ? was - now : null
+									const weAreFirst =
+										row?.top_domain != null &&
+										site(row.top_domain) === site(row.my_domain)
+									return (
+										<tr key={kw}>
+											<td>{kw}</td>
+											<td className="mini">{g.brand}</td>
+											<td
+												className={`num ${now != null && now <= 3 ? 'good' : now == null || now > 20 ? 'bad' : ''}`}
+											>
+												{now != null ? `#${now}` : 'not in top 100'}
+											</td>
+											<td className={`num ${delta ? (delta > 0 ? 'good' : 'bad') : ''}`}>
+												{delta == null ? '-' : delta === 0 ? '=' : delta > 0 ? `+${delta}` : delta}
+											</td>
+											<td className="mini">
+												{row?.my_url ? (
+													<a href={row.my_url} target="_blank" rel="noreferrer">
+														{site(row.my_domain)}
+														{new URL(row.my_url).pathname}
+													</a>
+												) : (
+													'-'
+												)}
+											</td>
+											<td className="mini">
+												{weAreFirst ? <strong>us</strong> : site(row?.top_domain ?? null) || '-'}
+											</td>
+										</tr>
+									)
+								}),
+							)}
+						</tbody>
+					</table>
+				</div>
+				<p className="note">
+					Organic position only, the map pack (above) and ads are excluded. Change
+					compares to the prior capture, positive means we climbed. Target site is the
+					site we want winning that term, the main site outranking a microsite for the
+					microsite's own keyword is worth seeing rather than hiding.
+				</p>
+			</section>
+
+			<section>
+				<h2>
+					Who we are up against{' '}
+					<span className="mini">organic top-10 appearances this week</span>
+				</h2>
+				<div className="rtable-wrap">
+					<table className="rtable">
+						<thead>
+							<tr>
+								<th>Domain</th>
+								<th className="num">Keywords in top 10</th>
+								<th className="num">Best rank</th>
+								<th className="num">Avg rank</th>
+							</tr>
+						</thead>
+						<tbody>
+							{rivals.map(r => {
+								const ours = ranks.some(x => site(x.my_domain) === site(r.domain))
+								return (
+									<tr key={r.domain}>
+										<td>
+											{site(r.domain)} {ours ? <strong>(us)</strong> : null}
+										</td>
+										<td className="num">{r.keywords}</td>
+										<td className="num">#{r.best}</td>
+										<td className="num">{r.avg_rank}</td>
+									</tr>
+								)
+							})}
+						</tbody>
+					</table>
+				</div>
+				<p className="note">
+					A domain high on this list beats us broadly rather than on one term, which is
+					usually a content-depth or backlink gap rather than a single-page fix.
+				</p>
+			</section>
+		</>
+	)
+}
+
+/**
+ * Authority + backlinks per site, captured every 3 days by sha-reports
+ * (src/backlinks.ts). Clean = referring domains with spam score under 25;
+ * that is the number link-building work should move.
+ */
+function BacklinkSections({
+	rows,
+}: {
+	rows: Array<{
+		day: string
+		target: string
+		rank: string | null
+		backlinks: string | null
+		referring_domains: string | null
+		clean_referring_domains: string | null
+		spam_referring_domains: string | null
+	}>
+}) {
+	if (!rows.length) return null
+	const days = [...new Set(rows.map(r => r.day))].sort()
+	const targets = [...new Set(rows.map(r => r.target))]
+	const cell = new Map(rows.map(r => [`${r.day}|${r.target}`, r]))
+	const latest = days[days.length - 1]
+	const num = (v: string | null | undefined) => (v == null ? null : Number(v))
+
+	return (
+		<>
+			<section>
+				<h2>
+					Authority score <span className="mini">DataForSEO domain rank, every 3 days</span>
+				</h2>
+				<LineChart
+					labels={days}
+					series={targets.map((t, i) => ({
+						name: site(t),
+						color: SERIES[i % SERIES.length]!,
+						values: days.map(d => num(cell.get(`${d}|${t}`)?.rank)),
+					}))}
+					height={200}
+					format={n => String(Math.round(n))}
+				/>
+			</section>
+
+			<section>
+				<h2>
+					Clean referring domains{' '}
+					<span className="mini">spam score under 25, the number worth growing</span>
+				</h2>
+				<LineChart
+					labels={days}
+					series={targets.map((t, i) => ({
+						name: site(t),
+						color: SERIES[i % SERIES.length]!,
+						values: days.map(d => num(cell.get(`${d}|${t}`)?.clean_referring_domains)),
+					}))}
+					height={200}
+					format={n => String(Math.round(n))}
+				/>
+				<div className="rtable-wrap">
+					<table className="rtable">
+						<thead>
+							<tr>
+								<th>Site</th>
+								<th className="num">Authority</th>
+								<th className="num">Backlinks</th>
+								<th className="num">Referring domains</th>
+								<th className="num">Clean</th>
+								<th className="num">Spam</th>
+							</tr>
+						</thead>
+						<tbody>
+							{targets.map(t => {
+								const r = cell.get(`${latest}|${t}`)
+								return (
+									<tr key={t}>
+										<td>{site(t)}</td>
+										<td className="num">{r?.rank ?? '-'}</td>
+										<td className="num">{r?.backlinks ?? '-'}</td>
+										<td className="num">{r?.referring_domains ?? '-'}</td>
+										<td className="num good">{r?.clean_referring_domains ?? '-'}</td>
+										<td className="num bad">{r?.spam_referring_domains ?? '-'}</td>
+									</tr>
+								)
+							})}
+						</tbody>
+					</table>
+				</div>
+				<p className="note">
+					As of {latest}. Most historical links are junk directories, so total referring
+					domains overstates the profile, watch the clean count. Link targets and
+					submission status live in docs/listings/playbook.md and the per-location
+					records.
+				</p>
+			</section>
+		</>
 	)
 }
