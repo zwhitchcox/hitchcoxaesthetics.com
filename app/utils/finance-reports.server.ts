@@ -255,10 +255,22 @@ export async function syncFinanceReports(): Promise<{
 			await q(`insert into household_income_monthly values ($1,$2)`, [r.month, r.takehome])
 
 		// ---- total household profit: business net + take-home − household spend
-		// − estimated tax accrual. 30% of positive business net approximates the
-		// household's 2026 marginal rate on SHA profit (SE + income tax after
-		// QBI; from the 2025 return analysis), W-2 tax is already withheld from
-		// take-home. Adjust the 0.30 here if the CPA lands elsewhere.
+		// − estimated tax accrual. Three tax components (docs/taxes/README.md):
+		//   federal: 30% of positive business net approximates the household's
+		//     2026 marginal rate on SHA profit (SE + income tax after QBI; from
+		//     the 2025 return analysis). W-2 tax is already withheld from
+		//     take-home. Adjust the 0.30 here if the CPA lands elsewhere.
+		//   tn_business: TN business tax is 0.375% of GROSS receipts (Class 3
+		//     retailer, Knox County 0.1875% + Knoxville 0.1875%), expenses never
+		//     reduce it. Filed annually on TNTAP, due Apr 15.
+		//   tn_excise: TN franchise & excise, 6.5% of positive net earnings.
+		//     Applies to the LLC even though it is federally disregarded. Bank
+		//     net overstates the excise base (no depreciation here; the 2025
+		//     return had $136k of depreciation), so this accrues conservatively
+		//     high. Franchise tax (0.25% of net worth, min $100/yr) is noise at
+		//     this scale and is left out of the monthly accrual.
+		// Sales tax is collected from customers and remitted, pass-through, not
+		// accrued here.
 		await q(`create view household_profit_monthly as
 			select b.month,
 			  round(b.revenue) as business_revenue,
@@ -266,8 +278,12 @@ export async function syncFinanceReports(): Promise<{
 			  round(b.net) as business_net,
 			  round(coalesce(i.takehome, 0)) as zane_takehome,
 			  round(coalesce(h.total, 0)) as household_spend,
-			  round(greatest(b.net, 0) * 0.30) as est_tax_accrual,
-			  round(b.net + coalesce(i.takehome, 0) - coalesce(h.total, 0) - greatest(b.net, 0) * 0.30) as net_household_profit
+			  round(greatest(b.net, 0) * 0.30) as est_tax_federal,
+			  round(b.revenue * 0.00375) as est_tax_tn_business,
+			  round(greatest(b.net, 0) * 0.065) as est_tax_tn_excise,
+			  round(greatest(b.net, 0) * 0.365 + b.revenue * 0.00375) as est_tax_accrual,
+			  round(b.net + coalesce(i.takehome, 0) - coalesce(h.total, 0)
+			        - greatest(b.net, 0) * 0.365 - b.revenue * 0.00375) as net_household_profit
 			from business_pnl_monthly b
 			left join household_income_monthly i using (month)
 			left join household_monthly_totals h using (month)
