@@ -63,3 +63,4 @@ processing-images-archive/
 
 # Generated provider review QR codes
 review-qr-codes*/
+__pycache__/

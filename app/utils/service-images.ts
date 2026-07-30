@@ -74,10 +74,10 @@ const SLUG_TO_PREFIX: Record<string, string | PrefixMapping> = {
 
 	// Services that share images with a sibling (offset to pick different images)
 	filler: 'filler-lip-filler',
-	jeuveau: { prefix: 'botox', offset: 1 },
-	dysport: { prefix: 'botox', offset: 2 },
+	jeuveau: 'jeuveau',
+	dysport: 'dysport',
 	tirzepatide: { prefix: 'semaglutide', offset: 1 },
-	everesse: 'skinvive',
+	everesse: 'everesse',
 	// skin-revitalization now uses direct prefix if available
 
 	// Botox sub-services
@@ -95,16 +95,17 @@ const SLUG_TO_PREFIX: Record<string, string | PrefixMapping> = {
 	'filler/cheek-filler': 'filler-cheek-filler',
 	'filler/chin-filler': 'filler-chin-filler',
 	'filler/jawline-filler': 'filler-jawline-filler',
-	'filler/under-eye-filler': { prefix: 'filler-cheek-filler', offset: 1 },
-	'filler/nasolabial-folds': { prefix: 'filler-cheek-filler', offset: 2 },
+	'filler/under-eye-filler': 'filler-under-eye-filler',
+	'filler/nasolabial-folds': 'filler-nasolabial-folds',
 
 	// Microneedling sub-services
 	'microneedling/facial': 'microneedling',
 
-	// Everesse sub-services (fallback to skinvive until real images exist)
-	'everesse/face': 'skinvive',
-	'everesse/neck': { prefix: 'skinvive', offset: 1 },
-	'everesse/jawline': { prefix: 'skinvive', offset: 2 },
+	// Everesse sub-services, each with its own real Everesse clinical photos
+	'everesse/face': 'everesse-face',
+	'everesse/neck': 'everesse-neck',
+	'everesse/jawline': 'everesse-jawline',
+	'everesse/body': 'everesse-body',
 }
 
 function resolvePrefix(mapping: string | PrefixMapping): {

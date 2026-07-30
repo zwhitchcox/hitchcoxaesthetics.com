@@ -92,10 +92,15 @@ sections:
           around 12 weeks as new collagen matures. Results vary by age and
           lifestyle; maintenance sessions can help sustain outcomes.
 heroImages:
-  - before: /img/before-after/skin-revitalization-001-before.webp
-    after: /img/before-after/skin-revitalization-001-after.webp
-  - before: /img/before-after/skin-revitalization-002-before.webp
-    after: /img/before-after/skin-revitalization-002-after.webp
+  - before: /img/before-after/everesse-001-before.webp
+    after: /img/before-after/everesse-001-after.webp
+    caption: Everesse, 1 session
+  - before: /img/before-after/everesse-002-before.webp
+    after: /img/before-after/everesse-002-after.webp
+    caption: Everesse, 1 session
+  - before: /img/before-after/everesse-003-before.webp
+    after: /img/before-after/everesse-003-after.webp
+    caption: Everesse body
 ---
 
 ## Everesse Skin Tightening in Knoxville

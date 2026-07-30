@@ -22,46 +22,12 @@ sections:
         description: Restores volume without looking puffy.
         icon: smile
 heroImages:
-  - before: /img/before-after/filler-cheek-filler-001-before.webp
-    after: /img/before-after/filler-cheek-filler-001-after.webp
-  - before: /img/before-after/filler-cheek-filler-002-before.webp
-    after: /img/before-after/filler-cheek-filler-002-after.webp
-  - before: /img/before-after/filler-cheek-filler-003-before.webp
-    after: /img/before-after/filler-cheek-filler-003-after.webp
-  - before: /img/before-after/filler-cheek-filler-004-before.webp
-    after: /img/before-after/filler-cheek-filler-004-after.webp
-  - before: /img/before-after/filler-cheek-filler-005-before.webp
-    after: /img/before-after/filler-cheek-filler-005-after.webp
-  - before: /img/before-after/filler-cheek-filler-006-before.webp
-    after: /img/before-after/filler-cheek-filler-006-after.webp
-  - before: /img/before-after/filler-chin-filler-001-before.webp
-    after: /img/before-after/filler-chin-filler-001-after.webp
-  - before: /img/before-after/filler-chin-filler-002-before.webp
-    after: /img/before-after/filler-chin-filler-002-after.webp
-  - before: /img/before-after/filler-chin-filler-003-before.webp
-    after: /img/before-after/filler-chin-filler-003-after.webp
-  - before: /img/before-after/filler-chin-filler-004-before.webp
-    after: /img/before-after/filler-chin-filler-004-after.webp
-  - before: /img/before-after/filler-jawline-filler-001-before.webp
-    after: /img/before-after/filler-jawline-filler-001-after.webp
-  - before: /img/before-after/filler-jawline-filler-002-before.webp
-    after: /img/before-after/filler-jawline-filler-002-after.webp
-  - before: /img/before-after/filler-jawline-filler-003-before.webp
-    after: /img/before-after/filler-jawline-filler-003-after.webp
-  - before: /img/before-after/filler-jawline-filler-004-before.webp
-    after: /img/before-after/filler-jawline-filler-004-after.webp
-  - before: /img/before-after/filler-jawline-filler-005-before.webp
-    after: /img/before-after/filler-jawline-filler-005-after.webp
-  - before: /img/before-after/filler-lip-filler-001-before.webp
-    after: /img/before-after/filler-lip-filler-001-after.webp
-  - before: /img/before-after/filler-lip-filler-002-before.webp
-    after: /img/before-after/filler-lip-filler-002-after.webp
-  - before: /img/before-after/filler-lip-filler-003-before.webp
-    after: /img/before-after/filler-lip-filler-003-after.webp
-  - before: /img/before-after/filler-lip-filler-004-before.webp
-    after: /img/before-after/filler-lip-filler-004-after.webp
-  - before: /img/before-after/filler-lip-filler-005-before.webp
-    after: /img/before-after/filler-lip-filler-005-after.webp
+  - before: /img/before-after/filler-nasolabial-folds-001-before.webp
+    after: /img/before-after/filler-nasolabial-folds-001-after.webp
+    caption: Restylane Lyft, 1 mL per nasolabial fold at 4 weeks · actual patient
+  - before: /img/before-after/filler-nasolabial-folds-002-before.webp
+    after: /img/before-after/filler-nasolabial-folds-002-after.webp
+    caption: Restylane Lyft, 1.5 mL per nasolabial fold at 2 weeks · actual patient
 ---
 
 ## Softening Nasolabial Folds in Knoxville

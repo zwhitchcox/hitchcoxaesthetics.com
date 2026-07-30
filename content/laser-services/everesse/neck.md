@@ -13,10 +13,12 @@ whyChoose: >-
   safely and effectively to restore firmness and texture.
 ctaText: Book Neck Treatment Consultation
 heroImages:
-  - before: /img/before-after/skin-revitalization-001-before.webp
-    after: /img/before-after/skin-revitalization-001-after.webp
-  - before: /img/before-after/skin-revitalization-002-before.webp
-    after: /img/before-after/skin-revitalization-002-after.webp
+  - before: /img/before-after/everesse-neck-001-before.webp
+    after: /img/before-after/everesse-neck-001-after.webp
+    caption: Everesse neck, 1 session
+  - before: /img/before-after/everesse-neck-002-before.webp
+    after: /img/before-after/everesse-neck-002-after.webp
+    caption: Everesse neck, 2 sessions
 ---
 
 ## Neck Tightening Services in Knoxville

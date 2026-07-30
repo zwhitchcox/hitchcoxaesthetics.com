@@ -13,10 +13,15 @@ whyChoose: >-
   collagen production for long-lasting, natural-looking firmness.
 ctaText: Book Face Treatment Consultation
 heroImages:
-  - before: /img/before-after/skin-revitalization-001-before.webp
-    after: /img/before-after/skin-revitalization-001-after.webp
-  - before: /img/before-after/skin-revitalization-002-before.webp
-    after: /img/before-after/skin-revitalization-002-after.webp
+  - before: /img/before-after/everesse-face-001-before.webp
+    after: /img/before-after/everesse-face-001-after.webp
+    caption: Everesse face, 1 session
+  - before: /img/before-after/everesse-face-002-before.webp
+    after: /img/before-after/everesse-face-002-after.webp
+    caption: Everesse face, 1 session
+  - before: /img/before-after/everesse-face-003-before.webp
+    after: /img/before-after/everesse-face-003-after.webp
+    caption: Everesse face, 1 session
 ---
 
 ## Non-Surgical Face Lift in Knoxville

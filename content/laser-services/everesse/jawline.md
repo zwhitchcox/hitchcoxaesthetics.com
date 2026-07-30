@@ -13,10 +13,15 @@ whyChoose: >-
   precise, comfortable way to tighten and define the lower face.
 ctaText: Book Jawline Treatment Consultation
 heroImages:
-  - before: /img/before-after/skin-revitalization-001-before.webp
-    after: /img/before-after/skin-revitalization-001-after.webp
-  - before: /img/before-after/skin-revitalization-002-before.webp
-    after: /img/before-after/skin-revitalization-002-after.webp
+  - before: /img/before-after/everesse-jawline-001-before.webp
+    after: /img/before-after/everesse-jawline-001-after.webp
+    caption: Everesse jawline, 1 session
+  - before: /img/before-after/everesse-jawline-002-before.webp
+    after: /img/before-after/everesse-jawline-002-after.webp
+    caption: Everesse jawline, 1 session
+  - before: /img/before-after/everesse-jawline-003-before.webp
+    after: /img/before-after/everesse-jawline-003-after.webp
+    caption: Everesse jawline, immediately post-treatment
 ---
 
 ## Jawline Contouring in Knoxville

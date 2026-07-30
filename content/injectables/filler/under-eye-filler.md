@@ -22,46 +22,15 @@ sections:
         description: Fills deep hollows and tear troughs.
         icon: droplet
 heroImages:
-  - before: /img/before-after/filler-cheek-filler-001-before.webp
-    after: /img/before-after/filler-cheek-filler-001-after.webp
-  - before: /img/before-after/filler-cheek-filler-002-before.webp
-    after: /img/before-after/filler-cheek-filler-002-after.webp
-  - before: /img/before-after/filler-cheek-filler-003-before.webp
-    after: /img/before-after/filler-cheek-filler-003-after.webp
-  - before: /img/before-after/filler-cheek-filler-004-before.webp
-    after: /img/before-after/filler-cheek-filler-004-after.webp
-  - before: /img/before-after/filler-cheek-filler-005-before.webp
-    after: /img/before-after/filler-cheek-filler-005-after.webp
-  - before: /img/before-after/filler-cheek-filler-006-before.webp
-    after: /img/before-after/filler-cheek-filler-006-after.webp
-  - before: /img/before-after/filler-chin-filler-001-before.webp
-    after: /img/before-after/filler-chin-filler-001-after.webp
-  - before: /img/before-after/filler-chin-filler-002-before.webp
-    after: /img/before-after/filler-chin-filler-002-after.webp
-  - before: /img/before-after/filler-chin-filler-003-before.webp
-    after: /img/before-after/filler-chin-filler-003-after.webp
-  - before: /img/before-after/filler-chin-filler-004-before.webp
-    after: /img/before-after/filler-chin-filler-004-after.webp
-  - before: /img/before-after/filler-jawline-filler-001-before.webp
-    after: /img/before-after/filler-jawline-filler-001-after.webp
-  - before: /img/before-after/filler-jawline-filler-002-before.webp
-    after: /img/before-after/filler-jawline-filler-002-after.webp
-  - before: /img/before-after/filler-jawline-filler-003-before.webp
-    after: /img/before-after/filler-jawline-filler-003-after.webp
-  - before: /img/before-after/filler-jawline-filler-004-before.webp
-    after: /img/before-after/filler-jawline-filler-004-after.webp
-  - before: /img/before-after/filler-jawline-filler-005-before.webp
-    after: /img/before-after/filler-jawline-filler-005-after.webp
-  - before: /img/before-after/filler-lip-filler-001-before.webp
-    after: /img/before-after/filler-lip-filler-001-after.webp
-  - before: /img/before-after/filler-lip-filler-002-before.webp
-    after: /img/before-after/filler-lip-filler-002-after.webp
-  - before: /img/before-after/filler-lip-filler-003-before.webp
-    after: /img/before-after/filler-lip-filler-003-after.webp
-  - before: /img/before-after/filler-lip-filler-004-before.webp
-    after: /img/before-after/filler-lip-filler-004-after.webp
-  - before: /img/before-after/filler-lip-filler-005-before.webp
-    after: /img/before-after/filler-lip-filler-005-after.webp
+  - before: /img/before-after/filler-under-eye-filler-001-before.webp
+    after: /img/before-after/filler-under-eye-filler-001-after.webp
+    caption: Restylane Eyelight, 1.5 mL undereye hollows at 2 weeks · actual patient
+  - before: /img/before-after/filler-under-eye-filler-002-before.webp
+    after: /img/before-after/filler-under-eye-filler-002-after.webp
+    caption: Restylane Eyelight undereye with cheek filler at 2 weeks · actual patient
+  - before: /img/before-after/filler-under-eye-filler-003-before.webp
+    after: /img/before-after/filler-under-eye-filler-003-after.webp
+    caption: Restylane Eyelight undereye with cheek filler at 2 weeks · actual patient
 ---
 
 ## Brightening Under-Eyes with Filler in Knoxville
