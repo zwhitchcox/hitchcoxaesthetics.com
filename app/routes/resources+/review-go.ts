@@ -1,6 +1,7 @@
 import { redirect, type LoaderFunctionArgs } from '@remix-run/node'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
+	findReviewPlatformUrl,
 	getReviewLocations,
 	matchLocationToAppointment,
 	readAppointmentSnapshot,
@@ -21,6 +22,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const providerId = url.searchParams.get('provider') ?? ''
 	const placeId = url.searchParams.get('place')
 	const appointmentId = url.searchParams.get('appt')
+	const platformId = url.searchParams.get('platform')?.toLowerCase() ?? 'google'
+	const viaParam = url.searchParams.get('via')?.toLowerCase()
+	const via = viaParam === 'nfc' || viaParam === 'link' ? viaParam : 'qr'
 
 	const locations = await getReviewLocations()
 	// Only redirect to a place we actually own (no open redirect).
@@ -43,9 +47,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			place_id: chosen.placeId,
 			place_label: chosen.label,
 			chose_visited_location: matchedPlaceId === chosen.placeId,
+			platform: platformId,
 			client_first_name: appt?.clientFirstName ?? null,
+			via,
 		},
 	})
 
+	// Non-Google destinations resolve through the whitelist, so a crafted
+	// ?platform= can never redirect off our own listings.
+	if (platformId !== 'google') {
+		const platformUrl = findReviewPlatformUrl(chosen.label, platformId)
+		if (platformUrl) return redirect(platformUrl)
+	}
 	return redirect(writeReviewUrl(chosen.placeId))
 }

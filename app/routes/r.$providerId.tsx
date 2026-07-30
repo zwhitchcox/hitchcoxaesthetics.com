@@ -15,8 +15,10 @@ import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
 	fallbackReview,
 	takeUniqueSamples,
+	takeUniqueSamplesPerDestination,
 	generateSampleReview,
 	getReviewLocations,
+	getReviewPlatforms,
 	getServiceProfile,
 	matchLocationToAppointment,
 	readAppointmentSnapshot,
@@ -31,10 +33,18 @@ export const meta: MetaFunction = () => [
 	{ name: 'robots', content: 'noindex' },
 ]
 
-export async function loader({ params }: LoaderFunctionArgs) {
+/** How the client reached the page: printed QR (the default, so codes already
+ * in the wild keep working) or a tapped NFC chip. */
+function readVia(request: Request) {
+	const via = new URL(request.url).searchParams.get('via')?.toLowerCase()
+	return via === 'nfc' || via === 'link' ? via : 'qr'
+}
+
+export async function loader({ params, request }: LoaderFunctionArgs) {
 	// The sample-uniqueness ledger writes to SQLite, pin to the primary.
 	await ensurePrimary()
 	const providerId = params.providerId!
+	const via = readVia(request)
 	const staffUrn = toStaffUrn(providerId)
 	const [snapshot, locations] = await Promise.all([
 		readAppointmentSnapshot(),
@@ -84,27 +94,35 @@ export async function loader({ params }: LoaderFunctionArgs) {
 				service_category: profile.category,
 				has_appointment: Boolean(appt),
 				redirected_to: micrositeHost,
+				via,
 			},
 		})
-		throw redirect(`${micrositeHost}/r/${providerId}`)
+		// Carry the QR-vs-NFC marker across the hop so the brand page's own
+		// scanned event keeps the attribution.
+		throw redirect(`${micrositeHost}/r/${providerId}?via=${via}`)
 	}
 
 	// Every sample goes through the served-hash ledger so no two customers can
-	// ever copy identical text (duplicate reviews get listings flagged).
-	const generated = appt
-		? await generateSampleReview({
-				serviceName,
-				providerFirstName,
-				keywords: profile.keywords,
-			})
-		: null
-	const [uniqueSample] = await takeUniqueSamples([
-		generated,
-		fallbackReview(appt ? serviceName : 'visit', providerFirstName, profile.keywords),
-	])
+	// ever copy identical text (duplicate reviews get listings flagged), and
+	// each DESTINATION gets its own text so one client posting to two places
+	// never pastes the same words twice.
+	const matchedPlaceIdEarly = matchLocationToAppointment(locations, appt?.locationName)
+	const orderedForSamples = [...locations].sort((a, b) => {
+		if (a.placeId === matchedPlaceIdEarly) return -1
+		if (b.placeId === matchedPlaceIdEarly) return 1
+		return a.label.localeCompare(b.label)
+	})
+	const samplesByPlace = await takeUniqueSamplesPerDestination(
+		orderedForSamples.map(l => `Google - ${l.label}`),
+		{
+			serviceName: appt ? serviceName : 'visit',
+			providerFirstName,
+			keywords: profile.keywords,
+		},
+	)
+	const genericFallback = `${providerFirstName} and the team took wonderful care of me, sharing a couple of details about your visit helps others in Knoxville find us.`
 	const review =
-		uniqueSample ??
-		`${providerFirstName} and the team took wonderful care of me, sharing a couple of details about your visit helps others in Knoxville find us.`
+		samplesByPlace.get(`Google - ${orderedForSamples[0]?.label}`) ?? genericFallback
 
 	const matchedPlaceId = matchLocationToAppointment(locations, appt?.locationName)
 	// Float the location they visited to the top.
@@ -128,10 +146,12 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			has_appointment: Boolean(appt),
 			client_first_name: appt?.clientFirstName ?? null,
 			brand: 'sha',
+			via,
 		},
 	})
 
 	return json({
+		via,
 		providerId,
 		providerFirstName,
 		appointmentId: appt?.id ?? null,
@@ -141,6 +161,15 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			placeId: l.placeId,
 			label: l.label,
 			address: l.address,
+			// Each destination carries its own text, so posting to a second
+			// place never reuses the first one's words.
+			sample: samplesByPlace.get(`Google - ${l.label}`) ?? genericFallback,
+			// Google always first, then anything else we've claimed for this
+			// location that actually accepts reviews.
+			platforms: [
+				{ id: 'google', label: 'Google' },
+				...getReviewPlatforms(l.label).map(p => ({ id: p.id, label: p.label })),
+			],
 		})),
 		matchedPlaceId,
 	})
@@ -170,9 +199,14 @@ export default function ReviewLinkPage() {
 	const fetcher = useFetcher()
 	const textareaRef = useRef<HTMLTextAreaElement>(null)
 	const [copied, setCopied] = useState(false)
+	// Which destination's sample is currently in the box. Picking a different
+	// place swaps in that place's own text so no two get the same words.
+	const [placeId, setPlaceId] = useState(data.locations[0]?.placeId ?? '')
+	const activeSample =
+		data.locations.find(l => l.placeId === placeId)?.sample ?? data.review
 
 	function handleCopy() {
-		const text = textareaRef.current?.value ?? data.review
+		const text = textareaRef.current?.value ?? activeSample
 		void navigator.clipboard?.writeText(text)
 		setCopied(true)
 		fetcher.submit(
@@ -197,8 +231,9 @@ export default function ReviewLinkPage() {
 
 			<section className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow-sm">
 				<Textarea
+					key={placeId}
 					ref={textareaRef}
-					defaultValue={data.review}
+					defaultValue={activeSample}
 					rows={6}
 					className="resize-none text-base"
 					aria-label="Sample review"
@@ -220,14 +255,14 @@ export default function ReviewLinkPage() {
 						data.appointmentId
 							? `&appt=${encodeURIComponent(data.appointmentId)}`
 							: ''
-					}`
+					}&via=${encodeURIComponent(data.via)}`
+					const selected = loc.placeId === placeId
 					return (
-						<a
+						<div
 							key={loc.placeId}
-							href={href}
 							className={cn(
-								'flex flex-col items-center rounded-xl border bg-white p-4 text-center shadow-sm transition hover:border-primary',
-								recommended && 'border-primary ring-1 ring-primary',
+								'flex flex-col items-center rounded-xl border bg-white p-4 text-center shadow-sm transition',
+								(recommended || selected) && 'border-primary ring-1 ring-primary',
 							)}
 						>
 							{recommended ? (
@@ -237,7 +272,27 @@ export default function ReviewLinkPage() {
 							) : null}
 							<span className="text-lg font-semibold">{loc.label}</span>
 							<span className="text-sm text-muted-foreground">{loc.address}</span>
-						</a>
+							{/* One button per site that actually takes reviews. Choosing a
+							    location first swaps in that location's own sample text. */}
+							<div className="mt-3 flex w-full flex-wrap justify-center gap-2">
+								{loc.platforms.map(platform => (
+									<a
+										key={platform.id}
+										href={`${href}&platform=${encodeURIComponent(platform.id)}`}
+										onClick={event => {
+											if (!selected) {
+												event.preventDefault()
+												setPlaceId(loc.placeId)
+												setCopied(false)
+											}
+										}}
+										className="rounded-lg border border-primary/40 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/5"
+									>
+										{selected ? platform.label : `Use ${platform.label} text`}
+									</a>
+								))}
+							</div>
+						</div>
 					)
 				})}
 			</section>

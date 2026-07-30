@@ -209,6 +209,54 @@ function classifyLocation(address: string): {
 	return { label: 'Bearden', blvdMatch: /knox|bearden/i }
 }
 
+/**
+ * Non-Google places a client can leave a review, keyed by the location label
+ * from classifyLocation. Only platforms we have actually claimed belong here,
+ * and only ones with a real write-a-review destination: Bing carries reviews
+ * but exposes no public deep link, and Apple Maps has no reviews of its own
+ * (it surfaces Yelp's).
+ *
+ * NOTE ON YELP: Yelp's content guidelines prohibit asking customers for
+ * reviews, and they badge offending listings publicly. This is here because
+ * Zane asked for it (2026-07-28); the risk is his call, not a bug.
+ */
+export type ReviewPlatform = { id: string; label: string; url: string }
+
+const EXTRA_REVIEW_PLATFORMS: Record<string, ReviewPlatform[]> = {
+	Bearden: [
+		{
+			id: 'yelp',
+			label: 'Yelp',
+			url: 'https://www.yelp.com/writeareview/biz/Cn16ehd-yszrPlgtVaSvxA',
+		},
+		{
+			id: 'nextdoor',
+			label: 'Nextdoor',
+			url: 'https://nextdoor.com/page/sarah-hitchcox-aesthetics-1/',
+		},
+	],
+	Farragut: [
+		{
+			id: 'yelp',
+			label: 'Yelp',
+			url: 'https://www.yelp.com/writeareview/biz/tsIXw38grVimXY-lCj_8Iw',
+		},
+	],
+}
+
+/** Every place a client can review the given location, Google first. */
+export function getReviewPlatforms(label: string): ReviewPlatform[] {
+	return EXTRA_REVIEW_PLATFORMS[label] ?? []
+}
+
+/** Whitelist lookup so /resources/review-go can never become an open redirect. */
+export function findReviewPlatformUrl(
+	label: string,
+	platformId: string,
+): string | null {
+	return getReviewPlatforms(label).find(p => p.id === platformId)?.url ?? null
+}
+
 export async function getReviewLocations(): Promise<ReviewLocation[]> {
 	const rows = await prisma.googleLocation.findMany({
 		select: { name: true, formattedAddress: true, json: true, url: true },
@@ -264,21 +312,55 @@ export type GenerateReviewInput = {
 	serviceName: string
 	providerFirstName: string
 	keywords: string[]
+	/** Where this sample is headed, e.g. "Google - Bearden". Two destinations
+	 * must never get the same text, so the angle/tone are picked per call. */
+	destinationLabel?: string
+}
+
+/**
+ * Superlative phrasings, used on roughly half of samples so the review corpus
+ * carries "best X in Knoxville" language that answer engines pick up, WITHOUT
+ * every review sharing one construction. Identical superlative phrasing across
+ * reviews is exactly what Google clusters and strips, so the pool is wide and
+ * the choice is random per sample.
+ */
+const SUPERLATIVE_HINTS = [
+	'call them the best med spa in Knoxville',
+	'say they do the best Botox in Knoxville',
+	'call this the best place in Knoxville for injectables',
+	'say it is the best med spa experience you have had in Knoxville',
+	'call them the top spot in Knoxville for this',
+	'say you would not go anywhere else in Knoxville',
+	'call it hands down the best aesthetics clinic in Knoxville',
+	'say they are the best in Knoxville at what they do',
+]
+
+/** Roughly half the time, ask for a superlative, and vary which one. */
+function superlativeInstruction(): string {
+	if (Math.random() >= 0.5) return ''
+	const hint =
+		SUPERLATIVE_HINTS[Math.floor(Math.random() * SUPERLATIVE_HINTS.length)]!
+	return ` Somewhere in it, naturally ${hint} - phrase it in your own words so it does not sound like a template.`
 }
 
 export async function generateSampleReview({
 	serviceName,
 	providerFirstName,
 	keywords,
+	destinationLabel,
 }: GenerateReviewInput): Promise<string | null> {
 	const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim()
 	if (!apiKey) return null
 	const model = process.env.REVIEW_GEN_MODEL?.trim() || DEFAULT_REVIEW_MODEL
-	const prompt = `You are writing a sample 5-star Google review that a happy med-spa client can use as a starting point and edit before posting.
+	const angle = SAMPLE_ANGLES[Math.floor(Math.random() * SAMPLE_ANGLES.length)]!
+	const tone = SAMPLE_TONES[Math.floor(Math.random() * SAMPLE_TONES.length)]!
+	const prompt = `You are writing a sample 5-star review that a happy med-spa client can use as a starting point and edit before posting.
 Business: Sarah Hitchcox Aesthetics, a med spa in Knoxville, TN.
 Provider the client just saw: ${providerFirstName}.
-Service the client received: ${serviceName}.
-Write it in FIRST PERSON as the client, warm and specific, 2-4 sentences, sounding like a real person (not generic marketing copy). Naturally weave in SEO keywords that help this business rank for this service: ${keywords.map(k => `"${k}"`).join(', ')}. Mention the provider by first name. Do NOT invent the client's own name, exact prices, or fake medical claims. No hashtags, no emoji. Return ONLY the review text.`
+Service the client received: ${serviceName}.${destinationLabel ? `\nThis particular sample is for: ${destinationLabel}. It must read differently from samples written for any other destination.` : ''}
+Angle to build it around: ${angle}.
+Tone: ${tone}.
+Write it in FIRST PERSON as the client, warm and specific, 2-4 sentences, sounding like a real person (not generic marketing copy). Naturally weave in SEO keywords that help this business rank for this service: ${keywords.map(k => `"${k}"`).join(', ')}. Mention the provider by first name. Do NOT invent the client's own name, exact prices, or fake medical claims. No hashtags, no emoji.${superlativeInstruction()} Return ONLY the review text.`
 	try {
 		const res = await fetch(OPENROUTER_URL, {
 			method: 'POST',
@@ -357,6 +439,46 @@ export async function takeUniqueSamples(
 		})
 	}
 	return unique
+}
+
+/**
+ * One distinct sample per destination, generated in parallel and deduped both
+ * against every sample ever served AND against each other, so a client who
+ * posts to Google Bearden and then to Yelp (or to another of our brands) never
+ * pastes the same words twice. Falls back to the deterministic sample only for
+ * destinations the model could not cover.
+ */
+export async function takeUniqueSamplesPerDestination(
+	destinations: string[],
+	input: Omit<GenerateReviewInput, 'destinationLabel'>,
+): Promise<Map<string, string>> {
+	const generated = await Promise.all(
+		destinations.map(async destinationLabel => {
+			// Two tries: the first may collide with an already-served sample.
+			for (let attempt = 0; attempt < 2; attempt++) {
+				const text = await generateSampleReview({ ...input, destinationLabel })
+				if (text) {
+					const [unique] = await takeUniqueSamples([text])
+					if (unique) return [destinationLabel, unique] as const
+				}
+			}
+			return [destinationLabel, null] as const
+		}),
+	)
+	const byDestination = new Map<string, string>()
+	for (const [destination, text] of generated) {
+		if (text) byDestination.set(destination, text)
+	}
+	// Anything the model missed gets a deterministic sample, still deduped so
+	// two destinations cannot land on the same fallback string.
+	for (const destination of destinations) {
+		if (byDestination.has(destination)) continue
+		const [unique] = await takeUniqueSamples([
+			`${fallbackReview(input.serviceName, input.providerFirstName, input.keywords)} (${destination})`,
+		])
+		if (unique) byDestination.set(destination, unique)
+	}
+	return byDestination
 }
 
 const SAMPLE_ANGLES = [

@@ -26,7 +26,7 @@ const LISTING_LINKS = [
 	{ brand: 'Botox Knox Med Spa', label: 'Bearden (Suite 15b)', placeId: 'ChIJd1SN2ZQ9XIgRB5F_naTr2pM' },
 	{ brand: 'Botox Knox Med Spa', label: 'Farragut (Suite 8b)', placeId: 'ChIJ6_7_utMvXIgRpP1LXfKVvn4' },
 	{ brand: 'Knoxville Weight Loss Clinic', label: 'Bearden (Suite 15c)', placeId: 'ChIJkWEu2yk9XIgR0d0tkwaQ2ac' },
-	{ brand: 'Knoxville Weight Loss Clinic', label: 'Farragut (Suite 8c), NEW, seed this one', placeId: 'ChIJn1HGW2YvXIgRoEaM1pxtrjg' },
+	{ brand: 'Knoxville Weight Loss Clinic', label: 'Farragut (Suite 8c)', placeId: 'ChIJn1HGW2YvXIgRoEaM1pxtrjg' },
 ].map(listing => ({
 	...listing,
 	url: `https://search.google.com/local/writereview?placeid=${listing.placeId}`,
