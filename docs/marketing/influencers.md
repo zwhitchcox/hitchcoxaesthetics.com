@@ -65,3 +65,11 @@ session. C = skincare set or express facial.
 | 2026-07-30 | Brittany Williams (email) | B | | |
 | 2026-07-30 | Alona Skliar (email) | C | | |
 | 2026-07-30 | Megan Galbraith (email) | C | | |
+| 2026-07-30 | Brianne Martin (IG DM from @sarah_hitchcox_rn) | B | | |
+| 2026-07-30 | Ash Mac (IG DM) | B | | |
+| 2026-07-30 | Mikaela Wallen (IG DM) | B | | |
+| 2026-07-30 | What To Do In Knoxville (IG DM) | B + feature ask | | |
+| 2026-07-30 | Asia Blake (IG DM) | B | | |
+| 2026-07-30 | Lily McQueen (IG DM) | B | | |
+| 2026-07-30 | Ella Belle (IG DM) | C | | |
+| 2026-07-30 | Rae Farley (IG DM) | C | | |
