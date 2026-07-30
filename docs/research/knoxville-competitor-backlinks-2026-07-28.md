@@ -453,8 +453,13 @@ cluster (seo-anomaly-*.xyz, australianwebdirectory.pro/.shop,
 urls-shortener.eu, wallpapers.pro, quero.party and similar). The owner
 confirmed on 2026-07-29 that no link building was ever purchased; the cluster
 is third-party junk. Disavow files (spam score >= 25) are in
-`docs/research/disavow/`. Google offers NO API for disavow; upload is manual
-at https://search.google.com/search-console/disavow-links per property.
+`docs/research/disavow/` and were UPLOADED on 2026-07-29 (9:37-9:47 PM ET):
+32 domains for hitchcoxaesthetics.com, 26 for botoxknoxvilletn.com, 1 for
+weightlossknoxvilletn.com. Google offers no disavow API; the uploads were done
+in Search Console after adding auto-verified https:// URL-prefix properties
+(the sc-domain properties the account already had are not supported by the
+disavow tool). To amend a list later: replace the file at
+https://search.google.com/search-console/disavow-links per property.
 Disavow is precautionary here, Google mostly ignores this class of spam.
 
 ### Competitor Redirect Domains (ownership confirmed 2026-07-29)
