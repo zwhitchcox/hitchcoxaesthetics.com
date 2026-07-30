@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react'
 import { HoneypotProvider } from 'remix-utils/honeypot/react'
 import { z } from 'zod'
 
+import { AiChat } from '#/app/components/ai-chat.tsx'
 import { GeneralErrorBoundary } from '#/app/components/error-boundary.tsx'
 import { ListWithDot } from '#/app/components/list-with-dot'
 import Logo from '#/app/components/logo'
@@ -442,6 +443,7 @@ function App() {
 							<>
 								<Footer />
 								<CTA />
+								<AiChat />
 							</>
 						)}
 					</div>

@@ -8,6 +8,7 @@ export type IconName =
 	| 'avatar'
 	| 'calendar'
 	| 'camera'
+	| 'chat-bubble'
 	| 'check'
 	| 'chevron-left'
 	| 'chevron-right'
