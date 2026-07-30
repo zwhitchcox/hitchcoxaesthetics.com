@@ -28,10 +28,18 @@
   of net worth, min $100), late since 2026-04-15. ESCALATE TO CPA: they
   must confirm when the LLC became the operating entity, register the F&E
   account, and file. Do not register it blind; registration date drives
-  which years owe.
+  which years owe. Checked 2026-07-30: NO F&E notice in the LLC's TNTAP
+  letters, DOR has not flagged it yet. If multiple years are open, use a
+  voluntary disclosure agreement via the CPA (3-year lookback, penalties
+  waived) instead of direct registration. Interest on ~$1,654 runs about
+  $4/week, so a short CPA delay is cheap.
+- TNTAP hygiene: the LLC has NO mailing address on file (Action Center
+  alert), add one so notices arrive. 82 unread messages + letters exist;
+  only sales-tax assessments found in the last 12 months.
 - Sales tax: account 1002589753-SLC, Jun-2026 return processed on time.
-  Balance due $30.33 as of 2026-07-30, owner should pay it off in TNTAP
-  (Make a Payment on the sales tax account).
+  Balance due $30.33 as of 2026-07-30 = leftover late penalties + interest
+  from the Feb/Mar 2026 migration months (letters L0931820480 etc.; tax
+  itself was paid). Owner should pay it off in TNTAP.
 
 ## Sources
 
