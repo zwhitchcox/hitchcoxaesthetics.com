@@ -318,17 +318,21 @@ paid plan merely to test whether a directory works.
 | MedSpa Compass | All eight records | Free profile supports business details and map; publisher must add Knoxville/Farragut | Bulk request for all eight canonical records submitted; `PENDING PUBLISHER REVIEW` |
 | Find My Cosmetic Injector | Four SHA and two Botox Knox records | Applicable to injectable providers/medical spas; public-link behavior must be verified after publication | Advertised registration button is broken; support request for all six applicable records submitted; `PENDING PUBLISHER RESPONSE` |
 | Laser Hair Removal Nearby | Four SHA records | Existing public profiles expose phone, website, and contact details | Standard-directory request for all four SHA locations submitted; no paid featured placement requested; `PENDING PUBLISHER RESPONSE` |
-| ProvenExpert | SHA records | BrightLocal already produced live location pages for all four SHA locations | Keep and audit the existing BrightLocal URLs. A separate brand account was email-verified on 2026-07-30 and is in profile onboarding; credentials are in 1Password |
+| ProvenExpert | SHA records | BrightLocal already produced live location pages for all four SHA locations | Keep and audit the existing BrightLocal URLs. The separate brand profile is live at `https://www.provenexpert.com/sarah-hitchcox-aesthetics/` with canonical Bearden NAP, `/bearden` website, Instagram, accurate RN credential, and service description. Credentials are in 1Password |
 | AllMedSpas | Applicable med-spa records | Intended free submission, but no usable publisher integration | Submission form returned `The form is not connected to any integration`; `BLOCKED - PUBLISHER FORM BROKEN` |
 | GLP1 Directory | Two Knoxville Weight Loss Clinic records | Existing profiles include address, phone, and website | No provider registration, add-business, or contact route exists; `BLOCKED - NO SUBMISSION PATH` |
 | WeightLossNinja | Two Knoxville Weight Loss Clinic records | Existing public profiles appear to contain business contact details | Site was unavailable and no publisher submission path could be verified; `BLOCKED - SITE/PUBLISHER UNAVAILABLE` |
 | MedSpaDirectory.org | Applicable medical-spa records | Listing disappears after the seven-day trial | `$75/month` for up to 10 listings; `NOT PURSUING - PAID/TEMPORARY` |
 | TrustAnalytica | All eight records | Business profile management is paid | Plans start at `$12.95/month` billed annually; `NOT PURSUING - PAID` |
-| Laser Hair Removal Success | Four SHA records | Paid permanent profile, but every future edit is also charged | `$45` per location, or `$180` for four SHA locations; `NOT PURSUING WITHOUT OWNER APPROVAL` |
+| Laser Hair Removal Success | Four SHA records | Paid permanent dofollow profiles; every future edit is also charged | Four records purchased for `$180` total on 2026-07-30; order `L6a6bc4769891f`; `PAID - PENDING PUBLISHER REVIEW` |
 | N49 | All eight records | Free profile omits the website link; dofollow website requires `$8/month` | Keep the four existing SHA records from BrightLocal; do not create new paid sub-brand records without approval |
 | Storeboard | All eight records | Free account is a community profile; business profile with website costs `$9/year` | Keep the four live SHA pages already produced by BrightLocal; no new paid sub-brand profiles without approval |
-| Bunity | All eight records | Permanent dofollow business profile | `$3` one-time per record, or `$24` for all eight; `HOLD FOR OWNER APPROVAL` |
+| Bunity | All eight records | Permanent dofollow business profiles | Eight records purchased for `$24` total on 2026-07-30; all public pages and website links verified; `LIVE` |
 | Bariatric Journal | Two Knoxville Weight Loss Clinic records | Sponsored editorial/business placement | `NOT PURSUING - PAID SPONSORSHIP` |
+
+Track future paid options in
+[`PAID-CANDIDATES.md`](./PAID-CANDIDATES.md) and publisher failures or
+pending rechecks in [`RETRY-FAILURES.md`](./RETRY-FAILURES.md).
 
 For submitted requests, do not mark the location complete until the publisher
 returns a public URL and the website link has been opened and verified. Record

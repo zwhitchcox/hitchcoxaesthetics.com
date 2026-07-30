@@ -22,6 +22,7 @@ Last audited: YYYY-MM-DD
 ## Account Ownership
 
 - Login email:
+- Login email verification status: UNVERIFIED / VERIFIED
 - Password manager item:
 - Owner/admin:
 - Recovery method:

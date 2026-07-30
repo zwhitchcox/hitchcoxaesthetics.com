@@ -36,39 +36,42 @@ listing needs to be corrected later.
 The consolidated unfinished-work checklist is [Business Listing TODO](TODO.md).
 Update it whenever a blocker clears or a listing is completed.
 
+Use the [Nextdoor Listing And Account Recovery Guide](nextdoor.md) whenever a
+Nextdoor Page or owner account reports an error, suspension, missing Page, or
+verification problem. The guide requires checking Sarah's business inbox before
+opening a duplicate support case.
+
 ## Portfolio
 
 | Record                                                              | Operating status                         | Google                | Yelp                                     | Nextdoor                                                | BBB       |
 | ------------------------------------------------------------------- | ---------------------------------------- | --------------------- | ---------------------------------------- | ------------------------------------------------------- | --------- |
 | [SHA Bearden](locations/sha-bearden.md)                             | Physical clinic                          | Live                  | Claimed                                  | Public live; admin blocked by shared-account suspension | Submitted |
 | [SHA Farragut](locations/sha-farragut.md)                           | Physical clinic                          | Live                  | Claimed                                  | Public live; admin blocked by shared-account suspension | Submitted |
-| [SHA West Hills](locations/sha-west-hills.md)                       | Business location; config update pending | Live                  | Claimed; pending Yelp moderator approval | Created; account suspended                              | Submitted |
-| [SHA Cedar Bluff](locations/sha-cedar-bluff.md)                     | Business location; config update pending | Live                  | Submission did not create listing        | Blocked by account suspension                           | Submitted |
-| [Botox Knox Bearden](locations/botox-knox-bearden.md)               | Physical sub-brand                       | Live                  | Submission pending                       | Blocked by account suspension                           | Submitted |
+| [SHA West Hills](locations/sha-west-hills.md)                       | Business location; config update pending | Live                  | Approved; suite correction pending       | Created; account suspended                              | Submitted |
+| [SHA Cedar Bluff](locations/sha-cedar-bluff.md)                     | Business location; config update pending | Live                  | Claimed; NAP correction pending          | Blocked by account suspension                           | Submitted |
+| [Botox Knox Bearden](locations/botox-knox-bearden.md)               | Physical sub-brand                       | Live                  | Claimed; initial moderation pending       | Blocked by account suspension                           | Submitted |
 | [Botox Knox Farragut](locations/botox-knox-farragut.md)             | Physical sub-brand                       | Live                  | Claimed                                  | Blocked by account suspension                           | Submitted |
 | [Weight Loss Knox Bearden](locations/weight-loss-knox-bearden.md)   | Physical sub-brand                       | Live                  | Claimed                                  | Blocked by account suspension                           | Submitted |
 | [Weight Loss Knox Farragut](locations/weight-loss-knox-farragut.md) | Physical sub-brand                       | Live; duplicate issue | Claimed                                  | Blocked by account suspension                           | Submitted |
 
-The Yelp account now contains six claimed listings: the five recovered listings
-plus SHA West Hills. Cedar Bluff and Botox Knox Bearden both passed Yelp's
-hCaptcha, but Yelp returned to the completed form without creating either
-location. The account still shows six locations. Yelp's logged-in support center
-offers phone support at (877) 767-9357 for this issue. SHA West Hills is present
-in Yelp for Business with the canonical phone and `/west-hills` website. Yelp
-explicitly says the page will not appear publicly until its moderators approve
-the business, so the public slug currently redirects to search by design.
+The Yelp account now contains eight claimed listings. SHA Cedar Bluff was
+claimed on 2026-07-30 and its canonical phone and direct website were submitted
+for moderation. Botox Knox Bearden was created, domain-email verified, and
+claimed the same day; it is awaiting initial moderator approval before its
+omitted Suite 15B can be corrected. SHA West Hills is approved with canonical
+phone and website, and its malformed suite correction is in moderator review.
 
 Nextdoor allowed SHA West Hills to be added under the shared owner account, then
 immediately suspended the account. A reinstatement appeal was submitted on
-2026-07-28; Nextdoor states it will respond within 24–48 hours. Do not create
-more Nextdoor pages until the account is reinstated. Nextdoor's disabled account
-screen and Sarah's inbox contain no specific policy reason. The Bearden and
+2026-07-28. Sarah completed Nextdoor's email identity confirmation, and
+Nextdoor escalated case `#29368270` to its Neighborhood Management team on
+2026-07-30. No reinstatement decision or policy reason has arrived. Do not
+create more Nextdoor pages until the account is reinstated. The Bearden and
 Farragut public Pages remained live with canonical NAP when checked on
 2026-07-29, but the suspended owner account cannot manage them. An automated
 "Check the verification of your business" email received on 2026-07-29 was not
 an appeal decision; its status link still redirected to the disabled-account
-screen. No reinstatement response was present in either the business inbox or
-the owner's personal Gmail.
+screen.
 
 ## Website Completion Standard
 
@@ -109,8 +112,13 @@ file.
 | Platform            | Public page                                                                                                   | Scope                                                        | Status                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Facebook            | [Official Sarah Hitchcox Aesthetics Page](https://www.facebook.com/profile.php?id=61592729485925)             | Brand-wide; Bearden is currently the primary Page address    | LIVE; owned by the Sarah Hitchcox Aesthetics Business Portfolio; Farragut, West Hills, and Cedar Bluff website links are published |
+| Facebook            | [Sarah Hitchcox Aesthetics - Farragut](https://www.facebook.com/profile.php?id=61592888541475)                | SHA Farragut standalone Page                                 | LIVE; canonical Farragut NAP and direct location website published 2026-07-30                                                     |
+| Facebook            | [Sarah Hitchcox Aesthetics - West Hills](https://www.facebook.com/profile.php?id=61592457969628)              | SHA West Hills standalone Page                               | LIVE; canonical West Hills NAP and direct location website published 2026-07-30                                                   |
+| Facebook            | [Sarah Hitchcox Aesthetics - Cedar Bluff](https://www.facebook.com/profile.php?id=61592881731877)             | SHA Cedar Bluff standalone Page                              | LIVE; canonical Cedar Bluff NAP and direct location website published 2026-07-30                                                  |
 | Facebook            | [Botox Knox Med Spa - Bearden](https://www.facebook.com/profile.php?id=61592681608237)                        | Botox Knox primary Page; Bearden Suite 15B                   | LIVE; exact canonical phone, website, email, and address saved 2026-07-28                                                          |
+| Facebook            | [Botox Knox Med Spa - Farragut](https://www.facebook.com/profile.php?id=61592359752743)                       | Botox Knox Farragut standalone Page                          | LIVE; exact canonical phone, website, email, and Suite 8B address saved 2026-07-30                                                 |
 | Facebook            | [Knoxville Weight Loss Clinic - Bearden](https://www.facebook.com/profile.php?id=61592834871651)              | Knoxville Weight Loss Clinic primary Page; Bearden Suite 15C | LIVE; exact canonical phone, website, email, and address saved 2026-07-28                                                          |
+| Facebook            | [Knoxville Weight Loss Clinic - Farragut](https://www.facebook.com/profile.php?id=61592313046404)             | Knoxville Weight Loss Clinic Farragut Page; Suite 8C         | LIVE; exact canonical phone, website, email, and address saved 2026-07-30                                                          |
 | Knoxville Moms      | [Sarah Hitchcox Aesthetics listing](https://knoxvillemoms.com/directory/listing/sarah-hitchcox-aesthetics-1/) | Bearden address; description mentions Bearden and Farragut   | LIVE, but the email and website are stale and require correction                                                                   |
 | Portrait Care       | [Sarah Hitchcox Aesthetics listing](https://www.portraitcare.com/location/sarah-hitchcox-aesthetics-34659/)   | Bearden address only                                         | LIVE, unclaimed, and showing a non-canonical phone                                                                                 |
 | JaneApp             | [Legacy SHA booking page](https://hitchcoxaesthetics.janeapp.com/)                                            | Historical Bearden and Farragut booking locations            | DEPRECATED; retain only as a cleanup record                                                                                        |
@@ -139,6 +147,18 @@ management screen.
 ## Shared Rules
 
 - Account email: `sarah@hitchcoxaesthetics.com`.
+- Paid multi-business directory account exception: MapQuest and Thryv use
+  `zwhitchcox@gmail.com`. MapQuest was purchased on 2026-07-30 for `$150/year`
+  with HEP is on the way at 1605 Prosser Rd as the subscribed listing. The
+  portal redirects every subsequent claim attempt back to that HEP record and
+  exposes no listing switcher, so do not assume the subscription covers a
+  second listing. An account-scope support request was submitted and
+  email-verified on 2026-07-30 asking MapQuest to enable multi-listing
+  management or confirm the subscription limit in writing. A second verified
+  request submitted all 11 active HEP Google Business Profiles for bulk
+  creation, correction, and duplicate cleanup. Track that work in
+  [HEP MapQuest Location Audit](hep-mapquest.md). Thryv has only a sales/demo
+  request under this email; no Thryv contract or payment has been approved.
 - Facebook Business Portfolio: `Sarah Hitchcox Aesthetics`, business ID
   `2014119969227719`. Sarah Hitchcox's personal Facebook profile has full
   control. The official SHA, Botox Knox Med Spa, and Knoxville Weight Loss
@@ -149,11 +169,11 @@ management screen.
   was less than two days old and lacked both a profile and cover image. Ask Meta
   support to enable the feature after completing those Page assets; continue
   treating standalone location Pages as the fallback.
-- After creating the Botox Knox and Knoxville Weight Loss Clinic Pages, Meta
-  initially displayed a recent-Page-creation limit. Retried Botox Knox Farragut
-  and Knoxville Weight Loss Clinic Farragut on 2026-07-29; both attempts
-  returned a generic Page-policy error and created no Page. Do not treat the
-  restriction as cleared until a new Page appears in the owned Pages list.
+- Meta's recent-Page-creation restriction cleared on 2026-07-30. All five
+  requested standalone location Pages were created and their public URLs are
+  recorded above. Keep them as standalone Pages unless Meta support later
+  enables Store Locations and confirms they can be linked without replacing
+  or losing the existing Page IDs.
 - Store passwords only in 1Password. Never put passwords, recovery codes, or
   one-time verification codes in this repository.
 - Citations use canonical NAP phones, never CallRail tracking numbers.

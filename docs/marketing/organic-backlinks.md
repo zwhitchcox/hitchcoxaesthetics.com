@@ -40,15 +40,19 @@ What to ask before choosing an injector; med spa red flags; Botox vs
 Dysport vs Jeuveau differences; why cheap filler is expensive. These are
 the quotes beauty desks need year-round.
 
-## Expert-source platforms (accounts needed, owner signup)
+## Expert-source platforms
 
 | Platform | What | Status |
 | --- | --- | --- |
-| qwoted.com | Journalists post source requests; free for sources | NOT SIGNED UP |
-| featured.com | Same model, publishes to partner outlets | NOT SIGNED UP |
+| [Qwoted](https://app.qwoted.com/) | Journalists post source requests; free for sources | `LIVE` - email verified 2026-07-30; Sarah Hitchcox source profile, SHA company, owner/RN role, and Health & Medicine, Design/Culture/Lifestyle, and Business/Industry topics configured. Public slug: `/sources/sarah-hitchcox`. Login is in 1Password. |
+| [Connectively](https://www.connectively.us/experts/questions) | Current expert-question marketplace and successor to the former Featured model | `LIVE` - email verified and free expert onboarding completed 2026-07-30. Profile includes headshot, accurate RN bio, Knoxville location, website, LinkedIn, and Botox, dermal fillers, laser hair removal, medical weight loss, and microneedling expertise. Free alerts are Botox, dermal fillers, and laser treatments. Login is in 1Password. |
+| [Featured](https://featured.com/) | Current AI PR/search product; no longer the former expert-question marketplace | `LIVE` - email verified 2026-07-30. Passwordless magic-link login is recorded in 1Password. Monitor separately from journalist questions. |
 
-Workflow once signed up: scan matching queries weekly (GLP-1, Botox,
-med spa, skin tightening), draft answers for Sarah's approval, submit.
+Workflow: scan Qwoted and Connectively matching queries weekly (GLP-1, Botox,
+med spa, skin tightening), draft answers for Sarah's approval, then submit.
+Use Featured for PR research where useful, not as a substitute for the two
+active expert-question feeds. Do not upgrade any account without owner
+approval.
 Expect 1-2 landed placements per quarter.
 
 ## Outreach targets and ledger
@@ -68,3 +72,13 @@ outlets before sending.)
 | StyleBlueprint | styleblueprint.com/southern-voices-story-submission/ | Guest essay, later | | |
 | Nashville Lifestyles | cindy@nashvillelifestyles.com | HOLD, Nashville-centric expert pool | | |
 | NewBeauty Top Doctor | n/a | SKIP, pay-to-play marketing program | | |
+
+## Active local follow-up
+
+- **Knox TN Today:** Susan Espiritu replied on 2026-07-30 and offered a New
+  Business Spotlight if the practice or location qualifies as sufficiently
+  new. She needs a photo and additional business details. She also offered a
+  separate medical FAQ article if Sarah supplies common questions and answers,
+  with a link to Sarah's email. The reply must explicitly correct the earlier
+  pitch's mistaken `NP` credential: Sarah is an `RN`. The optional ongoing
+  advertising/article partnership is paid and requires owner approval.

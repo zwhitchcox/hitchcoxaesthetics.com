@@ -482,7 +482,7 @@ Sent from `sarah@hitchcoxaesthetics.com` or submitted via public forms:
 
 | Target | Route | What | Status |
 | --- | --- | --- | --- |
-| Knox TN Today | Email to news@knoxtntoday.com (their contact form rejects automation) | Story pitch: two-clinic growth + in-house AI booking; GLP-1 consumer explainer; standard no-strings media-preview line | SENT 8:53 PM. NOTE: signature mistakenly said "NP"; Sarah is RN. Correct if they reply |
+| Knox TN Today | Email to news@knoxtntoday.com (their contact form rejects automation) | Story pitch: two-clinic growth + in-house AI booking; GLP-1 consumer explainer; standard no-strings media-preview line | REPLIED 2026-07-30: Susan Espiritu offered a New Business Spotlight with photo/details and a separate medical FAQ article. Reply must correct the mistaken `NP` credential; Sarah is an `RN`. Paid ongoing promotion is optional and requires owner approval. |
 | VoyageKnoxville | voyageinterviewinvites.com/knoxville/recommendations | Founder-interview nomination (name, email, site, Instagram) | SUBMITTED, confirmation shown |
 | BestProsInTown directory | bestprosintown.com/addbusiness.php | SHA Bearden listing, canonical NAP, /bearden URL | SUBMITTED; free queue is 3-4 months, paid priority skipped |
 | BestProsInTown blog | press@bestprosintown.com (they solicit interview features with links) | Founder-interview pitch, RN credential, listing referenced | SENT 2026-07-30 |

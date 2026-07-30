@@ -1,6 +1,6 @@
 # Botox Knox Med Spa - Farragut
 
-Last audited: 2026-07-29
+Last audited: 2026-07-30
 
 ## Canonical Identity
 
@@ -23,9 +23,16 @@ Last audited: 2026-07-29
 | Apple Maps | [Open Farragut listing](https://maps.apple.com/place?place-id=ID135AB7D68FC64DF&address=102+S+Campbell+Station+Rd%2C+Ste+8%2C+Farragut%2C+TN++37934%2C+United+States&coordinate=35.880401%2C-84.159083&name=Botox+Knox) | Public but unclaimed |
 | Bing Maps | No public page found | NOT STARTED |
 | Yelp | [Open Farragut listing](https://www.yelp.com/biz/botox-knox-farragut) | CLAIMED; canonical name, phone, and website verified 2026-07-29 |
+| Yellow Pages | [Open Farragut listing](https://www.yellowpages.com/farragut-tn/mip/botox-knox-581685390) | LIVE; canonical NAP and website; public-name correction submitted |
+| Superpages | [Open Farragut listing](https://www.superpages.com/farragut-tn/bpp/botox-knox-581685390) | LIVE; shared Thryv ID `581685390` |
+| DexKnows | [Open Farragut listing](https://www.dexknows.com/farragut-tn/bp/botox-knox-581685390) | LIVE; shared Thryv ID `581685390` |
 | Nextdoor | No public page yet | BLOCKED by shared owner account suspension |
-| Facebook | No public Page yet | BLOCKED by Meta Page-creation restriction |
+| Facebook | [Open Farragut Page](https://www.facebook.com/profile.php?id=61592359752743) | LIVE; Page ID `61592359752743` |
+| BizHWY | [Open Farragut listing](https://tennessee.bizhwy.com/botox-knox-med-spa-farragut-id15540.php) | LIVE; activated and website redirect verified 2026-07-30 |
+| Bunity | [Open Farragut listing](https://www.bunity.com/botox-knox-med-spa-farragut) | LIVE; permanent dofollow website link verified 2026-07-30 |
 | BBB | No public page yet | SUBMITTED 2026-07-28 |
+| ThreeBestRated | No public page yet | SUBMITTED FOR REVIEW 2026-07-29; single brand submission includes Bearden and Farragut |
+| MapQuest | No public page found | NOT CREATED; current self-service creation is paid |
 | RealSelf | No Botox Knox business/location page | NOT PURSUING - PAID / PROVIDER ONLY |
 
 ## Website Publication Audit
@@ -36,9 +43,16 @@ Last audited: 2026-07-29
 | Apple Business Connect | VERIFIED | https://botoxknoxvilletn.com | 2026-07-29 | Claim listing |
 | Bing Places | NO PUBLIC LISTING | - | 2026-07-29 | Create with canonical brand website |
 | Yelp | VERIFIED | https://botoxknoxvilletn.com | 2026-07-29 | None |
+| Yellow Pages | VERIFIED | https://botoxknoxvilletn.com | 2026-07-30 | Monitor public-name correction |
+| Superpages | VERIFIED | https://botoxknoxvilletn.com | 2026-07-30 | Monitor public-name correction |
+| DexKnows | VERIFIED | https://botoxknoxvilletn.com | 2026-07-30 | Monitor public-name correction |
 | Nextdoor | NO PUBLIC LISTING | - | 2026-07-29 | Create with canonical brand website after reinstatement |
-| Facebook | NO PUBLIC LOCATION PAGE | - | 2026-07-29 | Create with canonical brand website after Meta cooldown |
+| Facebook | VERIFIED | https://botoxknoxvilletn.com | 2026-07-30 | Add branded profile and cover images |
+| BizHWY | VERIFIED REDIRECT | https://botoxknoxvilletn.com/ | 2026-07-30 | None |
+| Bunity | VERIFIED DOFOLLOW | https://botoxknoxvilletn.com | 2026-07-30 | Add profile description and photos when the editor is accessible |
 | BBB | PENDING | Submitted website not publicly verifiable yet | 2026-07-29 | Verify when profile publishes |
+| ThreeBestRated | PENDING | Submitted website not publicly verifiable yet | 2026-07-29 | Verify the brand website after the listing publishes |
+| MapQuest | NO PUBLIC LISTING | - | 2026-07-29 | Do not purchase the paid self-service product without owner approval |
 
 ## Directory Registry
 
@@ -46,9 +60,16 @@ Last audited: 2026-07-29
 |---|---|---|---|
 | Google Business Profile | LIVE | [Google Maps](https://maps.google.com/maps?cid=9132901962533830052); `locations/8388106535416305139`; Place ID `ChIJ6_7_utMvXIgRpP1LXfKVvn4` | Maintain distinct suite, phone, site, and primary category. |
 | Yelp | CLAIMED | https://www.yelp.com/biz/botox-knox-farragut | Public name corrected to `Botox Knox Med Spa`; canonical phone and website verified 2026-07-29. |
+| Thryv directory network | LIVE; MANUAL CORRECTION SUBMITTED | [Yellow Pages](https://www.yellowpages.com/farragut-tn/mip/botox-knox-581685390); [Superpages](https://www.superpages.com/farragut-tn/bpp/botox-knox-581685390); [DexKnows](https://www.dexknows.com/farragut-tn/bp/botox-knox-581685390); ID `581685390` | Canonical NAP, website, and `Botox Knox Med Spa` name submitted through the direct free Thryv form on 2026-07-30. |
 | Nextdoor | BLOCKED - APPEAL SUBMITTED | - | Add under the shared account after Nextdoor approves the 2026-07-28 reinstatement appeal. |
 | BBB | SUBMITTED | Pending | Submitted 2026-07-28 using canonical NAP. |
-| Facebook | BLOCKED | - | The Bearden brand Page is live. A 2026-07-29 retry returned Meta's generic Page-policy error and created no Page. Retry after Meta clears the account restriction. |
+| ThreeBestRated | SUBMITTED FOR REVIEW | Pending | Submitted 2026-07-29 with both Bearden and Farragut branches, canonical phones and website, services, pricing, hours, reviews, and three photos. |
+| MapQuest | BLOCKED - PAID | - | No existing brand listing found; current self-service creation costs `$12.50/month` billed annually. |
+| Facebook | LIVE | https://www.facebook.com/profile.php?id=61592359752743 | Standalone Farragut Page created 2026-07-30 with Medical Spa category, exact Suite 8B address, canonical phone, website, business email, and brand bio. Hours are intentionally not published until an authoritative schedule is confirmed. |
+| BizHWY | LIVE | https://tennessee.bizhwy.com/botox-knox-med-spa-farragut-id15540.php | Activated 2026-07-30 using canonical NAP and brand website. The free redirect was tested; no paid upgrades were selected. |
+| Bunity | LIVE | https://www.bunity.com/botox-knox-med-spa-farragut | Purchased and activated 2026-07-30. Public page and dofollow brand website link verified. |
+| MedSpa Compass | BULK REQUEST SUBMITTED | Pending | Included in the 2026-07-30 eight-record request. Verify the public brand website link if approved. |
+| Find My Cosmetic Injector | SUPPORT REQUEST SUBMITTED | Pending | Included in the 2026-07-30 six-location injectable request because the publisher's registration button was broken. |
 | Apple Business Connect | PUBLIC; UNCLAIMED | [Apple Maps](https://maps.apple.com/place?place-id=ID135AB7D68FC64DF&address=102+S+Campbell+Station+Rd%2C+Ste+8%2C+Farragut%2C+TN++37934%2C+United+States&coordinate=35.880401%2C-84.159083&name=Botox+Knox) | Claim and verify the existing public record. |
 | Bing Places | DEFERRED | GBP import may exist | Verify canonical phone after core work. |
 | Birdeye | NOT PURSUING - PAID | - | Evaluated and intentionally excluded because it requires a paid subscription. |
@@ -70,3 +91,6 @@ Last audited: 2026-07-29
 | 2026-07-29 | Yelp | Corrected the public name from `Botox Knox` to `Botox Knox Med Spa`; verified canonical phone and website | LIVE |
 | 2026-07-29 | Yelp | Yelp approved the `Address 2` correction; public page shows `Ste 8B`, canonical phone, and canonical website | LIVE |
 | 2026-07-29 | Facebook | Retried the Farragut Page; Meta returned a generic Page-policy error and created no Page | BLOCKED BY META |
+| 2026-07-30 | Facebook | Created and published the standalone Farragut Page with canonical NAP, website, email, category, and bio | LIVE |
+| 2026-07-30 | BizHWY | Activated the Farragut listing and verified its public website redirect | LIVE |
+| 2026-07-29 | ThreeBestRated | Submitted a single Botox Knox Med Spa application containing both Bearden and Farragut | SUBMITTED; AWAITING REVIEW |
