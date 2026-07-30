@@ -28,6 +28,21 @@ cluster rules remain in
 9. Record the listing URL, profile ID, exact submitted NAP, website destination,
    date, and status immediately after the action.
 
+## Verification Email Rules
+
+- Never invent a location-specific email and assume it reaches the shared
+  inbox.
+- `hitchcoxaesthetics.com` currently uses Google Workspace for mail. Cloudflare
+  Email Routing does not provide an enabled catch-all for this domain.
+- Until explicit Google Workspace aliases are created and tested, use
+  `sarah@hitchcoxaesthetics.com` for every verification email.
+- Planned aliases are `bearden@`, `farragut@`, `westhills@`, `cedarbluff@`,
+  `botox-bearden@`, `botox-farragut@`, `weightloss-bearden@`, and
+  `weightloss-farragut@`, all at `hitchcoxaesthetics.com`.
+- Treat an alias as active only after a test message arrives in Sarah's inbox.
+- Record the exact verified login/recovery email in the location record. Do not
+  create separate paid Google Workspace users when a free alias is sufficient.
+
 ## Mandatory Website Rule
 
 Website links are a primary purpose of this citation work, not an optional
@@ -91,6 +106,81 @@ business explicitly wants a sales contact.
 One Nextdoor account can manage multiple Business Pages. Create one page per
 truthful location and switch pages from the same login. Do not create separate
 accounts unless access must be split between different staff.
+
+For any account error, suspension, missing Page, or verification request, follow
+the [Nextdoor Listing And Account Recovery Guide](nextdoor.md). Check Sarah's
+business inbox before opening another support case because Nextdoor may pause an
+appeal until the owner replies to an identity-confirmation email.
+
+### MapQuest
+
+MapQuest's current self-service claim/edit flow is paid: `$12.50/month`, billed
+annually as `$150`. A different login email does not remove this fee because the
+charge applies to claiming and managing the business listing. Use MapQuest's
+free issue-reporting route for NAP corrections unless the owner approves the
+subscription. A correct Google listing does not automatically update MapQuest.
+Do not purchase a subscription without explicit approval.
+
+The owner approved one annual subscription on 2026-07-30. It uses
+`zwhitchcox@gmail.com` and is attached to the HEP is on the way listing at
+1605 Prosser Rd, Knoxville. The paid portal has no account-level listing
+switcher: opening another claim while authenticated redirects back to the HEP
+record. Treat the product as one subscribed listing unless MapQuest support
+confirms otherwise in writing. Do not buy another subscription merely to test
+multi-location coverage. An account-scope support request was submitted and
+email-verified on 2026-07-30 because the paid portal redirected every
+additional claim to the subscribed HEP record.
+
+The owner requested cancellation without a refund on 2026-07-30. The
+email-verified cancellation request is MapQuest ticket `#3170174`; it asks
+MapQuest to turn off renewal and let the current paid term expire normally.
+The subscription remains pending cancellation until MapQuest confirms the
+expiration date by email.
+
+MapQuest's public developer APIs do not edit its public business directory. The
+Data Manager API only manages private datasets used by a developer's own map
+applications. Do not build a Google Business Profile sync against that API.
+MapQuest identifies Yext as its supported listings-management partner; use a
+listings distributor such as Yext only after the owner approves its exact
+multi-location price and contract. Without a distributor, audit MapQuest
+against the live Google profiles and submit correction/addition requests.
+
+HEP's current MapQuest reconciliation is tracked in
+[HEP MapQuest Location Audit](hep-mapquest.md). The exact public Google
+Business Profile values are the source of truth for that portfolio.
+
+### Thryv / Yellow Pages / Superpages / DexKnows
+
+The basic business/courtesy listing is free. Thryv's paid marketing package is
+not required to appear on YellowPages.com, Superpages.com, or DexKnows.com. A
+2026-07-30 sales quote of `$250/month` did not include a standalone
+listings-management option and was declined.
+
+All three directories use the same Thryv listing ID for a location. Correcting
+the shared record should update all three public pages. Use the free owner
+claim page at
+`https://www.yellowpages.com/claim-your-listing?from=advertise-with-us-YP`
+when it works. A free manual correction form is also available at
+`https://uitl.yellowpages.com/listing_feedback/{THRYV_ID}.html?site=UITL&ptid=dkdesktop`.
+It accepts the name, address, phone, hours, and website without a paid account.
+If neither route works, use the courtesy-listing support route at
+`https://www.dexknows.com/info/contact-us` or call `(866) 794-0889`.
+
+On 2026-07-30, the free claim page found all four SHA records, but its own
+reCAPTCHA Enterprise account was over quota and prevented submission. A
+consolidated free correction request for all eight SHA, Botox Knox, and
+Knoxville Weight Loss Clinic records was therefore submitted through the
+DexKnows feedback form using `sarah@hitchcoxaesthetics.com`. Do not create
+duplicate listings to work around a claim failure.
+
+On 2026-07-30, the manual form accepted direct corrections for SHA Bearden,
+SHA Farragut, both Botox Knox locations, and both Knoxville Weight Loss Clinic
+locations. Each submission displayed the review-within-a-few-days
+confirmation. Verify all three public directory pages after review.
+
+Use `zwhitchcox@gmail.com` only for the historical Thryv sales inquiry. Do not
+accept a Thryv contract, onboarding fee, or paid package without explicit owner
+approval.
 
 ### Facebook
 
@@ -180,7 +270,7 @@ Quarterly, or after any NAP change:
 ## Link-Building Directory Targets (2026-07-29 gap analysis)
 
 Source: DataForSEO backlink gap across 13 ranking Knoxville competitors
-(`docs/research/knoxville-competitor-backlinks-2026-07-28.md` has the full
+(`docs/marketing/knoxville-competitor-backlinks-2026-07-28.md` has the full
 audit). These directories link to 2+ competitors and not to us. Track status
 here; mirror completed submissions into the per-location records.
 
@@ -212,5 +302,34 @@ alastinknoxville.com / knoxvilleaesthetics.com (Skin & Sculpt redirect
 domains), bodytn.com / botoxtn.com (Beautique redirect domains).
 
 Press/editorial link targets and the outreach ledger live in
-`docs/research/knoxville-competitor-backlinks-2026-07-28.md`. Check the ledger
+`docs/marketing/knoxville-competitor-backlinks-2026-07-28.md`. Check the ledger
 before emailing anyone; several outlets were already contacted 2026-07-29.
+
+## Industry Directory Evaluation (2026-07-30)
+
+This audit evaluated the industry directories found in the 2026-07-30
+competitor-gap report. A directory is viable only when it can publish a
+durable business or location identity and a useful website link without
+misrepresenting the business. Do not repeatedly submit a broken form or start a
+paid plan merely to test whether a directory works.
+
+| Directory | Applies to | Free website/location value | Action and current status |
+| --- | --- | --- | --- |
+| MedSpa Compass | All eight records | Free profile supports business details and map; publisher must add Knoxville/Farragut | Bulk request for all eight canonical records submitted; `PENDING PUBLISHER REVIEW` |
+| Find My Cosmetic Injector | Four SHA and two Botox Knox records | Applicable to injectable providers/medical spas; public-link behavior must be verified after publication | Advertised registration button is broken; support request for all six applicable records submitted; `PENDING PUBLISHER RESPONSE` |
+| Laser Hair Removal Nearby | Four SHA records | Existing public profiles expose phone, website, and contact details | Standard-directory request for all four SHA locations submitted; no paid featured placement requested; `PENDING PUBLISHER RESPONSE` |
+| ProvenExpert | SHA records | BrightLocal already produced live location pages for all four SHA locations | Keep and audit the existing BrightLocal URLs. A separate brand account was email-verified on 2026-07-30 and is in profile onboarding; credentials are in 1Password |
+| AllMedSpas | Applicable med-spa records | Intended free submission, but no usable publisher integration | Submission form returned `The form is not connected to any integration`; `BLOCKED - PUBLISHER FORM BROKEN` |
+| GLP1 Directory | Two Knoxville Weight Loss Clinic records | Existing profiles include address, phone, and website | No provider registration, add-business, or contact route exists; `BLOCKED - NO SUBMISSION PATH` |
+| WeightLossNinja | Two Knoxville Weight Loss Clinic records | Existing public profiles appear to contain business contact details | Site was unavailable and no publisher submission path could be verified; `BLOCKED - SITE/PUBLISHER UNAVAILABLE` |
+| MedSpaDirectory.org | Applicable medical-spa records | Listing disappears after the seven-day trial | `$75/month` for up to 10 listings; `NOT PURSUING - PAID/TEMPORARY` |
+| TrustAnalytica | All eight records | Business profile management is paid | Plans start at `$12.95/month` billed annually; `NOT PURSUING - PAID` |
+| Laser Hair Removal Success | Four SHA records | Paid permanent profile, but every future edit is also charged | `$45` per location, or `$180` for four SHA locations; `NOT PURSUING WITHOUT OWNER APPROVAL` |
+| N49 | All eight records | Free profile omits the website link; dofollow website requires `$8/month` | Keep the four existing SHA records from BrightLocal; do not create new paid sub-brand records without approval |
+| Storeboard | All eight records | Free account is a community profile; business profile with website costs `$9/year` | Keep the four live SHA pages already produced by BrightLocal; no new paid sub-brand profiles without approval |
+| Bunity | All eight records | Permanent dofollow business profile | `$3` one-time per record, or `$24` for all eight; `HOLD FOR OWNER APPROVAL` |
+| Bariatric Journal | Two Knoxville Weight Loss Clinic records | Sponsored editorial/business placement | `NOT PURSUING - PAID SPONSORSHIP` |
+
+For submitted requests, do not mark the location complete until the publisher
+returns a public URL and the website link has been opened and verified. Record
+the exact public URL in each applicable location file when it becomes live.

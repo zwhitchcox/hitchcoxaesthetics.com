@@ -7,7 +7,7 @@ Goal: links inside real articles, not listings. Two mechanisms:
 2. Story pitches: an outlet covers something genuinely newsworthy about
    the practice.
 
-Rules (same as docs/research/knoxville-competitor-backlinks-2026-07-28.md):
+Rules (same as docs/marketing/knoxville-competitor-backlinks-2026-07-28.md):
 check the ledger before emailing anyone, never condition anything free on
 coverage, disclose comps, sign "Sarah Hitchcox, RN". Do not reuse the AI
 booking angle; the angles below are the approved ones.
