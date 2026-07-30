@@ -24,14 +24,15 @@ or a weight-loss doctor who cannot speak to skin. Sarah is both. Offer:
 what proportion of weight-loss patients ask about facial changes, what
 actually works (and what is oversold), when to treat vs wait.
 
-### 2. Everesse, first in the region
+### 2. Everesse experience (NOT exclusivity)
 
-Top-of-the-line skin-tightening laser; per Zane the nearest other unit
-is Memphis (verify against Cartessa's provider locator before putting
-"only in East Tennessee" in writing; use "among the first in Tennessee"
-until confirmed). Device firsts are standard trade-press and regional
-lifestyle stories, and it pairs with angle 1 (the tool for GLP-1 skin
-laxity).
+VERIFIED FALSE 2026-07-30: Cartessa's locator lists 12 Everesse
+providers statewide and 3 other Knoxville-area practices (Pretty Girl,
+Aesthetic Elevation, A Better You). Never claim "first/only in the
+region". The usable angle is device EXPERIENCE: real-world Everesse
+results for GLP-1 skin laxity, pairing with angle 1. Side note: our
+Cartessa locator listing has an EMPTY website field; fix via the
+Cartessa rep (task #15).
 
 ### 3. Consumer-safety evergreens
 
@@ -58,3 +59,12 @@ outlets before sending.)
 
 | Outlet | Contact | Angle | Sent | Result |
 | --- | --- | --- | --- | --- |
+| MedEsthetics (Allured) | jotoole@allured.com BOUNCED (address not found); resent to Joshua Eferighe, Assoc. Managing Editor, jeferighe@allured.com (current per contact page) | Contributed article for Nov/Dec "non-surgical lifts/tightening" issue (due Oct 6) | 2026-07-30 5:36 PM | |
+| Skin Inc. (Allured) | Tia Jones, tjones@allured.com | Contributed article, GLP-1 aftermath for skin pros | 2026-07-30 5:34 PM | |
+| NewBeauty | Liz Ritter, lritter@newbeauty.com | Expert-source availability, Ozempic face both-sides | 2026-07-30 5:38 PM | |
+| Chattanooga Times Free Press | Elizabeth Fite, efite@timesfreepress.com | Regional consumer story, GLP-1 boom + aftermath | 2026-07-30 5:39 PM | |
+| Modern Aesthetics | jmazda@bmctoday.com | HOLD, MD-core audience, weaker fit for RN-owner byline | | |
+| American Spa | no editorial email published (Questex) | HOLD | | |
+| StyleBlueprint | styleblueprint.com/southern-voices-story-submission/ | Guest essay, later | | |
+| Nashville Lifestyles | cindy@nashvillelifestyles.com | HOLD, Nashville-centric expert pool | | |
+| NewBeauty Top Doctor | n/a | SKIP, pay-to-play marketing program | | |

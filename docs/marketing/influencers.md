@@ -54,5 +54,14 @@ hairstylists/estheticians (adjacent competitors), Visit Knoxville staff.
 
 ## Outreach log
 
+Offer tiers: A = any service on the menu. B = signature facial or laser
+session. C = skincare set or express facial.
+
 | Date | Who | Offer | Response | Post/link |
 | --- | --- | --- | --- | --- |
+| 2026-07-30 | Heather Montgomery (email) | A | | |
+| 2026-07-30 | Whitney Heins (email) | B | | |
+| 2026-07-30 | Chrissy Jeub (email) | B | | |
+| 2026-07-30 | Brittany Williams (email) | B | | |
+| 2026-07-30 | Alona Skliar (email) | C | | |
+| 2026-07-30 | Megan Galbraith (email) | C | | |
