@@ -76,7 +76,7 @@ referring sites are more useful than total links.
 | Opportunity | Current published price | Notes |
 | --- | ---: | --- |
 | BBB basic business profile | Free | Accreditation is separate and quote-based; the existing basic profiles are sufficient for the citation |
-| Farragut West Knox Chamber | $240 first year | Annual membership for one employee, including a one-time $50 application fee |
+| Farragut West Knox Chamber | $240-$320 first year | $240 for one owner/employee or $320 for 2-10 employees; both include a one-time $50 application fee |
 | Farragut second location | $195 first year | Same EIN/business; includes the one-time $50 application fee |
 | Knoxville Chamber | $500/year | Associate level with online investor directory listing |
 | Knoxville Moms | Quote required | Sponsored posts, social packages, giveaways, and team events |
@@ -492,3 +492,73 @@ answered the 7/29 pitch. Reads as a paid-partnership funnel ("it comes down
 to your brand versus another. We can help"); wants a 30-minute meeting,
 calendly.com/marc_knoxville_city_lifestyle/30min. Decision left to Sarah/Zane.
 No other replies to the 7/28 or 7/29 waves as of 2026-07-30.
+
+## Major-City Winner Analysis (2026-07-30)
+
+Method: pulled Google top-20 for "med spa / botox / medical weight loss
+{city}" in 10 major markets (NYC, LA, Chicago, Houston, Dallas, Miami,
+Atlanta, Phoenix, Nashville, Denver), took the top-ranking private
+practices (33 after dropping hospital systems), and pulled all 9,600 of
+their referring domains. Kept sources linked from 3+ winners, clean spam
+score, national (not city-specific), and not already ours/handled.
+DataForSEO cost ~$1.35.
+
+SERP observation: yelp.com appeared in 31 of 30 SERPs (multiple slots),
+reddit.com in 12, instagram in 8, groupon in 6. Yelp + Reddit presence is
+what the big-market winners cannot escape; our claimed Yelp pages matter
+more than any directory below.
+
+### Tier 1: industry directories the winners use, we are on NONE (verified)
+
+| Directory | Winners linking | Fit |
+| --- | --- | --- |
+| allmedspas.com | 16 | med spa directory |
+| medspacompass.com | 12 | med spa directory |
+| trustanalytica.org | 17 | business ranking/review site |
+| laserhairremovalnearby.com | 11 | laser directory |
+| medspadirectory.org | 9 | med spa directory |
+| findmycosmeticinjector.com | 8 | injector directory, fits Sarah RN |
+| glp1directory.com | 8 | GLP-1 directory, perfect for KWLC |
+| laserhairremovalsuccess.com | 8 | laser directory |
+| weightlossninja.org | 7 | weight loss directory |
+| bariatricjournal.com | 7 | weight loss editorial/directory |
+| n49.com | 7 | general local directory |
+| provenexpert.com | 6 | review platform |
+| storeboard.com / bunity.com | 11 / 10 | general directories, lower value |
+
+Also: fresha.com (14 winners) - our Bearden placeholder EXISTS but is
+unclaimed (fresha.com/lvp/sarah-hitchcox-aesthetics-kingston-pike-
+knoxville-xX787Y). Claiming may require partner signup; check terms, they
+historically wanted payment processing.
+
+### Tier 2: manufacturer/vendor locators (the pattern the winners exploit)
+
+inmodemd.com links 6 winners because InMode lists every provider. Our
+equivalents to verify/claim with our actual vendors: Alle directory
+(already listed), Galderma ASPIRE locator (Dysport, Restylane), Evolus
+locator (Jeuveau), Cartessa/Everesse provider locator, Candela locator if
+applicable. Free, authoritative, dofollow.
+
+### Tier 3: editorial
+
+skininc.com (6 winners, trade magazine, accepts expert-author
+contributions), spareviewmag.com (7), beautyinbeta.co.uk (7),
+hauteliving.com (6, pay-to-play luxury). Pitch Sarah as expert source;
+same rules as the local ledger (no comp conditioned on coverage).
+
+### Not worth it
+
+- B2B data scrapers (zoominfo, lusha, clodura.ai, leadstal, prospeo,
+  neverbounce, growjo, siteprice, glarity, shipmore, intently): auto-
+  generated, no submission path that helps.
+- dayofdifference.org.au / manninghammedicalcentre.com.au /
+  willettonuniforms.com.au / piscatore.dk / globalcocolk.com /
+  xedulichdaklak.com / prothor-ing.com: a link-farm network that links
+  20+ of the winners AND the Knoxville competitors; evades spam scores.
+  Do not chase; being on it is not why the winners rank.
+- groupon.com (10 winners): real dofollow profile but discount-brand
+  positioning conflict; owner call, not recommended.
+- GBP scrapers (glowcompass, glossgo, auravenu, thelookfor, vettedglow):
+  same class as tryglassskin which already lists us; they auto-generate
+  from Google data. Keep GBP complete and they come on their own; no
+  submission exists.
