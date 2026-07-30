@@ -9,6 +9,12 @@ import {
 } from '#app/utils/blvd-admin.server.ts'
 import { getProjectedRevenueForBlvdService } from '#app/utils/service-pricing.ts'
 import {
+	buildKeptProbability,
+	buildServiceValues,
+	buildWeightLossClientValues,
+	detectRevenueCoverageStart,
+} from '#app/utils/revenue-valuation.server.ts'
+import {
 	avgFirstPaymentUsd,
 	buildWlProfiles,
 	revenuePerKeptVisit,
@@ -137,6 +143,8 @@ type ProjectionRow = AppointmentServiceSegment & {
 	projectedUsd: number
 	/** daily_v2_cadence value — per-client for weight loss, = projectedUsd otherwise. */
 	projectedUsdV2: number
+	/** daily_v4_perkept value — revenue per KEPT visit, revenue-window clamped. */
+	projectedUsdV4: number
 	sampleSize: number
 	source:
 		| 'historical_average'
@@ -190,12 +198,15 @@ export interface RevenueProjectionJson {
 			daysOut: number
 			bookedUsd: number
 			bookedUsdV1: number
+			bookedUsdV4: number
 			bookedCount: number
 			expectedNewCount: number
 			fillUsd: number
 			fillUsdV1: number
+			fillUsdV4: number
 			expectedUsd: number
 			expectedUsdV1: number
+			expectedUsdV4: number
 		}>
 		[key: string]: unknown
 	} | null
@@ -310,7 +321,7 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 
 	// One appointment pass covers both the target week and all history (Boulevard
 	// has no date filter on the query and our data only spans ~3 months anyway).
-	const [appointmentSegments, revenueSamples] = await Promise.all([
+	const [appointmentSegments, revenueHistory] = await Promise.all([
 		listAppointmentServiceSegments({ from: historyStart, locations, to: end }),
 		listHistoricalRevenueSamples({
 			end: historyEnd,
@@ -318,6 +329,11 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 			start: historyStart,
 		}),
 	])
+	const revenueSamples = revenueHistory.samples
+	const retailUpliftRatio =
+		revenueHistory.appointmentUsd > 0
+			? revenueHistory.retailUsd / revenueHistory.appointmentUsd
+			: 0
 	const serviceAverages = buildServiceAverages(revenueSamples)
 	const targetSegments = appointmentSegments.filter(
 		segment => segment.startAt >= start && segment.startAt < end,
@@ -425,6 +441,82 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 		if (perVisit !== null) row.projectedUsdV2 = perVisit
 	}
 
+	// ---- daily_v4_perkept -----------------------------------------------------
+	// Orders only exist from the March 2026 Boulevard migration forward, while
+	// appointments were backfilled to June 2024. Every per-visit average must
+	// therefore count visits ONLY from the day money started landing, or the
+	// denominator spans twice the period the numerator can.
+	const coverageStart = detectRevenueCoverageStart(
+		revenueSamples.map(sample => ({
+			day: localDateKey(sample.occurredAt),
+			usd: sample.amountUsd,
+		})),
+	)
+	const inCoverage = (day: string) => !coverageStart || day >= coverageStart
+	const coveredSegments = historySegments.filter(segment =>
+		inCoverage(localDateKey(segment.startAt)),
+	)
+	const coveredVisits = coveredSegments.map(segment => ({
+		clientId: segment.clientId,
+		day: localDateKey(segment.startAt),
+		kept: !segment.cancelled,
+		serviceId: segment.serviceId,
+		serviceName: segment.serviceName,
+	}))
+	// Payments are filtered by the same cutoff: the migration closed ~2,000
+	// legacy orders at $0 on one day, and counting those as real $0 sales would
+	// drag every package-like service's average down.
+	const coveredPayments = revenueSamples
+		.filter(sample => inCoverage(localDateKey(sample.occurredAt)))
+		.map(sample => ({
+			clientId: sample.clientId,
+			day: localDateKey(sample.occurredAt),
+			serviceId: sample.serviceId,
+			serviceName: sample.serviceName,
+			usd: sample.amountUsd,
+		}))
+	const serviceValuesV4 = buildServiceValues({
+		payments: coveredPayments,
+		visits: coveredVisits,
+	})
+	const wlValuesV4 = buildWeightLossClientValues({
+		payments: coveredPayments,
+		visits: coveredVisits,
+	})
+	// Cancellation as a survival curve rather than one flat rate: a slot booked
+	// for tomorrow nearly always happens, one booked six weeks out often does not.
+	// Post-migration appointments only: Jane imports carry the import date as
+	// createdAt, so their "lead time" is fiction and would flatten the curve.
+	const keptProbability = buildKeptProbability(
+		[
+			...new Map(
+				coveredSegments.map(segment => [segment.appointmentId, segment]),
+			).values(),
+		]
+			.filter(segment => segment.bookedAt)
+			.map(segment => ({
+				cancelled: segment.cancelled,
+				leadDays: Math.round(
+					(segment.startAt.getTime() - segment.bookedAt!.getTime()) / DAY_MS,
+				),
+			})),
+	)
+	for (const row of rows) {
+		if (row.source === 'manual_override') {
+			row.projectedUsdV4 = row.projectedUsd
+			continue
+		}
+		row.projectedUsdV4 = roundCurrency(
+			WL_INJECTION_RE.test(row.serviceName)
+				? wlValuesV4.lookup(row.clientId)
+				: serviceValuesV4.lookup(row.serviceId, row.serviceName),
+		)
+	}
+
+	const totalProjectedUsdV4 = rows.reduce(
+		(sum, row) => sum + row.projectedUsdV4,
+		0,
+	)
 	const totalProjectedUsdV1 = rows.reduce((sum, row) => sum + row.projectedUsd, 0)
 	const totalProjectedUsd = rows.reduce(
 		(sum, row) => sum + row.projectedUsdV2,
@@ -435,13 +527,17 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 				end,
 				historyEnd,
 				historySegments,
+				keptProbability,
 				minSampleSize: options.minSampleSize,
 				now,
 				perVisitValueUsd,
+				retailUpliftRatio,
 				rows,
 				serviceAverages,
+				serviceValuesV4,
 				start,
 				wlInjPerVisitUsd,
+				wlValuesV4,
 			})
 		: null
 
@@ -518,6 +614,16 @@ async function main(options: CliOptions): Promise<RevenueProjectionJson> {
 				: roundCurrency(totalProjectedUsdV1),
 			v1_expected_cancellations_usd: expectedCancellationsUsdV1,
 			v1_expected_net_revenue_usd: expectedNetRevenueUsdV1,
+			// v4 is already net: the survival curve is applied per booked slot and
+			// the per-kept-visit values price in no-shows, so there is no separate
+			// cancellation subtraction to make.
+			v4_model: 'daily_v4_perkept',
+			v4_revenue_coverage_start: coverageStart,
+			v4_retail_uplift_ratio: roundTo(retailUpliftRatio, 4),
+			v4_total_projected_revenue_usd: roundCurrency(totalProjectedUsdV4),
+			v4_expected_net_revenue_usd: expectedFill
+				? expectedFill.totalExpectedUsdV4
+				: roundCurrency(totalProjectedUsdV4 * (1 + retailUpliftRatio)),
 		},
 		window: {
 			end: end.toISOString(),
@@ -614,8 +720,13 @@ function buildProjectionRow({
 		serviceId: segment.serviceId,
 		serviceName: segment.serviceName,
 	})
-	// projectedUsdV2 starts equal to v1; the weight-loss cadence pass overrides.
-	return { ...segment, ...valuation, projectedUsdV2: valuation.projectedUsd }
+	// V2/V4 start equal to v1; their valuation passes override.
+	return {
+		...segment,
+		...valuation,
+		projectedUsdV2: valuation.projectedUsd,
+		projectedUsdV4: valuation.projectedUsd,
+	}
 }
 
 function getCompositeServiceAverage(
@@ -835,8 +946,17 @@ async function listHistoricalRevenueSamples({
 	end: Date
 	locations: BlvdAdminLocation[]
 	start: Date
-}): Promise<RevenueSample[]> {
+}): Promise<{
+	appointmentUsd: number
+	retailUsd: number
+	samples: RevenueSample[]
+}> {
 	const samples: RevenueSample[] = []
+	// Retail/product line groups never attach to an appointment, so nothing in
+	// the per-visit model can predict them. They are a stable ~5-6% of takings,
+	// carried as an uplift instead of being silently dropped.
+	let appointmentUsd = 0
+	let retailUsd = 0
 
 	for (const location of locations) {
 		let after: string | null = null
@@ -897,6 +1017,17 @@ async function listHistoricalRevenueSamples({
 				}
 				if (occurredAt < start || occurredAt >= end) continue
 				samples.push(...buildRevenueSamplesForOrder(order, occurredAt))
+				for (const group of order.lineGroups ?? []) {
+					const groupUsd = (group.lines ?? []).reduce(
+						(sum, line) => sum + centsToUsd(getLineAmountCents(line)),
+						0,
+					)
+					if (group.__typename === 'OrderAppointmentLineGroup') {
+						appointmentUsd += groupUsd
+					} else {
+						retailUsd += groupUsd
+					}
+				}
 			}
 
 			if (oldestOrderClosedAt && oldestOrderClosedAt < start) break
@@ -907,7 +1038,7 @@ async function listHistoricalRevenueSamples({
 		}
 	}
 
-	return samples
+	return { appointmentUsd, retailUsd, samples }
 }
 
 function buildRevenueSamplesForOrder(order: OrderNode, occurredAt: Date) {
@@ -1033,12 +1164,15 @@ type ForecastDay = {
 	 * original paid-average model for its frozen append-only snapshot. */
 	bookedUsd: number
 	bookedUsdV1: number
+	bookedUsdV4: number
 	bookedCount: number
 	expectedNewCount: number
 	fillUsd: number
 	fillUsdV1: number
+	fillUsdV4: number
 	expectedUsd: number
 	expectedUsdV1: number
+	expectedUsdV4: number
 }
 
 type ServiceArrival = {
@@ -1061,12 +1195,18 @@ type ArrivalForecast = {
 	totalBookedUsdV1: number
 	totalFillUsdV1: number
 	totalExpectedUsdV1: number
+	totalBookedUsdV4: number
+	totalFillUsdV4: number
+	totalExpectedUsdV4: number
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
 // Below this many historical bookings for a service, its lead-time curve is too
 // noisy, so we borrow the pooled all-service curve instead.
 const MIN_LEADS_FOR_OWN_CURVE = 8
+// v4 arrival rates look back this far. Long enough to average out a quiet
+// fortnight, short enough not to price today's volume off last summer's.
+const ARRIVAL_HISTORY_DAYS = 120
 
 type TypeStats = {
 	serviceId: string | null
@@ -1084,38 +1224,12 @@ type TypeStats = {
  * Each expected new booking is valued at that service's average sale, then
  * added on top of what is already on the calendar.
  */
-function buildArrivalForecast({
-	end,
-	historyEnd,
-	historySegments,
-	minSampleSize,
-	now,
-	perVisitValueUsd,
-	rows,
-	serviceAverages,
-	start,
-	wlInjPerVisitUsd,
-}: {
-	end: Date
-	historyEnd: Date
-	historySegments: AppointmentServiceSegment[]
-	minSampleSize: number
-	now: Date
-	perVisitValueUsd: (serviceName: string) => number | null
-	rows: ProjectionRow[]
-	serviceAverages: Map<string, ServiceAverage>
-	start: Date
-	wlInjPerVisitUsd: number
-}): ArrivalForecast {
-	const completed = historySegments.filter(
-		segment => !segment.cancelled && segment.startAt < historyEnd,
-	)
-
-	// Per-service weekday volume and lead-time samples.
+/** Per-service weekday counts and lead-time samples over a set of kept visits. */
+function collectArrivalStats(segments: AppointmentServiceSegment[]) {
 	const typeStats = new Map<string, TypeStats>()
 	const pooledLeads: number[] = []
 	let observedStartMs = Infinity
-	for (const segment of completed) {
+	for (const segment of segments) {
 		observedStartMs = Math.min(observedStartMs, segment.startAt.getTime())
 		const key = getServiceAverageKey(segment.serviceId, segment.serviceName)
 		const stats =
@@ -1127,10 +1241,7 @@ function buildArrivalForecast({
 				weekdayCounts: new Map<string, number>(),
 			} satisfies TypeStats)
 		const weekday = localWeekday(segment.startAt)
-		stats.weekdayCounts.set(
-			weekday,
-			(stats.weekdayCounts.get(weekday) ?? 0) + 1,
-		)
+		stats.weekdayCounts.set(weekday, (stats.weekdayCounts.get(weekday) ?? 0) + 1)
 		if (segment.bookedAt) {
 			const leadMs = segment.startAt.getTime() - segment.bookedAt.getTime()
 			// Drop appointments "created" after they occurred: those are Jane ->
@@ -1145,6 +1256,57 @@ function buildArrivalForecast({
 		}
 		typeStats.set(key, stats)
 	}
+	return { typeStats, pooledLeads, observedStartMs }
+}
+
+function buildArrivalForecast({
+	end,
+	historyEnd,
+	historySegments,
+	keptProbability,
+	minSampleSize,
+	now,
+	perVisitValueUsd,
+	retailUpliftRatio,
+	rows,
+	serviceAverages,
+	serviceValuesV4,
+	start,
+	wlInjPerVisitUsd,
+	wlValuesV4,
+}: {
+	end: Date
+	historyEnd: Date
+	historySegments: AppointmentServiceSegment[]
+	keptProbability: (leadDays: number) => number
+	minSampleSize: number
+	now: Date
+	perVisitValueUsd: (serviceName: string) => number | null
+	retailUpliftRatio: number
+	rows: ProjectionRow[]
+	serviceAverages: Map<string, ServiceAverage>
+	serviceValuesV4: { lookup: (id: string | null, name: string) => number }
+	start: Date
+	wlInjPerVisitUsd: number
+	wlValuesV4: { lookup: (clientId: string | null) => number }
+}): ArrivalForecast {
+	const completed = historySegments.filter(
+		segment => !segment.cancelled && segment.startAt < historyEnd,
+	)
+
+	// Per-service weekday volume and lead-time samples.
+	const { typeStats, pooledLeads, observedStartMs } = collectArrivalStats(completed)
+	// v4 reads arrival rates off a recent window instead. The clinic is growing
+	// (~140 appointments/month a year ago vs ~230 now), so a 365-day average
+	// understates how many bookings a weekday still has coming. v1/v2 keep the
+	// full-history stats above so their frozen snapshots stay reproducible.
+	const arrivalWindowStart = new Date(
+		historyEnd.getTime() - ARRIVAL_HISTORY_DAYS * DAY_MS,
+	)
+	const recent = completed.filter(
+		segment => segment.startAt >= arrivalWindowStart,
+	)
+	const statsV4 = collectArrivalStats(recent)
 
 	const observedStart = new Date(
 		Number.isFinite(observedStartMs) ? observedStartMs : historyEnd.getTime(),
@@ -1152,37 +1314,55 @@ function buildArrivalForecast({
 
 	// How many of each weekday occurred in the observed history span; this is
 	// the denominator that turns counts into "appointments per Monday", etc.
-	const weekdayOccurrences = new Map<string, number>()
-	for (
-		let cursor = observedStart.getTime() + DAY_MS / 2;
-		cursor < historyEnd.getTime();
-		cursor += DAY_MS
-	) {
-		const weekday = localWeekday(new Date(cursor))
-		weekdayOccurrences.set(weekday, (weekdayOccurrences.get(weekday) ?? 0) + 1)
+	const countWeekdays = (from: number) => {
+		const counts = new Map<string, number>()
+		for (let cursor = from + DAY_MS / 2; cursor < historyEnd.getTime(); cursor += DAY_MS) {
+			const weekday = localWeekday(new Date(cursor))
+			counts.set(weekday, (counts.get(weekday) ?? 0) + 1)
+		}
+		return counts
 	}
+	const weekdayOccurrences = countWeekdays(observedStart.getTime())
+	const weekdayOccurrencesV4 = countWeekdays(
+		Math.max(arrivalWindowStart.getTime(), observedStart.getTime()),
+	)
 
 	// Fraction of bookings made with strictly less than `d` days of lead time
 	// (i.e. not yet booked when a day is `d` days away).
-	const shareBookedWithin = (leads: number[], d: number) => {
-		const sample = leads.length >= MIN_LEADS_FOR_OWN_CURVE ? leads : pooledLeads
+	const shareBookedWithinUsing = (pooled: number[]) => (leads: number[], d: number) => {
+		const sample = leads.length >= MIN_LEADS_FOR_OWN_CURVE ? leads : pooled
 		if (sample.length === 0) return 0
 		const within = sample.filter(lead => lead < d).length
 		return within / sample.length
 	}
+	const shareBookedWithin = shareBookedWithinUsing(pooledLeads)
+	const shareBookedWithinV4 = shareBookedWithinUsing(statsV4.pooledLeads)
 
-	const bookedByDate = new Map<string, { usd: number; usdV1: number; count: number }>()
+	const todayStartMs = startOfLocalDay(now)
+	const bookedByDate = new Map<
+		string,
+		{ usd: number; usdV1: number; usdV4: number; count: number }
+	>()
 	for (const row of rows) {
 		if (row.cancelled) continue
 		const key = localDateKey(row.startAt)
-		const entry = bookedByDate.get(key) ?? { usd: 0, usdV1: 0, count: 0 }
+		const entry = bookedByDate.get(key) ?? {
+			usd: 0,
+			usdV1: 0,
+			usdV4: 0,
+			count: 0,
+		}
 		entry.usd += row.projectedUsdV2
 		entry.usdV1 += row.projectedUsd
+		// Only future slots can still cancel; a day that already happened is
+		// settled, so discounting it again would double-count the loss.
+		const daysOut = Math.round((startOfLocalDay(row.startAt) - todayStartMs) / DAY_MS)
+		entry.usdV4 +=
+			daysOut > 0 ? row.projectedUsdV4 * keptProbability(daysOut) : row.projectedUsdV4
 		entry.count += 1
 		bookedByDate.set(key, entry)
 	}
 
-	const todayStartMs = startOfLocalDay(now)
 	const serviceArrivals = new Map<string, ServiceArrival>()
 	const days: ForecastDay[] = []
 	for (
@@ -1196,10 +1376,16 @@ function buildArrivalForecast({
 		const daysOut = Math.round(
 			(startOfLocalDay(instant) - todayStartMs) / DAY_MS,
 		)
-		const booked = bookedByDate.get(key) ?? { usd: 0, usdV1: 0, count: 0 }
+		const booked = bookedByDate.get(key) ?? {
+			usd: 0,
+			usdV1: 0,
+			usdV4: 0,
+			count: 0,
+		}
 
 		let fillUsd = 0
 		let fillUsdV1 = 0
+		let fillUsdV4 = 0
 		let expectedNewCount = 0
 		if (daysOut > 0) {
 			for (const stats of typeStats.values()) {
@@ -1236,6 +1422,24 @@ function buildArrivalForecast({
 				arrival.expectedNewUsd += usd
 				serviceArrivals.set(stats.serviceName, arrival)
 			}
+			// v4 fill, off the recent-window arrival rates. A still-to-book slot is
+			// worth its revenue per KEPT visit, which is already an expectation
+			// over visits that no-show, so the survival curve is not applied again.
+			for (const stats of statsV4.typeStats.values()) {
+				const weekdayCount = stats.weekdayCounts.get(weekday) ?? 0
+				if (weekdayCount === 0) continue
+				const occurrences = weekdayOccurrencesV4.get(weekday) ?? 0
+				if (occurrences === 0) continue
+				const stillToCome =
+					(weekdayCount / occurrences) *
+					shareBookedWithinV4(stats.leads, daysOut)
+				if (stillToCome <= 0) continue
+				fillUsdV4 +=
+					stillToCome *
+					(WL_INJECTION_RE.test(stats.serviceName)
+						? wlValuesV4.lookup(null)
+						: serviceValuesV4.lookup(stats.serviceId, stats.serviceName))
+			}
 		}
 
 		days.push({
@@ -1244,12 +1448,17 @@ function buildArrivalForecast({
 			daysOut,
 			bookedUsd: roundCurrency(booked.usd),
 			bookedUsdV1: roundCurrency(booked.usdV1),
+			bookedUsdV4: roundCurrency(booked.usdV4 * (1 + retailUpliftRatio)),
 			bookedCount: booked.count,
 			expectedNewCount: roundTo(expectedNewCount, 1),
 			fillUsd: roundCurrency(fillUsd),
 			fillUsdV1: roundCurrency(fillUsdV1),
+			fillUsdV4: roundCurrency(fillUsdV4 * (1 + retailUpliftRatio)),
 			expectedUsd: roundCurrency(booked.usd + fillUsd),
 			expectedUsdV1: roundCurrency(booked.usdV1 + fillUsdV1),
+			expectedUsdV4: roundCurrency(
+				(booked.usdV4 + fillUsdV4) * (1 + retailUpliftRatio),
+			),
 		})
 	}
 
@@ -1266,6 +1475,8 @@ function buildArrivalForecast({
 	const totalBookedUsd = days.reduce((sum, day) => sum + day.bookedUsd, 0)
 	const totalFillUsd = days.reduce((sum, day) => sum + day.fillUsd, 0)
 	const totalBookedUsdV1 = days.reduce((sum, day) => sum + day.bookedUsdV1, 0)
+	const totalBookedUsdV4 = days.reduce((sum, day) => sum + day.bookedUsdV4, 0)
+	const totalFillUsdV4 = days.reduce((sum, day) => sum + day.fillUsdV4, 0)
 	const totalFillUsdV1 = days.reduce((sum, day) => sum + day.fillUsdV1, 0)
 	return {
 		days,
@@ -1285,6 +1496,9 @@ function buildArrivalForecast({
 		totalBookedUsd: roundCurrency(totalBookedUsd),
 		totalFillUsd: roundCurrency(totalFillUsd),
 		totalExpectedUsd: roundCurrency(totalBookedUsd + totalFillUsd),
+		totalBookedUsdV4: roundCurrency(totalBookedUsdV4),
+		totalFillUsdV4: roundCurrency(totalFillUsdV4),
+		totalExpectedUsdV4: roundCurrency(totalBookedUsdV4 + totalFillUsdV4),
 		totalBookedUsdV1: roundCurrency(totalBookedUsdV1),
 		totalFillUsdV1: roundCurrency(totalFillUsdV1),
 		totalExpectedUsdV1: roundCurrency(totalBookedUsdV1 + totalFillUsdV1),
@@ -1503,6 +1717,7 @@ function serializeProjectionRow(row: ProjectionRow) {
 		appointment_id: row.appointmentId,
 		average_usd: row.averageUsd,
 		cancelled: row.cancelled,
+		client_id: row.clientId,
 		client_name: row.clientName,
 		configured_fallback_usd: row.fallbackUsd,
 		duration_minutes: row.durationMinutes,
@@ -1510,6 +1725,7 @@ function serializeProjectionRow(row: ProjectionRow) {
 		location_name: row.locationName,
 		projected_usd: roundCurrency(row.projectedUsd),
 		projected_usd_v2: roundCurrency(row.projectedUsdV2),
+		projected_usd_v4: roundCurrency(row.projectedUsdV4),
 		projection_source: row.source,
 		service_id: row.serviceId,
 		service_name: row.serviceName,

@@ -12,6 +12,8 @@ import {
 } from '#app/utils/blvd-admin.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { getGoogleAdsSpendUsd } from '#app/utils/google-ads-spend.server.ts'
+import { inferRevenueServiceCategory } from '#app/utils/blvd-revenue-sync.server.ts'
+import { valueAppointments } from '#app/utils/appointment-performance.server.ts'
 import {
 	GRANULARITIES,
 	WINDOWS,
@@ -308,12 +310,14 @@ export type BlvdAppointmentMeta = {
 	clientCreatedAt: Date | null
 	locationName: string | null
 	manageUrl: string | null
-	services: Array<{ price: number | null; name: string }>
+	/** Booked block length in minutes, the chair time the appointment holds. */
+	durationMinutes: number | null
+	services: Array<{ price: number | null; name: string; minutes: number | null }>
 }
 
-const APPOINTMENT_FIELDS = `id startAt createdAt state cancelled bookedByType manageUrl
+const APPOINTMENT_FIELDS = `id startAt createdAt state cancelled bookedByType manageUrl duration
 	location { name } client { id name appointmentCount createdAt }
-	appointmentServices { price service { name } }`
+	appointmentServices { price duration service { name } }`
 
 function toAppointmentMeta(node: any): BlvdAppointmentMeta | null {
 	if (!node?.id || !node.startAt) return null
@@ -332,9 +336,11 @@ function toAppointmentMeta(node: any): BlvdAppointmentMeta | null {
 		clientCreatedAt: node.client?.createdAt ? new Date(node.client.createdAt) : null,
 		locationName: node.location?.name ?? null,
 		manageUrl: node.manageUrl ?? null,
+		durationMinutes: typeof node.duration === 'number' ? node.duration : null,
 		services: (node.appointmentServices ?? []).map((s: any) => ({
 			price: s.price ?? null,
 			name: s.service?.name ?? 'Unknown service',
+			minutes: typeof s.duration === 'number' ? s.duration : null,
 		})),
 	}
 }
@@ -409,6 +415,253 @@ async function getAvgTicketByName(names: string[]) {
 	return new Map(averages.map(a => [a.itemName, a._avg.grossAmountUsd ?? 0]))
 }
 
+/**
+ * A client is NEW on exactly one booking: their first-ever one. Everything
+ * after that, including a rebook made minutes later, is a returning booking.
+ *
+ * The first-ever appointment per client never changes once known, so it is
+ * cached for the life of the process.
+ */
+const firstAppointmentByClient = new Map<string, string | null>()
+/** Past this age at booking time, a client with history booked before. */
+const NEW_CLIENT_RECORD_AGE_MS = 45 * 24 * 3600 * 1000
+const MAX_FIRST_APPOINTMENT_LOOKUPS = 400
+
+async function mapWithConcurrency<T>(
+	items: T[],
+	limit: number,
+	worker: (item: T) => Promise<void>,
+) {
+	let cursor = 0
+	await Promise.all(
+		Array.from({ length: Math.min(limit, items.length) }, async () => {
+			while (cursor < items.length) {
+				const item = items[cursor++]!
+				await worker(item)
+			}
+		}),
+	)
+}
+
+/**
+ * Earliest non-cancelled appointment per client, straight from Boulevard.
+ * Cancelled and no-showed bookings are skipped so this matches the bookings
+ * the report actually counts. Clients with more than 100 appointments at one
+ * location can't be paged here, but they are filtered out long before by the
+ * record-age shortcut in resolveNewClientFlags.
+ */
+async function getFirstAppointmentIdByClient(clientIds: string[]) {
+	const unique = [...new Set(clientIds)]
+	const pending = unique
+		.filter(id => !firstAppointmentByClient.has(id))
+		.slice(0, MAX_FIRST_APPOINTMENT_LOOKUPS)
+	if (pending.length) {
+		const locations = await listBlvdAdminLocations()
+		await mapWithConcurrency(pending, 6, async clientId => {
+			const bookings: Array<{ id: string; at: number }> = []
+			for (const location of locations) {
+				const res: any = await boulevardAdminFetch(
+					`query ClientAppointments($clientId: ID!, $locationId: ID!) {
+						appointments(first: 100, clientId: $clientId, locationId: $locationId) {
+							edges { node { id startAt createdAt state cancelled } }
+						}
+					}`,
+					{ clientId, locationId: location.id },
+				)
+				for (const edge of res.appointments?.edges ?? []) {
+					const node = edge?.node
+					if (!node?.id || node.cancelled || node.state === 'NO_SHOW') continue
+					bookings.push({
+						id: normalizeBlvdEntityId('Appointment', node.id)!,
+						at: new Date(node.createdAt ?? node.startAt).getTime(),
+					})
+				}
+			}
+			bookings.sort((a, b) => a.at - b.at)
+			firstAppointmentByClient.set(clientId, bookings[0]?.id ?? null)
+		})
+	}
+	return firstAppointmentByClient
+}
+
+/**
+ * true = this booking is the client's first ever, false = they had booked
+ * before, null = no client history to judge by. Obvious cases (their only
+ * appointment / a client record far older than this booking) are settled
+ * without a Boulevard round trip; the ambiguous ones are looked up exactly.
+ */
+async function resolveNewClientFlags(metas: BlvdAppointmentMeta[]) {
+	const flags = new Map<string, boolean | null>()
+	const ambiguous: BlvdAppointmentMeta[] = []
+	for (const a of metas) {
+		const bookedAt = (a.createdAt ?? a.startAt).getTime()
+		if (!a.clientId) {
+			flags.set(a.id, a.services.some(s => /new client/i.test(s.name)) || null)
+		} else if (a.clientAppointmentCount != null && a.clientAppointmentCount <= 1) {
+			flags.set(a.id, true)
+		} else if (
+			a.clientCreatedAt != null &&
+			(a.clientAppointmentCount ?? 2) > 1 &&
+			bookedAt - a.clientCreatedAt.getTime() > NEW_CLIENT_RECORD_AGE_MS
+		) {
+			flags.set(a.id, false)
+		} else {
+			ambiguous.push(a)
+		}
+	}
+	if (ambiguous.length) {
+		const firstIds = await getFirstAppointmentIdByClient(
+			ambiguous.map(a => a.clientId!),
+		)
+		for (const a of ambiguous) {
+			const first = firstIds.get(a.clientId!)
+			flags.set(a.id, first === undefined ? null : first === a.id)
+		}
+	}
+	return flags
+}
+
+/**
+ * Appointments, chair time, and money per service category. Categories come
+ * from the same name inference the revenue import uses, so booked time and
+ * collected revenue land on one axis.
+ *
+ * An appointment is counted once, under its primary service (the longest one),
+ * and its whole block of time goes there too, so the rows always add up to the
+ * real appointment count and the real hours on the calendar.
+ */
+async function rollUpByServiceCategory(
+	appointments: BlvdAppointmentMeta[],
+	cells: RevenueChartCell[],
+): Promise<ServiceCategoryRow[]> {
+	// Same v4 valuation as the per-appointment table AND the weekly forecast:
+	// each service is worth its revenue per KEPT visit, so the no-shows and $0
+	// comp visits are already priced in and the three surfaces agree.
+	const values = await valueAppointments(
+		appointments.map(a => ({
+			id: a.id,
+			startAtMs: a.startAt.getTime(),
+			clientId: a.clientId,
+			clientAppointmentCount: a.clientAppointmentCount,
+			clientCreatedAtMs: a.clientCreatedAt?.getTime() ?? null,
+			services: a.services.map(s => ({ name: s.name })),
+		})),
+	)
+	const rows = new Map<string, ServiceCategoryRow>()
+	const rowFor = (cat: string) => {
+		let row = rows.get(cat)
+		if (!row) {
+			row = { cat, appts: 0, minutes: 0, bookedUsd: 0, actualUsd: 0 }
+			rows.set(cat, row)
+		}
+		return row
+	}
+	for (const a of appointments) {
+		const primary = a.services.reduce<(typeof a.services)[number] | null>(
+			(best, s) => (best == null || (s.minutes ?? 0) > (best.minutes ?? 0) ? s : best),
+			null,
+		)
+		const row = rowFor(
+			inferRevenueServiceCategory(primary?.name) ?? 'Uncategorized',
+		)
+		row.appts++
+		row.minutes +=
+			a.durationMinutes ??
+			a.services.reduce((sum, s) => sum + (s.minutes ?? 0), 0)
+		row.bookedUsd += values.get(a.id)?.usd ?? 0
+	}
+	for (const cell of cells) rowFor(cell.cat).actualUsd += cell.usd
+	return [...rows.values()]
+		.map(r => ({
+			...r,
+			bookedUsd: Math.round(r.bookedUsd),
+			actualUsd: Math.round(r.actualUsd),
+		}))
+		.sort((a, b) => b.minutes - a.minutes || b.actualUsd - a.actualUsd)
+}
+
+export type TodayProgress = {
+	/** 0-1 share of today's booked value whose appointments have already ended. */
+	progress: number
+	apptsDone: number
+	apptsTotal: number
+	/** Booked value of the finished appointments, and of the whole day. */
+	doneUsd: number
+	totalUsd: number
+}
+
+/**
+ * How much of today has actually happened, measured in booked value rather
+ * than clock time. Revenue lands at checkout, so an appointment only counts
+ * once it has ENDED - a 3pm facial still on the table hasn't paid yet.
+ * Falls back to elapsed business hours on a day with nothing booked.
+ */
+export async function loadTodayProgress(todayEt: string): Promise<TodayProgress> {
+	const appointments = await getBlvdAppointmentsInRange(todayEt, todayEt).catch(
+		error => {
+			console.error('Failed to load today for progress', error)
+			return [] as BlvdAppointmentMeta[]
+		},
+	)
+	const values = await valueAppointments(
+		appointments.map(a => ({
+			id: a.id,
+			startAtMs: a.startAt.getTime(),
+			clientId: a.clientId,
+			clientAppointmentCount: a.clientAppointmentCount,
+			clientCreatedAtMs: a.clientCreatedAt?.getTime() ?? null,
+			services: a.services.map(s => ({ name: s.name })),
+		})),
+	)
+	const now = Date.now()
+	let doneUsd = 0
+	let totalUsd = 0
+	let apptsDone = 0
+	for (const a of appointments) {
+		const usd = values.get(a.id)?.usd ?? 0
+		const minutes =
+			a.durationMinutes ??
+			a.services.reduce((sum, s) => sum + (s.minutes ?? 0), 0)
+		totalUsd += usd
+		if (a.startAt.getTime() + minutes * 60_000 <= now) {
+			doneUsd += usd
+			apptsDone++
+		}
+	}
+	if (totalUsd > 0) {
+		return {
+			progress: Math.min(1, doneUsd / totalUsd),
+			apptsDone,
+			apptsTotal: appointments.length,
+			doneUsd: Math.round(doneUsd),
+			totalUsd: Math.round(totalUsd),
+		}
+	}
+	// Nothing booked (or nothing valued): fall back to the 9am-7pm business day.
+	const openMs = etMidnightUtc(todayEt).getTime() + 9 * 3600_000
+	const closeMs = etMidnightUtc(todayEt).getTime() + 19 * 3600_000
+	const elapsed = (now - openMs) / (closeMs - openMs)
+	return {
+		progress: Math.min(1, Math.max(0, elapsed)),
+		apptsDone,
+		apptsTotal: appointments.length,
+		doneUsd: 0,
+		totalUsd: 0,
+	}
+}
+
+export type ServiceCategoryRow = {
+	cat: string
+	/** Appointments on the calendar in the window, cancellations excluded. */
+	appts: number
+	/** Booked chair time in minutes. */
+	minutes: number
+	/** What those appointments are booked to be worth. */
+	bookedUsd: number
+	/** Money actually collected in the window, from closed orders. */
+	actualUsd: number
+}
+
 export type RevenueChartCell = {
 	/** ET day the revenue landed (YYYY-MM-DD). */
 	day: string
@@ -430,6 +683,10 @@ export type RevenueChartCell = {
 export async function loadRevenueChartCells(win: ReportWindow): Promise<{
 	cells: RevenueChartCell[]
 	categories: string[]
+	byCategory: ServiceCategoryRow[]
+	/** First day the appointment rollup covers, later than the window start
+	 * when the 120-day metadata cap bites. */
+	apptCoverageFromDay: string
 	lastSyncedAt: string | null
 }> {
 	const { fromDay, toDay, todayEt, since, until } = win
@@ -518,9 +775,14 @@ export async function loadRevenueChartCells(win: ReportWindow): Promise<{
 		if (bestKey) cellByKey.get(bestKey)!.appts++
 	}
 	const cells = [...cellByKey.values()].map(c => ({ ...c, usd: Math.round(c.usd) }))
+	const byCategory = await rollUpByServiceCategory(rangeAppointments, cells)
 	return {
 		cells,
-		categories: [...new Set(cells.map(c => c.cat))].sort(),
+		categories: [
+			...new Set([...cells.map(c => c.cat), ...byCategory.map(r => r.cat)]),
+		].sort(),
+		byCategory,
+		apptCoverageFromDay: metaFromDay,
 		lastSyncedAt: syncState?.value ?? null,
 	}
 }
@@ -536,7 +798,8 @@ export type FunnelRow = {
 	clientName: string | null
 	blvdUrl: string | null
 	posthogUrl: string | null
-	/** true = first-time client, false = returning, null = unknown */
+	/** true = the client's first-ever booking, false = they had booked before,
+	 * null = no client history to judge by */
 	newClient: boolean | null
 }
 
@@ -614,8 +877,13 @@ export async function loadBookingFunnel(request: Request) {
 		]),
 	)
 	const untracked = createdAppointments.filter(a => !touchedIds.has(a.id))
-	const avgByName = await getAvgTicketByName([
-		...new Set(untracked.flatMap(a => a.services.filter(s => !s.price).map(s => s.name))),
+	// Every booking in the window, tracked or not, judged against the same
+	// Boulevard history so a client counts as new on one booking only.
+	const [avgByName, newClientFlags] = await Promise.all([
+		getAvgTicketByName([
+			...new Set(untracked.flatMap(a => a.services.filter(s => !s.price).map(s => s.name))),
+		]),
+		resolveNewClientFlags(createdAppointments),
 	])
 
 	const rows: FunnelRow[] = [
@@ -632,23 +900,19 @@ export async function loadBookingFunnel(request: Request) {
 				null,
 			blvdUrl: blvdClientUrl(t.blvdClient?.boulevardClientId),
 			posthogUrl: posthogSessionUrl(t),
+			// Boulevard history first; what the client told the booking form
+			// about themselves only fills in when the appointment isn't linked
+			// yet (the sync runs a few minutes behind).
 			newClient:
-				clientTypeByCart.get(t.bookingCartId ?? '') === 'new_client'
+				newClientFlags.get(t.appointments[0]?.boulevardAppointmentId ?? '') ??
+				(clientTypeByCart.get(t.bookingCartId ?? '') === 'new_client'
 					? true
 					: clientTypeByCart.get(t.bookingCartId ?? '') === 'returning_client'
 						? false
-						: null,
+						: null),
 		})),
 		...untracked.map(a => {
-			const isNew =
-				(a.clientCreatedAt != null &&
-					(a.createdAt ?? a.startAt).getTime() - a.clientCreatedAt.getTime() <
-						45 * 24 * 3600 * 1000) ||
-				(a.clientAppointmentCount != null && a.clientAppointmentCount <= 1) ||
-				a.services.some(s => /new client/i.test(s.name)) ||
-				(a.clientAppointmentCount != null || a.clientCreatedAt != null
-					? false
-					: null)
+			const isNew = newClientFlags.get(a.id) ?? null
 			return {
 			bookedAt: (a.createdAt ?? a.startAt).toISOString(),
 			apptAt: a.startAt.toISOString(),
@@ -663,9 +927,6 @@ export async function loadBookingFunnel(request: Request) {
 			clientName: a.clientName,
 			blvdUrl: a.manageUrl ?? blvdClientUrl(a.clientId),
 			posthogUrl: null,
-			// First-time = client record ≤45 days old at booking, or their only
-			// appointment, or the service literally says New Client (computed
-			// above so the source label can use it too).
 			newClient: isNew,
 		}
 		}),

@@ -33,6 +33,11 @@ const schema = z.object({
 	// Server-only, Google Voice follow-up sync
 	GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
 	GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+	// '1' renders the website AI chat bubble (code ships inert without it)
+	AI_CHAT_ENABLED: z.string().optional(),
+	// Server-only, website AI chat proxy to the Retell Chat API
+	RETELL_API_KEY: z.string().optional(),
+	RETELL_CHAT_AGENT_ID: z.string().optional(),
 	// Server-only, Temporal background-job scheduling
 	TEMPORAL_ADDRESS: z.string().optional(),
 	TEMPORAL_NAMESPACE: z.string().optional(),
@@ -83,6 +88,7 @@ export function getEnv() {
 		REACT_APP_PUBLIC_POSTHOG_KEY: process.env.REACT_APP_PUBLIC_POSTHOG_KEY,
 		REACT_APP_PUBLIC_POSTHOG_HOST: process.env.REACT_APP_PUBLIC_POSTHOG_HOST,
 		GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY,
+		AI_CHAT_ENABLED: process.env.AI_CHAT_ENABLED,
 	}
 }
 

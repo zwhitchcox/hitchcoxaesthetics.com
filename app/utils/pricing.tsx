@@ -330,6 +330,17 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			],
 		},
 	],
+	'everesse/body': [
+		{
+			title: 'Everesse Body Treatment Pricing',
+			items: [
+				{
+					name: 'Everesse Body (abdomen and other areas)',
+					price: 'Priced by area at consultation',
+				},
+			],
+		},
+	],
 
 	// ─── Laser Hair Removal ──────────────────────────────────────
 	'laser-hair-removal': [

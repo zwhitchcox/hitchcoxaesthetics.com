@@ -33,9 +33,11 @@ import { getGoogleAdsSpendByDay } from '#app/utils/google-ads-spend.server.ts'
 import {
 	etMidnightUtc,
 	loadRevenueChartCells,
+	loadTodayProgress,
 	parseReportWindow,
 	shiftDay,
 	type RevenueChartCell,
+	type ServiceCategoryRow,
 } from '#app/utils/revenue-by-source.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
@@ -47,6 +49,42 @@ async function tryQuery<T extends Record<string, any>>(sql: string): Promise<T[]
 	} catch {
 		return null
 	}
+}
+
+/**
+ * Read a projection column that may not exist yet.
+ *
+ * The *_v4 columns appear only once the finance sync has run with the v4 code,
+ * and code always deploys before that sync runs. Naming the column directly
+ * would make the whole statement fail to parse, and tryQuery turns that into
+ * null -> every card renders $0. Going through to_jsonb yields NULL for an
+ * absent key instead, so the coalesce falls through to the previous model and
+ * the page keeps working across the deploy/sync gap.
+ */
+function maybeColumn(alias: string, column: string) {
+	return `(to_jsonb(${alias}) ->> '${column}')::numeric`
+}
+
+const CANCELLATION_RATE =
+	'(SELECT cancellation_rate FROM revenue_projection_summary WHERE id = 1)'
+
+/**
+ * Expected dollars for a projection row, best model first.
+ *
+ * v4 is already NET (it discounts each booked slot by its own survival
+ * probability and values services per kept visit), so it is used as-is.
+ * v3/v2 are gross and still need the cancellation haircut. Falling through
+ * v3 rather than straight to v2 keeps the numbers steady in the window
+ * between deploying v4 and the first sync that writes its columns.
+ */
+function expectedNetUsd(alias: string) {
+	return `coalesce(${maybeColumn(alias, 'expected_usd_v4')},
+		coalesce(${maybeColumn(alias, 'expected_usd_v3')}, expected_usd) * (1 - ${CANCELLATION_RATE}))`
+}
+
+function bookedUsd(alias: string) {
+	return `coalesce(${maybeColumn(alias, 'booked_usd_v4')},
+		${maybeColumn(alias, 'booked_usd_v3')}, booked_usd)`
 }
 
 const REPORT_TIME_ZONE = 'America/New_York'
@@ -152,6 +190,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		weekLost,
 		chartCells,
 		ads,
+		todayProgress,
 	] = await Promise.all([
 		tryQuery<{ week: string; revenue: string }>(
 			`SELECT to_char(week, 'YYYY-MM-DD') AS week, round(revenue) AS revenue
@@ -159,9 +198,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			 ORDER BY week DESC LIMIT 1`,
 		),
 		tryQuery<{ booked: string; net: string }>(
-			`SELECT round(sum(booked_usd)) AS booked,
-				round(sum(expected_usd) * (1 - (SELECT cancellation_rate FROM revenue_projection_summary WHERE id = 1))) AS net
-			 FROM revenue_projection_daily
+			`SELECT round(sum(${bookedUsd('d')})) AS booked,
+				round(sum(${expectedNetUsd('d')})) AS net
+			 FROM revenue_projection_daily d
 			 WHERE date_trunc('week', day) = date_trunc('week', now())`,
 		),
 		tryQuery<{
@@ -172,12 +211,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			actual: string | null
 			err_pct: string | null
 		}>(
+			// Each sync writes one row per model for the same week, so pick the
+			// newest snapshot of the BEST model available for that week rather
+			// than letting two same-timestamp rows race. Weeks forecast before
+			// daily_fill_v4 existed still show their v2 (or unlabelled) snapshot,
+			// which is the honest record of what was predicted at the time.
 			`WITH snap AS (
 				SELECT DISTINCT ON (week) week::date AS week,
 					projected_revenue, projected_lo AS lo, projected_hi AS hi
 				FROM revenue_projection
 				WHERE computed_at < week
-				ORDER BY week, computed_at DESC)
+				ORDER BY week,
+					(model = 'daily_fill_v4') DESC,
+					computed_at DESC)
 			 SELECT to_char(s.week, 'YYYY-MM-DD') AS week, s.projected_revenue AS projected,
 				 s.lo, s.hi, round(w.revenue) AS actual,
 				 CASE WHEN w.revenue > 0
@@ -206,8 +252,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		),
 		tryQuery<{ day: string; expected: string }>(
 			`SELECT to_char(day, 'YYYY-MM-DD') AS day,
-				round(expected_usd * (1 - (SELECT cancellation_rate FROM revenue_projection_summary WHERE id = 1))) AS expected
-			 FROM revenue_projection_daily
+				round(${expectedNetUsd('d')}) AS expected
+			 FROM revenue_projection_daily d
 			 WHERE day >= '${weekDays[0]}'::date AND day <= '${weekDays[6]}'::date
 			 ORDER BY day`,
 		),
@@ -219,13 +265,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				WHERE month < to_char(current_date, 'YYYY-MM')
 				ORDER BY month DESC LIMIT 6) recent`,
 		),
-		// Expected is NET of cancellations: expected_usd is gross (booked + fill),
-		// scaled by (1 - cancellation_rate) from the projection summary.
+		// expected_usd_v4 is ALREADY net: v4 discounts each booked slot by its own
+		// survival probability and values services per KEPT visit, so applying
+		// the summary cancellation_rate on top would take the haircut twice.
+		// The pre-v4 fallback column still needs it.
 		tryQuery<{ day: string; expected: string; expected_appts: string | null }>(
 			`SELECT to_char(day, 'YYYY-MM-DD') AS day,
-				round(expected_usd * (1 - (SELECT cancellation_rate FROM revenue_projection_summary WHERE id = 1))) AS expected,
+				round(${expectedNetUsd('d')}) AS expected,
 				booked_count + expected_new_count AS expected_appts
-			 FROM revenue_projection_daily
+			 FROM revenue_projection_daily d
 			 WHERE day >= '${win.fromDay}'::date AND day <= '${win.toDay}'::date
 			 ORDER BY day`,
 		),
@@ -236,10 +284,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			return {
 				cells: [] as RevenueChartCell[],
 				categories: [] as string[],
+				byCategory: [] as ServiceCategoryRow[],
+				apptCoverageFromDay: win.fromDay,
 				lastSyncedAt: null as string | null,
 			}
 		}),
 		getGoogleAdsSpendByDay(win.fromDay, win.toDay),
+		loadTodayProgress(win.todayEt).catch(error => {
+			console.error('Failed to load today progress', error)
+			return null
+		}),
 	])
 
 	// Tiles stay pinned to the current week regardless of the chart window.
@@ -264,6 +318,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		accuracy: accuracy?.slice(-12) ?? null,
 		summary: summary?.[0] ?? null,
 		thisWeekDaily,
+		todayProgress,
 		window: {
 			windowKey: win.windowKey,
 			granularity: win.granularity,
@@ -281,6 +336,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			cancelled: rangeLost,
 			cells: chartCells.cells,
 			categories: chartCells.categories,
+			byCategory: chartCells.byCategory,
+			apptCoverageFromDay: chartCells.apptCoverageFromDay,
 			lastSyncedAt: chartCells.lastSyncedAt,
 			expensesByMonth: Object.fromEntries(
 				(expensesRows ?? []).map(r => [r.month, Number(r.expenses)]),
@@ -334,6 +391,13 @@ export function shouldRevalidate({
 const SERIES_KEYS = ['expected', 'actual', 'cancelled', 'expenses', 'adspend'] as const
 type SeriesKey = (typeof SERIES_KEYS)[number]
 const AVG_DAYS_PER_MONTH = 30.4
+
+/** Booked minutes as chair time, e.g. 17h 30m. */
+function hoursLabel(minutes: number) {
+	const h = Math.floor(minutes / 60)
+	const m = Math.round(minutes % 60)
+	return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`
+}
 
 function shiftDayStr(day: string, days: number): string {
 	const d = new Date(`${day}T12:00:00Z`)
@@ -466,18 +530,25 @@ export default function Revenue() {
 		thisWeekDaily,
 		window: win,
 		chart,
+		todayProgress,
 	} = data
+	const todayEt = data.window.todayEt
 	const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 	const refreshing = refresher.state !== 'idle'
 
 	// ---- Tiles (pinned to the current week) ----
+	// "Expected by now" must not count today as a finished day. Today's share is
+	// prorated by how much of the day has actually happened, measured in booked
+	// value of appointments that have ENDED (revenue lands at checkout).
 	const weekToDate = thisWeekDaily
 		? thisWeekDaily.reduce(
 				(acc, d) => {
 					if (d.actual == null) return acc
+					const isToday = d.day === todayEt
+					const share = isToday ? (todayProgress?.progress ?? 1) : 1
 					return {
 						actual: acc.actual + d.actual,
-						expected: acc.expected + (d.expected ?? 0),
+						expected: acc.expected + (d.expected ?? 0) * share,
 					}
 				},
 				{ actual: 0, expected: 0 },
@@ -646,6 +717,24 @@ export default function Revenue() {
 		)
 	}
 
+	const catTotals = chart.byCategory.reduce(
+		(t, r) => ({
+			appts: t.appts + r.appts,
+			minutes: t.minutes + r.minutes,
+			bookedUsd: t.bookedUsd + r.bookedUsd,
+			actualUsd: t.actualUsd + r.actualUsd,
+		}),
+		{ appts: 0, minutes: 0, bookedUsd: 0, actualUsd: 0 },
+	)
+	// One forecast on the page: the window's projection (booked + the bookings
+	// still expected to arrive) split across categories by each category's share
+	// of booked value, so the column totals to the same number as the tiles.
+	const windowProjected = chart.expected.reduce((t, r) => t + r.usd, 0)
+	const projectedFor = (bookedUsd: number) =>
+		windowProjected > 0 && catTotals.bookedUsd > 0
+			? Math.round(windowProjected * (bookedUsd / catTotals.bookedUsd))
+			: null
+
 	// Window-to-date comparison for the note under the chart.
 	const windowToDate = (() => {
 		let actual = 0
@@ -698,7 +787,11 @@ export default function Revenue() {
 					<StatTile
 						label="Expected by now"
 						value={usd(weekToDate.expected)}
-						whisper={`the projection's Mon–today share · actual is ${
+						whisper={`${
+							todayProgress
+								? `Mon–now, today counted ${Math.round(todayProgress.progress * 100)}% done (${todayProgress.apptsDone} of ${todayProgress.apptsTotal} appts finished)`
+								: "the projection's Mon–today share"
+						} · actual is ${
 							weekToDate.expected > 0
 								? `${Math.round((100 * weekToDate.actual) / weekToDate.expected)}%`
 								: '-'
@@ -869,6 +962,94 @@ export default function Revenue() {
 							: chart.adsError}
 					</p>
 				) : null}
+			</section>
+
+			<section>
+				<h2>
+					By service category{' '}
+					<span className="mini">
+						{win.fromDay} → {win.toDay} · appointments on the calendar and the
+						chair time they hold, cancellations excluded
+					</span>
+				</h2>
+				{catTotals.appts === 0 ? (
+					<p className="note">No appointments booked in this window.</p>
+				) : (
+					<>
+						<p className="note">
+							{catTotals.appts} appointments · {hoursLabel(catTotals.minutes)} of
+							booked time
+							{windowProjected > 0 ? ` · ${usd(windowProjected)} projected` : ''} ·{' '}
+							{usd(catTotals.actualUsd)} collected so far
+						</p>
+						<div className="rtable-wrap">
+							<table className="rtable">
+								<thead>
+									<tr>
+										<th>Category</th>
+										<th className="num">Appointments</th>
+										<th className="num">Time</th>
+										<th className="num">Projected</th>
+										<th className="num">Actual revenue</th>
+										<th className="num">Projected $/hr</th>
+									</tr>
+								</thead>
+								<tbody>
+									{chart.byCategory.map(r => {
+										const projected = projectedFor(r.bookedUsd)
+										return (
+											<tr key={r.cat}>
+												<td>{r.cat}</td>
+												<td className="num">{r.appts || '-'}</td>
+												<td className="num">
+													{r.minutes ? hoursLabel(r.minutes) : '-'}
+												</td>
+												<td className="num">{projected ? usd(projected) : '-'}</td>
+												<td className="num">
+													{r.actualUsd ? usd(r.actualUsd) : '-'}
+												</td>
+												<td className="num">
+													{projected && r.minutes
+														? usd(Math.round(projected / (r.minutes / 60)))
+														: '-'}
+												</td>
+											</tr>
+										)
+									})}
+									<tr style={{ fontWeight: 600 }}>
+										<td>Total</td>
+										<td className="num">{catTotals.appts}</td>
+										<td className="num">{hoursLabel(catTotals.minutes)}</td>
+										<td className="num">
+											{windowProjected > 0 ? usd(windowProjected) : '-'}
+										</td>
+										<td className="num">{usd(catTotals.actualUsd)}</td>
+										<td className="num">
+											{windowProjected > 0 && catTotals.minutes
+												? usd(
+														Math.round(windowProjected / (catTotals.minutes / 60)),
+													)
+												: '-'}
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+						<p className="note">
+							Each appointment counts once, under its longest service, and its
+							whole block of time goes there too, so the rows add up to the real
+							calendar. Projected is this window's projection, the same figure the
+							tiles show, split across categories by each category's share of
+							booked value, so it already covers the bookings still expected to
+							arrive during the window. Actual revenue is money collected in the
+							window from closed orders, so it lands on the checkout date and can
+							sit under a category with no appointments (retail, gratuity).
+							{chart.apptCoverageFromDay > win.fromDay
+								? ` Appointment detail only goes back to ${chart.apptCoverageFromDay}, so earlier days in this window are not counted here.`
+								: ''}
+						</p>
+					</>
+				)}
 			</section>
 
 			<section>

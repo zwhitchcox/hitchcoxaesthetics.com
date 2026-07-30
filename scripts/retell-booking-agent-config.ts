@@ -569,7 +569,7 @@ function buildCallerTool(publicUrl: string, toolHeaders: ToolHeaders) {
 	}
 }
 
-function buildServicesTool(publicUrl: string, toolHeaders: ToolHeaders) {
+export function buildServicesTool(publicUrl: string, toolHeaders: ToolHeaders) {
 	return {
 		type: 'custom',
 		name: 'lookup_services',

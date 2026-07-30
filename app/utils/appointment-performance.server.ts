@@ -1,23 +1,22 @@
 /**
- * Per-appointment expected vs actual revenue. Expected values each booked
- * service the same way the projections do: the booked price when Boulevard
- * has one, otherwise the service's average paid ticket over the last 90 days.
- * Actual is the closed-order revenue linked to the appointment. The delta and
- * a plain-English reason make underperformers self-explanatory.
+ * Per-appointment expected vs actual revenue. Expected uses the SAME v4
+ * valuation as the weekly forecast (app/utils/revenue-valuation.server.ts, via
+ * appointment-valuation.server.ts) so the two surfaces can never quote
+ * different dollars for the same visit. Actual is the closed-order revenue
+ * linked to the appointment. The delta and a plain-English reason make
+ * underperformers self-explanatory.
  */
 import {
 	boulevardAdminFetch,
 	listBlvdAdminLocations,
 } from '#app/utils/blvd-admin.server.ts'
 import { getRecentClientComms, type ClientComm } from '#app/utils/client-comms.server.ts'
+import { getAppointmentValuation } from '#app/utils/appointment-valuation.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import {
-	avgFirstPaymentUsd,
-	buildWlProfiles,
-	valueWlVisit,
 	WL_INJECTION_RE,
-	type WlSimState,
-} from '#app/utils/wl-cadence.server.ts'
+	type WeightLossClientKind,
+} from '#app/utils/revenue-valuation.server.ts'
 
 const EXCLUDED_CLIENT_NAMES = new Set(['zane hitchcox'])
 
@@ -74,18 +73,83 @@ type ApptNode = {
 	}> | null
 }
 
-async function avgPaidTicketByName(names: string[]) {
-	if (names.length === 0) return new Map<string, number>()
-	const items = await prisma.blvdRevenueItem.groupBy({
-		by: ['itemName'],
-		where: {
-			itemName: { in: names },
-			grossAmountUsd: { gt: 0 },
-			occurredAt: { gte: new Date(Date.now() - 90 * 24 * 3600 * 1000) },
-		},
-		_avg: { grossAmountUsd: true },
-	})
-	return new Map(items.map(i => [i.itemName, i._avg.grossAmountUsd ?? 0]))
+/** The minimum an appointment needs before it can be valued. */
+export type ValuableAppointment = {
+	id: string
+	startAtMs: number
+	clientId: string | null
+	clientAppointmentCount: number | null
+	clientCreatedAtMs: number | null
+	services: Array<{ name: string }>
+}
+
+export type AppointmentValue = {
+	/** Expected dollars at the till for this visit. */
+	usd: number
+	wlKind: WeightLossClientKind | null
+	isPrepaidVisit: boolean
+	isNewPatient: boolean
+}
+
+/**
+ * The one place an appointment is turned into expected dollars, shared by the
+ * per-appointment table and the service-category rollup.
+ *
+ * WHY THE BOOKED PRICE IS NOT USED. This used to prefer
+ * `appointmentServices.price` and fall back to the average PAID ticket. Both
+ * were wrong. Measured over the Boulevard revenue window (2026-07-27):
+ *
+ *   - Boulevard WRITES THE PRICE BACK at checkout. Past months are 74-82%
+ *     priced, future months 7-35%, and on past visits "has a price" matches
+ *     "collected money" 99.3% of the time versus 0.7% for unpriced ones. So
+ *     the price is a record of what happened, not a forecast: using it made
+ *     expected == actual for completed rows (delta always ~0, the report's
+ *     whole point) while upcoming rows silently fell through to the average.
+ *   - The paid-ticket average ignored the 22.3% of kept visits that collect
+ *     $0, overstating every service by about 1/0.78.
+ *
+ * v4 values a service at its revenue per KEPT visit, which is the honest ex
+ * ante expectation: it already blends in the visits that pay nothing. Weight
+ * loss is valued from the client's own history. Ordering no longer matters -
+ * there is no cadence simulation to walk.
+ */
+export async function valueAppointments(
+	appts: ValuableAppointment[],
+): Promise<Map<string, AppointmentValue>> {
+	const values = new Map<string, AppointmentValue>()
+	if (appts.length === 0) return values
+
+	const valuation = await getAppointmentValuation()
+
+	for (const a of appts) {
+		const isNewPatient =
+			(a.clientAppointmentCount != null && a.clientAppointmentCount <= 1) ||
+			(a.clientCreatedAtMs != null &&
+				a.startAtMs - a.clientCreatedAtMs < 45 * 24 * 3600 * 1000)
+		const usd = Math.round(
+			a.services.reduce(
+				(sum, s) =>
+					sum +
+					valuation.valueSegment({
+						clientId: a.clientId,
+						serviceName: s.name,
+					}),
+				0,
+			),
+		)
+		const wlService = a.services.find(s => WL_INJECTION_RE.test(s.name))
+		values.set(a.id, {
+			usd,
+			wlKind: wlService
+				? valuation.describeWeightLossClient(a.clientId).kind
+				: null,
+			isNewPatient,
+			// Name-only: a written-back price cannot classify an upcoming visit
+			// (see the note above), and this flag now only colours the reason text.
+			isPrepaidVisit: a.services.some(s => PREPAID_PACKAGE.test(s.name)),
+		})
+	}
+	return values
 }
 
 export async function loadAppointmentPerformance(
@@ -130,17 +194,21 @@ export async function loadAppointmentPerformance(
 			!EXCLUDED_CLIENT_NAMES.has((a.client?.name ?? '').trim().toLowerCase()),
 	)
 
-	const serviceNames = [
-		...new Set(
-			kept.flatMap(a =>
-				(a.appointmentServices ?? [])
-					.map(s => s.service?.name)
-					.filter((n): n is string => Boolean(n)),
-			),
+	const [values, revenueItems] = await Promise.all([
+		valueAppointments(
+			kept.map(a => ({
+				id: a.id!,
+				startAtMs: new Date(a.startAt ?? 0).getTime(),
+				clientId: a.client?.id ?? null,
+				clientAppointmentCount: a.client?.appointmentCount ?? null,
+				clientCreatedAtMs: a.client?.createdAt
+					? Date.parse(a.client.createdAt)
+					: null,
+				services: (a.appointmentServices ?? []).map(s => ({
+					name: s.service?.name ?? '',
+				})),
+			})),
 		),
-	]
-	const [avgByName, revenueItems] = await Promise.all([
-		avgPaidTicketByName(serviceNames),
 		prisma.blvdRevenueItem.findMany({
 			where: { boulevardAppointmentId: { in: kept.map(a => a.id!) } },
 			select: { boulevardAppointmentId: true, grossAmountUsd: true },
@@ -155,54 +223,6 @@ export async function loadAppointmentPerformance(
 		)
 	}
 
-	// Weight-loss cadence: expected for a $0-booked WL-injection visit comes
-	// from that client's own payment rhythm (weekly per-shot payers vs monthly
-	// renewers whose off-week visits owe $0), built from the local revenue
-	// archive. Clients with no WL payment history are treated as new patients
-	// and keep the service-average expectation.
-	const wlClientIds = [
-		...new Set(
-			kept
-				.filter(a =>
-					(a.appointmentServices ?? []).some(s =>
-						WL_INJECTION_RE.test(s.service?.name ?? ''),
-					),
-				)
-				.map(a => a.client?.id)
-				.filter((id): id is string => Boolean(id)),
-		),
-	]
-	const wlPayItems = wlClientIds.length
-		? await prisma.blvdRevenueItem.findMany({
-				where: {
-					boulevardClientId: { in: wlClientIds },
-					itemName: { contains: 'weight loss' },
-					grossAmountUsd: { gt: 0 },
-					occurredAt: { gte: new Date(Date.now() - 150 * 24 * 3600 * 1000) },
-				},
-				select: { boulevardClientId: true, occurredAt: true, grossAmountUsd: true },
-			})
-		: []
-	const wlPayByClientDay = new Map<string, { clientId: string; atMs: number; usd: number }>()
-	for (const item of wlPayItems) {
-		const day = item.occurredAt.toISOString().slice(0, 10)
-		const key = `${item.boulevardClientId}|${day}`
-		const entry = wlPayByClientDay.get(key) ?? {
-			clientId: item.boulevardClientId!,
-			atMs: item.occurredAt.getTime(),
-			usd: 0,
-		}
-		entry.usd += item.grossAmountUsd
-		wlPayByClientDay.set(key, entry)
-	}
-	const wlProfiles = buildWlProfiles([...wlPayByClientDay.values()], [])
-	// What a brand-new weight-loss patient's first paying visit averages -
-	// start packages, so higher than the ongoing per-visit price.
-	const wlNewPatientUsd = Math.round(
-		avgFirstPaymentUsd([...wlPayByClientDay.values()]),
-	)
-	const wlSim: WlSimState = new Map()
-
 	const rows = kept
 		.sort(
 			(a, b) =>
@@ -212,46 +232,14 @@ export async function loadAppointmentPerformance(
 		const services = (a.appointmentServices ?? [])
 			.map(s => s.service?.name)
 			.filter((n): n is string => Boolean(n))
-		let wlKind: ReturnType<typeof valueWlVisit>['kind'] | null = null
 		const startMs = new Date(a.startAt ?? 0).getTime()
-		const clientCreatedMs = a.client?.createdAt
-			? Date.parse(a.client.createdAt)
-			: NaN
-		const isNewPatient =
-			(a.client?.appointmentCount != null && a.client.appointmentCount <= 1) ||
-			(Number.isFinite(clientCreatedMs) &&
-				startMs - clientCreatedMs < 45 * 24 * 3600 * 1000)
-		const expectedUsd = Math.round(
-			(a.appointmentServices ?? []).reduce((sum, s) => {
-				const booked = (s.price ?? 0) / 100
-				const name = s.service?.name ?? ''
-				if (booked > 0) return sum + booked
-				if (PREPAID_PACKAGE.test(name)) return sum // prepaid, visit owes $0
-				if (WL_INJECTION_RE.test(name)) {
-					const profile = a.client?.id ? wlProfiles.get(a.client.id) : undefined
-					// A repeat visitor with zero payment history isn't a new patient -
-					// they're on a package/comp, so nothing is expected at the till.
-					if (!profile && !isNewPatient) {
-						wlKind = 'non_paying'
-						return sum
-					}
-					const wl = valueWlVisit({
-						clientId: a.client?.id ?? null,
-						visitAtMs: startMs,
-						profile,
-						fallbackUsd: wlNewPatientUsd || (avgByName.get(name) ?? 0),
-						sim: wlSim,
-					})
-					wlKind = wl.kind
-					return sum + wl.usd
-				}
-				return sum + (avgByName.get(name) ?? 0)
-			}, 0),
-		)
-		const isPrepaidVisit =
-			(a.appointmentServices ?? []).some(
-				s => PREPAID_PACKAGE.test(s.service?.name ?? '') && !(s.price ?? 0),
-			)
+		const value = values.get(a.id!)
+		const { usd: expectedUsd, wlKind, isNewPatient, isPrepaidVisit } = value ?? {
+			usd: 0,
+			wlKind: null,
+			isNewPatient: false,
+			isPrepaidVisit: false,
+		}
 		const actualUsd = Math.round(actualByAppt.get(a.id!) ?? 0)
 		const startAt = a.startAt ?? ''
 		const isNoShow =
@@ -304,19 +292,17 @@ export async function loadAppointmentPerformance(
 						? 'not happened yet'
 						: isPrepaidVisit && actualUsd === 0
 							? 'prepaid package visit: paid up front, $0 due today'
-							: wlKind === 'mid_cycle' && actualUsd === 0
-								? 'mid-cycle weight-loss visit: $0 due today'
-								: wlKind === 'non_paying' && actualUsd === 0
+							: wlKind === 'spread' && actualUsd === 0
+								? 'weight-loss visit: this client pays every few visits, so each one carries a share'
+								: wlKind === 'never_pays' && actualUsd === 0
 									? 'weight-loss visit: this client never pays at the till'
-									: wlKind === 'renewal' && actualUsd === 0
-										? `weight-loss renewal was due, nothing collected${maybeOpenCheckout}`
-										: wlKind === 'per_visit' && actualUsd === 0
-											? `pays every visit historically, nothing collected${maybeOpenCheckout}`
-											: isConsult && actualUsd === 0
-												? "consultation: didn't convert to a purchase that day"
-												: wlKind === 'new_client' && actualUsd === 0
-													? 'no payment history: valued like a new patient'
-													: actualUsd === 0
+									: wlKind === 'per_visit' && actualUsd === 0
+										? `pays every visit historically, nothing collected${maybeOpenCheckout}`
+										: isConsult && actualUsd === 0
+											? "consultation: didn't convert to a purchase that day"
+											: wlKind === 'new_client' && actualUsd === 0
+												? 'no weight-loss payment history: valued at the injection average'
+												: actualUsd === 0
 							? `completed but $0 collected (membership, package, or unlinked order)${maybeOpenCheckout}`
 							: deltaUsd <= -100
 								? 'lighter ticket than the service average'

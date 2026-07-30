@@ -91,12 +91,12 @@ export async function syncFinanceReports(): Promise<{
 		const winStart = new Date(projection.window.start)
 		await q(`drop view if exists report_revenue_projection_monthly`)
 		await q(`drop table if exists revenue_projection_daily`)
-		await q(`create table revenue_projection_daily (day date primary key, weekday text, booked_usd numeric, booked_count int, fill_usd numeric, expected_new_count numeric, expected_usd numeric)`)
+		await q(`create table revenue_projection_daily (day date primary key, weekday text, booked_usd numeric, booked_count int, fill_usd numeric, expected_new_count numeric, expected_usd numeric, booked_usd_v4 numeric, fill_usd_v4 numeric, expected_usd_v4 numeric)`)
 		const days = projection.expected_fill?.days ?? []
 		for (let i = 0; i < days.length; i++) {
 			const day = new Date(winStart.getTime() + i * 86400_000).toISOString().slice(0, 10)
 			const r = days[i]!
-			await q(`insert into revenue_projection_daily values ($1,$2,$3,$4,$5,$6,$7)`, [day, r.weekday, r.bookedUsd, r.bookedCount, r.fillUsd, r.expectedNewCount, r.expectedUsd])
+			await q(`insert into revenue_projection_daily values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [day, r.weekday, r.bookedUsd, r.bookedCount, r.fillUsd, r.expectedNewCount, r.expectedUsd, r.bookedUsdV4, r.fillUsdV4, r.expectedUsdV4])
 		}
 
 		// Frozen daily forecasts, APPEND-ONLY, one row per (compute_date, day,
@@ -133,16 +133,40 @@ export async function syncFinanceReports(): Promise<{
 			 on conflict (compute_date, day, model) do nothing`,
 		)
 
+		// ---- daily_v4_perkept ----
+		// Replaces daily_v3_calibrated, which multiplied v2 by the median
+		// actual/predicted ratio over past weeks. That was a correction factor
+		// standing in for a bug, not a model: v2 counted kept visits over 365
+		// days of backfilled appointments but could only see revenue back to the
+		// March 2026 Boulevard migration, so its per-visit averages were divided
+		// by a denominator spanning twice the period its numerator covered.
+		// v4 fixes the window itself (see app/utils/revenue-valuation.server.ts),
+		// which removes the need for any calibration multiplier: backtested over
+		// 14 complete weeks it is unbiased (median actual/predicted 1.02-1.05)
+		// where v2 ran 2.2x-3.3x light.
+		// RULE (Zane): new label beside v1/v2/v3, never overwrite any of them.
+		// Every daily_v3_calibrated row already frozen into
+		// revenue_projection_daily_snapshots stays untouched; v3 simply stops
+		// being computed for new days.
+		await q(
+			`insert into revenue_projection_daily_snapshots
+			 select current_date, day, 'daily_v4_perkept', weekday, booked_usd_v4,
+			   booked_count, fill_usd_v4, expected_new_count, expected_usd_v4
+			 from revenue_projection_daily
+			 on conflict (compute_date, day, model) do nothing`,
+		)
+
 		await q(`drop table if exists revenue_projection_summary`)
-		await q(`create table revenue_projection_summary (id int primary key, window_start date, window_end date, gross_expected_usd numeric, cancellation_rate numeric, expected_cancellations_usd numeric, net_expected_usd numeric, generated_at timestamptz)`)
+		await q(`create table revenue_projection_summary (id int primary key, window_start date, window_end date, gross_expected_usd numeric, cancellation_rate numeric, expected_cancellations_usd numeric, net_expected_usd numeric, generated_at timestamptz, net_expected_usd_v4 numeric)`)
 		const s = projection.summary
-		await q(`insert into revenue_projection_summary values (1,$1,$2,$3,$4,$5,$6, now())`, [
+		await q(`insert into revenue_projection_summary values (1,$1,$2,$3,$4,$5,$6, now(), $7)`, [
 			projection.window.start.slice(0, 10),
 			projection.window.end.slice(0, 10),
 			s.expected_total_revenue_usd,
 			s.cancellation_rate,
 			s.expected_cancellations_usd,
 			s.expected_net_revenue_usd,
+			s.v4_expected_net_revenue_usd,
 		])
 
 		// Snapshot the next 4 weeks into revenue_projection so projection
@@ -166,6 +190,29 @@ export async function syncFinanceReports(): Promise<{
 			   round(sum(expected_usd) * (1 - (select cancellation_rate from revenue_projection_summary where id = 1))),
 			   round(sum(expected_usd) * 1.05),
 			   'daily_fill_v2'
+			 from revenue_projection_daily
+			 where date_trunc('week', day) >= date_trunc('week', now())
+			 group by 1 order by 1 limit 4`,
+		)
+		// Same forward snapshot under the v4 label, so week-over-week projection
+		// accuracy can be compared between models on equal terms. v4 is already
+		// net, so lo/hi are a plain +/-15% band (roughly the backtested spread)
+		// rather than another cancellation haircut.
+		await q(
+			`insert into revenue_projection
+			   (week, booked_appts, lead_share, rev_per_appt, projected_appts,
+			    projected_revenue, projected_lo, projected_hi, model)
+			 select date_trunc('week', day)::date,
+			   coalesce(sum(booked_count), 0),
+			   0,
+			   case when coalesce(sum(booked_count), 0) + coalesce(sum(expected_new_count), 0) > 0
+			     then round(sum(expected_usd_v4) / (sum(booked_count) + sum(expected_new_count)))
+			     else 0 end,
+			   round(coalesce(sum(booked_count), 0) + coalesce(sum(expected_new_count), 0)),
+			   round(sum(expected_usd_v4)),
+			   round(sum(expected_usd_v4) * 0.85),
+			   round(sum(expected_usd_v4) * 1.15),
+			   'daily_fill_v4'
 			 from revenue_projection_daily
 			 where date_trunc('week', day) >= date_trunc('week', now())
 			 group by 1 order by 1 limit 4`,

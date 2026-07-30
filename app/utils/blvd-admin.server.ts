@@ -6,7 +6,32 @@ export type BlvdAdminLocation = {
 	tz?: string | null
 }
 
+/** Boulevard bills queries against a refilling point budget. */
+const RATE_LIMIT_RE = /API limit exceeded|rate limit/i
+const RATE_LIMIT_RETRIES = 6
+
 export async function boulevardAdminFetch<TData>(
+	query: string,
+	variables?: Record<string, unknown>,
+): Promise<TData> {
+	// The bucket refills continuously, so a paginating caller that outruns it
+	// only needs to wait. Back off and retry rather than failing a whole sync
+	// (or a backtest) on a transient budget shortfall.
+	for (let attempt = 0; attempt < RATE_LIMIT_RETRIES; attempt += 1) {
+		try {
+			return await boulevardAdminFetchOnce<TData>(query, variables)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error)
+			if (!RATE_LIMIT_RE.test(message) || attempt === RATE_LIMIT_RETRIES - 1) {
+				throw error
+			}
+			await sleep(500 * 2 ** attempt)
+		}
+	}
+	throw new Error('Boulevard Admin API: exhausted rate-limit retries')
+}
+
+async function boulevardAdminFetchOnce<TData>(
 	query: string,
 	variables?: Record<string, unknown>,
 ) {

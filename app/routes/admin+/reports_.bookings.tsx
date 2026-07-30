@@ -107,7 +107,7 @@ export default function BookingsFunnel() {
 				<StatTile
 					label="New clients"
 					value={String(newCount)}
-					whisper={`${usd(newValue)} expected value · of ${allRows.length} bookings in window`}
+					whisper={`${usd(newValue)} expected value · first-ever bookings, of ${allRows.length} in window`}
 				/>
 				<StatTile
 					label="Google Ads spend"
@@ -245,7 +245,8 @@ export default function BookingsFunnel() {
 				<p className="note">
 					Cancelled and no-showed bookings are excluded. Expected value uses the
 					booked price where Boulevard has one, otherwise the service's average
-					paid ticket over the last 90 days.
+					paid ticket over the last 90 days. A client counts as new on their
+					first-ever booking only, so a rebook is never a new client.
 				</p>
 			</section>
 		</ReportPage>
