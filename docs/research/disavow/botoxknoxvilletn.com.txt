@@ -1,0 +1,29 @@
+# Disavow file for botoxknoxvilletn.com, generated 2026-07-29 from DataForSEO
+# referring-domains data. Cutoff: backlink spam score >= 25. Owner
+# confirmed these links were never purchased by us.
+domain:alljobs.info
+domain:anchorurl.cloud
+domain:australianwebdirectory.pro
+domain:australianwebdirectory.shop
+domain:booksreadr.org
+domain:buzzshrink.website
+domain:bye.fyi
+domain:drjack.world
+domain:getwebsiteworth.com
+domain:global-ranks.pages.dev
+domain:global-websites.pages.dev
+domain:globalecommerce.org
+domain:itxoft.com
+domain:musweb.org
+domain:pagesearch.net
+domain:quero.party
+domain:read.org.in
+domain:ready.pro
+domain:screenshots.wiki
+domain:sergechel.info
+domain:tellows.com
+domain:tunca.org
+domain:urls-shortener.eu
+domain:wallpapers.pro
+domain:way2check.cv
+domain:ycm.info

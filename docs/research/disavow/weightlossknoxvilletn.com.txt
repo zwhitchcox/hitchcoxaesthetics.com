@@ -1,0 +1,4 @@
+# Disavow file for weightlossknoxvilletn.com, generated 2026-07-29 from DataForSEO
+# referring-domains data. Cutoff: backlink spam score >= 25. Owner
+# confirmed these links were never purchased by us.
+domain:tellows.com

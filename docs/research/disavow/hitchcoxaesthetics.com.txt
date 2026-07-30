@@ -1,0 +1,35 @@
+# Disavow file for hitchcoxaesthetics.com, generated 2026-07-29 from DataForSEO
+# referring-domains data. Cutoff: backlink spam score >= 25. Owner
+# confirmed these links were never purchased by us.
+domain:alljobs.info
+domain:anchorurl.cloud
+domain:australianwebdirectory.pro
+domain:australianwebdirectory.shop
+domain:booksreadr.org
+domain:buzzshrink.website
+domain:bye.fyi
+domain:drjack.world
+domain:getwebsiteworth.com
+domain:globalecommerce.org
+domain:jake.eu
+domain:m98ufa.com
+domain:musweb.org
+domain:pagesearch.net
+domain:plumeriamarketing.com
+domain:quero.party
+domain:read.org.in
+domain:ready.pro
+domain:runningwebsites.net
+domain:screenshots.wiki
+domain:seo-anomaly-s2.xyz
+domain:seo-anomaly-s6.xyz
+domain:seo-anomaly-s8.xyz
+domain:seo-anomaly-s9.xyz
+domain:sergechel.info
+domain:simplewebdirectory.com
+domain:tellows.com
+domain:tunca.org
+domain:urls-shortener.eu
+domain:wallpapers.pro
+domain:websiterace.com
+domain:ycm.info

@@ -1,0 +1,73 @@
+# Knoxville Weight Loss Clinic - Bearden
+
+Last audited: 2026-07-29
+
+## Canonical Identity
+
+| Field | Value |
+|---|---|
+| Operating status | Physical sub-brand at Bearden |
+| Public business name | Knoxville Weight Loss Clinic |
+| Prior/short brand name | Weight Loss Knox |
+| Primary category | Weight loss service |
+| Address | 5113 Kingston Pike, Suite 15C, Knoxville, TN 37919 |
+| Canonical phone | (865) 500-3135 |
+| Website | https://weightlossknoxvilletn.com |
+| Email | sarah@hitchcoxaesthetics.com |
+
+## Public Listing Links
+
+| Platform | Public page | Status / identity |
+|---|---|---|
+| Brand website | [weightlossknoxvilletn.com](https://weightlossknoxvilletn.com) | No dedicated Bearden website page recorded |
+| Google Maps | [Open Bearden listing](https://maps.google.com/maps?cid=12094856632193637841) | LIVE; resource `locations/15016055128629417766`; Place ID `ChIJkWEu2yk9XIgR0d0tkwaQ2ac` |
+| Apple Maps | [Open Bearden listing](https://maps.apple.com/place?place-id=I94ACB93F6884766F&address=5113+Kingston+Pike%2C+Ste+15%2C+Knoxville%2C+TN++37919%2C+United+States&coordinate=35.939202%2C-83.988910&name=Weight+Loss+Knox) | Public but unclaimed |
+| Bing Maps | [Open Bearden listing](https://www.bing.com/maps?ss=ypid%3AYN97792A49F02875AD) | Public; canonical-phone correction required |
+| Yelp | [Open Bearden listing](https://www.yelp.com/biz/weight-loss-knox-knoxville) | CLAIMED; canonical name, phone, and website verified 2026-07-29 |
+| Nextdoor | No public page yet | BLOCKED by shared owner account suspension |
+| Facebook | [Open Bearden Page](https://www.facebook.com/profile.php?id=61592834871651) | LIVE; Page ID `61592834871651`, asset ID `1315048945014208` |
+| BBB | No public page yet | SUBMITTED 2026-07-28 under the prior `Weight Loss Knox` name |
+| Medical directories | No separate Knoxville Weight Loss Clinic practice page recorded | NOT PURSUING; provider directories are limited to applicable SHA affiliations |
+
+## Website Publication Audit
+
+| Directory | Website status | Published destination | Last verified | Required action |
+|---|---|---|---|---|
+| Google Business Profile | VERIFIED | https://weightlossknoxvilletn.com/?utm_campaign=gmb&utm_content=kwlc-bearden | 2026-07-29 | None |
+| Apple Business Connect | VERIFIED | https://weightlossknoxvilletn.com | 2026-07-29 | Claim listing |
+| Bing Places | MISSING | - | 2026-07-29 | Add canonical brand website |
+| Yelp | VERIFIED | https://weightlossknoxvilletn.com | 2026-07-29 | None |
+| Nextdoor | NO PUBLIC LISTING | - | 2026-07-29 | Create with canonical brand website after reinstatement |
+| Facebook | VERIFIED | https://weightlossknoxvilletn.com | 2026-07-29 | None |
+| BBB | PENDING | Submitted website not publicly verifiable yet | 2026-07-29 | Verify when profile publishes |
+
+## Directory Registry
+
+| Directory | Status | Listing URL or ID | Last action / next action |
+|---|---|---|---|
+| Google Business Profile | LIVE | [Google Maps](https://maps.google.com/maps?cid=12094856632193637841); `locations/15016055128629417766`; Place ID `ChIJkWEu2yk9XIgR0d0tkwaQ2ac` | Confirm live title against current brand config. |
+| Yelp | CLAIMED | https://www.yelp.com/biz/weight-loss-knox-knoxville | Public name corrected to `Knoxville Weight Loss Clinic`; canonical phone and website verified 2026-07-29. |
+| Nextdoor | BLOCKED - APPEAL SUBMITTED | - | Add under the shared account after Nextdoor approves the 2026-07-28 reinstatement appeal. |
+| BBB | SUBMITTED | Pending | Submitted 2026-07-28 as Weight Loss Knox - Bearden. |
+| Facebook | LIVE | https://www.facebook.com/profile.php?id=61592834871651 | Created 2026-07-28 with Weight Loss Center category, exact Suite 15C address, canonical phone, website, business email, and brand bio. Owned by Business Portfolio `2014119969227719`. |
+| Apple Business Connect | PUBLIC; UNCLAIMED | [Apple Maps](https://maps.apple.com/place?place-id=I94ACB93F6884766F&address=5113+Kingston+Pike%2C+Ste+15%2C+Knoxville%2C+TN++37919%2C+United+States&coordinate=35.939202%2C-83.988910&name=Weight+Loss+Knox) | Claim and verify the existing public record. |
+| Bing Places | NEEDS CORRECTION | https://www.bing.com/maps?ss=ypid%3AYN97792A49F02875AD | Public record uses a tracking phone; replace with canonical phone. |
+| Birdeye | NOT PURSUING - PAID | - | Evaluated and intentionally excluded because it requires a paid subscription. |
+| Healthgrades / Vitals | NOT ELIGIBLE AS BUSINESS | - | These are provider directories, not brand citations. |
+| RealSelf | NOT PURSUING - PAID / PROVIDER ONLY | - | No free location listing or direct website backlink has been confirmed. |
+
+## Open Issues
+
+- Align directory naming with the current site/GBP title before the BBB profile
+  publishes; the BBB submission used the older `Weight Loss Knox` name.
+- Create a dedicated website location page if Bearden-specific canonical
+  attribution is required outside the directory listings.
+
+## Change Log
+
+| Date | Directory | Change | Result |
+|---|---|---|---|
+| Prior to 2026-07-28 | Yelp | Claimed and corrected | CLAIMED |
+| 2026-07-28 | BBB | Submitted using Suite 15C and canonical phone | SUBMITTED |
+| 2026-07-28 | Facebook | Created the Bearden Page and saved exact canonical contact and location details | LIVE |
+| 2026-07-29 | Yelp | Corrected the public name from `Weight Loss Knox` to `Knoxville Weight Loss Clinic`; verified canonical phone and website | LIVE |
