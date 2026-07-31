@@ -31,8 +31,9 @@ providers statewide and 3 other Knoxville-area practices (Pretty Girl,
 Aesthetic Elevation, A Better You). Never claim "first/only in the
 region". The usable angle is device EXPERIENCE: real-world Everesse
 results for GLP-1 skin laxity, pairing with angle 1. Side note: our
-Cartessa locator listing has an EMPTY website field; fix via the
-Cartessa rep (task #15).
+Cartessa locator listing had an EMPTY website field. A correction request was
+sent to the Cartessa rep on 2026-07-30; see the manufacturer-locator ledger
+below.
 
 ### 3. Consumer-safety evergreens
 
@@ -53,6 +54,19 @@ med spa, skin tightening), draft answers for Sarah's approval, then submit.
 Use Featured for PR research where useful, not as a substitute for the two
 active expert-question feeds. Do not upgrade any account without owner
 approval.
+
+## Manufacturer-locator outreach
+
+These requests use only products and devices the practice actually offers.
+Each request asks the manufacturer to link the practice website and confirm
+the current Bearden and Farragut locations. Do not resend while a request is
+pending.
+
+| Locator | Contact | Request | Sent | Status |
+| --- | --- | --- | --- | --- |
+| Galderma ASPIRE (Dysport/Restylane) | Tiffany Alvino, `Tiffany.Alvino@galderma.com` | Add the SHA website and confirm both current locations | 2026-07-30 | `SENT - AWAITING REP` |
+| Evolus (Jeuveau) | Bryan Ocampo, `bryan.ocampo.c@evolus.com` | Add the SHA website and confirm both current locations | 2026-07-30 | `SENT - AWAITING REP` |
+| Cartessa/Everesse | Ford Wilson, `fwilson@cartessaaesthetics.com` | Fill the empty website field and confirm both current locations | 2026-07-30 | `SENT - AWAITING REP` |
 Expect 1-2 landed placements per quarter.
 
 ## Outreach targets and ledger

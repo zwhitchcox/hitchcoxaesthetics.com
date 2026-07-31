@@ -562,3 +562,50 @@ same rules as the local ledger (no comp conditioned on coverage).
   same class as tryglassskin which already lists us; they auto-generate
   from Google data. Keep GBP complete and they come on their own; no
   submission exists.
+
+## Pass 3 (2026-07-30): Local Sponsorship Layer + Vendor Links
+
+Method: backlinks of 18 top-ranking Knoxville businesses in OTHER verticals
+(dentists, plastic surgeons, chiropractors, gyms, salons, derms, PT).
+Their local sources accept any Knoxville business. Cost ~$0.60.
+
+### Sponsorships that produce links (budget decisions, owner)
+
+| Source | Authority | How the link happens |
+| --- | --- | --- |
+| runsignup.com | HIGH (217) | Sponsor a local 5K; race pages list sponsors with links. Pairs with The Mother Runners outreach |
+| ambcknox.org | HIGH (226) | Appalachian Mountain Bike Club sponsor/partner page |
+| knoxyouthsports.com | mid (30) | Youth sports team sponsorship; a dentist and a derm already do this |
+| oneknoxsc.com | mid (47) | One Knoxville SC (soccer) sponsors |
+| knoxvillesymphony.com / knoxvilleopera.org | mid | Arts sponsor tiers |
+| easttennesseepbs.org | mid | PBS local sponsor listings |
+| maryvillecityschoolsfoundation.org | low | School foundation sponsors |
+
+### Free/cheap, actionable now
+
+| Source | Note |
+| --- | --- |
+| knoxvilledailysun.com (rank 63) | Local news outlet NOT in our press ledger; add to pitch list |
+| shopfarragut.com / Farragut Business Alliance | Town business org, member links; we have a Farragut location |
+| Bearden business district org | Same play for the Bearden clinic |
+| tennesseeschoolofbeauty.edu | .edu link; 3 salons have it (partner/employer page); explore hiring-pipeline relationship |
+| knoxlgbtbusinesses.com | Free local directory if the owner wants the affiliation |
+| topdermatology.com / dermprolist.com | Skin-vertical directories, check submission routes |
+
+### Vendor and partner links (we already qualify, nobody asked)
+
+| Vendor | Link vehicle |
+| --- | --- |
+| Boulevard (joinblvd.com) | Customer stories program; the Jane-to-Boulevard migration + growth story is exactly what they publish, with a dofollow link |
+| Retell AI | Case study: the in-house AI phone/booking system (the AI angle IS right for a tech vendor's blog) |
+| CallRail | Customer case studies; we are a heavy attribution user |
+| IMAGE Skincare | Professional spa locator (we carry IMAGE; see rep emails in inbox) |
+| Other carried retail lines | Every skincare line we retail likely has a "find a spa" locator |
+| Galderma ASPIRE / Evolus / Cartessa | Locators, already task #15 |
+
+### Certifications/orgs worth checking
+
+Women-owned business certification (TN Uniform Certification Program /
+WBENC) lists certified businesses in linked directories; NAWBO chapter;
+Knoxville Entrepreneur Center member/alumni pages; UT alumni-owned
+business directory if Sarah qualifies.
