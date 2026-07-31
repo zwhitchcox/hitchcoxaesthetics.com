@@ -12,7 +12,7 @@
  */
 import { json, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
-import { LineChart, ReportPage, SERIES, StatTile, usd } from '#app/components/report-ui'
+import { BarChart, LineChart, ReportPage, SERIES, StatTile, usd } from '#app/components/report-ui'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
 
@@ -55,7 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	if (!hasReportsDb()) return json({ configured: false as const })
 
-	const [reach, volumes, values, serpRanks, serpRivals, backlinks] = await Promise.all([
+	const [reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks] = await Promise.all([
 		// Homes-weighted combined reach (any of our listings top-3) per
 		// keyword per capture date. homes=1 fallback keeps cells without
 		// census data counted while geo_grid_homes back-fills.
@@ -111,6 +111,38 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		),
 		// Authority + backlink counts per site, every 3 days
 		// (sha-reports src/backlinks.ts).
+		// New referring domains per ISO week (clean only), from the per-domain
+		// first-seen ledger. The seed week counts every pre-existing domain as
+		// "new", ignore the first bar.
+		reportsQuery<{ week: string; target: string; gained: string }>(
+			`SELECT to_char(date_trunc('week', first_seen), 'YYYY-MM-DD') AS week,
+			   target, count(*)::int AS gained
+			 FROM backlink_domains WHERE spam < 25
+			 GROUP BY 1, 2 ORDER BY 1`,
+		),
+		// The actual newest links, so the weekly number is auditable.
+		reportsQuery<{ domain: string; target: string; rank: string | null; first_seen: string }>(
+			`SELECT domain, target, rank, to_char(first_seen, 'YYYY-MM-DD') AS first_seen
+			 FROM backlink_domains WHERE spam < 25
+			 ORDER BY first_seen DESC, rank DESC NULLS LAST LIMIT 25`,
+		),
+		// Lost links: a domain whose last sighting predates the newest capture
+		// has stopped linking. Loss week = week it was last seen.
+		reportsQuery<{ week: string; target: string; lost: string }>(
+			`SELECT to_char(date_trunc('week', last_seen), 'YYYY-MM-DD') AS week,
+			   target, count(*)::int AS lost
+			 FROM backlink_domains
+			 WHERE spam < 25
+			   AND last_seen < (SELECT max(day) FROM raw_backlink_summary)
+			 GROUP BY 1, 2 ORDER BY 1`,
+		),
+		reportsQuery<{ domain: string; target: string; rank: string | null; last_seen: string }>(
+			`SELECT domain, target, rank, to_char(last_seen, 'YYYY-MM-DD') AS last_seen
+			 FROM backlink_domains
+			 WHERE spam < 25
+			   AND last_seen < (SELECT max(day) FROM raw_backlink_summary)
+			 ORDER BY last_seen DESC, rank DESC NULLS LAST LIMIT 15`,
+		),
 		reportsQuery<{
 			day: string
 			target: string
@@ -132,6 +164,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		values,
 		serpRanks,
 		serpRivals,
+		linkGains,
+		newLinks,
+		linkLosses,
+		lostLinks,
 		backlinks,
 	})
 }
@@ -143,7 +179,7 @@ export default function ReachReport() {
 	const data = useLoaderData<typeof loader>()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { reach, volumes, values, serpRanks, serpRivals, backlinks } = data
+	const { reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks } = data
 
 	const volumeByKw = new Map(volumes.map(v => [v.keyword, v]))
 	const valueByCat = new Map(values.map(v => [v.category, Number(v.expected_value)]))
@@ -313,6 +349,7 @@ export default function ReachReport() {
 
 			<OrganicRankSections ranks={serpRanks} rivals={serpRivals} />
 			<BacklinkSections rows={backlinks} />
+			<LinkVelocitySections gains={linkGains} newest={newLinks} losses={linkLosses} lost={lostLinks} />
 		</ReportPage>
 	)
 }
@@ -583,5 +620,104 @@ function BacklinkSections({
 				</p>
 			</section>
 		</>
+	)
+}
+
+/**
+ * Links gained per week (clean referring domains only), with the actual
+ * domains listed so the number is auditable. first_seen tracking started
+ * 2026-07-30; that seed week counts the whole backlog as new.
+ */
+function LinkVelocitySections({
+	gains,
+	newest,
+	losses,
+	lost,
+}: {
+	gains: Array<{ week: string; target: string; gained: string }>
+	newest: Array<{ domain: string; target: string; rank: string | null; first_seen: string }>
+	losses: Array<{ week: string; target: string; lost: string }>
+	lost: Array<{ domain: string; target: string; rank: string | null; last_seen: string }>
+}) {
+	if (!gains.length) return null
+	const weeks = [...new Set([...gains.map(g => g.week), ...losses.map(l => l.week)])].sort()
+	const targets = [...new Set(gains.map(g => g.target))]
+	const cell = new Map(gains.map(g => [`${g.week}|${g.target}`, Number(g.gained)]))
+	const lossCell = new Map(losses.map(l => [`${l.week}|${l.target}`, Number(l.lost)]))
+	const totalLost = losses.reduce((n, l) => n + Number(l.lost), 0)
+	return (
+		<section>
+			<h2>
+				New links per week <span className="mini">clean referring domains gained, all sources</span>
+			</h2>
+			<BarChart
+				labels={weeks}
+				series={targets.map((t, i) => ({
+					name: site(t),
+					color: SERIES[i % SERIES.length]!,
+					values: weeks.map(w =>
+						(cell.get(`${w}|${t}`) ?? 0) - (lossCell.get(`${w}|${t}`) ?? 0),
+					),
+				}))}
+				height={180}
+				tickEvery={1}
+				format={n => String(Math.round(n))}
+			/>
+			<div className="rtable-wrap">
+				<table className="rtable">
+					<thead>
+						<tr>
+							<th>Newest links</th>
+							<th>Points at</th>
+							<th className="num">Source authority</th>
+							<th className="num">First seen</th>
+						</tr>
+					</thead>
+					<tbody>
+						{newest.map(l => (
+							<tr key={`${l.target}|${l.domain}`}>
+								<td>{l.domain}</td>
+								<td className="mini">{site(l.target)}</td>
+								<td className="num">{l.rank ?? '-'}</td>
+								<td className="num">{l.first_seen}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			{totalLost > 0 ? (
+				<div className="rtable-wrap">
+					<table className="rtable">
+						<thead>
+							<tr>
+								<th>Lost links</th>
+								<th>Pointed at</th>
+								<th className="num">Source authority</th>
+								<th className="num">Last seen</th>
+							</tr>
+						</thead>
+						<tbody>
+							{lost.map(l => (
+								<tr key={`${l.target}|${l.domain}`}>
+									<td className="bad">{l.domain}</td>
+									<td className="mini">{site(l.target)}</td>
+									<td className="num">{l.rank ?? '-'}</td>
+									<td className="num">{l.last_seen}</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			) : (
+				<p className="note">No links lost since tracking began.</p>
+			)}
+			<p className="note">
+				Bars are NET (gained minus lost) per week. Tracking began 2026-07-30,
+				so that week's bar includes the entire pre-existing backlog. Captures
+				run every 3 days; a link appears once DataForSEO's crawler sees it,
+				typically 1-3 weeks after it goes live, and shows as lost when it
+				stops appearing in a capture.
+			</p>
+		</section>
 	)
 }
