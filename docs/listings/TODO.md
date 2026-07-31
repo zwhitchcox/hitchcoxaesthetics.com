@@ -111,9 +111,13 @@ per brand and the record explicitly includes both branches.
       request and six direct manual correction submissions made on 2026-07-30.
       Thryv replied in the business inbox requesting documents that show the
       legal business name and location/address before it will begin
-      verification. Select a matching business-license, formation, lease, or
-      utility document and send it to `ClientCareEmail@Thryv.com`, referencing
-      the existing request. Do not send unrelated personal records.
+      verification. The Knox County business license showing the legal SHA
+      name and Bearden address was sent to `ClientCareEmail@Thryv.com` in the
+      existing support thread on 2026-07-30, together with all eight listing
+      IDs. A redacted repository copy and its Gmail provenance are recorded in
+      [Listing Verification Evidence](evidence/README.md). The license expired
+      in 2025, so monitor for Thryv's response; if it requires current evidence,
+      require it to identify the exact record and document needed.
       The manual form confirmed that each submission will be reviewed within a
       few days. A same-day public recheck found that the changes had not
       published yet: SHA Bearden still had the prohibited tracking phone, SHA
@@ -152,10 +156,14 @@ per brand and the record explicitly includes both branches.
       it while the owner account is suspended.
 - [ ] Nextdoor Bearden: replace the homepage link with
       `https://hitchcoxaesthetics.com/bearden` after account reinstatement.
-- [ ] Apple SHA Bearden and Farragut: replace the generic SHA homepage with
-      their exact location pages when the listings are claimed.
-- [ ] Bing Knoxville Weight Loss Clinic Bearden: add
-      `https://weightlossknoxvilletn.com`; no website was visible on 2026-07-29.
+- [ ] Apple SHA Bearden and Farragut: the latest owner handoff reports these
+      listings claimed/corrected. Re-audit the public records, replace any
+      generic SHA homepage with the exact location page, and record the Apple
+      place IDs. Do not create duplicate claims.
+- [ ] Bing Knoxville Weight Loss Clinic Bearden: the latest owner handoff
+      reports Bing claimed/corrected, but the 2026-07-29 public audit showed no
+      visible website. Re-audit and add `https://weightlossknoxvilletn.com` if
+      still absent; do not create a duplicate record.
 - [x] Yelp SHA West Hills: Yelp emailed approval on 2026-07-30. The claimed
       record has the canonical phone and
       `https://hitchcoxaesthetics.com/west-hills`.
@@ -247,10 +255,11 @@ Completed foundation:
 
 - [x] Yelp approved SHA West Hills by email on 2026-07-30, clearing the
       dependency Yelp support placed on the remaining submissions.
-- [ ] Submit or ask Yelp support at `(877) 767-9357` to create:
-  - SHA Cedar Bluff
-  - Botox Knox Bearden
-- [ ] Capture and record the public URLs after Yelp creates those listings.
+- [x] SHA Cedar Bluff is claimed. Canonical phone and website corrections were
+      submitted on 2026-07-30 and are pending moderator review.
+- [x] Botox Knox Bearden is created and claimed at
+      `https://www.yelp.com/biz/botox-knox-med-spa-knoxville`. Monitor
+      moderation, then add the omitted `Suite 15B`.
 - [x] Re-audit phone and website on all six managed Yelp listings. Each has a
       canonical non-tracking phone and the correct brand or location website.
 - [x] Correct the public Yelp names for Botox Knox Farragut and both Knoxville
@@ -296,30 +305,24 @@ Completed foundation:
 
 ### Apple Business Connect
 
-- [ ] Claim and correct the existing SHA Bearden listing.
-- [ ] Claim and correct the existing SHA Farragut listing.
-- [ ] Monitor BrightLocal publication for SHA West Hills and Cedar Bluff, then
-      claim both.
-- [ ] Create or locate Botox Knox Bearden.
-- [ ] Claim the existing Botox Knox Farragut listing.
-- [ ] Claim the existing Knoxville Weight Loss Clinic Bearden listing.
-- [ ] Create or locate Knoxville Weight Loss Clinic Farragut.
+- [ ] Reconcile the owner handoff that reports Apple claimed/corrected with the
+      per-location ledger. Audit SHA Bearden, SHA Farragut, SHA West Hills, SHA
+      Cedar Bluff, both Botox Knox records, and both Knoxville Weight Loss
+      Clinic records. Correct only records that remain wrong; do not create
+      duplicate claims.
 - [ ] Use the business Apple ID from 1Password and record the Apple place ID and
       public URL for each location.
 
 ### Bing Places
 
-- [ ] Establish access through an owned Sarah Hitchcox Aesthetics Microsoft
-      account. On 2026-07-29, `sarah@hitchcoxaesthetics.com` was not recognized
-      as a Microsoft account, and the only Google sign-in offered belonged to
-      the third-party HEP account. Do not use that third-party account.
-- [ ] Replace tracking phones with canonical phones on SHA Bearden and Farragut.
-- [ ] Replace the tracking phone on Knoxville Weight Loss Clinic Bearden.
-- [ ] Add `https://weightlossknoxvilletn.com` to Knoxville Weight Loss Clinic
-      Bearden; its public Bing listing had no visible website on 2026-07-29.
-- [ ] Audit imported listings for SHA West Hills and Cedar Bluff.
-- [ ] Locate or create Botox Knox Bearden and Farragut.
-- [ ] Locate or create Knoxville Weight Loss Clinic Farragut.
+- [ ] Reconcile the owner handoff that reports Bing claimed/corrected with the
+      per-location ledger. Audit all eight records for canonical name, suite,
+      phone, and website. Correct only records that remain wrong; do not create
+      duplicate listings.
+- [ ] Establish owned access if the handoff does not identify the controlling
+      Microsoft account. On 2026-07-29, `sarah@hitchcoxaesthetics.com` was not
+      recognized as a Microsoft account; do not use the third-party HEP
+      account.
 - [ ] Record every Bing public URL or listing ID after correction.
 
 ## Priority 4: Citation Cleanup
@@ -355,6 +358,26 @@ Completed foundation:
       total on 2026-07-30 under order `L6a6bc4769891f`. Publisher review
       normally takes up to three business days; record and verify each public
       URL when the approval email arrives.
+- [ ] Manufacturer locators: monitor the 2026-07-30 website/location update
+      requests sent to Tiffany Alvino at Galderma ASPIRE, Bryan Ocampo at
+      Evolus, and Ford Wilson at Cartessa. When each rep confirms completion,
+      open the public locator result and verify the SHA website plus the
+      Bearden and Farragut details.
+      - Galderma replied on 2026-07-30. The Bearden locator currently has the
+        correct address but publishes `(865) 248-9365`. A correction form is
+        fully prepared with McKesson account `97523003`, canonical Bearden
+        phone, and `https://hitchcoxaesthetics.com/bearden`; submission is
+        blocked only on the required HCP signature. Tiffany was asked whether
+        Dr. Fair must sign or Sarah may sign as practice owner.
+      - Galderma confirmed that Farragut needs its own ship-to and ASPIRE
+        account before it can receive a separate locator record. Tiffany was
+        asked for the setup steps and whether a separate McKesson account is
+        required.
+      - Evolus and Cartessa have not replied yet. Do not send duplicate
+        requests while the original emails are pending.
+- [ ] Fresha: retain and periodically audit the unclaimed Bearden placeholder.
+      It already links to the SHA website. Do not adopt Fresha's booking or
+      payment platform solely to claim this citation without owner approval.
 - [ ] Knoxville Moms: replace `botoxknoxville.com` and
       `sarah@botoxknoxville.com` with the canonical SHA website and email.
 - [ ] Portrait Care: claim the Bearden listing and replace its non-canonical
