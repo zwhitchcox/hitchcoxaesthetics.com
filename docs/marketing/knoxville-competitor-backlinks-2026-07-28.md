@@ -482,7 +482,7 @@ Sent from `sarah@hitchcoxaesthetics.com` or submitted via public forms:
 
 | Target | Route | What | Status |
 | --- | --- | --- | --- |
-| Knox TN Today | Email to news@knoxtntoday.com (their contact form rejects automation) | Story pitch: two-clinic growth + in-house AI booking; GLP-1 consumer explainer; standard no-strings media-preview line | REPLIED 2026-07-30: Susan Espiritu offered a New Business Spotlight with photo/details and a separate medical FAQ article. Reply must correct the mistaken `NP` credential; Sarah is an `RN`. Paid ongoing promotion is optional and requires owner approval. |
+| Knox TN Today | Email to news@knoxtntoday.com (their contact form rejects automation) | Story pitch: two-clinic growth + in-house AI booking; GLP-1 consumer explainer; standard no-strings media-preview line | REPLIED 2026-07-30: Susan Espiritu offered a New Business Spotlight and separate medical FAQ. Follow-up sent with corrected `Sarah Hitchcox, RN` credential, canonical Farragut details, website, and Sarah photo. Awaiting next instructions. Paid ongoing promotion remains optional and requires owner approval. |
 | VoyageKnoxville | voyageinterviewinvites.com/knoxville/recommendations | Founder-interview nomination (name, email, site, Instagram) | SUBMITTED, confirmation shown |
 | BestProsInTown directory | bestprosintown.com/addbusiness.php | SHA Bearden listing, canonical NAP, /bearden URL | SUBMITTED; free queue is 3-4 months, paid priority skipped |
 | BestProsInTown blog | press@bestprosintown.com (they solicit interview features with links) | Founder-interview pitch, RN credential, listing referenced | SENT 2026-07-30 |
@@ -609,3 +609,27 @@ Women-owned business certification (TN Uniform Certification Program /
 WBENC) lists certified businesses in linked directories; NAWBO chapter;
 Knoxville Entrepreneur Center member/alumni pages; UT alumni-owned
 business directory if Sarah qualifies.
+
+## Sponsorship pricing research (2026-07-30)
+
+Ranked by confirmed link value. Prices are mostly unpublished; the route
+is an email asking for the sponsor packet.
+
+| Rank | Org | Link evidence | Cost | Contact |
+| --- | --- | --- | --- | --- |
+| 1 | Knoxville Symphony | CONFIRMED: linked logo on their site + a dedicated sponsor page on knoxvillesymphony.com | Unpublished, "variety of giving levels" | development@knoxvillesymphony.com, 865-226-3262 |
+| 2 | One Knoxville SC | CONFIRMED: ~50 clickable partner logos | Custom packages | Ami Rabiei, ami@oneknoxsc.com |
+| 3 | Knox Youth Sports | CONFIRMED: ~30 clickable sponsor logos on homepage | Unpublished | info@knoxyouthsports.com |
+| 4 | RunSignUp fall races: Cotton Candy Classic 5K (Sep 12), Ainsley's Angels Rollin On Rocky Top (Sep 27), PJ Parkinson's Costumes for a Cause (Oct 31) | CONFIRMED: linked sponsor walls on race pages | Unpublished, 5K sponsorships typically low hundreds | race contact forms; info@pjparkinsons.org |
+| 5 | AMBC | Unconfirmed link treatment; Fall Fest sponsor page 404 | Unpublished | info@ambcknox.org |
+| skip | Knoxville Opera | Partner lists are PLAIN TEXT, no links | n/a | |
+| skip | Maryville City Schools Fdn | Sponsor logos are UNLINKED images | n/a | |
+| skip | East TN PBS | No linked sponsor directory found | image-only media kit | bshipley@easttennesseepbs.org if ever wanted |
+| skip | WBENC/Go-DBE/TNUCP certifications | Directories are search apps / Excel, no crawlable links; badge value only | WBENC $350/yr | |
+| skip | Bearden district | Bearden Village Council has NO website; districtinbearden.com DNS-dead | n/a | |
+
+Free link wins still queued: Tennessee School of Beauty "Meet the Salons"
+profile (confirmed dofollow-style links to salons; call 865-588-7878 or
+site form; pitch the esthetics-grad hiring pipeline) and the Shop
+Farragut self-serve directory listing (member sites linked; membership
+requirement unclear, ask info@shopfarragut.com; FARRAGUT location only).

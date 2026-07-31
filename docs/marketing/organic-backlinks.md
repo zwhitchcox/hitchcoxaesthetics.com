@@ -64,9 +64,17 @@ pending.
 
 | Locator | Contact | Request | Sent | Status |
 | --- | --- | --- | --- | --- |
-| Galderma ASPIRE (Dysport/Restylane) | Tiffany Alvino, `Tiffany.Alvino@galderma.com` | Add the SHA website and confirm both current locations | 2026-07-30 | `SENT - AWAITING REP` |
+| Galderma ASPIRE (Dysport/Restylane) | Tiffany Alvino, `Tiffany.Alvino@galderma.com` | Correct Bearden phone/website and establish Farragut as a separate ship-to/ASPIRE account | 2026-07-30 | `REP REPLIED - FORM PREPARED; AWAITING HCP SIGNER CLARIFICATION` |
 | Evolus (Jeuveau) | Bryan Ocampo, `bryan.ocampo.c@evolus.com` | Add the SHA website and confirm both current locations | 2026-07-30 | `SENT - AWAITING REP` |
 | Cartessa/Everesse | Ford Wilson, `fwilson@cartessaaesthetics.com` | Fill the empty website field and confirm both current locations | 2026-07-30 | `SENT - AWAITING REP` |
+
+Galderma's current locator record is for Bearden, specialist Tasheema Fair, MD.
+The address is correct, but the published phone is `(865) 248-9365`. Tiffany
+confirmed that the website can be changed through Galderma's change form and
+that Farragut requires a separate ship-to plus a separate ASPIRE account. The
+Bearden form is populated with McKesson account `97523003`, canonical phone,
+and the `/bearden` URL, but its required HCP signature is intentionally blank
+until Tiffany confirms who must sign.
 Expect 1-2 landed placements per quarter.
 
 ## Outreach targets and ledger
@@ -93,6 +101,28 @@ outlets before sending.)
   Business Spotlight if the practice or location qualifies as sufficiently
   new. She needs a photo and additional business details. She also offered a
   separate medical FAQ article if Sarah supplies common questions and answers,
-  with a link to Sarah's email. The reply must explicitly correct the earlier
-  pitch's mistaken `NP` credential: Sarah is an `RN`. The optional ongoing
-  advertising/article partnership is paid and requires owner approval.
+  with a link to Sarah's email. A reply was sent on 2026-07-30 correcting the
+  mistaken credential to `Sarah Hitchcox, RN`, providing the canonical
+  Farragut address and website, attaching Sarah's photo, and accepting the
+  spotlight plus medical-FAQ opportunities. Await Susan's next instructions.
+  The optional ongoing advertising/article partnership is paid and requires
+  owner approval.
+
+## Vendor/partner outreach (2026-07-30)
+
+| Vendor | Route | Status |
+| --- | --- | --- |
+| CallRail | Existing case-study thread w/ Emily Fox (emily.fox@callrail.com); she promised a BACKLINK + draft approval on Jun 25, then silence | Follow-up sent from zwhitchcox@gmail.com |
+| Boulevard | support@blvd.co, route to customer marketing; Jane-to-Boulevard migration story | Sent from sarah@ |
+| Retell AI | support@retellai.com, case study of the AI phone agent | Sent from zwhitchcox@gmail.com |
+| IMAGE Skincare | Jennifer Scheetz (jscheetz@imageskincare.com, TN BDM), spa locator listing for both locations | Sent from sarah@ |
+| LMNT | wholesale@drinklmnt.com (we are an official Salt Dealer since Dec 2025), asked about retail locator | Sent from sarah@ |
+| Galderma ASPIRE | Locator update ALREADY IN PROGRESS in a parallel thread (Alvino/Tiffany, Bearden correction w/ McKesson acct) | In flight, do not duplicate |
+| Knoxville Daily Sun | Jeaneane Payne (jpayne@knoxvilledailysun.com), GLP-1 second-act pitch | Sent from sarah@ |
+
+Replies as of 2026-07-30 evening: KnoxTNToday's Susan Espiritu replied to
+the story suggestion and asked for a photo of the business (story in
+motion, owner should send a good exterior/interior shot). Qwoted,
+Connectively, and Featured accounts were all created today (welcome
+emails in sarah@); first matching Qwoted query already arrived (PEOPLE,
+psoriasis). Weekly query-scan workflow can start.
