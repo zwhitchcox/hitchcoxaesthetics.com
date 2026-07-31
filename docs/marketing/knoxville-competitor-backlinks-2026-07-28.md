@@ -633,3 +633,27 @@ profile (confirmed dofollow-style links to salons; call 865-588-7878 or
 site form; pitch the esthetics-grad hiring pipeline) and the Shop
 Farragut self-serve directory listing (member sites linked; membership
 requirement unclear, ask info@shopfarragut.com; FARRAGUT location only).
+
+### Sponsorship price requests SENT 2026-07-30 (from sarah@)
+
+| Org | To | Sent |
+| --- | --- | --- |
+| Knoxville Symphony | development@knoxvillesymphony.com | 8:51 PM |
+| One Knoxville SC | ami@oneknoxsc.com | 8:52 PM |
+| Knox Youth Sports | info@knoxyouthsports.com | 8:53 PM |
+| AMBC | info@ambcknox.org | 8:54 PM |
+| PJ Parkinson's (Costumes for a Cause 5K) | info@pjparkinsons.org | 8:55 PM |
+| Soccer Shots Knoxville | Knoxvilleadmin@soccershots.com (warm: Zephyr was in the program) | 8:56 PM |
+
+When packets come back, rank by cost per confirmed dofollow link and
+bring the short list to the owner for budget sign-off.
+
+### Also completed 2026-07-30
+
+- Shop Farragut directory listing SUBMITTED (free tier, never expires,
+  /farragut URL, Salon & Spas category), pending admin approval.
+- Manufacturer locators: parallel session emailed Cartessa (fwilson) and
+  Evolus (bryan.ocamp) at 7:06 PM; ASPIRE thread already active. All of
+  task 15 is now in flight.
+- Still queued: Tennessee School of Beauty salon-profile pitch (call
+  865-588-7878 or site form; Cloudflare blocks bots, needs browser).
