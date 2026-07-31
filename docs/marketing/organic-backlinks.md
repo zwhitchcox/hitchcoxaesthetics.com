@@ -12,6 +12,13 @@ check the ledger before emailing anyone, never condition anything free on
 coverage, disclose comps, sign "Sarah Hitchcox, RN". Do not reuse the AI
 booking angle; the angles below are the approved ones.
 
+LINK AND LOCATION RULES (owner directive 2026-07-30):
+- Articles, interviews, and press ALWAYS link the HOMEPAGE
+  (https://hitchcoxaesthetics.com), never a location page.
+- Bearden leads in all messaging; list Bearden before Farragut everywhere.
+- Location pages (/bearden, /farragut) are for DIRECTORY CITATIONS only,
+  per the listings playbook.
+
 ## Angles, in order of strength
 
 ### 1. GLP-1 aftermath ("Ozempic face"), the both-sides expert
@@ -107,6 +114,15 @@ outlets before sending.)
   spotlight plus medical-FAQ opportunities. Await Susan's next instructions.
   The optional ongoing advertising/article partnership is paid and requires
   owner approval.
+- **Tennessee School of Beauty:** An employer-profile request was sent from
+  `sarah@hitchcoxaesthetics.com` to
+  `tsb1930@tennesseeschoolofbeauty.edu` on 2026-07-30. The message asks to
+  include Sarah Hitchcox Aesthetics on the school's "TSB Meet the Salons"
+  page, explains that the practice hires and mentors licensed esthetics
+  professionals, and requests a link to
+  `https://hitchcoxaesthetics.com/bearden`. No current vacancy was claimed.
+  Await the school's requested materials, then verify the live profile and
+  backlink before closing.
 
 ## Vendor/partner outreach (2026-07-30)
 
