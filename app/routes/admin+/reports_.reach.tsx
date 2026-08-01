@@ -55,7 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	if (!hasReportsDb()) return json({ configured: false as const })
 
-	const [reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals] = await Promise.all([
+	const [reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals, linkPages] = await Promise.all([
 		// Homes-weighted combined reach (any of our listings top-3) per
 		// keyword per capture date. homes=1 fallback keeps cells without
 		// census data counted while geo_grid_homes back-fills.
@@ -233,6 +233,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			 FROM ranked WHERE rn <= 10 OR is_mine
 			 ORDER BY keyword, homes_reached DESC`,
 		),
+		// Clean linking pages and whether Google has crawled each one yet
+		// (sha-reports src/backlinks.ts polls a site: query every 3 days;
+		// google_indexed_confirmed is the first day the page proved indexed).
+		reportsQuery<{
+			target: string
+			domain: string
+			url_from: string
+			dofollow: boolean | null
+			first_seen: string
+			google_indexed_confirmed: string | null
+		}>(
+			`SELECT target, domain, url_from, dofollow,
+			   to_char(first_seen, 'YYYY-MM-DD') AS first_seen,
+			   to_char(google_indexed_confirmed, 'YYYY-MM-DD') AS google_indexed_confirmed
+			 FROM backlink_pages WHERE spam < 25
+			 ORDER BY google_indexed_confirmed NULLS FIRST, first_seen DESC
+			 LIMIT 60`,
+		),
 	])
 	return json({
 		configured: true as const,
@@ -248,6 +266,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		backlinks,
 		rivalAuthority,
 		packRivals,
+		linkPages,
 	})
 }
 
@@ -258,7 +277,7 @@ export default function ReachReport() {
 	const data = useLoaderData<typeof loader>()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals } = data
+	const { reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals, linkPages } = data
 
 	const volumeByKw = new Map(volumes.map(v => [v.keyword, v]))
 	const valueByCat = new Map(values.map(v => [v.category, Number(v.expected_value)]))
@@ -430,6 +449,7 @@ export default function ReachReport() {
 			<OrganicRankSections ranks={serpRanks} rivals={serpRivals} />
 			<BacklinkSections rows={backlinks} />
 			<RivalAuthoritySections ours={backlinks} rivals={rivalAuthority} />
+			<LinkCrawlSection rows={linkPages} />
 			<LinkVelocitySections gains={linkGains} newest={newLinks} losses={linkLosses} lost={lostLinks} />
 		</ReportPage>
 	)
@@ -882,6 +902,74 @@ function RivalAuthoritySections({
 			<p className="note">
 				As of {latest}. Clean = referring domains with spam score under 25, the
 				number our link work should move. Competitor tracking started 2026-07-31.
+			</p>
+		</section>
+	)
+}
+
+/**
+ * Which clean linking pages Google has crawled. Confirmed = the first day a
+ * site: query proved the page is in Google's index; expect rank effects 2-6
+ * weeks after that date, not immediately. Unconfirmed pages recheck every
+ * 3 days.
+ */
+function LinkCrawlSection({
+	rows,
+}: {
+	rows: Array<{
+		target: string
+		domain: string
+		url_from: string
+		dofollow: boolean | null
+		first_seen: string
+		google_indexed_confirmed: string | null
+	}>
+}) {
+	if (!rows.length) return null
+	const waiting = rows.filter(r => !r.google_indexed_confirmed).length
+	return (
+		<section>
+			<h2>
+				Google crawl status per link{' '}
+				<span className="mini">
+					{waiting} of {rows.length} clean links not yet confirmed in the index
+				</span>
+			</h2>
+			<div className="rtable-wrap">
+				<table className="rtable">
+					<thead>
+						<tr>
+							<th>Linking site</th>
+							<th>Our site</th>
+							<th className="num">Dofollow</th>
+							<th className="num">Link first seen</th>
+							<th className="num">Google confirmed</th>
+						</tr>
+					</thead>
+					<tbody>
+						{rows.map(r => (
+							<tr key={`${r.target}|${r.url_from}`}>
+								<td>
+									<a href={r.url_from} target="_blank" rel="noreferrer">
+										{r.domain}
+									</a>
+								</td>
+								<td className="mini">{site(r.target)}</td>
+								<td className="num">{r.dofollow == null ? '-' : r.dofollow ? 'yes' : 'no'}</td>
+								<td className="num">{r.first_seen}</td>
+								<td className={`num ${r.google_indexed_confirmed ? 'good' : 'bad'}`}>
+									{r.google_indexed_confirmed ?? 'not yet'}
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<p className="note">
+				Confirmed = a site: query returned the page, so Google crawled it on or
+				before that day (checks started 2026-08-01; links confirmed on the first
+				check were crawled earlier). Rankings absorb a new link gradually; look
+				for movement in the rank charts 2 to 6 weeks after confirmation.
 			</p>
 		</section>
 	)
