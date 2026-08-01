@@ -1,4 +1,6 @@
 import crypto from 'crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import { createRequestHandler as _createRequestHandler } from '@remix-run/express'
 import { installGlobals, type ServerBuild } from '@remix-run/node'
 import { ip as ipAddress } from 'address'
@@ -56,6 +58,40 @@ app.use((req, res, next) => {
 		return
 	}
 	next()
+})
+
+// Bought-domain microsites (expired domains rebuilt for their backlinks)
+// served straight from this server, one prebuilt static bundle per host in
+// network-sites/. Must run BEFORE the trailing-slash and alternate-domain
+// redirects so those never touch these hosts.
+const NETWORK_SITES = new Set([
+	'mesolaserclinic.com',
+	'abellamedspa.com',
+	'naturalskincarerecipes.com',
+])
+app.use((req, res, next) => {
+	const host = getHost(req).toLowerCase().split(':')[0]!.replace(/^www\./, '')
+	if (!NETWORK_SITES.has(host)) return next()
+	if (req.method !== 'GET' && req.method !== 'HEAD') {
+		return res.status(405).end()
+	}
+	const root = path.join(process.cwd(), 'network-sites', host)
+	const reqPath = decodeURIComponent(req.path).replace(/\/+$/, '') || '/'
+	const candidates =
+		reqPath === '/'
+			? ['index.html']
+			: [reqPath, `${reqPath}.html`, `${reqPath}/index.html`]
+	for (const candidate of candidates) {
+		const filePath = path.join(root, candidate)
+		// join() collapses "..", so a candidate escaping root lands outside it.
+		if (!filePath.startsWith(root + path.sep)) continue
+		if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+			return res.sendFile(filePath)
+		}
+	}
+	const notFound = path.join(root, '404.html')
+	if (fs.existsSync(notFound)) return res.status(404).sendFile(notFound)
+	return res.status(404).send('Not found')
 })
 
 // no ending slashes for SEO reasons

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="24" fill="#fbfaf7"/>
+  <!-- Leaf -->
+  <path d="M100 30 C 150 55, 160 120, 100 170 C 40 120, 50 55, 100 30 Z" fill="#4a7c59"/>
+  <path d="M100 45 L 100 160 M100 75 L 72 95 M100 75 L 128 95 M100 110 L 76 128 M100 110 L 124 128" stroke="#e8efe3" stroke-width="7" stroke-linecap="round" fill="none"/>
+</svg>
