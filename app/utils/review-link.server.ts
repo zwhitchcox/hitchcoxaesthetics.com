@@ -242,6 +242,20 @@ const EXTRA_REVIEW_PLATFORMS: Record<string, ReviewPlatform[]> = {
 			url: 'https://www.yelp.com/writeareview/biz/tsIXw38grVimXY-lCj_8Iw',
 		},
 	],
+	'West Hills': [
+		{
+			id: 'yelp',
+			label: 'Yelp',
+			url: 'https://www.yelp.com/writeareview/biz/IPEk7gx3ZfIMb6x2L-bxmg',
+		},
+	],
+	'Cedar Bluff': [
+		{
+			id: 'yelp',
+			label: 'Yelp',
+			url: 'https://www.yelp.com/writeareview/biz/IeUKrptRDmeQbcY4u7nL4Q',
+		},
+	],
 }
 
 /** Every place a client can review the given location, Google first. */

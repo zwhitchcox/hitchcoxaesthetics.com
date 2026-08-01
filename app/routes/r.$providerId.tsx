@@ -13,10 +13,7 @@ import { ensurePrimary } from '#app/utils/litefs.server.ts'
 import { cn } from '#app/utils/misc.tsx'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
-	fallbackReview,
-	takeUniqueSamples,
 	takeUniqueSamplesPerDestination,
-	generateSampleReview,
 	getReviewLocations,
 	getReviewPlatforms,
 	getServiceProfile,
@@ -164,11 +161,16 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			// Each destination carries its own text, so posting to a second
 			// place never reuses the first one's words.
 			sample: samplesByPlace.get(`Google - ${l.label}`) ?? genericFallback,
-			// Google always first, then anything else we've claimed for this
-			// location that actually accepts reviews.
+			// Yelp first (owner priority 2026-07-31), then Google, then anything
+			// else we've claimed for this location that actually accepts reviews.
 			platforms: [
+				...getReviewPlatforms(l.label)
+					.filter(p => p.id === 'yelp')
+					.map(p => ({ id: p.id, label: p.label })),
 				{ id: 'google', label: 'Google' },
-				...getReviewPlatforms(l.label).map(p => ({ id: p.id, label: p.label })),
+				...getReviewPlatforms(l.label)
+					.filter(p => p.id !== 'yelp')
+					.map(p => ({ id: p.id, label: p.label })),
 			],
 		})),
 		matchedPlaceId,
