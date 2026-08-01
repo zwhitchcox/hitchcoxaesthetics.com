@@ -55,7 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	if (!hasReportsDb()) return json({ configured: false as const })
 
-	const [reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks] = await Promise.all([
+	const [reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals] = await Promise.all([
 		// Homes-weighted combined reach (any of our listings top-3) per
 		// keyword per capture date. homes=1 fallback keeps cells without
 		// census data counted while geo_grid_homes back-fills.
@@ -156,6 +156,83 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			   referring_domains, clean_referring_domains, spam_referring_domains
 			 FROM raw_backlink_summary ORDER BY day, target`,
 		),
+		// Competitor authority + backlink snapshots, same cadence as ours
+		// (sha-reports src/backlinks.ts COMPETITORS).
+		reportsQuery<{
+			day: string
+			domain: string
+			rank: string | null
+			backlinks: string | null
+			referring_domains: string | null
+			clean_referring_domains: string | null
+			spam_referring_domains: string | null
+		}>(
+			`SELECT to_char(day, 'YYYY-MM-DD') AS day, domain, rank, backlinks,
+			   referring_domains, clean_referring_domains, spam_referring_domains
+			 FROM raw_competitor_authority ORDER BY day, domain`,
+		),
+		// Map-pack rivals per keyword: same homes-weighted reach math as our
+		// own number, computed for every business in the latest grid capture.
+		// Listings sharing a domain count as one business (multi-location).
+		reportsQuery<{
+			keyword: string
+			title: string
+			domain: string | null
+			is_mine: boolean
+			avg_rank: string
+			rating: string | null
+			reviews: string | null
+			homes_reached: string
+			total_homes: string
+			reach_pct: string | null
+		}>(
+			`WITH latest AS (SELECT max(week) AS week FROM raw_dataforseo_region),
+			 cellhomes AS (
+			   SELECT r.keyword, r."gridRow" gr, r."gridCol" gc,
+			     max(COALESCE(h.homes, 1)) AS homes
+			   FROM raw_dataforseo_region r
+			   JOIN latest ON r.week = latest.week
+			   LEFT JOIN geo_grid_homes h
+			     ON h.grid_lat = round(r."gridLat"::numeric, 4)
+			    AND h.grid_lng = round(r."gridLng"::numeric, 4)
+			   GROUP BY 1, 2, 3),
+			 tot AS (SELECT keyword, sum(homes) AS total_homes FROM cellhomes GROUP BY 1),
+			 bizcell AS (
+			   SELECT r.keyword, COALESCE(nullif(r.domain, ''), r."placeId") AS biz,
+			     r."gridRow" gr, r."gridCol" gc, bool_or(r."rankAbsolute" <= 3) AS hit
+			   FROM raw_dataforseo_region r JOIN latest ON r.week = latest.week
+			   WHERE r."placeId" IS NOT NULL
+			   GROUP BY 1, 2, 3, 4),
+			 bizmeta AS (
+			   SELECT keyword, COALESCE(nullif(domain, ''), "placeId") AS biz,
+			     max(title) AS title, max(domain) AS domain, bool_or("isMine") AS is_mine,
+			     round(avg("rankAbsolute"), 1) AS avg_rank,
+			     max(rating) AS rating, max("ratingVotes") AS reviews
+			   FROM raw_dataforseo_region r JOIN latest ON r.week = latest.week
+			   WHERE "placeId" IS NOT NULL GROUP BY 1, 2),
+			 ranked AS (
+			   SELECT m.keyword, m.title, m.domain, m.is_mine, m.avg_rank, m.rating,
+			     m.reviews,
+			     COALESCE(sum(ch.homes) FILTER (WHERE bc.hit), 0)::int AS homes_reached,
+			     t.total_homes::int AS total_homes,
+			     round(100.0 * COALESCE(sum(ch.homes) FILTER (WHERE bc.hit), 0)
+			       / nullif(t.total_homes, 0), 1) AS reach_pct,
+			     row_number() OVER (
+			       PARTITION BY m.keyword
+			       ORDER BY COALESCE(sum(ch.homes) FILTER (WHERE bc.hit), 0) DESC
+			     ) AS rn
+			   FROM bizcell bc
+			   JOIN cellhomes ch ON ch.keyword = bc.keyword AND ch.gr = bc.gr AND ch.gc = bc.gc
+			   JOIN bizmeta m ON m.keyword = bc.keyword AND m.biz = bc.biz
+			   JOIN tot t ON t.keyword = bc.keyword
+			   GROUP BY m.keyword, m.title, m.domain, m.is_mine, m.avg_rank, m.rating,
+			     m.reviews, t.total_homes
+			   HAVING COALESCE(sum(ch.homes) FILTER (WHERE bc.hit), 0) > 0)
+			 SELECT keyword, title, domain, is_mine, avg_rank, rating, reviews,
+			   homes_reached, total_homes, reach_pct
+			 FROM ranked WHERE rn <= 10 OR is_mine
+			 ORDER BY keyword, homes_reached DESC`,
+		),
 	])
 	return json({
 		configured: true as const,
@@ -169,6 +246,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		linkLosses,
 		lostLinks,
 		backlinks,
+		rivalAuthority,
+		packRivals,
 	})
 }
 
@@ -179,7 +258,7 @@ export default function ReachReport() {
 	const data = useLoaderData<typeof loader>()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks } = data
+	const { reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals } = data
 
 	const volumeByKw = new Map(volumes.map(v => [v.keyword, v]))
 	const valueByCat = new Map(values.map(v => [v.category, Number(v.expected_value)]))
@@ -347,8 +426,10 @@ export default function ReachReport() {
 				</p>
 			</section>
 
+			<PackRivalSections rows={packRivals} />
 			<OrganicRankSections ranks={serpRanks} rivals={serpRivals} />
 			<BacklinkSections rows={backlinks} />
+			<RivalAuthoritySections ours={backlinks} rivals={rivalAuthority} />
 			<LinkVelocitySections gains={linkGains} newest={newLinks} losses={linkLosses} lost={lostLinks} />
 		</ReportPage>
 	)
@@ -620,6 +701,189 @@ function BacklinkSections({
 				</p>
 			</section>
 		</>
+	)
+}
+
+/**
+ * Map-pack rivals per keyword: every business with top-3 presence in the
+ * latest grid capture, homes-weighted with the same math as our own reach
+ * number. Our row is highlighted.
+ */
+function PackRivalSections({
+	rows,
+}: {
+	rows: Array<{
+		keyword: string
+		title: string
+		domain: string | null
+		is_mine: boolean
+		avg_rank: string
+		rating: string | null
+		reviews: string | null
+		reach_pct: string | null
+	}>
+}) {
+	if (!rows.length) return null
+	const keywords = [...new Set(rows.map(r => r.keyword))]
+	return (
+		<section>
+			<h2>
+				Map-pack rivals by keyword{' '}
+				<span className="mini">homes-weighted reach, latest grid capture, our row highlighted</span>
+			</h2>
+			{keywords.map(kw => (
+				<div key={kw}>
+					<h3>{kw}</h3>
+					<div className="rtable-wrap">
+						<table className="rtable">
+							<thead>
+								<tr>
+									<th>Business</th>
+									<th>Site</th>
+									<th className="num">Reach</th>
+									<th className="num">Avg rank</th>
+									<th className="num">Rating</th>
+									<th className="num">Reviews</th>
+								</tr>
+							</thead>
+							<tbody>
+								{rows
+									.filter(r => r.keyword === kw)
+									.map(r => (
+										<tr key={`${kw}|${r.title}`}>
+											<td className={r.is_mine ? 'good' : ''}>
+												{r.title}
+												{r.is_mine ? ' (us)' : ''}
+											</td>
+											<td className="mini">{site(r.domain)}</td>
+											<td className={`num ${r.is_mine ? 'good' : ''}`}>
+												{r.reach_pct != null ? `${r.reach_pct}%` : '-'}
+											</td>
+											<td className="num">{r.avg_rank}</td>
+											<td className="num">{r.rating ?? '-'}</td>
+											<td className="num">{r.reviews ?? '-'}</td>
+										</tr>
+									))}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			))}
+			<p className="note">
+				Reach = share of metro homes inside a grid cell where the business ranks
+				top-3 in the local pack. Listings on one website count as one business, so
+				multi-location brands (including us) show combined reach.
+			</p>
+		</section>
+	)
+}
+
+/**
+ * Authority and clean-link race: us against the tracked Knoxville
+ * competitors, every 3 days (sha-reports src/backlinks.ts).
+ */
+function RivalAuthoritySections({
+	ours,
+	rivals,
+}: {
+	ours: Array<{
+		day: string
+		target: string
+		rank: string | null
+		backlinks: string | null
+		referring_domains: string | null
+		clean_referring_domains: string | null
+		spam_referring_domains: string | null
+	}>
+	rivals: Array<{
+		day: string
+		domain: string
+		rank: string | null
+		backlinks: string | null
+		referring_domains: string | null
+		clean_referring_domains: string | null
+		spam_referring_domains: string | null
+	}>
+}) {
+	if (!rivals.length) return null
+	// One combined series set: our main site plus every tracked competitor.
+	const us = ours.filter(r => r.target === 'hitchcoxaesthetics.com')
+	const all = [
+		...us.map(r => ({ ...r, domain: 'hitchcoxaesthetics.com', mine: true })),
+		...rivals.map(r => ({ ...r, mine: false })),
+	]
+	const days = [...new Set(all.map(r => r.day))].sort()
+	const latest = days[days.length - 1]
+	const cell = new Map(all.map(r => [`${r.day}|${r.domain}`, r]))
+	// Us first, then competitors by latest authority, descending. Rows are
+	// day-ordered, so the last write per domain is its newest rank.
+	const newestRank = new Map<string, number>()
+	for (const r of rivals) newestRank.set(r.domain, Number(r.rank ?? 0))
+	const domains = [
+		'hitchcoxaesthetics.com',
+		...[...new Set(rivals.map(r => r.domain))].sort(
+			(a, b) => (newestRank.get(b) ?? 0) - (newestRank.get(a) ?? 0),
+		),
+	]
+	const num = (v: string | null | undefined) => (v == null ? null : Number(v))
+	const latestRow = (d: string) =>
+		cell.get(`${latest}|${d}`) ??
+		[...all].reverse().find(r => r.domain === d)
+
+	return (
+		<section>
+			<h2>
+				Authority race: us vs competitors{' '}
+				<span className="mini">DataForSEO domain rank (Ahrefs DR × ~10), every 3 days</span>
+			</h2>
+			<LineChart
+				labels={days}
+				series={domains.map((d, i) => ({
+					name: d === 'hitchcoxaesthetics.com' ? 'us' : site(d),
+					color: SERIES[i % SERIES.length]!,
+					values: days.map(day => num(cell.get(`${day}|${d}`)?.rank)),
+				}))}
+				height={240}
+				format={n => String(Math.round(n))}
+			/>
+			<div className="rtable-wrap">
+				<table className="rtable">
+					<thead>
+						<tr>
+							<th>Site</th>
+							<th className="num">Authority</th>
+							<th className="num">Backlinks</th>
+							<th className="num">Referring domains</th>
+							<th className="num">Clean</th>
+							<th className="num">Spam</th>
+						</tr>
+					</thead>
+					<tbody>
+						{domains.map(d => {
+							const r = latestRow(d)
+							const mine = d === 'hitchcoxaesthetics.com'
+							return (
+								<tr key={d}>
+									<td className={mine ? 'good' : ''}>
+										{site(d)}
+										{mine ? ' (us)' : ''}
+									</td>
+									<td className={`num ${mine ? 'good' : ''}`}>{r?.rank ?? '-'}</td>
+									<td className="num">{r?.backlinks ?? '-'}</td>
+									<td className="num">{r?.referring_domains ?? '-'}</td>
+									<td className="num">{r?.clean_referring_domains ?? '-'}</td>
+									<td className="num">{r?.spam_referring_domains ?? '-'}</td>
+								</tr>
+							)
+						})}
+					</tbody>
+				</table>
+			</div>
+			<p className="note">
+				As of {latest}. Clean = referring domains with spam score under 25, the
+				number our link work should move. Competitor tracking started 2026-07-31.
+			</p>
+		</section>
 	)
 }
 
