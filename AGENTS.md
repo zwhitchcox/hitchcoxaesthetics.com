@@ -53,3 +53,32 @@ Strict hierarchy rules to prevent circular logic and maintain silo structure:
 - **Good:** "Learn more about [Knoxville Botox treatments](/botox)", "Explore
   our [dermal filler options in Knoxville](/filler)" o npm install
   @typescript/native-preview
+
+## Email Access (Gmail API, no browser needed)
+
+Keychain-backed OAuth helpers exist on this machine for both business
+inboxes. Use these instead of driving Gmail through a browser:
+
+- `~/.local/bin/google-business-token` prints an access token for
+  `sarah@hitchcoxaesthetics.com` (scopes: gmail.modify, calendar,
+  contacts, drive, tasks). Use it to read outreach replies and send
+  mail from Sarah's address through the Gmail API.
+- `~/.local/bin/google-personal-token` does the same for
+  `zwhitchcox@gmail.com`.
+- `--refresh-token` on either prints the refresh token. Secrets live in
+  the macOS Keychain; nothing to source or copy into .env.
+- The separate `GOOGLE_REFRESH_TOKEN` in this repo's `.env` is
+  `zwhitchcox@gmail.com` with GBP/Ads/Search Console scopes only, no
+  Gmail. It is also `siteOwner` on all three Search Console properties,
+  so Search Analytics API calls need no new consent.
+
+Log every outreach email in `docs/marketing/organic-backlinks.md` or
+the Knoxville ledger, and check those ledgers before emailing anyone.
+
+## Domain Authority Playbook
+
+Finding expired domains, vetting them (Wayback + mandatory anchor
+audit), rebuilding them as honest static replicas, and serving them
+from this server: follow
+`docs/marketing/domain-authority-playbook.md`. The ledger of hunts
+and buys is `docs/marketing/knoxville-competitor-backlinks-2026-07-28.md`.

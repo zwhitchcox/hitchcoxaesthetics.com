@@ -375,6 +375,13 @@ Completed foundation:
         required.
       - Evolus and Cartessa have not replied yet. Do not send duplicate
         requests while the original emails are pending.
+- [ ] Tennessee School of Beauty "Meet the Salons": employer-profile request
+      sent from `sarah@hitchcoxaesthetics.com` to
+      `tsb1930@tennesseeschoolofbeauty.edu` on 2026-07-30. The requested
+      backlink is `https://hitchcoxaesthetics.com/`; a same-thread correction
+      replaced the initially requested Bearden URL. Monitor the inbox,
+      supply the requested photos/company information, and verify the public
+      profile and backlink before marking complete.
 - [ ] Fresha: retain and periodically audit the unclaimed Bearden placeholder.
       It already links to the SHA website. Do not adopt Fresha's booking or
       payment platform solely to claim this citation without owner approval.

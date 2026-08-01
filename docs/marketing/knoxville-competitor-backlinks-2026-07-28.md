@@ -612,6 +612,15 @@ business directory if Sarah qualifies.
 
 ## Sponsorship pricing research (2026-07-30)
 
+INCIDENT (found 2026-07-31): all five sponsorship inquiry emails sent
+2026-07-30 went out with EMPTY BODIES (Gmail compose glitch). Soccer
+Shots noticed and replied. Real content was re-sent in every thread on
+2026-07-31: Soccer Shots (knoxvilleadmin@soccershots.com), KSO
+(development@knoxvillesymphony.com), Knox Youth Sports
+(info@knoxyouthsports.com), AMBC (info@ambcknox.org), PJ Parkinson's 5K
+(info@pjparkinsons.org). One Knoxville SC never got an email (no sent
+record); still needs first contact at ami@oneknoxsc.com.
+
 Ranked by confirmed link value. Prices are mostly unpublished; the route
 is an email asking for the sponsor packet.
 
@@ -628,11 +637,16 @@ is an email asking for the sponsor packet.
 | skip | WBENC/Go-DBE/TNUCP certifications | Directories are search apps / Excel, no crawlable links; badge value only | WBENC $350/yr | |
 | skip | Bearden district | Bearden Village Council has NO website; districtinbearden.com DNS-dead | n/a | |
 
-Free link wins still queued: Tennessee School of Beauty "Meet the Salons"
-profile (confirmed dofollow-style links to salons; call 865-588-7878 or
-site form; pitch the esthetics-grad hiring pipeline) and the Shop
-Farragut self-serve directory listing (member sites linked; membership
-requirement unclear, ask info@shopfarragut.com; FARRAGUT location only).
+Free link wins: Tennessee School of Beauty "Meet the Salons" profile
+request was sent on 2026-07-30 to
+`tsb1930@tennesseeschoolofbeauty.edu`. The request presents SHA as an
+employer and mentor of licensed esthetics professionals and asks TSB to
+link the profile to `https://hitchcoxaesthetics.com/`. A correction
+clarifying the brand-level homepage destination was sent in the same thread
+on 2026-07-30. Await a
+reply, then provide the requested photos and company description. The
+Shop Farragut self-serve directory listing was also submitted (member
+sites linked; FARRAGUT location only).
 
 ### Sponsorship price requests SENT 2026-07-30 (from sarah@)
 
@@ -648,6 +662,100 @@ requirement unclear, ask info@shopfarragut.com; FARRAGUT location only).
 When packets come back, rank by cost per confirmed dofollow link and
 bring the short list to the owner for budget sign-off.
 
+## Update 2026-08-01: Expired-Domain Hunt (Register Compass)
+
+Criteria: 20+ Majestic linking domains, real Wayback history, no spam
+eras. Every candidate below was Wayback-vetted (yearly snapshots +
+content spot checks for CJK/casino/pharma). Buy decisions are the
+owner's; prices as seen 2026-08-01 evening.
+
+Tier 1, clean and buy-ready:
+
+| Domain | Route/price | Links | What it was | Play |
+| --- | --- | --- | --- | --- |
+| naturalskincarerecipes.com | GoDaddy auction, $1 bid, ends ~Aug 4 | 164 domains, DA 23 | Skincare content site 2005-2024, clean | Rebuild thin content site, Sarah as reviewer, link to us |
+| mesolaserclinic.com | Dropped, hand-register ~$12 | 136 domains, TF 19 | Bay Area laser/body clinic 2007-2015, clean | Rebuild or 301 to laser services page |
+| abellamedspa.com | PURCHASED $40 2026-08-01 | 105 domains, TF 13 | Real med spa 2021-2025 | DOWNGRADED post-purchase: anchor audit found the profile is mostly scraped directories + the dayofdifference.org.au PBN cluster. Standalone network site ONLY, never 301 into the main site (SHA-19) |
+
+Tier 2, local names with caveats:
+
+| Domain | Route/price | Links | Caveat |
+| --- | --- | --- | --- |
+| beardenbeardco.com | Drops Aug 2, hand-reg/backorder | 22 domains | Clean but thin (one-year brand) |
+| knoxvillenow.org | Dropped, hand-reg | 32 domains, TF 22 | Real Knoxville NOW chapter 2007-2024, but 2025 CJK spam squat |
+| knoxvillelaserhairremoval.com | Dropped, hand-reg | 22 domains | Exact-match local; real site to 2022, 2025 CJK squat |
+
+Tier 3 maybes: jaynehydukmedspa.com (clean, 36), sobobamedspa.com
+(real 2006-2025, 35), nitamedspa.com ($69 Snap, 103 domains incl.
+edu/gov, content unvetted), diamondmedicalspaandvein.com (126 domains,
+content unvetted), medspacanada.com ($69, geo mismatch).
+
+Rejected for spam history/profiles: jozenskincare.com (CJK for years),
+fatweightlossguide.com, ushaskincarereview.com, offerweightloss.com,
+hotweightlossdiet.com and similar review-mill names.
+
+Strategy note: rebuilds beat bare 301s. Redirect only into a
+topically matching page, keep any rebuilt site genuinely real, and
+expect Google to discount same-owner networks; the value here is the
+pre-earned links plus local/topical entity association.
+
+### Late-night wider sweeps (2026-08-01, anchor-audited)
+
+Regional (tennessee/knox): all killed. knoxmusictoday.com is a
+confirmed PBN target (real music blog until ~2012, then Indonesian
+gambling anchors, "deposit pulsa"; no Wayback record survives).
+copperhilltennessee.com: 386 of 400 live anchors are "albaslot",
+active gambling target. knoxpr.com: clean but the profile is one PR
+syndication network plus mass-spam sites; DA value ~zero.
+
+Nationwide treatment terms (dermatology/cosmetic/injectables/
+antiaging/facials/microneedling/hydrafacial/coolsculpting/juvederm):
+mostly dead makeup brands with junk profiles. Two survivors:
+
+- BUY: antiagingpress.org (expired, hand-reg ~$12). Real anti-aging
+  publication (Julia Busch, Anti-Aging Press Inc) 2011-2024. Clean
+  natural anchors, real niche linkers (longhaircareforums.com,
+  webwire, a dermatologist site dofollow), 72 live linking domains,
+  hotlinked images + a linked /FMS/FMS.pdf. Deep paths to recreate:
+  /about/about-julia-busch, the lunar-hair-chart pages, hair-loss
+  images under /wp-content/uploads/2014/10/, and /FMS/FMS.pdf.
+  Topical bullseye for us.
+- OPTIONAL $12 flyer: safecosmeticsalliance.org. Real advocacy-org
+  history (TF 19, a real prnewswire link, John Hurson-era anchors)
+  but the live profile is dominated by google.\* CSE/maps ghost spam,
+  so expect little transfer. Rebuild as consumer safe-cosmetics info
+  if bought.
+
+Auction-side sweep of the same wide terms not yet run; fold into the
+next weekly pass.
+
+## Update 2026-07-31: Competitor Authority Now Tracked Automatically
+
+The 8 audited competitors are captured every 3 days alongside our 3 sites
+(sha-reports src/backlinks.ts, `raw_competitor_authority` table). The reach
+report (/admin/reports/reach) now charts the authority race and lists
+map-pack rivals per keyword with homes-weighted reach.
+
+DataForSEO authority snapshot 2026-07-31 (their 0-1000 rank; clean =
+referring domains with spam score < 25):
+
+| Site | Authority | Referring domains | Clean |
+| --- | ---: | ---: | ---: |
+| smileyaesthetics.com | 454 | 160 | 98 |
+| culturemedspa.com | 272 | 70 | 42 |
+| oldcitymedspa.com | 242 | 75 | 42 |
+| prettygirlaes.com | 223 | 82 | 41 |
+| hitchcoxaesthetics.com | 217 | 45 | 10 |
+| weightogoweightloss.com | 197 | 97 | 46 |
+| pureluxespa.com | 196 | 304 | 95 |
+| drjasonhall.com | 185 | 215 | 104 |
+| gallaherplasticsurgery.com | 176 | 170 | 101 |
+
+Note the two authority models disagree on order (Ahrefs DR puts Pure Luxe
+above us; DataForSEO puts us above Pure Luxe). Track direction within one
+model, not the absolute number. The clean referring-domain gap is the real
+story: we have 10, competitors run 41-104.
+
 ### Also completed 2026-07-30
 
 - Shop Farragut directory listing SUBMITTED (free tier, never expires,
@@ -655,5 +763,9 @@ bring the short list to the owner for budget sign-off.
 - Manufacturer locators: parallel session emailed Cartessa (fwilson) and
   Evolus (bryan.ocamp) at 7:06 PM; ASPIRE thread already active. All of
   task 15 is now in flight.
-- Still queued: Tennessee School of Beauty salon-profile pitch (call
-  865-588-7878 or site form; Cloudflare blocks bots, needs browser).
+- Tennessee School of Beauty salon-profile request SENT from
+  `sarah@hitchcoxaesthetics.com` to
+  `tsb1930@tennesseeschoolofbeauty.edu` at 9:02 PM on 2026-07-30. The
+  public contact page exposes email rather than a web form. Await TSB's
+  requirements and verify the published profile and homepage backlink
+  before marking complete.
