@@ -64,8 +64,19 @@ and emails only when something survives. Failures always email.
   Seeded 2026-08-01 with the 19 domains judged that day (5 buys, 14
   rejects).
 - **Cost ladder**: RC scrape free, ledger dedupe free, Wayback free,
-  DataForSEO only for survivors (~$0.05 each), LLM verdict only after
-  the hard rules pass. Typical day $0.10 to $0.25, most days near zero.
+  DataForSEO only for survivors (~$0.027 each), LLM verdict only after
+  the hard rules pass.
+- **Real measured cost**: the first run drains the whole backlog. On
+  2026-08-01 it scanned 155 rows, vetted 122 new domains and spent
+  $3.31. Steady state is only genuinely-new domains, so expect roughly
+  $0.20 to $0.80 a day, not the $0.10 first guessed. `HUNT_MAX_SPEND`
+  (default $2.00) hard-caps a run; anything past it keeps its ledger
+  slot and is vetted the next day.
+- **Status page**: http://Zanes-Mac-mini.local:8788 (own launch agent,
+  `com.hitchcox.hunt-status`, separate from worker-manager on 8787).
+  Flagged domains with authority, referring domains, clean count, PBN
+  risk, price and deadline; click through for the top 25 backlinks by
+  authority and the anchor mix.
 - **Hard rejects before any spend**: spam anchor patterns (slot, casino,
   judi, togel, deposit pulsa, pharma, adult), known mass-spam linkers
   (drjack.world, bye.fyi, urls-shortener.eu, the AU link-farm cluster),
@@ -91,10 +102,28 @@ Playwright's own profile. Logging in with regular Chrome does not carry
 over. When the session expires the job emails "Register Compass login
 needed" and stops until someone runs `--login` again.
 
-Gotcha found at build time: the site `.env` declares `RESEND_API_KEY`
-twice and the last value is a mock dev key, so naive sourcing yields a
-key that 401s. `bin/domain-hunt.sh` picks the first non-mock key. Remove
-that workaround if the .env is ever cleaned up.
+Gotchas found while building it, all fixed, all worth knowing:
+
+- The site `.env` declares `RESEND_API_KEY` twice and the last value is
+  a mock dev key, so naive sourcing yields a key that 401s.
+  `bin/domain-hunt.sh` picks the first non-mock key. Remove that
+  workaround if the .env is ever cleaned up.
+- launchd does not inherit the Homebrew PATH, so `npx` was not found and
+  BOTH agents would have failed silently. Each plist now sets PATH
+  explicitly.
+- The RC DetailView URL bounces back to the search form unless the
+  session already has an active search, so the job loads
+  DomainSearch.aspx first.
+- RC data rows carry extra leading cells the header row lacks, so header
+  index does not equal cell index. The parser locates the domain cell by
+  pattern and shifts every other column by that offset.
+- Playwright does not auto-invoke a bare function string, and tsx
+  compiles closures with a `__name` helper that does not exist in page
+  context. The parser is passed as an IIFE string with values baked in.
+- OpenRouter model `anthropic/claude-3.5-haiku` 404s (no endpoints),
+  which silently produced empty verdicts. Use
+  `anthropic/claude-haiku-4.5`. Judgment failures now surface the API
+  error text instead of an empty reason.
 
 ## 2. Vetting (all three steps, BEFORE recommending a buy)
 
