@@ -51,6 +51,51 @@ AUC auction):
 Read Majestic linking DOMAINS and Trust Flow. Ignore raw link counts
 and composite authority scores.
 
+### Automated daily hunt (built 2026-08-01)
+
+`sha-reports/src/domain-hunt.ts` runs the whole of steps 1 and 2 daily
+and emails only when something survives. Failures always email.
+
+- **Runs on the Mac mini** (needs a logged-in Register Compass browser
+  profile; RC has no API and a captcha on login).
+- **Ledger**: SQLite at `~/.domain-hunt/ledger.db`, tables `seen` and
+  `runs`. Every domain ever judged is stored with its verdict, so it is
+  never paid for twice. Re-vetted only if its linking domains grow 50%.
+  Seeded 2026-08-01 with the 19 domains judged that day (5 buys, 14
+  rejects).
+- **Cost ladder**: RC scrape free, ledger dedupe free, Wayback free,
+  DataForSEO only for survivors (~$0.05 each), LLM verdict only after
+  the hard rules pass. Typical day $0.10 to $0.25, most days near zero.
+- **Hard rejects before any spend**: spam anchor patterns (slot, casino,
+  judi, togel, deposit pulsa, pharma, adult), known mass-spam linkers
+  (drjack.world, bye.fyi, urls-shortener.eu, the AU link-farm cluster),
+  no Wayback history, fewer than 15 real linking domains.
+- **Email**: digest of BUY/WATCH rows with price, auction deadline, and
+  reasoning. Silent when nothing survives.
+
+Setup and operation:
+
+```
+cd ~/dev/zwhitchcox/sha/sha-reports
+pnpm install && npx playwright install chromium
+npx tsx src/domain-hunt.ts --login     # log in once, in Playwright's own profile
+cp bin/com.hitchcox.domain-hunt.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.hitchcox.domain-hunt.plist
+```
+
+Runs 7:20am daily. Manual run: `bin/domain-hunt.sh` (add `--dry-run` to
+skip email). Logs at `/tmp/domain-hunt.log`.
+
+IMPORTANT: the login must happen through `--login`, which opens
+Playwright's own profile. Logging in with regular Chrome does not carry
+over. When the session expires the job emails "Register Compass login
+needed" and stops until someone runs `--login` again.
+
+Gotcha found at build time: the site `.env` declares `RESEND_API_KEY`
+twice and the last value is a mock dev key, so naive sourcing yields a
+key that 401s. `bin/domain-hunt.sh` picks the first non-mock key. Remove
+that workaround if the .env is ever cleaned up.
+
 ## 2. Vetting (all three steps, BEFORE recommending a buy)
 
 1. **Wayback history.** CDX yearly snapshots (try bare and www):
