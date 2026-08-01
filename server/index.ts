@@ -68,6 +68,8 @@ const NETWORK_SITES = new Set([
 	'mesolaserclinic.com',
 	'abellamedspa.com',
 	'naturalskincarerecipes.com',
+	'antiagingpress.org',
+	'safecosmeticsalliance.org',
 ])
 app.use((req, res, next) => {
 	const host = getHost(req).toLowerCase().split(':')[0]!.replace(/^www\./, '')
@@ -86,6 +88,9 @@ app.use((req, res, next) => {
 		// join() collapses "..", so a candidate escaping root lands outside it.
 		if (!filePath.startsWith(root + path.sep)) continue
 		if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+			// Legacy extensions from old sites (.cfm, .html-as-dir) carry no
+			// known mime type; they are all HTML.
+			if (/\.(cfm|php)$/.test(filePath)) res.type('html')
 			return res.sendFile(filePath)
 		}
 	}
