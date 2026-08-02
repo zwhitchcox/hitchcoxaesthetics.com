@@ -34,8 +34,24 @@ Sweeps (saved in RC search history; click to reload):
 
 1. Local: name contains `knoxville;farragut;bearden;easttennessee`
    (widen with `tennessee;knox` when thin)
-2. Topical: `aesthetic;botox;medspa;medicalspa;laserhair;laserclinic;weightloss;skinclinic;skincare`
-   (widen with `dermatology;cosmetic;injectables;antiaging;facials`)
+2. Topical: `medspa;medicalspa;esthetic;botox;laserhair;laserclinic;weightloss;skinclinic;skincare;dermatology;cosmetic;injectables;antiaging;microneedling`
+3. Services and brands: `filler;dermalfiller;lipfiller;juvederm;restylane;dysport;jeuveau;xeomin;sculptra;kybella;semaglutide;tirzepatide;hydrafacial;coolsculpting;bodysculpting;facial;dayspa;wellnesscenter`
+
+Include every service the practice sells. A term that is missing is a
+domain we will never see, and brand names matter as much as generic ones
+because old clinic sites are usually named after what they injected.
+
+RC matches SUBSTRINGS, so choose the shortest stem that covers the
+variants: `esthetic` catches aesthetic, aesthetics, esthetics,
+esthetician and aesthetician in one term, while `aesthetic` alone would
+miss every American spelling. Likewise `facial` covers facials, and
+`filler` covers fillers.
+
+Broad stems pull real noise (`filler` also matches anime lists,
+refilleries and packaging suppliers), so the automated job runs ONE
+batched LLM name screen before any paid lookup. Measured 2026-08-01: 13
+names screened for $0.0014, correctly dropping the 5 that would have
+cost $0.135 to check.
 
 Filters: TLD com/net/org, no hyphens, no digits, Internet Archive
 snapshots > 1, Age (WB) before ~4 years ago, Majestic Linking
