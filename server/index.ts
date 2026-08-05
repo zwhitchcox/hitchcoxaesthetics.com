@@ -67,18 +67,79 @@ app.use((req, res, next) => {
 const NETWORK_SITES = new Set([
 	'mesolaserclinic.com',
 	'abellamedspa.com',
-	'naturalskincarerecipes.com',
+	'agelessyoumedspa.com',
 	'antiagingpress.org',
 	'safecosmeticsalliance.org',
+	'testandoprodutoscosmeticos.com',
+	'cosmeticcrave.com',
+	'temanaskincare.com',
+	'xceleratedweightloss.com',
 ])
+/**
+ * Editorial links earned by these domains before we owned them point at post
+ * URLs that no longer exist. A 404 passes nothing, so each legacy URL that
+ * still has real inbound links is mapped to the article covering the same
+ * subject. Verified against DataForSEO on 2026-08-02; the linking page is
+ * noted so the mapping can be re-checked.
+ */
+const LEGACY_REDIRECTS: Record<string, Record<string, string>> = {
+	'cosmeticcrave.com': {
+		// buzzfeed.com (DA 61), a hand-cream review -> our hand-care guide
+		'/2013/03/review-soap-and-glory-hand-food.html':
+			'https://hitchcoxaesthetics.com/blog/hand-cream-and-hand-aging',
+		// cosmopolitan.com (DA 52), a product round-up -> how to read a label
+		'/2013/08/monthly-favourites-july.html':
+			'https://hitchcoxaesthetics.com/blog/how-to-read-a-skincare-label',
+		// low-value giveaway post stays on-site
+		'/2013/07/international-giveaway-1000-followers-1.html': '/guides/',
+		// These two guides were replaced by articles on our own blog; the
+		// guides index no longer lists them.
+		'/guides/hand-creams-what-actually-works/':
+			'https://hitchcoxaesthetics.com/blog/hand-cream-and-hand-aging',
+		'/guides/how-to-judge-a-beauty-product/':
+			'https://hitchcoxaesthetics.com/blog/how-to-read-a-skincare-label',
+	},
+	'xceleratedweightloss.com': {
+		// Three fda.gov public notifications (dofollow) all link the homepage.
+		// Zane's call 2026-08-04: send them to the warning article on our blog
+		// rather than hosting it here. Deeper pages on this domain still serve.
+		'/': 'https://hitchcoxaesthetics.com/blog/xcelerated-weight-loss-fda-warning',
+	},
+	'safecosmeticsalliance.org': {
+		// lifestyle.howstuffworks.com (DA 51), a cosmetics-history article.
+		// Keyed with its query string; other objectid values still serve
+		// index.cfm on-site.
+		'/index.cfm?objectid=EE203500-D4DB-11E1-A38E000C296BA163':
+			'https://hitchcoxaesthetics.com/blog/a-brief-history-of-cosmetics',
+	},
+	'testandoprodutoscosmeticos.com': {
+		// areademulher.r7.com (DA 55) is Portuguese-language; keep the visitor
+		// on a Portuguese page rather than sending them to an English site.
+		'/2020/11/cor-de-cabelo-ruivo-dourado.html':
+			'/artigos/rotina-de-cuidados-sem-mitos/',
+		'/2011/10/sorteio-testando-e-sigma.html': '/artigos/',
+		'/2012/03/sorteio-mascara-de-tratamento-nutri.html': '/artigos/',
+		'/2012/04/sorteio-agua-thermal-aguas-de-sao-pedro.html': '/artigos/',
+	},
+}
+
 app.use((req, res, next) => {
 	const host = getHost(req).toLowerCase().split(':')[0]!.replace(/^www\./, '')
 	if (!NETWORK_SITES.has(host)) return next()
 	if (req.method !== 'GET' && req.method !== 'HEAD') {
 		return res.status(405).end()
 	}
+	const decodedPath = decodeURIComponent(req.path)
+	const legacyMap = LEGACY_REDIRECTS[host]
+	// Match the full URL first (some legacy CMS URLs differ only by query
+	// string), then the path, tolerating a missing trailing slash.
+	const legacy =
+		legacyMap?.[decodeURIComponent(req.originalUrl)] ??
+		legacyMap?.[decodedPath] ??
+		legacyMap?.[`${decodedPath.replace(/\/+$/, '')}/`]
+	if (legacy) return res.redirect(301, legacy)
 	const root = path.join(process.cwd(), 'network-sites', host)
-	const reqPath = decodeURIComponent(req.path).replace(/\/+$/, '') || '/'
+	const reqPath = decodedPath.replace(/\/+$/, '') || '/'
 	const candidates =
 		reqPath === '/'
 			? ['index.html']
@@ -93,6 +154,14 @@ app.use((req, res, next) => {
 			if (/\.(cfm|php)$/.test(filePath)) res.type('html')
 			return res.sendFile(filePath)
 		}
+	}
+	// Old WordPress asset URLs we do not host (hotlinks from other sites):
+	// redirect to the article index rather than 404. Files we DO host under
+	// /wp-content are served by the loop above, so our own pages keep their
+	// assets on this server.
+	if (/^\/wp-content\//.test(req.path)) {
+		const home = host === 'testandoprodutoscosmeticos.com' ? '/artigos/' : '/'
+		return res.redirect(301, home)
 	}
 	const notFound = path.join(root, '404.html')
 	if (fs.existsSync(notFound)) return res.status(404).sendFile(notFound)
@@ -117,14 +186,24 @@ app.get('*', (req, res, next) => {
 	if (
 		host === 'www.hitchcoxaesthetics.com' ||
 		host === 'hitchcoxaesthetics.pharmacy' ||
-		host === 'www.hitchcoxaesthetics.pharmacy' ||
-		host === 'botoxknoxville.com' ||
-		host === 'www.botoxknoxville.com' ||
-		host === 'botoxknoxvilletn.com' ||
-		host === 'www.botoxknoxvilletn.com'
+		host === 'www.hitchcoxaesthetics.pharmacy'
 	) {
 		const newUrl = `https://hitchcoxaesthetics.com${req.originalUrl}`
 		return res.redirect(301, newUrl)
+	}
+	next()
+})
+
+// The Botox Knox brand is its own site; its alternate domain must not touch
+// hitchcoxaesthetics.com. Send it to the brand's canonical domain.
+app.get('*', (req, res, next) => {
+	const host = getHost(req)
+	if (
+		host === 'botoxknoxville.com' ||
+		host === 'www.botoxknoxville.com' ||
+		host === 'www.botoxknoxvilletn.com'
+	) {
+		return res.redirect(301, `https://botoxknoxvilletn.com${req.originalUrl}`)
 	}
 	next()
 })
