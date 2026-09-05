@@ -94,12 +94,15 @@ locations:
 # Sub-brands with their own Google Business Profiles. Each is a real business at the
 # same offices; on listings that allow one entry per business, list them separately.
 # Verified 2026-09-05 against docs/listings/locations/*.md.
+# email = the brand's own address, verified 2026-09-05 delivering to the business inbox.
+# Use it as the account email on that brand's sign-ups. This file wins over any table
+# in ~/outreach/README.md.
 brands:
   - slug: botox-knox
     name: Botox Knox Med Spa
     website: https://botoxknoxvilletn.com
     category: Skin care clinic
-    email: sarah@hitchcoxaesthetics.com
+    email: sarah@botoxknoxvilletn.com
     locations:
       - office: bearden
         address: 5113 Kingston Pike, Suite 15B, Knoxville, TN 37919
@@ -112,7 +115,7 @@ brands:
     short_name: Weight Loss Knox
     website: https://weightlossknoxvilletn.com
     category: Weight loss service
-    email: sarah@hitchcoxaesthetics.com
+    email: sarah@weightlossknoxvilletn.com
     locations:
       - office: bearden
         address: 5113 Kingston Pike, Suite 15C, Knoxville, TN 37919
