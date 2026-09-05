@@ -90,3 +90,33 @@ locations:
       location_id: locations/7823258395260652453
       place_id: ChIJUf4iYQ4lXIgRgbDLZ6xVz98
       maps_cid: "16127202989601173633"
+
+# Sub-brands with their own Google Business Profiles. Each is a real business at the
+# same offices; on listings that allow one entry per business, list them separately.
+# Verified 2026-09-05 against docs/listings/locations/*.md.
+brands:
+  - slug: botox-knox
+    name: Botox Knox Med Spa
+    website: https://botoxknoxvilletn.com
+    category: Skin care clinic
+    email: sarah@hitchcoxaesthetics.com
+    locations:
+      - office: bearden
+        address: 5113 Kingston Pike, Suite 15B, Knoxville, TN 37919
+        phone_listing: "(865) 370-2246"
+      - office: farragut
+        address: 102 S Campbell Station Rd, Suite 8B, Knoxville, TN 37934
+        phone_listing: "(865) 370-2639"
+  - slug: weight-loss-knox
+    name: Knoxville Weight Loss Clinic
+    short_name: Weight Loss Knox
+    website: https://weightlossknoxvilletn.com
+    category: Weight loss service
+    email: sarah@hitchcoxaesthetics.com
+    locations:
+      - office: bearden
+        address: 5113 Kingston Pike, Suite 15C, Knoxville, TN 37919
+        phone_listing: "(865) 500-3135"
+      - office: farragut
+        address: 102 S Campbell Station Rd, Suite 8C, Knoxville, TN 37934
+        phone_listing: "(865) 500-3510"
