@@ -11,6 +11,9 @@ Use these in order:
 
 1. `app/config/locations.json` for Sarah Hitchcox Aesthetics location NAP,
    Google Business Profile IDs, BrightLocal IDs, and map coordinates.
+   `docs/listings/locations.yaml` is the same NAP for listing and outreach
+   work. It names the phone to use on third-party listings (the GBP
+   secondary phone, never the tracking number).
 2. `app/config/brands.ts` for current customer-facing brand names and domains.
 3. `~/dev/zwhitchcox/sha/sha-reports/docs/gbp-playbook.md` for GBP-specific
    naming, categories, tracking-phone rules, attribution, and cluster risks.

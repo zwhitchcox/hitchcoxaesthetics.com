@@ -1,0 +1,92 @@
+# Sarah Hitchcox Aesthetics - location NAP for third-party listings and outreach.
+#
+# Verified against the Google Business Profile API on 2026-09-04
+# (mybusinessbusinessinformation.googleapis.com, readMask=phoneNumbers).
+# The app's source of truth stays app/config/locations.json. Keep both in sync.
+# Read this file before you fill any directory, citation, or outreach form.
+
+business:
+  name: Sarah Hitchcox Aesthetics
+  website: https://hitchcoxaesthetics.com
+  email: sarah@hitchcoxaesthetics.com
+  gbp_account: accounts/104663503113561659457
+
+phone_rule: |
+  Each Google Business Profile has two phones.
+  - The GBP primary phone is a CallRail tracking number. Google only.
+  - The GBP secondary phone (additionalPhones) is the real office line.
+  On every third-party listing, directory, citation, or outreach form, use
+  the secondary phone (phone_listing below). Never use a tracking number
+  off Google. Never use a personal phone or a personal email.
+
+location_rule: |
+  - A directory with one entry per location: submit all four locations.
+  - A directory with one entry per business: submit Bearden.
+  - A form with no location field: use the Bearden phone.
+
+default_location: bearden
+
+locations:
+  - slug: bearden
+    gbp_title: Sarah Hitchcox Aesthetics - Knoxville (Bearden)
+    page: https://hitchcoxaesthetics.com/bearden
+    address:
+      line1: 5113 Kingston Pike
+      line2: Suite 15
+      city: Knoxville
+      state: TN
+      zip: "37919"
+    phone_listing: "(865) 489-8008"      # GBP secondary. Use this.
+    phone_gbp_primary: "(865) 419-4234"  # Tracking. Google only.
+    gbp:
+      location_id: locations/13581758717989522836
+      place_id: ChIJT25n7649XIgRyzkQqbTa0DY
+      maps_cid: "3949897342669306315"
+
+  - slug: farragut
+    gbp_title: Sarah Hitchcox Aesthetics - Knoxville (Farragut)
+    page: https://hitchcoxaesthetics.com/farragut
+    address:
+      line1: 102 S Campbell Station Rd
+      line2: Suite 8
+      city: Knoxville
+      state: TN
+      zip: "37934"
+    phone_listing: "(865) 489-8001"      # GBP secondary. Use this.
+    phone_gbp_primary: "(865) 346-4512"  # Tracking. Google only.
+    gbp:
+      location_id: locations/7968858603211080242
+      place_id: ChIJnRT1vOsvXIgRBKvfYNUGpUI
+      maps_cid: "4802252091183573764"
+
+  - slug: west-hills
+    gbp_title: Sarah Hitchcox Aesthetics - Knoxville (West Hills)
+    page: https://hitchcoxaesthetics.com/west-hills
+    address:
+      line1: 7600 Kingston Pike
+      line2: "#1550 Suite 30"
+      city: Knoxville
+      state: TN
+      zip: "37919"
+    phone_listing: "(865) 489-8008"      # GBP secondary. Use this.
+    phone_gbp_primary: "(865) 351-6951"  # Tracking. Google only.
+    gbp:
+      location_id: locations/18165056681856849543
+      place_id: ChIJM5BJLf8lXIgRMi0A2rFo_UM
+      maps_cid: "4899187082724912434"
+
+  - slug: cedar-bluff
+    gbp_title: Sarah Hitchcox Aesthetics (Cedar Bluff)
+    page: https://hitchcoxaesthetics.com/cedar-bluff
+    address:
+      line1: 9141 Cross Park Dr
+      line2: Suite 30
+      city: Knoxville
+      state: TN
+      zip: "37923"
+    phone_listing: "(865) 489-8008"      # GBP secondary. Use this.
+    phone_gbp_primary: "(865) 401-8707"  # Tracking. Google only.
+    gbp:
+      location_id: locations/7823258395260652453
+      place_id: ChIJUf4iYQ4lXIgRgbDLZ6xVz98
+      maps_cid: "16127202989601173633"
