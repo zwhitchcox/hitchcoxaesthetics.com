@@ -1,1 +1,2 @@
 *.pdf binary
+business-and-sarah-info-confidential.txt filter=git-crypt diff=git-crypt
