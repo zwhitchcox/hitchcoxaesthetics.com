@@ -17,7 +17,7 @@ FROM base as deps
 WORKDIR /myapp
 
 ADD package.json pnpm-lock.yaml ./
-RUN npx pnpm install --prod false
+RUN npx --yes pnpm@9.15.9 install --frozen-lockfile --prod false
 
 # Setup production node_modules
 FROM base as production-deps
@@ -26,7 +26,7 @@ WORKDIR /myapp
 
 COPY --from=deps /myapp/node_modules /myapp/node_modules
 ADD package.json pnpm-lock.yaml ./
-RUN npx pnpm prune --prod
+RUN npx --yes pnpm@9.15.9 prune --prod
 # Rebuild better-sqlite3 for the Linux environment
 RUN cd node_modules/better-sqlite3 && npx node-gyp rebuild
 RUN npx puppeteer browsers install chrome
@@ -47,7 +47,7 @@ COPY --from=deps /myapp/node_modules /myapp/node_modules
 
 ADD . .
 
-RUN npx pnpm run build
+RUN npx --yes pnpm@9.15.9 run build
 
 # Finally, build the production image with minimal footprint
 FROM base
