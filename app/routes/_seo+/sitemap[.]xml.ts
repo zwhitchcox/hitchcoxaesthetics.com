@@ -15,6 +15,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		...locations.map(location => location.id),
 		'book',
 		'support',
+		'careers',
 		'privacy',
 		'tos',
 	]
