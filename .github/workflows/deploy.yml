@@ -214,6 +214,17 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
+      - name: 🔐 Stage the article sync token
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: |
+          if [ -n "$ARTICLE_SYNC_TOKEN" ]; then
+            flyctl secrets set --stage --app "${{ steps.app_name.outputs.value }}" "ARTICLE_SYNC_TOKEN=$ARTICLE_SYNC_TOKEN" \
+              || echo "secret unchanged or not set; see above"
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          ARTICLE_SYNC_TOKEN: ${{ secrets.ARTICLE_SYNC_TOKEN }}
+
       - name: 🚀 Deploy Production
         if: ${{ github.ref == 'refs/heads/master' }}
         run:

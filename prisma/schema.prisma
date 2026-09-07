@@ -849,3 +849,64 @@ model PlaidTransaction {
   @@index([institution])
   @@index([accountOwner])
 }
+
+// Articles written under the practice's name, for Sarah to approve, deny or edit
+// in /admin/articles before they go anywhere. kind "guest" = written for another
+// publication (pushed here by the outreach system on the Mac mini, which polls
+// the review back and only then submits it). kind "blog" = a guide for this
+// site's /blog, live only once approved.
+model Article {
+  id                String  @id @default(cuid())
+  kind              String
+  sourceKey         String  @unique
+  outreachRowId     Int?
+  outreachArticleId Int?
+  publication       String?
+  publicationUrl    String?
+  slug              String? @unique
+  title             String
+  dek               String?
+  byline            String?
+  body              String
+  bodyOriginal      String
+  bodyHash          String
+  previousBody      String?
+  writer            String?
+  isReference       Boolean @default(false)
+  wordCount         Int?
+  linksJson         String?
+  notes             String?
+  outreachStatus    String?
+  liveUrl           String?
+  status            String  @default("pending")
+  reviewNote        String?
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  editedAt          DateTime?
+  editedBy          String?
+  publishedAt       DateTime?
+  receivedAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  images ArticleImage[]
+
+  @@index([kind, status])
+}
+
+model ArticleImage {
+  id          String  @id @default(cuid())
+  position    Int     @default(0)
+  fileName    String
+  contentType String
+  altText     String?
+  caption     String?
+  blob        Bytes
+  createdAt   DateTime @default(now())
+
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId String
+
+  @@unique([articleId, fileName])
+  @@index([articleId])
+}

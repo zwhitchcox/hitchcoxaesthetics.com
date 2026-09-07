@@ -1,6 +1,7 @@
 import { type LoaderFunctionArgs } from '@remix-run/node'
 import { getDomainUrl } from '#app/utils/misc.tsx'
 import { locations } from '#app/utils/locations.ts'
+import { prisma } from '#app/utils/db.server.ts'
 import { sitePages } from '#app/utils/site-pages.server.js'
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -25,7 +26,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		.filter(p => p.enabled)
 		.map(p => p.path)
 
-	const allPaths = [...new Set([...staticPaths, ...servicePagePaths])]
+	// Skincare guides that Sarah approved in /admin/articles
+	const guides = await prisma.article.findMany({
+		where: { kind: 'blog', status: 'approved', slug: { not: null } },
+		select: { slug: true },
+	})
+	const guidePaths = guides.length
+		? ['blog', ...guides.map(g => `blog/${g.slug}`)]
+		: []
+
+	const allPaths = [
+		...new Set([...staticPaths, ...servicePagePaths, ...guidePaths]),
+	]
 
 	const urls = allPaths
 		.map(p => {

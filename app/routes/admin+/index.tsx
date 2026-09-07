@@ -13,6 +13,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 // Admin quick links with icons for the dashboard
 const adminQuickLinks = [
 	{
+		title: 'Articles',
+		icon: 'file-text' as const,
+		description: 'Approve, deny or edit articles written under the practice\'s name',
+		path: '/admin/articles',
+		color: 'bg-emerald-100 dark:bg-emerald-950',
+	},
+	{
 		title: 'Reviews',
 		icon: 'star' as const,
 		description: 'Manage and view customer reviews',

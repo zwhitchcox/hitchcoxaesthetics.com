@@ -1,10 +1,30 @@
-import { json, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/node'
+import {
+	json,
+	type LoaderFunctionArgs,
+	type MetaFunction,
+} from '@remix-run/node'
 import { Link, useLoaderData } from '@remix-run/react'
-import { getPost, type BlogSection } from '#app/utils/blog-posts.ts'
+import { MarkdownContent } from '#app/components/markdown-content.tsx'
+import { prisma } from '#app/utils/db.server.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
 
+/** One skincare guide. Live only after Sarah approves it in /admin/articles. */
 export async function loader({ params }: LoaderFunctionArgs) {
-	const post = getPost(params.slug ?? '')
+	const post = await prisma.article.findFirst({
+		where: { kind: 'blog', status: 'approved', slug: params.slug ?? '' },
+		select: {
+			slug: true,
+			title: true,
+			dek: true,
+			body: true,
+			publishedAt: true,
+			updatedAt: true,
+			images: {
+				orderBy: { position: 'asc' },
+				select: { id: true, altText: true, caption: true },
+			},
+		},
+	})
 	if (!post) throw new Response('Not found', { status: 404 })
 	return json({ post })
 }
@@ -14,45 +34,28 @@ export const meta: MetaFunction<typeof loader> = ({ data, location }) =>
 		title: data
 			? `${data.post.title} | Sarah Hitchcox Aesthetics`
 			: 'Skincare Guide | Sarah Hitchcox Aesthetics',
-		description: data?.post.description ?? '',
+		description: data?.post.dek ?? '',
 		pathname: location.pathname,
+		image: data?.post.images[0]
+			? `https://hitchcoxaesthetics.com/resources/article-images/${data.post.images[0].id}`
+			: undefined,
 	})
-
-function Section({ section }: { section: BlogSection }) {
-	if (section.type === 'h2')
-		return (
-			<h2 className="mt-10 text-2xl font-semibold text-foreground">
-				{section.text}
-			</h2>
-		)
-	if (section.type === 'ul')
-		return (
-			<ul className="mt-4 list-disc space-y-2 pl-6 text-foreground/80">
-				{section.items.map(i => (
-					<li key={i}>{i}</li>
-				))}
-			</ul>
-		)
-	if (section.type === 'note')
-		return (
-			<p className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-base leading-relaxed text-amber-900">
-				{section.text}
-			</p>
-		)
-	return <p className="mt-4 leading-relaxed text-foreground/80">{section.text}</p>
-}
 
 export default function BlogPost() {
 	const { post } = useLoaderData<typeof loader>()
+	const hero = post.images[0]
+	const published = post.publishedAt ?? post.updatedAt
 
 	const jsonLd = {
 		'@context': 'https://schema.org',
 		'@type': 'Article',
 		headline: post.title,
-		description: post.description,
-		image: `https://hitchcoxaesthetics.com${post.image}`,
-		datePublished: post.published,
-		dateModified: post.published,
+		description: post.dek ?? undefined,
+		image: hero
+			? `https://hitchcoxaesthetics.com/resources/article-images/${hero.id}`
+			: undefined,
+		datePublished: published,
+		dateModified: post.updatedAt,
 		author: {
 			'@type': 'Person',
 			name: 'Sarah Hitchcox, RN, BSN',
@@ -70,8 +73,18 @@ export default function BlogPost() {
 		'@context': 'https://schema.org',
 		'@type': 'BreadcrumbList',
 		itemListElement: [
-			{ '@type': 'ListItem', position: 1, name: 'Home', item: 'https://hitchcoxaesthetics.com' },
-			{ '@type': 'ListItem', position: 2, name: 'Skincare Guides', item: 'https://hitchcoxaesthetics.com/blog' },
+			{
+				'@type': 'ListItem',
+				position: 1,
+				name: 'Home',
+				item: 'https://hitchcoxaesthetics.com',
+			},
+			{
+				'@type': 'ListItem',
+				position: 2,
+				name: 'Skincare Guides',
+				item: 'https://hitchcoxaesthetics.com/blog',
+			},
 			{ '@type': 'ListItem', position: 3, name: post.title },
 		],
 	}
@@ -96,7 +109,9 @@ export default function BlogPost() {
 				<h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
 					{post.title}
 				</h1>
-				<p className="mt-4 text-lg text-muted-foreground">{post.summary}</p>
+				{post.dek ? (
+					<p className="mt-4 text-lg text-muted-foreground">{post.dek}</p>
+				) : null}
 				<p className="mt-4 text-sm text-muted-foreground">
 					Written and reviewed by{' '}
 					<Link to="/about" className="font-medium text-primary hover:underline">
@@ -104,34 +119,50 @@ export default function BlogPost() {
 					</Link>
 				</p>
 
-				<figure className="mt-8">
-					<img
-						src={post.image}
-						alt={post.imageAlt}
-						className="max-h-[420px] w-full rounded-2xl object-cover"
-					/>
-				</figure>
+				{hero ? (
+					<figure className="mt-8">
+						<img
+							src={`/resources/article-images/${hero.id}`}
+							alt={hero.altText ?? ''}
+							className="max-h-[420px] w-full rounded-2xl object-cover"
+						/>
+						{hero.caption ? (
+							<figcaption className="mt-2 text-sm text-muted-foreground">
+								{hero.caption}
+							</figcaption>
+						) : null}
+					</figure>
+				) : null}
 
-				<div className="mt-2 text-lg">
-					{post.sections.map((s, i) => (
-						<Section key={i} section={s} />
-					))}
+				<div className="mt-8">
+					<MarkdownContent
+						content={post.body}
+						className="prose prose-lg prose-gray max-w-none dark:prose-invert"
+					/>
 				</div>
 
-				<aside className="mt-12 rounded-2xl bg-muted/50 p-6">
-					<h2 className="text-lg font-semibold text-foreground">
-						Related treatments
-					</h2>
-					<ul className="mt-3 space-y-2">
-						{post.related.map(r => (
-							<li key={r.href}>
-								<Link to={r.href} className="text-primary hover:underline">
-									{r.label}
-								</Link>
-							</li>
+				{post.images.length > 1 ? (
+					<div className="mt-10 grid gap-6 sm:grid-cols-2">
+						{post.images.slice(1).map(im => (
+							<figure key={im.id}>
+								<img
+									src={`/resources/article-images/${im.id}`}
+									alt={im.altText ?? ''}
+									loading="lazy"
+									className="w-full rounded-2xl object-cover"
+								/>
+								{im.caption ? (
+									<figcaption className="mt-2 text-sm text-muted-foreground">
+										{im.caption}
+									</figcaption>
+								) : null}
+							</figure>
 						))}
-					</ul>
-					<p className="mt-4 text-sm text-muted-foreground">
+					</div>
+				) : null}
+
+				<aside className="mt-12 rounded-2xl bg-muted/50 p-6">
+					<p className="text-sm text-muted-foreground">
 						Nothing here is medical advice. For a personal assessment, book a
 						consultation at our{' '}
 						<Link to="/bearden" className="text-primary hover:underline">

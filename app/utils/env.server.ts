@@ -25,6 +25,8 @@ const schema = z.object({
 	REVIEW_REMINDER_SMS_TO: z.string().optional(),
 	// Server-only, powers AI call analysis
 	OPEN_ROUTER_API_KEY: z.string().optional(),
+	/** Bearer token the outreach system on the Mac mini uses for /resources/article-sync. Unset = sync off. */
+	ARTICLE_SYNC_TOKEN: z.string().optional(),
 	OPENROUTER_CALL_MODEL: z.string().optional(),
 	ENABLE_DEV_POSTHOG: z.string().optional(),
 	REACT_APP_PUBLIC_POSTHOG_KEY: z.string().optional(),
