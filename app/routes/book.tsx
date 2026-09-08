@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Calendar } from '#app/components/ui/calendar.tsx'
+import { Checkbox } from '#app/components/ui/checkbox.tsx'
 import {
 	Card,
 	CardDescription,
@@ -485,6 +486,8 @@ export default function BlvdBookRoute() {
 		string | null
 	>(null)
 	const [verifiedExistingClient, setVerifiedExistingClient] = useState(false)
+	const [cardRisk, setCardRisk] = useState<BookingCardRiskResult | null>(null)
+	const [policyAccepted, setPolicyAccepted] = useState(false)
 	const [availablePaymentMethods, setAvailablePaymentMethods] = useState<
 		BlvdPaymentMethod[]
 	>([])
@@ -693,7 +696,11 @@ export default function BlvdBookRoute() {
 	const selectedSiteLocation = selectedLocation
 		? (getSiteLocationForBlvdLocation(selectedLocation) ?? null)
 		: null
-	const requiresCard = Boolean(cart?.summary.paymentMethodRequired)
+	const riskRequiresCard = Boolean(
+		cardRisk?.require_card && !cardRisk.has_card_on_file,
+	)
+	const requiresCard =
+		Boolean(cart?.summary.paymentMethodRequired) || riskRequiresCard
 	const hasVerifiedMobile = Boolean(ownershipVerifiedPhone)
 	const hasCompletedBlvdOwnershipVerification = Boolean(
 		hasVerifiedMobile &&
@@ -1000,6 +1007,24 @@ export default function BlvdBookRoute() {
 			window.scrollTo(0, 0)
 		}
 	}, [currentStep])
+
+	useEffect(() => {
+		// Once the phone is verified, ask the server whether this booking needs
+		// a card on file (new client, or a prior cancellation/no-show). Fails
+		// open: any error leaves the booking cardless rather than blocked.
+		if (!ownershipVerifiedPhone) {
+			setCardRisk(null)
+			setPolicyAccepted(false)
+			return
+		}
+		let cancelled = false
+		void requestBookingCardRisk(ownershipVerifiedPhone).then(result => {
+			if (!cancelled) setCardRisk(result)
+		})
+		return () => {
+			cancelled = true
+		}
+	}, [ownershipVerifiedPhone])
 
 	useEffect(() => {
 		// Once the booking completes, the derived step flips to "reserve" (the
@@ -1554,6 +1579,13 @@ export default function BlvdBookRoute() {
 			}
 		}
 
+		if (requiresCard && !policyAccepted) {
+			setStepError(
+				'Please confirm you understand the cancellation policy to continue.',
+			)
+			return
+		}
+
 		setSubmittingBooking(true)
 		setStepError(null)
 
@@ -1594,16 +1626,29 @@ export default function BlvdBookRoute() {
 				)
 			}
 
-			if (
-				nextCart.summary.paymentMethodRequired &&
-				selectedExistingPaymentMethod
-			) {
+			// Attach a card when Boulevard demands one OR when our own risk rule
+			// does (new client / prior cancellation without a card on file).
+			const mustAttachCard =
+				nextCart.summary.paymentMethodRequired || riskRequiresCard
+			if (mustAttachCard && selectedExistingPaymentMethod) {
 				nextCart = await nextCart.selectPaymentMethod(
 					selectedExistingPaymentMethod,
 				)
-			} else if (nextCart.summary.paymentMethodRequired) {
+			} else if (mustAttachCard) {
 				const card = parseCardDetails(clientForm)
 				nextCart = await nextCart.addCardPaymentMethod({ card })
+			}
+
+			if (requiresCard) {
+				captureBookingPostHogEvent(
+					'booking_cancellation_policy_acknowledged',
+					{
+						...bookingAnalyticsPropertiesRef.current,
+						booking_card_risk_reason: cardRisk?.reason ?? 'boulevard-required',
+						booking_policy_accepted_at: new Date().toISOString(),
+					},
+					{ phone: ownershipVerifiedPhone ?? clientForm.phone },
+				)
 			}
 
 			nextCart = await ensureCartHasSelectedTime(nextCart, selectedTime)
@@ -3227,12 +3272,17 @@ export default function BlvdBookRoute() {
 													<div className="space-y-4 rounded-xl border bg-card p-5">
 														<div className="space-y-1">
 															<h3 className="text-lg font-semibold">
-																Card Hold
+																Card to hold your appointment
 															</h3>
 															<p className="text-sm text-muted-foreground">
-																Boulevard currently requires a payment method
-																for this booking, even when the live subtotal is{' '}
-																<code>{formatMoney(cart?.summary.total)}</code>.
+																{riskRequiresCard &&
+																cardRisk?.reason === 'prior-cancel'
+																	? 'A card on file is needed to hold this appointment. You will not be charged today.'
+																	: riskRequiresCard
+																		? 'We hold appointments for new clients with a card on file. You will not be charged today.'
+																		: 'A payment method is required to hold this booking. You will not be charged today.'}{' '}
+																Your card is stored securely by Boulevard, our
+																booking system.
 															</p>
 														</div>
 														{availablePaymentMethods.length > 0 ? (
@@ -3366,6 +3416,25 @@ export default function BlvdBookRoute() {
 																</div>
 															</div>
 														) : null}
+														<div className="flex items-start gap-3">
+															<Checkbox
+																id="policyAccepted"
+																checked={policyAccepted}
+																onCheckedChange={checked => {
+																	setPolicyAccepted(checked === true)
+																}}
+															/>
+															<Label
+																htmlFor="policyAccepted"
+																className="text-sm font-normal leading-snug text-muted-foreground"
+															>
+																I understand the cancellation policy: cancelling
+																less than 24 hours before my appointment may be
+																charged a $50 fee, and cancelling less than 12
+																hours before, or missing the appointment, may be
+																charged a $100 fee.
+															</Label>
+														</div>
 													</div>
 												) : null}
 											</form>
@@ -4640,6 +4709,35 @@ async function requestBookingPhoneVerification(
 	}
 
 	return { ok: true }
+}
+
+type BookingCardRiskResult = {
+	has_card_on_file: boolean
+	reason: 'new-client' | 'prior-cancel' | null
+	require_card: boolean
+}
+
+async function requestBookingCardRisk(
+	phone: string,
+): Promise<BookingCardRiskResult | null> {
+	try {
+		const response = await fetch('/resources/booking-card-risk', {
+			body: JSON.stringify({ phone }),
+			headers: { 'Content-Type': 'application/json' },
+			method: 'POST',
+		})
+		const result = (await response.json().catch(() => null)) as
+			| (Partial<BookingCardRiskResult> & { ok?: boolean })
+			| null
+		if (!response.ok || !result?.ok) return null
+		return {
+			has_card_on_file: Boolean(result.has_card_on_file),
+			reason: result.reason ?? null,
+			require_card: Boolean(result.require_card),
+		}
+	} catch {
+		return null
+	}
 }
 
 async function requestBookingClientLookup(phone: string) {
