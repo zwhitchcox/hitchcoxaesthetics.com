@@ -341,6 +341,8 @@ export const meta: MetaFunction<typeof loader> = ({ data, location }) => {
 		title: brand.bookTitle,
 		description: brand.bookDescription,
 		pathname: location.pathname,
+		siteName: brand.businessName,
+		siteUrl: brand.homeUrl,
 	})
 }
 
@@ -2252,7 +2254,7 @@ export default function BlvdBookRoute() {
 						void handleSelectService(service, renderInstanceId)
 					}}
 					className={cn(
-						'w-full min-w-0 rounded-xl border bg-white p-5 text-left transition hover:border-primary hover:shadow-md',
+						'w-full min-w-0 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-md',
 						isSelected && 'border-primary shadow-sm',
 					)}
 				>
@@ -2283,7 +2285,7 @@ export default function BlvdBookRoute() {
 					</div>
 				</button>
 				{activeOptionGroup?.selectionOptions?.length ? (
-					<div className="mt-3 rounded-xl border bg-white p-4 shadow-sm">
+					<div className="mt-3 rounded-xl border bg-card p-4 shadow-sm">
 						{activeOptionGroup.id !== service.id ? (
 							<div className="text-sm font-semibold text-foreground">
 								{activeOptionGroup.displayName}
@@ -2432,7 +2434,7 @@ export default function BlvdBookRoute() {
 
 				{checkoutSuccess ? (
 					<div className="flex min-h-full w-full flex-col items-center justify-center py-12">
-						<Card className="mx-auto flex w-full max-w-xl flex-col items-center space-y-8 bg-white px-6 py-10 sm:px-12">
+						<Card className="mx-auto flex w-full max-w-xl flex-col items-center space-y-8 bg-card px-6 py-10 sm:px-12">
 							<div className="flex flex-col items-center space-y-2 text-center">
 								<h2 className="flex items-center gap-2 text-4xl font-bold tracking-tight">
 									Success! <span className="text-3xl">🎉</span>
@@ -2482,7 +2484,7 @@ export default function BlvdBookRoute() {
 							stepAvailability={stepAvailability}
 							stepCompletion={stepCompletion}
 						/>
-						<Card className="flex w-full max-w-5xl flex-col items-stretch bg-white p-4 pb-6 transition-all duration-300 lg:flex-row lg:items-start lg:space-x-8">
+						<Card className="flex w-full max-w-5xl flex-col items-stretch bg-card p-4 pb-6 transition-all duration-300 lg:flex-row lg:items-start lg:space-x-8">
 							<div className="order-2 mt-6 w-full max-w-xs flex-shrink-0 self-center lg:order-1 lg:mt-0 lg:w-64 lg:self-auto">
 								<BlvdAppointmentDetails
 									appointmentDate={appointmentDate}
@@ -2527,7 +2529,7 @@ export default function BlvdBookRoute() {
 
 										{clientHistorySelection === 'unsure' && !clientHistory ? (
 											<form
-												className="w-full max-w-2xl space-y-3 rounded-xl border bg-white p-4"
+												className="w-full max-w-2xl space-y-3 rounded-xl border bg-card p-4"
 												onSubmit={handleLookupClientHistory}
 											>
 												<div className="space-y-2">
@@ -2684,7 +2686,7 @@ export default function BlvdBookRoute() {
 														return (
 															<div
 																key={location.id}
-																className="overflow-hidden rounded-xl border bg-white transition hover:border-primary hover:shadow-md"
+																className="overflow-hidden rounded-xl border bg-card transition hover:border-primary hover:shadow-md"
 															>
 																<button
 																	type="button"
@@ -2768,7 +2770,7 @@ export default function BlvdBookRoute() {
 													})}
 
 													{serviceLocations.length > 1 ? (
-														<div className="overflow-hidden rounded-xl border border-dashed bg-white transition hover:border-primary hover:shadow-md">
+														<div className="overflow-hidden rounded-xl border border-dashed bg-card transition hover:border-primary hover:shadow-md">
 															<button
 																type="button"
 																onClick={() => {
@@ -2844,7 +2846,7 @@ export default function BlvdBookRoute() {
 																'rounded-full border px-4 py-1.5 text-sm font-medium transition',
 																isActive
 																	? 'border-primary bg-primary text-primary-foreground'
-																	: 'bg-white text-foreground hover:border-primary',
+																	: 'bg-card text-foreground hover:border-primary',
 																loadingSchedule && 'opacity-60',
 															)}
 														>
@@ -3104,7 +3106,7 @@ export default function BlvdBookRoute() {
 														) : null}
 													</div>
 													{hasVerifiedClient ? (
-														<div className="rounded-xl border bg-white p-5 text-sm text-muted-foreground md:col-span-2">
+														<div className="rounded-xl border bg-card p-5 text-sm text-muted-foreground md:col-span-2">
 															Your contact details are already attached through
 															the verified Boulevard record.
 														</div>
@@ -3144,7 +3146,7 @@ export default function BlvdBookRoute() {
 
 												{cart?.bookingQuestions &&
 												cart.bookingQuestions.length > 0 ? (
-													<div className="space-y-4 rounded-xl border bg-white p-5">
+													<div className="space-y-4 rounded-xl border bg-card p-5">
 														<div className="space-y-1">
 															<h3 className="text-lg font-semibold">
 																Booking Questions
@@ -3222,7 +3224,7 @@ export default function BlvdBookRoute() {
 												</div>
 
 												{requiresCard ? (
-													<div className="space-y-4 rounded-xl border bg-white p-5">
+													<div className="space-y-4 rounded-xl border bg-card p-5">
 														<div className="space-y-1">
 															<h3 className="text-lg font-semibold">
 																Card Hold
@@ -3442,10 +3444,10 @@ function BlvdStepTracker({
 								className={cn(
 									'flex h-6 w-6 items-center justify-center rounded-full text-xs sm:h-8 sm:w-8 sm:text-base',
 									isActive
-										? 'bg-gray-700 text-white'
+										? 'bg-primary text-primary-foreground'
 										: isComplete
-											? 'bg-gray-500 text-white'
-											: 'bg-gray-300 text-gray-800',
+											? 'bg-primary/60 text-primary-foreground'
+											: 'bg-muted text-muted-foreground',
 								)}
 							>
 								{isComplete ? '✓' : index + 1}
@@ -3453,7 +3455,7 @@ function BlvdStepTracker({
 							<div
 								className={cn(
 									'mt-1 hidden text-sm sm:block',
-									isActive ? 'font-medium text-gray-700' : 'text-gray-500',
+									isActive ? 'font-medium text-foreground/80' : 'text-muted-foreground',
 								)}
 							>
 								{step.label}
@@ -3463,7 +3465,7 @@ function BlvdStepTracker({
 							<div
 								className={cn(
 									'h-0.5 w-full translate-y-0 sm:-translate-y-3',
-									isComplete || isActive ? 'bg-gray-500' : 'bg-gray-300',
+									isComplete || isActive ? 'bg-primary/60' : 'bg-muted',
 								)}
 							/>
 						)}
@@ -3571,7 +3573,7 @@ function BlvdAppointmentDetails({
 					</div>
 					{selectedService &&
 					(selectedServicePrice || cart?.summary.depositAmount) ? (
-						<div className="mt-4 w-full rounded-xl border bg-white p-4 text-sm">
+						<div className="mt-4 w-full rounded-xl border bg-card p-4 text-sm">
 							{selectedServicePrice ? (
 								<div className="flex items-center justify-between gap-4">
 									<span className="font-medium text-muted-foreground">
