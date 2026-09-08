@@ -74,7 +74,7 @@ export default function CedarBluffLocation() {
 				type="application/ld+json"
 				dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
 			/>
-			<div className="font-poppins flex w-full flex-col bg-background">
+			<div className="font-poppins flex w-full flex-col bg-white">
 				<Hero
 					image="/img/sarah.jpg"
 					imageAlt="Sarah Hitchcox - Cedar Bluff Med Spa"
@@ -88,10 +88,10 @@ export default function CedarBluffLocation() {
 				<div className="mx-auto w-full max-w-4xl px-6 py-16">
 					<div className="space-y-12">
 						<div className="text-center">
-							<h2 className="mb-4 text-3xl font-bold text-foreground">
+							<h2 className="mb-4 text-3xl font-bold text-gray-900">
 								Knoxville Med Spa | Cedar Bluff
 							</h2>
-							<p className="text-lg leading-relaxed text-muted-foreground">
+							<p className="text-lg leading-relaxed text-gray-600">
 								Serving the Cedar Bluff area of West Knoxville, Sarah Hitchcox
 								Aesthetics offers premier medical spa services. We specialize in
 								natural-looking results through expert Botox injections, dermal
@@ -101,7 +101,7 @@ export default function CedarBluffLocation() {
 						</div>
 
 						<div>
-							<h2 className="text-center text-2xl font-bold text-foreground">
+							<h2 className="text-center text-2xl font-bold text-gray-900">
 								Knoxville Med Spa Services Available in Cedar Bluff
 							</h2>
 							<div className="mt-8">
@@ -109,11 +109,11 @@ export default function CedarBluffLocation() {
 							</div>
 						</div>
 
-						<div className="rounded-xl bg-muted/50 p-8 text-center">
-							<h3 className="mb-4 text-2xl font-semibold text-foreground">
+						<div className="rounded-xl bg-gray-50 p-8 text-center">
+							<h3 className="mb-4 text-2xl font-semibold text-gray-900">
 								Visit Our Cedar Bluff Location
 							</h3>
-							<p className="mb-6 text-muted-foreground">
+							<p className="mb-6 text-gray-600">
 								We are located at {location.address}, in the Cedar Bluff area of
 								West Knoxville. Ample parking is available.
 							</p>
@@ -121,7 +121,7 @@ export default function CedarBluffLocation() {
 								<Link
 									to={`tel:${location.phoneRaw}`}
 									reloadDocument
-									className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-card px-6 py-3 font-semibold text-foreground/80 hover:bg-muted"
+									className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
 								>
 									Call {location.phone}
 								</Link>
@@ -129,7 +129,7 @@ export default function CedarBluffLocation() {
 									href={location.googleMapsDirectionsUrl}
 									target="_blank"
 									rel="noopener noreferrer"
-									className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground hover:bg-primary/90"
+									className="inline-flex items-center justify-center gap-2 rounded-md bg-black px-6 py-3 font-semibold text-white hover:bg-gray-800"
 								>
 									<Icon name="map-pin" className="h-5 w-5" />
 									Get Directions
@@ -151,7 +151,7 @@ export default function CedarBluffLocation() {
 						</div>
 
 						<div className="text-center">
-							<p className="text-muted-foreground">
+							<p className="text-gray-600">
 								Also visit our{' '}
 								<Link
 									to="/bearden"

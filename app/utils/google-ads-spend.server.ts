@@ -4,45 +4,10 @@
  * string on failure so pages can surface why the series is missing; the
  * range-total variant keeps its old null-on-failure contract.
  */
-import { prisma } from '#app/utils/db.server.ts'
-import { ttlCache } from '#app/utils/ttl-cache.server.ts'
-
-// v21 was sunset by Google (404s began 2026-08-12 and went unnoticed for 12
-// days); bump again when Google retires this one - a failing
-// google-ads-spend-sync workflow is the signal.
-const ADS_API_VERSION = 'v23'
-/** One sync covers this much history; spend older than that never changes. */
-const SYNC_BACK_DAYS = 400
-
-// Fallback-path cache only (mirror still empty right after first deploy).
-const spendCache = ttlCache<{
-	byDay: Record<string, number> | null
-	error: string | null
-}>({ ttlMs: 10 * 60 * 1000, shouldCache: r => r.error == null })
+const ADS_API_VERSION = 'v21'
 
 function truncateError(text: string) {
 	return text.length > 300 ? `${text.slice(0, 300)}…` : text
-}
-
-/**
- * Pull daily spend from the Ads API into GoogleAdsSpendDay. Runs on the
- * google-ads-spend-sync background job; report loaders read the table.
- */
-export async function syncGoogleAdsSpend(): Promise<{ days: number }> {
-	const toDay = new Date().toISOString().slice(0, 10)
-	const fromDay = new Date(Date.now() - SYNC_BACK_DAYS * 24 * 3600 * 1000)
-		.toISOString()
-		.slice(0, 10)
-	const { byDay, error } = await fetchGoogleAdsSpendByDay(fromDay, toDay)
-	if (error || !byDay) throw new Error(error ?? 'Ads API returned no data')
-	for (const [day, usd] of Object.entries(byDay)) {
-		await prisma.googleAdsSpendDay.upsert({
-			where: { day },
-			create: { day, usd },
-			update: { usd },
-		})
-	}
-	return { days: Object.keys(byDay).length }
 }
 
 /**
@@ -52,33 +17,6 @@ export async function syncGoogleAdsSpend(): Promise<{ days: number }> {
  * silently missing series.
  */
 export async function getGoogleAdsSpendByDay(
-	fromDay: string,
-	toDay: string,
-): Promise<{ byDay: Record<string, number> | null; error: string | null }> {
-	// Primary path: the GoogleAdsSpendDay mirror (google-ads-spend-sync job).
-	const rows = await prisma.googleAdsSpendDay.findMany({
-		where: { day: { gte: fromDay, lte: toDay } },
-	})
-	if (rows.length) {
-		return {
-			byDay: Object.fromEntries(rows.map(r => [r.day, r.usd])),
-			error: null,
-		}
-	}
-	const mirrored = await prisma.googleAdsSpendDay.findFirst({
-		select: { day: true },
-	})
-	if (mirrored) {
-		// The mirror exists but has nothing in this window: no spend then.
-		return { byDay: {}, error: null }
-	}
-	// Mirror empty (first deploy): live call, cached, so pages still work.
-	return spendCache(`${fromDay}..${toDay}`, () =>
-		fetchGoogleAdsSpendByDay(fromDay, toDay),
-	)
-}
-
-async function fetchGoogleAdsSpendByDay(
 	fromDay: string,
 	toDay: string,
 ): Promise<{ byDay: Record<string, number> | null; error: string | null }> {

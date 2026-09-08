@@ -1,5 +1,4 @@
 import crypto from 'crypto'
-import { lookup, reverse } from 'node:dns/promises'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequestHandler as _createRequestHandler } from '@remix-run/express'
@@ -49,88 +48,6 @@ const getHost = (req: { get: (key: string) => string | undefined }) =>
 // fly is our proxy
 app.set('trust proxy', true)
 
-type GooglebotVerification = {
-	verified: boolean
-	hostname: string | null
-	checkedAt: string
-}
-
-const googlebotVerificationCache = new Map<
-	string,
-	{ expiresAt: number; result: GooglebotVerification }
->()
-
-const normalizeIp = (value: string) =>
-	value
-		.toLowerCase()
-		.replace(/^::ffff:/, '')
-		.split('%')[0] ?? value
-
-async function verifyGooglebotIp(ip: string): Promise<GooglebotVerification> {
-	const normalizedIp = normalizeIp(ip)
-	const cached = googlebotVerificationCache.get(normalizedIp)
-	if (cached && cached.expiresAt > Date.now()) return cached.result
-
-	let hostname: string | null = null
-	let verified = false
-	try {
-		const hostnames = await reverse(normalizedIp)
-		hostname =
-			hostnames
-				.map(value => value.toLowerCase().replace(/\.$/, ''))
-				.find(
-					value =>
-						value.endsWith('.googlebot.com') || value.endsWith('.google.com'),
-				) ?? null
-		if (hostname) {
-			const forward = await lookup(hostname, { all: true, verbatim: true })
-			verified = forward.some(
-				entry => normalizeIp(entry.address) === normalizedIp,
-			)
-		}
-	} catch {
-		// A failed reverse or forward lookup means the request remains unverified.
-	}
-
-	const result = {
-		verified,
-		hostname,
-		checkedAt: new Date().toISOString(),
-	}
-	googlebotVerificationCache.set(normalizedIp, {
-		expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-		result,
-	})
-	return result
-}
-
-// Establish a defensible T0 for SEO experiments. A Googlebot user-agent alone
-// is spoofable, so the log entry is marked verified only after reverse DNS and
-// matching forward DNS both resolve to the request IP.
-app.use((req, res, next) => {
-	const userAgent = req.get('user-agent') ?? ''
-	if (!/\bGooglebot\b/i.test(userAgent)) return next()
-	const clientIp = req.ip ?? ''
-	res.on('finish', () => {
-		void verifyGooglebotIp(clientIp).then(verification => {
-			console.log(
-				JSON.stringify({
-					event: 'googlebot_request',
-					observedAt: new Date().toISOString(),
-					method: req.method,
-					host: getHost(req),
-					path: req.path,
-					status: res.statusCode,
-					clientIp: normalizeIp(clientIp),
-					userAgent,
-					...verification,
-				}),
-			)
-		})
-	})
-	next()
-})
-
 // ensure HTTPS only (X-Forwarded-Proto comes from Fly)
 app.use((req, res, next) => {
 	const proto = req.get('X-Forwarded-Proto')
@@ -147,13 +64,16 @@ app.use((req, res, next) => {
 // served straight from this server, one prebuilt static bundle per host in
 // network-sites/. Must run BEFORE the trailing-slash and alternate-domain
 // redirects so those never touch these hosts.
-// Most of these moved to their own Cloudflare Pages projects on
-// 2026-08-05 and are no longer served here. These two remain until
-// cosmeticcrave.com finishes its rebuild and
-// testandoprodutoscosmeticos.com moves its nameservers to Cloudflare.
 const NETWORK_SITES = new Set([
+	'mesolaserclinic.com',
+	'abellamedspa.com',
+	'agelessyoumedspa.com',
+	'antiagingpress.org',
+	'safecosmeticsalliance.org',
 	'testandoprodutoscosmeticos.com',
 	'cosmeticcrave.com',
+	'temanaskincare.com',
+	'xceleratedweightloss.com',
 ])
 /**
  * Editorial links earned by these domains before we owned them point at post
@@ -179,9 +99,19 @@ const LEGACY_REDIRECTS: Record<string, Record<string, string>> = {
 		'/guides/how-to-judge-a-beauty-product/':
 			'https://hitchcoxaesthetics.com/blog/how-to-read-a-skincare-label',
 	},
-	// xceleratedweightloss.com and safecosmeticsalliance.org moved to
-	// Cloudflare Pages on 2026-08-05. Their legacy redirects now live in
-	// each site's own _redirects file.
+	'xceleratedweightloss.com': {
+		// Three fda.gov public notifications (dofollow) all link the homepage.
+		// Zane's call 2026-08-04: send them to the warning article on our blog
+		// rather than hosting it here. Deeper pages on this domain still serve.
+		'/': 'https://hitchcoxaesthetics.com/blog/xcelerated-weight-loss-fda-warning',
+	},
+	'safecosmeticsalliance.org': {
+		// lifestyle.howstuffworks.com (DA 51), a cosmetics-history article.
+		// Keyed with its query string; other objectid values still serve
+		// index.cfm on-site.
+		'/index.cfm?objectid=EE203500-D4DB-11E1-A38E000C296BA163':
+			'https://hitchcoxaesthetics.com/blog/a-brief-history-of-cosmetics',
+	},
 	'testandoprodutoscosmeticos.com': {
 		// areademulher.r7.com (DA 55) is Portuguese-language; keep the visitor
 		// on a Portuguese page rather than sending them to an English site.
@@ -194,10 +124,7 @@ const LEGACY_REDIRECTS: Record<string, Record<string, string>> = {
 }
 
 app.use((req, res, next) => {
-	const host = getHost(req)
-		.toLowerCase()
-		.split(':')[0]!
-		.replace(/^www\./, '')
+	const host = getHost(req).toLowerCase().split(':')[0]!.replace(/^www\./, '')
 	if (!NETWORK_SITES.has(host)) return next()
 	if (req.method !== 'GET' && req.method !== 'HEAD') {
 		return res.status(405).end()

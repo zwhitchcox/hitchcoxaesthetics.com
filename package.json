@@ -1,6 +1,5 @@
 {
 	"name": "hitchcoxaesthetics-com-7a21",
-	"packageManager": "pnpm@10.33.3",
 	"private": true,
 	"sideEffects": false,
 	"type": "module",

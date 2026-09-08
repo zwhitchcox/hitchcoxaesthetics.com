@@ -20,7 +20,7 @@ function BeforeAfterCard({
 	index: number
 }) {
 	return (
-		<div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-muted/50 shadow-sm">
+		<div className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 shadow-sm">
 			<BeforeAfterDisplay
 				beforeImage={pair.before}
 				afterImage={pair.after}
@@ -28,7 +28,7 @@ function BeforeAfterCard({
 				className="w-full"
 			/>
 			{pair.caption ? (
-				<div className="p-4 text-center text-sm font-medium text-foreground/80">
+				<div className="p-4 text-center text-sm font-medium text-gray-700">
 					{pair.caption}
 				</div>
 			) : null}
@@ -113,8 +113,8 @@ export function BeforeAfterResults({
 							onClick={() => api?.scrollTo(index)}
 							className={
 								index === current
-									? 'h-2.5 w-6 rounded-full bg-primary'
-									: 'h-2.5 w-2.5 rounded-full bg-muted transition-colors hover:bg-muted-foreground/50'
+									? 'h-2.5 w-6 rounded-full bg-black'
+									: 'h-2.5 w-2.5 rounded-full bg-gray-300 transition-colors hover:bg-gray-400'
 							}
 							aria-label={`Go to result ${index + 1}`}
 						/>

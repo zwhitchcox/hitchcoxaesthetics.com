@@ -329,7 +329,7 @@ export default function ReviewsPage() {
 												typeof reviewStats.averageRating === 'number' &&
 												star <= Math.round(reviewStats.averageRating)
 													? 'text-yellow-400'
-													: 'text-gray-300 dark:text-muted-foreground'
+													: 'text-gray-300 dark:text-gray-500'
 											}`}
 											fill="currentColor"
 											viewBox="0 0 20 20"
@@ -481,7 +481,7 @@ function ReviewCard({ review }: { review: Review }) {
 							className={`h-4 w-4 ${
 								star <= starCount
 									? 'text-yellow-400'
-									: 'text-gray-300 dark:text-muted-foreground'
+									: 'text-gray-300 dark:text-gray-500'
 							}`}
 							fill="currentColor"
 							viewBox="0 0 20 20"

@@ -16,10 +16,10 @@ export const meta: MetaFunction = ({ location }) =>
 export default function SupportRoute() {
 	return (
 		<div className="font-poppins mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-			<h1 className="mb-8 text-3xl font-bold text-foreground">
+			<h1 className="mb-8 text-3xl font-bold text-gray-900">
 				Contact & Support
 			</h1>
-			<p className="mb-8 text-lg text-muted-foreground">
+			<p className="mb-8 text-lg text-gray-600">
 				Questions about a treatment, your appointment, or anything else? Reach
 				out and we'll be happy to help.
 			</p>
@@ -56,7 +56,7 @@ export default function SupportRoute() {
 					</div>
 				))}
 			</div>
-			<p className="mt-12 text-muted-foreground">
+			<p className="mt-12 text-gray-600">
 				Ready to book?{' '}
 				<Link to="/book" className="text-primary hover:underline">
 					Schedule your appointment online

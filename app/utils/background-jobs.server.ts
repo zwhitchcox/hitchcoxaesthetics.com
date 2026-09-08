@@ -3,10 +3,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import { getInstanceInfoSync } from 'litefs-js'
 
-import { getAppointmentValuation } from '#app/utils/appointment-valuation.server.ts'
-import { syncBlvdAppointments } from '#app/utils/blvd-appointment-sync.server.ts'
 import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
-import { syncGoogleAdsSpend } from '#app/utils/google-ads-spend.server.ts'
 import { reconcileMissingAttributionFromPostHog } from '#app/utils/blvd-attribution-reconcile.server.ts'
 import { syncReviewAppointments } from '#app/utils/review-link-sync.server.ts'
 import { sendReviewReminderTexts } from '#app/utils/review-reminder-sms.server.ts'
@@ -35,7 +32,6 @@ import {
 	hasLapsedPatientsConfig,
 	syncLapsedPatients,
 } from '#app/utils/lapsed-patients.server.ts'
-import { runScheduleHealthCheck } from '#app/utils/schedule-health.server.ts'
 
 // Background job types and interfaces
 export interface JobStatus {
@@ -113,36 +109,9 @@ let jobStatuses: Record<string, JobStatus> = {
 		lastRunDuration: null,
 		lastError: null,
 	},
-	blvdAppointmentSync: {
-		id: 'blvdAppointmentSync',
-		name: 'Boulevard Appointment Mirror (hot window)',
-		status: 'idle',
-		lastRun: null,
-		nextRun: null,
-		lastRunDuration: null,
-		lastError: null,
-	},
-	blvdAppointmentBackfill: {
-		id: 'blvdAppointmentBackfill',
-		name: 'Boulevard Appointment Mirror (full backfill)',
-		status: 'idle',
-		lastRun: null,
-		nextRun: null,
-		lastRunDuration: null,
-		lastError: null,
-	},
-	googleAdsSpendSync: {
-		id: 'googleAdsSpendSync',
-		name: 'Google Ads Spend Sync',
-		status: 'idle',
-		lastRun: null,
-		nextRun: null,
-		lastRunDuration: null,
-		lastError: null,
-	},
 	financeReports: {
 		id: 'financeReports',
-		name: 'Finance Reports',
+		name: 'Finance Reports (Metabase)',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -170,15 +139,6 @@ let jobStatuses: Record<string, JobStatus> = {
 	lapsedPatients: {
 		id: 'lapsedPatients',
 		name: 'Lapsed Patients (retention)',
-		status: 'idle',
-		lastRun: null,
-		nextRun: null,
-		lastRunDuration: null,
-		lastError: null,
-	},
-	scheduleHealthAlert: {
-		id: 'scheduleHealthAlert',
-		name: 'Temporal Schedule Health Alert',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -488,17 +448,6 @@ export async function runAppointmentLedgerJob(): Promise<void> {
 		console.log(
 			`Appointment ledger: ${result.seen} appointments seen, ${result.changes} changes logged`,
 		)
-		// Piggybacks on the hourly cadence: mine WHY recent client cancels
-		// happened from the CallRail call near each cancellation (bounded,
-		// append-only; see cancellation-reasons.server.ts).
-		const { mineCancellationReasons } = await import(
-			'#app/utils/cancellation-reasons.server.ts'
-		)
-		const minedCount = await mineCancellationReasons().catch(error => {
-			console.error('Cancellation reason mining failed', error)
-			return 0
-		})
-		if (minedCount) console.log(`Cancellation reasons: mined ${minedCount}`)
 		job.status = 'completed'
 		job.lastError = null
 	} catch (error) {
@@ -584,23 +533,6 @@ export async function runFinanceReportsJob(): Promise<void> {
 export function initializeBackgroundJobs() {
 	if (isInitialized) return
 	isInitialized = true
-
-	// Keep the appointment valuation perpetually warm in the WEB process so
-	// no report request ever waits on its Boulevard order pull: build it
-	// shortly after boot, then refresh ahead of its 30-min TTL. Paired with
-	// stale-while-revalidate in appointment-valuation.server.ts.
-	if (
-		Boolean(process.env.BLVD_API_KEY?.trim()) &&
-		(process.env.NODE_ENV === 'production' ||
-			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1')
-	) {
-		const warm = () =>
-			getAppointmentValuation().catch(error =>
-				console.error('Appointment valuation warmup failed', error),
-			)
-		setTimeout(warm, 15_000)
-		setInterval(warm, 20 * 60 * 1000)
-	}
 
 	const temporalAddress = process.env.TEMPORAL_ADDRESS?.trim()
 	if (process.env.NODE_ENV === 'production' && temporalAddress) {
@@ -797,51 +729,6 @@ function initializeIntervalScheduling() {
 		}, 150_000)
 	}
 
-	if (
-		Boolean(process.env.BLVD_API_KEY?.trim()) &&
-		(process.env.NODE_ENV === 'production' ||
-			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1')
-	) {
-		const hotMs = getBlvdAppointmentSyncIntervalMs()
-		jobIntervals.blvdAppointmentSync = setInterval(() => {
-			runBlvdAppointmentSyncJob().catch(console.error)
-		}, hotMs)
-		const hotJob = jobStatuses['blvdAppointmentSync']
-		if (hotJob) hotJob.nextRun = new Date(Date.now() + hotMs).toISOString()
-		setTimeout(() => {
-			runBlvdAppointmentSyncJob().catch(console.error)
-		}, 20_000)
-
-		jobIntervals.blvdAppointmentBackfill = setInterval(() => {
-			runBlvdAppointmentBackfillJob().catch(console.error)
-		}, BLVD_APPOINTMENT_BACKFILL_INTERVAL_MS)
-		const backfillJob = jobStatuses['blvdAppointmentBackfill']
-		if (backfillJob)
-			backfillJob.nextRun = new Date(
-				Date.now() + BLVD_APPOINTMENT_BACKFILL_INTERVAL_MS,
-			).toISOString()
-		// Backfill once shortly after boot so first-visit history is complete.
-		setTimeout(() => {
-			runBlvdAppointmentBackfillJob().catch(console.error)
-		}, 120_000)
-	}
-
-	if (
-		Boolean(process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim()) &&
-		(process.env.NODE_ENV === 'production' ||
-			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1')
-	) {
-		const adsMs = getGoogleAdsSpendSyncIntervalMs()
-		jobIntervals.googleAdsSpendSync = setInterval(() => {
-			runGoogleAdsSpendSyncJob().catch(console.error)
-		}, adsMs)
-		const adsJob = jobStatuses['googleAdsSpendSync']
-		if (adsJob) adsJob.nextRun = new Date(Date.now() + adsMs).toISOString()
-		setTimeout(() => {
-			runGoogleAdsSpendSyncJob().catch(console.error)
-		}, 45_000)
-	}
-
 	if (shouldAutoRunFinanceReports()) {
 		const intervalMs = getFinanceReportsIntervalMs()
 		jobIntervals.financeReports = setInterval(() => {
@@ -928,128 +815,6 @@ function shouldAutoRunPlaidSync() {
 		(process.env.NODE_ENV === 'production' ||
 			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1')
 	)
-}
-
-export async function runBlvdAppointmentSyncJob(): Promise<void> {
-	const job = jobStatuses['blvdAppointmentSync']
-	if (!job) return
-	if (job.status === 'running') return
-	const startTime = Date.now()
-	job.status = 'running'
-	job.lastRun = new Date().toISOString()
-	try {
-		const result = await syncBlvdAppointments('hot')
-		console.log('Boulevard appointment sync (hot):', result)
-		job.status = 'completed'
-		job.lastError = null
-	} catch (error) {
-		console.error('Boulevard appointment sync failed:', error)
-		job.status = 'failed'
-		job.lastError = error instanceof Error ? error.message : String(error)
-	} finally {
-		job.lastRunDuration = Date.now() - startTime
-		job.nextRun = new Date(
-			Date.now() + getBlvdAppointmentSyncIntervalMs(),
-		).toISOString()
-	}
-}
-
-export async function runBlvdAppointmentBackfillJob(): Promise<void> {
-	const job = jobStatuses['blvdAppointmentBackfill']
-	if (!job) return
-	if (job.status === 'running') return
-	const startTime = Date.now()
-	job.status = 'running'
-	job.lastRun = new Date().toISOString()
-	try {
-		const result = await syncBlvdAppointments('full')
-		console.log('Boulevard appointment backfill:', result)
-		job.status = 'completed'
-		job.lastError = null
-	} catch (error) {
-		console.error('Boulevard appointment backfill failed:', error)
-		job.status = 'failed'
-		job.lastError = error instanceof Error ? error.message : String(error)
-	} finally {
-		job.lastRunDuration = Date.now() - startTime
-		job.nextRun = new Date(
-			Date.now() + BLVD_APPOINTMENT_BACKFILL_INTERVAL_MS,
-		).toISOString()
-	}
-}
-
-export async function runGoogleAdsSpendSyncJob(): Promise<void> {
-	const job = jobStatuses['googleAdsSpendSync']
-	if (!job) return
-	if (job.status === 'running') return
-	const startTime = Date.now()
-	job.status = 'running'
-	job.lastRun = new Date().toISOString()
-	try {
-		const result = await syncGoogleAdsSpend()
-		console.log('Google Ads spend sync:', result)
-		job.status = 'completed'
-		job.lastError = null
-	} catch (error) {
-		console.error('Google Ads spend sync failed:', error)
-		job.status = 'failed'
-		job.lastError = error instanceof Error ? error.message : String(error)
-	} finally {
-		job.lastRunDuration = Date.now() - startTime
-		job.nextRun = new Date(
-			Date.now() + getGoogleAdsSpendSyncIntervalMs(),
-		).toISOString()
-	}
-}
-
-export async function runScheduleHealthAlertJob(): Promise<void> {
-	const job = jobStatuses['scheduleHealthAlert']
-	if (!job) return
-	if (job.status === 'running') return
-	const startTime = Date.now()
-	job.status = 'running'
-	job.lastRun = new Date().toISOString()
-	try {
-		const result = await runScheduleHealthCheck()
-		console.log('Temporal schedule health check:', result)
-		job.status = 'completed'
-		job.lastError = null
-	} catch (error) {
-		console.error('Temporal schedule health check failed:', error)
-		job.status = 'failed'
-		job.lastError = error instanceof Error ? error.message : String(error)
-	} finally {
-		job.lastRunDuration = Date.now() - startTime
-		job.nextRun = new Date(
-			Date.now() + getScheduleHealthAlertIntervalMs(),
-		).toISOString()
-	}
-}
-
-export const BLVD_APPOINTMENT_BACKFILL_INTERVAL_MS = 24 * 60 * 60 * 1000
-
-export function getBlvdAppointmentSyncIntervalMs() {
-	const minutes = Number.parseInt(
-		process.env.BLVD_APPOINTMENT_SYNC_INTERVAL_MINUTES ?? '5',
-		10,
-	)
-	const safeMinutes = Number.isFinite(minutes) && minutes >= 1 ? minutes : 5
-	return safeMinutes * 60 * 1000
-}
-
-export function getGoogleAdsSpendSyncIntervalMs() {
-	const minutes = Number.parseInt(
-		process.env.GOOGLE_ADS_SPEND_SYNC_INTERVAL_MINUTES ?? '30',
-		10,
-	)
-	const safeMinutes = Number.isFinite(minutes) && minutes >= 5 ? minutes : 30
-	return safeMinutes * 60 * 1000
-}
-
-export function getScheduleHealthAlertIntervalMs() {
-	const raw = process.env.SCHEDULE_HEALTH_ALERT_INTERVAL_MS?.trim()
-	const parsed = raw ? Number(raw) : NaN
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : 24 * 60 * 60 * 1000
 }
 
 export function getPlaidSyncIntervalMs() {

@@ -107,15 +107,12 @@ const KNOWN_VENDORS: Array<{
 	// Compounding pharmacies = GLP-1s
 	{
 		match: [
-			// Plaid's merchant field is often just "Empower" (no "pharmacy").
-			// Sarah's business cards have no Empower-Retirement exposure.
-			'empower',
+			'empower pharmacy',
 			'olympia pharmacy',
 			'strive pharmacy',
 			'belmar',
 			'red rock',
 			'hallandale',
-			'bridgeline', // Bridgeline Medical, weekly GLP-1/peptide supply runs
 		],
 		service: 'weight-loss',
 		category: 'COGS',
@@ -129,10 +126,6 @@ const KNOWN_VENDORS: Array<{
 			'skinbetter',
 			'glo2facial',
 			'universkin',
-			'hydrinity',
-			'vitality institute',
-			'vi aesthetics',
-			'vi peel',
 		],
 		service: 'skincare',
 		category: 'COGS',
@@ -212,90 +205,6 @@ const KNOWN_VENDORS: Array<{
 	},
 ]
 
-// ---------------------------------------------------------------- cadence
-// Expense classes for the reports (Zane 2026-08-24): COGS moves with
-// revenue; monthly overhead is the routine bill stack; ANNUAL fees would
-// make one month look bad, so reports amortize them over 12; the rest are
-// one-time lumps shown on their real dates. Cash totals are never touched -
-// FCF stays visible.
-export type ExpenseClass = 'cogs' | 'monthly' | 'annual' | 'irregular'
-
-/** Known once-a-year fees, matched as lowercase substrings. */
-const ANNUAL_VENDOR_MATCH = [
-	'encirca', // .pharmacy domain registrar, ~$1,125/yr each August
-	'iapam', // membership/training, ~$597/yr
-	'tnsos', // TN Secretary of State annual report, ~$307/yr
-	'legitscript', // pharmacy-ads certification (not yet seen in linked accounts)
-	'.pharmacy',
-]
-
-const MONTHLY_OVERHEAD_CATEGORIES = new Set<Category>([
-	'Marketing',
-	'Software',
-	'Payroll',
-	'Rent/Utilities',
-	'Fees/Processing',
-	'Insurance/Professional',
-])
-
-/**
- * Classify each vendor's cadence. Priority: COGS by category, then the
- * explicit/detected annual fees, then monthly (routine category OR seen in
- * six of the last eight full months - catches equipment financing and the
- * medical-director checks), else a one-time lump.
- */
-function classifyCadence(opts: {
-	vendors: string[]
-	effCategoryOf: (vendor: string) => Category
-	monthsWithCharges: (vendor: string) => string[]
-	chargeDates: (vendor: string) => string[]
-	nowMonth: string
-}): Map<string, ExpenseClass> {
-	const out = new Map<string, ExpenseClass>()
-	for (const vendor of opts.vendors) {
-		const lower = vendor.toLowerCase()
-		const months = opts.monthsWithCharges(vendor)
-		const fullMonths = months.filter(m => m < opts.nowMonth)
-		if (opts.effCategoryOf(vendor) === 'COGS') {
-			out.set(vendor, 'cogs')
-			continue
-		}
-		if (ANNUAL_VENDOR_MATCH.some(m => lower.includes(m))) {
-			out.set(vendor, 'annual')
-			continue
-		}
-		// Year-over-year detector: charges ~12 months apart (300-430d), and
-		// rare otherwise. Needs the second year to exist, so it only starts
-		// firing as history accumulates.
-		const dates = opts.chargeDates(vendor).sort()
-		const yoy =
-			fullMonths.length <= 3 &&
-			dates.some((d, i) =>
-				dates
-					.slice(i + 1)
-					.some(later => {
-						const gap = (Date.parse(later) - Date.parse(d)) / 86400_000
-						return gap >= 300 && gap <= 430
-					}),
-			)
-		if (yoy) {
-			out.set(vendor, 'annual')
-			continue
-		}
-		const recent8 = fullMonths.slice(-8)
-		const monthlyByCadence = recent8.length >= 6
-		if (
-			monthlyByCadence ||
-			MONTHLY_OVERHEAD_CATEGORIES.has(opts.effCategoryOf(vendor))
-		) {
-			out.set(vendor, 'monthly')
-			continue
-		}
-		out.set(vendor, 'irregular')
-	}
-	return out
-}
-
 function parseArgs(argv: string[]) {
 	let days = 90
 	let from: string | undefined
@@ -352,34 +261,6 @@ function loadCache(): Record<string, CacheEntry> {
 	} catch {
 		return {}
 	}
-}
-
-/** Vendor class lookup for other finance surfaces (daily profit model):
- * cache first, then the KNOWN_VENDORS rules, null when unknown. */
-export function classifyExpenseVendor(
-	merchant: string | null,
-	name: string,
-): { service: Service; category: Category; confidence: 'high' | 'low' } | null {
-	const key = vendorKey(merchant ?? '', name)
-	const cached = loadCache()[key]
-	if (cached) return cached
-	return ruleMatch(key) ?? null
-}
-
-/** The card-payment / transfer filter the P&L uses, for reuse. */
-export function isExcludedMoneyMovement(row: {
-	merchant?: string | null
-	name: string
-	pfcPrimary?: string | null
-	pfcDetailed?: string | null
-}): boolean {
-	return (
-		row.pfcDetailed === 'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT' ||
-		row.pfcPrimary === 'TRANSFER_OUT' ||
-		/payment thank you|autopay|crd autopay|online payment to|capital one mobile pymt/i.test(
-			`${row.merchant ?? ''} ${row.name}`,
-		)
-	)
 }
 
 const AI_PROMPT_HEADER = `You categorize credit card / bank transactions for Sarah Hitchcox Aesthetics, a med spa in Knoxville TN. Its service lines are:
@@ -683,158 +564,15 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 			[...businessExpenses, ...revenue].map(t => t.date.slice(0, 7)),
 		),
 	].sort()
-
-	// Cadence class per vendor, then per-class sums per month. `expenses`
-	// stays the true cash total (FCF); the classes let reports color the
-	// stack and amortize the annual fees.
-	const nowMonthKey = new Date().toISOString().slice(0, 7)
-	const vendorMonths = new Map<string, Set<string>>()
-	const vendorDates = new Map<string, string[]>()
-	for (const t of businessExpenses) {
-		if (!vendorMonths.has(t.key)) vendorMonths.set(t.key, new Set())
-		vendorMonths.get(t.key)!.add(t.date.slice(0, 7))
-		if (!vendorDates.has(t.key)) vendorDates.set(t.key, [])
-		vendorDates.get(t.key)!.push(t.date)
-	}
-	const cadence = classifyCadence({
-		vendors: [...vendorMonths.keys()],
-		effCategoryOf: vendor => {
-			const c = effCategory({ key: vendor } as Txn)
-			return c === 'Unknown' ? 'Other' : c
-		},
-		monthsWithCharges: vendor => [...(vendorMonths.get(vendor) ?? [])].sort(),
-		chargeDates: vendor => vendorDates.get(vendor) ?? [],
-		nowMonth: nowMonthKey,
-	})
-	const classOf = (t: Txn): ExpenseClass => cadence.get(t.key) ?? 'irregular'
-
-	const monthly: Array<{
-		month: string
-		revenue: number
-		expenses: number
-		net: number
-		cogs: number
-		overheadMonthly: number
-		annualCash: number
-		irregular: number
-		/** Trailing-12-month annual-fee total spread evenly: what the annual
-		 * class costs per month when it stops ambushing single months. */
-		annualAmortized: number
-		expensesSmoothed: number
-		netSmoothed: number
-		/** Current partial month only: fixed bills accrued pro-rata by day. */
-		amortized?: boolean
-	}> = months.map(m => {
+	const monthly = months.map(m => {
 		const rev = revenue
 			.filter(t => t.date.startsWith(m))
 			.reduce((s, t) => s - t.amount, 0)
-		const inMonth = businessExpenses.filter(t => t.date.startsWith(m))
-		const exp = inMonth.reduce((s, t) => s + t.amount, 0)
-		const byClass = (cls: ExpenseClass) =>
-			inMonth.filter(t => classOf(t) === cls).reduce((s, t) => s + t.amount, 0)
-		return {
-			month: m,
-			revenue: rev,
-			expenses: exp,
-			net: rev - exp,
-			cogs: byClass('cogs'),
-			overheadMonthly: byClass('monthly'),
-			annualCash: byClass('annual'),
-			irregular: byClass('irregular'),
-			annualAmortized: 0, // filled below once the 12-month total is known
-			expensesSmoothed: 0,
-			netSmoothed: 0,
-		}
-	})
-	{
-		const full12 = months.filter(m => m < nowMonthKey).slice(-12)
-		const annualTotal = businessExpenses
-			.filter(t => full12.includes(t.date.slice(0, 7)) && classOf(t) === 'annual')
+		const exp = businessExpenses
+			.filter(t => t.date.startsWith(m))
 			.reduce((s, t) => s + t.amount, 0)
-		const perMonth = full12.length ? annualTotal / full12.length : 0
-		for (const row of monthly) {
-			row.annualAmortized = perMonth
-			row.expensesSmoothed =
-				row.cogs + row.overheadMonthly + row.irregular + perMonth
-			row.netSmoothed = row.revenue - row.expensesSmoothed
-		}
-	}
-
-	// The current partial month amortizes fixed monthly bills: rent paid on
-	// the 1st should not make a 10-day-old month read deep in the red. A
-	// vendor is a fixed bill when it is in a contractual category (rent,
-	// software, insurance, marketing retainers, fees), hit in >=3 of the last
-	// 4 full months, at most twice a month, with stable totals (spread <= 35%
-	// of the median). Supplies/COGS always stay on their actual dates even
-	// when the totals happen to be stable (Zane 2026-08-11), so the current
-	// month = variable actuals + fixed-bill medians x day fraction. Full
-	// months are never touched.
-	// Equipment is included for financing payments (e.g. the Medshift loan,
-	// same amount every month); one-off equipment purchases fail the
-	// recurrence/stability gates below and stay on their actual dates.
-	const FIXED_BILL_CATEGORIES = new Set<Category>([
-		'Marketing',
-		'Software',
-		'Rent/Utilities',
-		'Fees/Processing',
-		'Insurance/Professional',
-		'Equipment',
-	])
-	let fixedBills: Array<[string, number]> = []
-	const nowDate = new Date()
-	const curMonthKey = nowDate.toISOString().slice(0, 7)
-	const fullMonths = months.filter(m => m < curMonthKey).slice(-4)
-	const curRow = monthly.find(r => r.month === curMonthKey)
-	if (curRow && fullMonths.length >= 3) {
-		const perVendorMonth = new Map<string, Map<string, { total: number; count: number }>>()
-		for (const t of businessExpenses) {
-			const m = t.date.slice(0, 7)
-			if (m !== curMonthKey && !fullMonths.includes(m)) continue
-			let byMonth = perVendorMonth.get(t.key)
-			if (!byMonth) perVendorMonth.set(t.key, (byMonth = new Map()))
-			const v = byMonth.get(m) ?? { total: 0, count: 0 }
-			v.total += t.amount
-			v.count++
-			byMonth.set(m, v)
-		}
-		const fixedMonthlyByVendor = new Map<string, number>()
-		for (const [vendor, byMonth] of perVendorMonth) {
-			const vendorClass = classes.get(vendor)
-			if (
-				!vendorClass ||
-				vendorClass.confidence === 'low' ||
-				!FIXED_BILL_CATEGORIES.has(vendorClass.category)
-			)
-				continue
-			const rows = fullMonths
-				.map(m => byMonth.get(m))
-				.filter((r): r is { total: number; count: number } => r != null)
-			if (rows.length < 3) continue
-			if (rows.some(r => r.count > 2)) continue
-			const totals = rows.map(r => r.total).sort((a, b) => a - b)
-			const median = totals[Math.floor(totals.length / 2)]!
-			if (median <= 0) continue
-			if ((totals[totals.length - 1]! - totals[0]!) / median > 0.35) continue
-			fixedMonthlyByVendor.set(vendor, median)
-		}
-		fixedBills = [...fixedMonthlyByVendor.entries()].sort((a, b) => b[1] - a[1])
-		if (fixedMonthlyByVendor.size) {
-			const daysInMonth = new Date(
-				Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth() + 1, 0),
-			).getUTCDate()
-			const dayFraction = Math.min(1, nowDate.getUTCDate() / daysInMonth)
-			const variableActuals = businessExpenses
-				.filter(
-					t => t.date.startsWith(curMonthKey) && !fixedMonthlyByVendor.has(t.key),
-				)
-				.reduce((s, t) => s + t.amount, 0)
-			const fixedAccrued =
-				[...fixedMonthlyByVendor.values()].reduce((s, v) => s + v, 0) * dayFraction
-			curRow.expenses = variableActuals + fixedAccrued
-			curRow.net = curRow.revenue - curRow.expenses
-			curRow.amortized = true
-		}
-	}
+		return { month: m, revenue: rev, expenses: exp, net: rev - exp }
+	})
 
 	const unknownVendors = byVendor.filter(([k]) => {
 		const c = classes.get(k)
@@ -903,13 +641,8 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 	console.log('\nBy month (revenue / expenses / net):')
 	for (const m of monthly)
 		console.log(
-			`  ${m.month}  ${usd(m.revenue).padStart(12)} ${usd(m.expenses).padStart(12)} ${usd(m.net).padStart(12)}${m.amortized ? '  (fixed bills amortized)' : ''}`,
+			`  ${m.month}  ${usd(m.revenue).padStart(12)} ${usd(m.expenses).padStart(12)} ${usd(m.net).padStart(12)}`,
 		)
-	if (fixedBills.length) {
-		console.log('\nFixed monthly bills amortized over the current month:')
-		for (const [vendor, expected] of fixedBills)
-			console.log(`  ${vendor.padEnd(46)} ${usd(expected).padStart(12)}/mo`)
-	}
 
 	console.log('\nRevenue by source:')
 	for (const [source, v] of byRevenueSource)

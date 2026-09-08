@@ -12,7 +12,6 @@ import {
 } from '#app/utils/blvd-admin.server.ts'
 import { getRecentClientComms, type ClientComm } from '#app/utils/client-comms.server.ts'
 import { getAppointmentValuation } from '#app/utils/appointment-valuation.server.ts'
-import { hasBlvdAppointmentMirror } from '#app/utils/blvd-appointment-sync.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import {
 	WL_INJECTION_RE,
@@ -158,81 +157,35 @@ export async function loadAppointmentPerformance(
 	until: Date,
 	now = new Date(),
 ): Promise<AppointmentPerformanceRow[]> {
+	const locations = await listBlvdAdminLocations()
 	const appointments: Array<ApptNode & { locationName: string }> = []
-	if (await hasBlvdAppointmentMirror()) {
-		// Read the BlvdAppointment mirror (blvd-appointment-sync job) and
-		// reshape rows into the node form the mapping below already handles.
-		const rows = await prisma.blvdAppointment.findMany({
-			where: { startAt: { gte: since, lte: until } },
-		})
-		for (const r of rows) {
-			let services: Array<{ name: string; price: number | null }> = []
-			try {
-				services = JSON.parse(r.services) as typeof services
-			} catch {
-				services = []
+	for (const location of locations) {
+		let after: string | null = null
+		for (let page = 0; page < 30; page++) {
+			const res: any = await boulevardAdminFetch(
+				`query PerfAppointments($after: String, $locationId: ID!) {
+					appointments(first: 100, after: $after, locationId: $locationId,
+						query: "startAt >= '${since.toISOString()}' AND startAt <= '${until.toISOString()}'") {
+						pageInfo { endCursor hasNextPage }
+						edges { node {
+							id startAt state cancelled manageUrl
+							cancellation { reason notes cancelledAt }
+							client { id name mobilePhone appointmentCount createdAt }
+							appointmentServices { price service { name } }
+						} }
+					}
+				}`,
+				{ after, locationId: location.id },
+			)
+			for (const edge of res.appointments?.edges ?? []) {
+				if (edge?.node?.id)
+					appointments.push({
+						...edge.node,
+						locationName: location.name ?? location.id,
+					})
 			}
-			appointments.push({
-				id: r.id,
-				startAt: r.startAt.toISOString(),
-				state: r.state,
-				cancelled: r.cancelled,
-				manageUrl: r.manageUrl,
-				cancellation:
-					r.cancellationReason || r.cancellationNotes || r.cancelledAt
-						? {
-								reason: r.cancellationReason,
-								notes: r.cancellationNotes,
-								cancelledAt: r.cancelledAt?.toISOString() ?? null,
-							}
-						: null,
-				client: r.clientId
-					? {
-							id: r.clientId,
-							name: r.clientName,
-							mobilePhone: r.clientMobilePhone,
-							appointmentCount: r.clientAppointmentCount,
-							createdAt: r.clientCreatedAt?.toISOString() ?? null,
-						}
-					: null,
-				appointmentServices: services.map(s => ({
-					price: s.price,
-					service: { name: s.name },
-				})),
-				locationName: r.locationName ?? r.locationId,
-			})
-		}
-	} else {
-		// Mirror not populated yet (first deploy): live Boulevard walk.
-		const locations = await listBlvdAdminLocations()
-		for (const location of locations) {
-			let after: string | null = null
-			for (let page = 0; page < 30; page++) {
-				const res: any = await boulevardAdminFetch(
-					`query PerfAppointments($after: String, $locationId: ID!) {
-						appointments(first: 100, after: $after, locationId: $locationId,
-							query: "startAt >= '${since.toISOString()}' AND startAt <= '${until.toISOString()}'") {
-							pageInfo { endCursor hasNextPage }
-							edges { node {
-								id startAt state cancelled manageUrl
-								cancellation { reason notes cancelledAt }
-								client { id name mobilePhone appointmentCount createdAt }
-								appointmentServices { price service { name } }
-							} }
-						}
-					}`,
-					{ after, locationId: location.id },
-				)
-				for (const edge of res.appointments?.edges ?? []) {
-					if (edge?.node?.id)
-						appointments.push({
-							...edge.node,
-							locationName: location.name ?? location.id,
-						})
-				}
-				if (!res.appointments?.pageInfo?.hasNextPage) break
-				after = res.appointments.pageInfo.endCursor
-			}
+			if (!res.appointments?.pageInfo?.hasNextPage) break
+			after = res.appointments.pageInfo.endCursor
 		}
 	}
 
@@ -408,57 +361,32 @@ export async function loadAppointmentPerformance(
 		string,
 		Array<{ id: string; startAt: string; cancelled: boolean }>
 	>()
-	if (await hasBlvdAppointmentMirror()) {
-		// One indexed read over the mirror answers "next visit" for every
-		// client at once; no per-client Boulevard fan-out, no 30-client cap.
-		const clientIds = [...earliestStartByClient.keys()]
-		if (clientIds.length) {
-			const futureRows = await prisma.blvdAppointment.findMany({
-				where: {
-					clientId: { in: clientIds },
-					startAt: { gt: new Date(Math.min(...[...earliestStartByClient.values()].map(v => Date.parse(v)))) },
-				},
-				select: { id: true, clientId: true, startAt: true, cancelled: true },
-			})
-			for (const row of futureRows) {
-				const list = futureByClient.get(row.clientId!) ?? []
-				list.push({
-					id: row.id,
-					startAt: row.startAt.toISOString(),
-					cancelled: row.cancelled,
-				})
-				futureByClient.set(row.clientId!, list)
-			}
-		}
-	} else {
-		const locations = await listBlvdAdminLocations()
-		await Promise.all(
-			[...earliestStartByClient.entries()].slice(0, 30).map(async ([clientId, earliest]) => {
-				const found: Array<{ id: string; startAt: string; cancelled: boolean }> = []
-				for (const location of locations) {
-					const res: any = await boulevardAdminFetch(
-						`query NextAppointments($locationId: ID!, $clientId: ID) {
-							appointments(first: 20, locationId: $locationId, clientId: $clientId,
-								query: "startAt > '${new Date(earliest).toISOString()}'") {
-								edges { node { id startAt cancelled } }
-							}
-						}`,
-						{ clientId, locationId: location.id },
-					).catch(() => null)
-					for (const edge of res?.appointments?.edges ?? []) {
-						const node = edge?.node
-						if (node?.id && node.startAt)
-							found.push({
-								id: node.id,
-								startAt: node.startAt,
-								cancelled: node.cancelled === true,
-							})
-					}
+	await Promise.all(
+		[...earliestStartByClient.entries()].slice(0, 30).map(async ([clientId, earliest]) => {
+			const found: Array<{ id: string; startAt: string; cancelled: boolean }> = []
+			for (const location of locations) {
+				const res: any = await boulevardAdminFetch(
+					`query NextAppointments($locationId: ID!, $clientId: ID) {
+						appointments(first: 20, locationId: $locationId, clientId: $clientId,
+							query: "startAt > '${new Date(earliest).toISOString()}'") {
+							edges { node { id startAt cancelled } }
+						}
+					}`,
+					{ clientId, locationId: location.id },
+				).catch(() => null)
+				for (const edge of res?.appointments?.edges ?? []) {
+					const node = edge?.node
+					if (node?.id && node.startAt)
+						found.push({
+							id: node.id,
+							startAt: node.startAt,
+							cancelled: node.cancelled === true,
+						})
 				}
-				futureByClient.set(clientId, found)
-			}),
-		)
-	}
+			}
+			futureByClient.set(clientId, found)
+		}),
+	)
 	for (const r of lookupRows) {
 		const clientId = clientIdByApptId.get(r.appointmentId)
 		if (!clientId) continue

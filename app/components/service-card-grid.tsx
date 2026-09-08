@@ -30,6 +30,7 @@ export function BeforeAfterImage({
 
 	// Auto-cycle for mobile (no hover capability)
 	const [showAfter, setShowAfter] = useState(false)
+	const [hasHovered, setHasHovered] = useState(false)
 
 	useEffect(() => {
 		if (!beforeSrc) return
@@ -52,7 +53,10 @@ export function BeforeAfterImage({
 	}
 
 	return (
-		<div className={cn('relative h-full w-full overflow-hidden', className)}>
+		<div
+			className={cn('relative h-full w-full overflow-hidden', className)}
+			onMouseEnter={() => setHasHovered(true)}
+		>
 			{/* Before, visible by default; hidden on hover (desktop) or when cycling (mobile) */}
 			<img
 				src={beforeSrc}
@@ -65,22 +69,21 @@ export function BeforeAfterImage({
 				loading="lazy"
 				decoding="async"
 			/>
-			{/* After, hidden by default; visible on hover (desktop) or when cycling
-			    (mobile). Always rendered so server and client markup match -
-			    conditionally rendering it only on the server caused a hydration
-			    mismatch that made React re-render the whole page (visible as a
-			    flicker on load). loading="lazy" still defers the download. */}
-			<img
-				src={afterSrc}
-				alt={`${alt} after`}
-				className={cn(
-					'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
-					'md:opacity-0 md:group-hover:opacity-100',
-					showAfter ? 'opacity-100 md:opacity-0' : 'opacity-0',
-				)}
-				loading="lazy"
-				decoding="async"
-			/>
+			{/* After, hidden by default; visible on hover (desktop) or when cycling (mobile) */}
+			{/* Only load the after image if we're showing it or if we've been hovered (desktop eager load) */}
+			{showAfter || hasHovered || typeof window === 'undefined' ? (
+				<img
+					src={afterSrc}
+					alt={`${alt} after`}
+					className={cn(
+						'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
+						'md:opacity-0 md:group-hover:opacity-100',
+						showAfter ? 'opacity-100 md:opacity-0' : 'opacity-0',
+					)}
+					loading="lazy"
+					decoding="async"
+				/>
+			) : null}
 			{/* Label */}
 			<div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-black/50 px-2 py-0.5 backdrop-blur-[2px]">
 				<span className="text-[10px] font-medium uppercase tracking-wider text-white">
@@ -112,11 +115,11 @@ export function ServiceCardGrid({
 						key={service.slug}
 						to={`/${service.slug}`}
 						prefetch="intent"
-						className="group isolate flex transform-gpu flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+						className="group isolate flex transform-gpu flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
 					>
 						{service.heroImage && (
 							<div className="relative h-48 w-full shrink-0 overflow-hidden rounded-t-2xl sm:h-56">
-								<div className="absolute inset-0 bg-muted/10" />
+								<div className="absolute inset-0 bg-gray-100/10" />
 								<BeforeAfterImage
 									src={service.heroImage}
 									alt={service.serviceName}
@@ -125,18 +128,18 @@ export function ServiceCardGrid({
 							</div>
 						)}
 						<div className="flex flex-1 flex-col p-5">
-							<h3 className="mb-2 text-xl font-bold text-foreground transition-colors group-hover:text-primary">
+							<h3 className="mb-2 text-xl font-bold text-gray-900 transition-colors group-hover:text-primary">
 								{service.serviceName}
 							</h3>
 							{service.treatmentLabel ? (
-								<p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+								<p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
 									{service.treatmentLabel}
 								</p>
 							) : null}
-							<p className="mb-4 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+							<p className="mb-4 line-clamp-3 text-sm leading-relaxed text-gray-500">
 								{service.shortDescription}
 							</p>
-							<div className="mt-auto flex items-center text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+							<div className="mt-auto flex items-center text-sm font-semibold text-gray-900 transition-colors group-hover:text-primary">
 								Learn More
 								<svg
 									className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"

@@ -16,12 +16,12 @@ export function BeforeAfterDisplay({
 	return (
 		<div
 			className={cn(
-				'grid w-full grid-cols-2 gap-[1px] overflow-hidden bg-border',
+				'grid w-full grid-cols-2 gap-[1px] overflow-hidden bg-gray-200',
 				className,
 			)}
 		>
 			{/* Before Image */}
-			<div className="relative w-full bg-card">
+			<div className="relative w-full bg-white">
 				<img
 					src={beforeImage}
 					alt={`${alt} Before`}
@@ -34,7 +34,7 @@ export function BeforeAfterDisplay({
 			</div>
 
 			{/* After Image */}
-			<div className="relative w-full bg-card">
+			<div className="relative w-full bg-white">
 				<img
 					src={afterImage}
 					alt={`${alt} After`}

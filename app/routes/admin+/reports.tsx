@@ -4,22 +4,24 @@
  * lives in the URL hash so an arrangement can be bookmarked). Ported from the
  * hep-reports hub (reports2.hepisontheway.com).
  *
- * Admin-only, same gate as the rest of /admin. (Metabase was decommissioned
- * 2026-08-05 — the 0-day made the call easy since these pages replaced it;
- * the standalone reach simulator survives as an external pane.)
+ * Metabase dashboards render via signed static embeds (METABASE_EMBED_SECRET,
+ * HS256 JWT) so nothing is public; site pages (geo-rank) iframe same-origin.
+ * Admin-only, same gate as the rest of /admin.
  */
+import crypto from 'node:crypto'
 import { type LoaderFunctionArgs } from '@remix-run/node'
 import { requireUserWithRole } from '#app/utils/permissions.server'
+
+const MB_URL = 'https://reports.hitchcoxaesthetics.com'
+const EMBED_TTL_S = 7 * 24 * 3600
 
 interface HubEntry {
 	title: string
 	desc: string
+	/** Metabase dashboard id (signed embed), mutually exclusive with path. */
+	dashboard?: number
 	/** Same-origin site path. */
 	path?: string
-	/** External URL pane (e.g. the standalone reach simulator). */
-	href?: string
-	/** Pane key when there is no path (layout hash + data-key). */
-	id?: string
 	/** Collapsible sub-entries; the parent stays a clickable link itself. */
 	children?: HubEntry[]
 }
@@ -29,8 +31,7 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 		heading: 'Money',
 		entries: [
 			{ title: 'Revenue', desc: 'Actuals, this week, projections + P&L profitability, revenue by type/source/day with drill-down', path: '/admin/reports/revenue' },
-			{ title: 'Daily profit', desc: 'Was each day profitable: revenue − est. COGS − ads − overhead per workday (Mon–Sat)', path: '/admin/reports/daily-profit' },
-		{ title: 'Bookings funnel', desc: 'Bookings made by day × source, expected value, ads cost per booking', path: '/admin/reports/bookings' },
+			{ title: 'Bookings funnel', desc: 'Bookings made by day × source, expected value, ads cost per booking', path: '/admin/reports/bookings' },
 			{ title: 'Retention: lapsed patients', desc: 'Who stopped coming: overdue vs their usual visit rhythm, win-back list by value', path: '/admin/reports/retention' },
 			{ title: 'Service trends', desc: 'Demand per category since 2024, seasonality, peak booking times', path: '/admin/reports/service-trends' },
 			{
@@ -50,7 +51,7 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 		entries: [
 			{ title: 'Maps & reach', desc: 'Rank map + competitor leaderboard, household reach, reach → $, GMB clients', path: '/geo-rank' },
 			{ title: 'Reach over time', desc: 'People reached + expected revenue, organic Google rank per site, backlinks & authority, week by week', path: '/admin/reports/reach' },
-			{ title: 'Reach simulator', desc: 'What-if: listings, reviews, simulated rank/reach', href: 'https://hitchcox-sim.fly.dev/', id: 'simulator' },
+			{ title: 'Reach simulator (Metabase)', desc: 'What-if: listings, reviews, simulated rank/reach', dashboard: 4 },
 		],
 	},
 	{
@@ -61,19 +62,49 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 	},
 ]
 
+function b64url(buf: Buffer) {
+	return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** Metabase static-embed URL: HS256 JWT over {resource:{dashboard}, params, exp}. */
+function embedUrl(dashboardId: number, secret: string) {
+	const header = b64url(Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })))
+	const payload = b64url(
+		Buffer.from(
+			JSON.stringify({
+				resource: { dashboard: dashboardId },
+				params: {},
+				exp: Math.floor(Date.now() / 1000) + EMBED_TTL_S,
+			}),
+		),
+	)
+	const sig = b64url(crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest())
+	return `${MB_URL}/embed/dashboard/${header}.${payload}.${sig}#bordered=false&titled=false`
+}
+
 const esc = (s: string) =>
 	s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
+	const secret = process.env.METABASE_EMBED_SECRET?.trim()
+
 	const reports: Record<string, { href: string; title: string }> = {}
-	const visible = SECTIONS
+	const visible = SECTIONS.map(sec => ({
+		heading: sec.heading,
+		entries: sec.entries
+			.filter(e => e.path || secret)
+			.map(e => ({
+				...e,
+				children: e.children?.filter(c => c.path || secret),
+			})),
+	}))
 	for (const sec of visible) {
 		for (const e of sec.entries) {
 			for (const entry of [e, ...(e.children ?? [])]) {
-				const key = entry.path?.replace(/^\//, '') ?? entry.id!
+				const key = (entry.path ?? `mb-${entry.dashboard}`).replace(/^\//, '')
 				reports[key] = {
-					href: entry.path ?? entry.href!,
+					href: entry.path ?? embedUrl(entry.dashboard!, secret!),
 					title: entry.title,
 				}
 			}
@@ -81,7 +112,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	}
 
 	const renderItem = (e: HubEntry) => {
-		const key = e.path?.replace(/^\//, '') ?? e.id!
+		const key = (e.path ?? `mb-${e.dashboard}`).replace(/^\//, '')
 		return `<a class="item" href="${esc(reports[key]!.href)}" data-key="${esc(key)}">
 			 <span class="t">${esc(e.title)}</span><span class="d">${esc(e.desc)}</span></a>`
 	}

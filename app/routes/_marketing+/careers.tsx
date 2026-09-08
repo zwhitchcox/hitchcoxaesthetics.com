@@ -5,7 +5,7 @@ export const meta: MetaFunction = ({ location }) =>
 	getSocialMetas({
 		title: 'Careers | Sarah Hitchcox Aesthetics | Knoxville, TN',
 		description:
-			'Open positions at Sarah Hitchcox Aesthetics, a nurse-owned medical aesthetics practice with four West Knoxville offices: Licensed Medical Aesthetician and part-time Marketing and Patient Experience Assistant.',
+			'Open positions at Sarah Hitchcox Aesthetics, a nurse-owned medical aesthetics practice with four West Knoxville offices: Licensed Esthetician and part-time Marketing and Patient Experience Assistant.',
 		pathname: location.pathname,
 	})
 
@@ -69,14 +69,14 @@ const jobs = [
 		},
 	},
 	{
-		slug: 'licensed-medical-aesthetician',
-		title: 'Licensed Medical Aesthetician (LMA)',
+		slug: 'licensed-esthetician',
+		title: 'Licensed Esthetician',
 		type: 'Full-time or part-time',
 		pay: 'Hourly, based on experience, plus commission on services and retail',
 		hours: 'Full-time or part-time, weekdays',
 		where: 'West Knoxville, with days at more than one of our four offices',
 		summary:
-			'You will deliver medical-grade skincare services under the same roof as our nurse injector and help patients before and after their aesthetic treatments. We hire Licensed Medical Aestheticians only: a Tennessee esthetician license plus medical aesthetics training or certification and experience in a medical setting. An esthetician license on its own does not meet the requirement.',
+			'You will deliver skincare services under the same roof as our nurse injector and help patients before and after their aesthetic treatments. A current Tennessee esthetician license is required. New graduates are welcome; we train.',
 		duties: [
 			'Facials, chemical peels, dermaplaning, and skincare consultations.',
 			'Prepare patients for treatment and give after-care instructions.',
@@ -85,7 +85,7 @@ const jobs = [
 			'If you enjoy it, help with patient photos (with consent), social media posts, and reviews. That is a plus, not a requirement.',
 		],
 		you: [
-			'Licensed Medical Aesthetician: Tennessee esthetician license in good standing plus medical aesthetics certification or documented medical-setting training. Esthetician license alone does not qualify.',
+			'Tennessee esthetician license in good standing.',
 			'Warm with patients, precise with protocols.',
 			'Comfortable in a medical setting alongside a registered nurse.',
 			'Reliable and organized.',
@@ -93,9 +93,9 @@ const jobs = [
 		schema: {
 			'@context': 'https://schema.org',
 			'@type': 'JobPosting',
-			title: 'Licensed Medical Aesthetician (LMA)',
+			title: 'Licensed Esthetician',
 			description:
-				'Licensed Medical Aesthetician at a nurse-owned medical aesthetics practice with four West Knoxville offices: facials, chemical peels, dermaplaning, skincare consultations, pre- and post-treatment care. Licensed Medical Aesthetician required: Tennessee esthetician license plus medical aesthetics certification or medical-setting experience; an esthetician license alone does not qualify.',
+				'Licensed esthetician at a nurse-owned medical aesthetics practice with four West Knoxville offices: facials, chemical peels, dermaplaning, skincare consultations, pre- and post-treatment care. Tennessee esthetician license required.',
 			datePosted: POSTED,
 			employmentType: ['FULL_TIME', 'PART_TIME'],
 			hiringOrganization: ORG,
@@ -187,9 +187,8 @@ export default function Careers() {
 				<p className="mt-14 border-t border-gray-200 pt-8 text-gray-600">
 					In your email, include a short note on why this fits you and your
 					availability. For the assistant role, add any photo, video, or social
-					work you are proud of (links are fine). For the medical aesthetician
-					role, include your license number, your medical aesthetics
-					certification, and where you have worked in a medical setting.
+					work you are proud of (links are fine). For the esthetician role,
+					include your license number and experience.
 				</p>
 			</div>
 		</div>

@@ -180,20 +180,9 @@ export type ReviewLocation = {
 	placeId: string
 	label: string
 	address: string
-	/** Which of our brands the listing belongs to (SHA or a microsite). */
-	business: string
 	writeReviewUrl: string
 	/** matches a Boulevard location name keyword for pre-highlighting */
 	blvdMatch: RegExp
-}
-
-/** Listing name -> brand. Microsite listings share addresses with SHA
- * listings, so the review page groups by location first, then business. */
-function classifyBusiness(name: string | null): string {
-	const hay = (name ?? '').toLowerCase()
-	if (hay.includes('botox knox')) return 'Botox Knox'
-	if (hay.includes('weight loss')) return 'Knoxville Weight Loss Clinic'
-	return 'Sarah Hitchcox Aesthetics'
 }
 
 export function writeReviewUrl(placeId: string) {
@@ -260,12 +249,6 @@ const EXTRA_REVIEW_PLATFORMS: Record<string, ReviewPlatform[]> = {
 			url: 'https://www.yelp.com/writeareview/biz/IPEk7gx3ZfIMb6x2L-bxmg',
 		},
 	],
-	// Trustpilot / Zocdoc / Healthgrades: once the profiles are claimed, add
-	// entries here per location, e.g.
-	//   { id: 'trustpilot', label: 'Trustpilot', url: 'https://www.trustpilot.com/evaluate/hitchcoxaesthetics.com' },
-	//   { id: 'healthgrades', label: 'Healthgrades', url: '<profile review url>' },
-	//   { id: 'zocdoc', label: 'Zocdoc', url: '<profile url>' },
-	// The page renders a chip automatically for every entry with a URL.
 	'Cedar Bluff': [
 		{
 			id: 'yelp',
@@ -310,7 +293,6 @@ export async function getReviewLocations(): Promise<ReviewLocation[]> {
 			placeId,
 			label,
 			address,
-			business: classifyBusiness(row.name),
 			writeReviewUrl: writeReviewUrl(placeId),
 			blvdMatch,
 		})

@@ -722,18 +722,6 @@ export function inferTrafficAttribution({
 		}
 	}
 
-	// AI assistants (ChatGPT sets utm_source=chatgpt.com; others arrive as
-	// plain referrers). Checked before the search-referrer branch so
-	// copilot/gemini traffic does not get folded into organic search.
-	const aiPlatform = getAiPlatform(source, referrerDomain, referrer)
-	if (aiPlatform) {
-		return {
-			channel: 'ai_assistant',
-			detail: `${aiPlatform}_referral`,
-			platform: aiPlatform,
-		}
-	}
-
 	if (isPaidMedium && socialPlatform) {
 		return {
 			channel: 'paid_social',
@@ -883,18 +871,6 @@ function getSocialPlatform(
 
 function matchesAny(value: string, needles: string[]) {
 	return needles.some(needle => value.includes(needle))
-}
-
-/** AI-assistant referrers: ChatGPT, Perplexity, Claude, Copilot, Gemini, Grok. */
-function getAiPlatform(source: string, referrerDomain: string, referrer: string) {
-	const combined = [source, referrerDomain, referrer].filter(Boolean).join(' ')
-	if (/chatgpt|chat\.openai/.test(combined)) return 'chatgpt'
-	if (/perplexity/.test(combined)) return 'perplexity'
-	if (/claude\.ai/.test(combined)) return 'claude'
-	if (/copilot/.test(combined)) return 'copilot'
-	if (/gemini\.google|bard\.google/.test(combined)) return 'gemini'
-	if (/grok\.com|\bx\.ai\b/.test(combined)) return 'grok'
-	return null
 }
 
 function normalizeReferrer(value?: string | null) {

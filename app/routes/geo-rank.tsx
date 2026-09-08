@@ -61,67 +61,37 @@ export async function action({ request }: ActionFunctionArgs) {
 	}
 }
 
-// Background stale-while-revalidate for geo_point_week_mv. Staleness is
-// data-driven (a capture week the view has not seen), so the view refreshes
-// exactly once per new capture, ~8s in the background, never in a request.
-let geoRefreshInFlight = false
-function maybeRefreshGeoView() {
-	if (geoRefreshInFlight) return
-	geoRefreshInFlight = true
-	void (async () => {
-		try {
-			const stale = (
-				await reportsQuery<{ stale: boolean }>(
-					`SELECT coalesce((SELECT max(week) FROM geo_point_week_mv)
-					   < (SELECT max(week) FROM raw_dataforseo_region), true) AS stale`,
-				)
-			)[0]?.stale
-			if (stale) {
-				await reportsQuery(
-					'REFRESH MATERIALIZED VIEW CONCURRENTLY geo_point_week_mv',
-				)
-			}
-		} catch (error) {
-			console.error('[geo-rank] view refresh failed:', error)
-		} finally {
-			geoRefreshInFlight = false
-		}
-	})()
-}
-
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	if (!hasReportsDb()) return json({ configured: false as const })
 
 	const params = new URL(request.url).searchParams
 	// All heavy aggregates read geo_point_week_mv (one row per grid point per
-	// week, ~46k rows instead of ~900k raw results). Refresh in the
-	// BACKGROUND when a new capture has landed: the inline version made the
-	// first page view after a capture wait ~17s (measured 2026-08-03).
-	// CONCURRENTLY (enabled by the unique index on week/keyword/row/col)
-	// keeps the view readable during the refresh, so this request and every
-	// concurrent one serve the previous capture until the new one is in.
-	maybeRefreshGeoView()
+	// week, ~46k rows instead of ~900k raw results). Refresh it lazily when a
+	// new capture has landed; the first page view after a capture pays once.
+	const stale = (
+		await reportsQuery<{ stale: boolean }>(
+			`SELECT coalesce((SELECT max(week) FROM geo_point_week_mv)
+			   < (SELECT max(week) FROM raw_dataforseo_region), true) AS stale`,
+		)
+	)[0]?.stale
+	if (stale) await reportsQuery(`REFRESH MATERIALIZED VIEW geo_point_week_mv`)
 	const client = {
 		query: async <T extends Record<string, any> = any>(sql: string, params?: unknown[]) => ({
 			rows: await reportsQuery<T>(sql, params ?? []),
 		}),
 	}
 	{
-		// Weeks and keywords come from the 46k-row materialized view, not the
-		// ~900k-row raw table (the raw DISTINCT took ~700ms). During the
-		// short background refresh after a capture, the newest week appears
-		// one page load later, consistent with everything else on this page.
-		const [weeksResult, keywordsResult] = await Promise.all([
-			client.query<{ week: string }>(
-				`SELECT DISTINCT to_char(week, 'YYYY-MM-DD') AS week FROM geo_point_week_mv ORDER BY 1 DESC`,
-			),
-			client.query<{ keyword: string }>(
-				`SELECT DISTINCT keyword FROM geo_point_week_mv WHERE week = (SELECT max(week) FROM geo_point_week_mv) ORDER BY 1`,
-			),
-		])
-		const weeks = weeksResult.rows.map(r => r.week)
-		const keywords = keywordsResult.rows.map(r => r.keyword)
+		const weeks = (
+			await client.query<{ week: string }>(
+				`SELECT DISTINCT to_char(week, 'YYYY-MM-DD') AS week FROM raw_dataforseo_region ORDER BY 1 DESC`,
+			)
+		).rows.map(r => r.week)
+		const keywords = (
+			await client.query<{ keyword: string }>(
+				`SELECT keyword FROM raw_dataforseo_region WHERE week = (SELECT max(week) FROM raw_dataforseo_region) GROUP BY 1 ORDER BY 1`,
+			)
+		).rows.map(r => r.keyword)
 
 		const week = weeks.includes(params.get('week') ?? '') ? params.get('week')! : weeks[0]
 		const keyword = keywords.includes(params.get('keyword') ?? '')
@@ -140,48 +110,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 					? 'hit_bk'
 					: 'hit_wlk'
 
-		// Viewing a competitor: the map shows THEIR best rank per grid point
-		// instead of ours. Chosen by clicking a row in the leaderboard.
-		const competitor = params.get('competitor')?.trim() || null
-
-		const gridPromise = client.query(
-			competitor
-				? `SELECT g.grid_lat AS lat, g.grid_lng AS lng, g."gridRow" AS row, g."gridCol" AS col, r.rank
-				 FROM (SELECT DISTINCT "gridRow", "gridCol", "gridLat" AS grid_lat, "gridLng" AS grid_lng
-				       FROM raw_dataforseo_region WHERE week = $1::date AND keyword = $2) g
-				 LEFT JOIN (SELECT "gridRow", "gridCol", min("rankAbsolute") AS rank
-				            FROM raw_dataforseo_region
-				            WHERE week = $1::date AND keyword = $2 AND title = $3
-				            GROUP BY 1, 2) r USING ("gridRow", "gridCol")`
-				: `SELECT g.grid_lat AS lat, g.grid_lng AS lng, g."gridRow" AS row, g."gridCol" AS col, r.rank
+		const grid = (
+			await client.query(
+				`SELECT g.grid_lat AS lat, g.grid_lng AS lng, g."gridRow" AS row, g."gridCol" AS col, r.rank
 				 FROM (SELECT DISTINCT "gridRow", "gridCol", "gridLat" AS grid_lat, "gridLng" AS grid_lng
 				       FROM raw_dataforseo_region WHERE week = $1::date AND keyword = $2) g
 				 LEFT JOIN (SELECT "gridRow", "gridCol", min("rankAbsolute") AS rank
 				            FROM raw_dataforseo_region r JOIN geo_my_listing m ON m.place_id = r."placeId"
 				            WHERE week = $1::date AND keyword = $2${isAll ? '' : ` AND ${BRAND_CASE} = $3`}
 				            GROUP BY 1, 2) r USING ("gridRow", "gridCol")`,
-			competitor
-				? [week, keyword, competitor]
-				: isAll
-					? [week, keyword]
-					: [week, keyword, brand],
-		)
+				isAll ? [week, keyword] : [week, keyword, brand],
+			)
+		).rows as Array<{ lat: number; lng: number; row: number; col: number; rank: number | null }>
 
-		// Competitor reach over time for the selected keyword: share of grid
-		// points with them in the top 3, per capture week. Point-share, not
-		// homes-weighted (the homes-weighted mv only precomputes OUR brands).
-		const competitorTrendPromise = competitor
-			? client.query<{ week: string; pct: string | null }>(
-					`SELECT to_char(week, 'YYYY-MM-DD') AS week,
-					   round(100.0 * count(DISTINCT ("gridRow","gridCol")) FILTER (WHERE title = $2 AND "rankAbsolute" <= 3)
-					     / nullif(count(DISTINCT ("gridRow","gridCol")), 0), 1) AS pct
-					 FROM raw_dataforseo_region WHERE keyword = $1
-					 GROUP BY week ORDER BY week`,
-					[keyword, competitor],
-				)
-			: null
-
-		const rangesPromise = client.query(
+		const ranges = (
+			await client.query(
 				`SELECT r.keyword, ${isAll ? `'(all businesses combined)' AS listing` : 'm.listing'},
 				   count(DISTINCT (r."gridRow", r."gridCol")) AS points,
 				   round(100.0 * count(DISTINCT (r."gridRow", r."gridCol"))
@@ -196,21 +139,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				 GROUP BY 1${isAll ? '' : ', 2'} ORDER BY metro_pct DESC, r.keyword`,
 				isAll ? [week] : [week, brand],
 			)
+		).rows
 
 		// Trend: per week per keyword, share of metro households whose top-3
 		// local pack includes the brand (falls back to point share while
 		// geo_grid_homes is empty, matching report_geo_reach semantics).
-		const trendsPromise = client.query(
+		const trends = (
+			await client.query(
 				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
 				   round(100.0 * sum(COALESCE(homes, 1)) FILTER (WHERE ${hitCol})
 				     / nullif(sum(COALESCE(homes, 1)), 0), 2) AS reach_pct
 				 FROM geo_point_week_mv
 				 GROUP BY week, keyword ORDER BY keyword, week`,
 			)
+		).rows as Array<{ week: string; keyword: string; reach_pct: number | null }>
 
 		// Competitor leaderboard for the selected keyword+week, who owns the
 		// map pack across the metro (replaces the Metabase geo-rank dashboard).
-		const leaderboardPromise = client.query(
+		const leaderboard = (
+			await client.query(
 				`SELECT r.title,
 					count(DISTINCT (r."gridRow", r."gridCol")) FILTER (WHERE r."rankAbsolute" <= 3) AS top3,
 					count(DISTINCT (r."gridRow", r."gridCol")) FILTER (WHERE r."rankAbsolute" BETWEEN 4 AND 10) AS mid,
@@ -224,69 +171,61 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				 GROUP BY r.title ORDER BY top3 DESC, mid DESC LIMIT 15`,
 				[week, keyword],
 			)
-		const totalPointsPromise = client.query(
-			`SELECT count(DISTINCT ("gridRow","gridCol")) AS n
-			 FROM raw_dataforseo_region WHERE week = $1::date AND keyword = $2`,
-			[week, keyword],
+		).rows as Array<{ title: string; top3: string; mid: string; best: number; rating: number | null; votes: number | null; is_mine: boolean }>
+		const totalPoints = Number(
+			(
+				await client.query(
+					`SELECT count(DISTINCT ("gridRow","gridCol")) AS n
+					 FROM raw_dataforseo_region WHERE week = $1::date AND keyword = $2`,
+					[week, keyword],
+				)
+			).rows[0]?.n ?? 0,
 		)
 
 		// Census-weighted household reach per keyword per week (brand-scoped).
-		const reachRowsPromise = client.query(
+		const reachRows = (
+			await client.query(
 				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
 					 COALESCE(sum(COALESCE(homes, 0)) FILTER (WHERE ${hitCol}), 0) AS reached,
 					 sum(COALESCE(homes, 0)) AS metro
 				 FROM geo_point_week_mv
 				 GROUP BY 1, 2 ORDER BY 1, 2`,
 			)
+		).rows as Array<{ week: string; keyword: string; reached: string; metro: string }>
 
 		// Reach → $ inputs (brand-independent: all our listings combined).
-		const rankHomesPromise = client.query(
+		const rankHomes = (
+			await client.query(
 				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, best_rank,
 					 sum(COALESCE(homes, 0)) AS homes
 				 FROM geo_point_week_mv
 				 WHERE best_rank IS NOT NULL
 				 GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`,
 			)
-		const totalsRvPromise = client.query(
+		).rows as Array<{ week: string; keyword: string; best_rank: number; homes: string }>
+		const totalsRv = (
+			await client.query(
 				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
 					 sum(COALESCE(homes, 0)) AS total_homes
 				 FROM geo_point_week_mv
 				 GROUP BY 1, 2`,
 			)
-		const clientValuesPromise = client.query(
+		).rows as Array<{ week: string; keyword: string; total_homes: string }>
+		const clientValues = (
+			await client.query(
 				`SELECT category, expected_value_per_conversion AS value
 				 FROM client_value WHERE horizon_months = 12`,
 			)
+		).rows as Array<{ category: string; value: string }>
 
-		// One parallel batch: the serial version stacked ten DB round trips.
-		const [
-			gridResult, rangesResult, trendsResult, leaderboardResult,
-			totalPointsResult, reachRowsResult, rankHomesResult, totalsRvResult,
-			clientValuesResult, competitorTrendResult, actualWeb, actualPhone,
-		] = await Promise.all([
-			gridPromise, rangesPromise, trendsPromise, leaderboardPromise,
-			totalPointsPromise, reachRowsPromise, rankHomesPromise, totalsRvPromise,
-			clientValuesPromise, competitorTrendPromise,
+		const [actualWeb, actualPhone] = await Promise.all([
 			weeklyGmbWeightLossByListing().catch(() => [] as Array<[string, string, number]>),
 			weeklyGmbWeightLossPhone().catch(() => [] as Array<[string, number]>),
 		])
-		const grid = gridResult.rows as Array<{ lat: number; lng: number; row: number; col: number; rank: number | null }>
-		const ranges = rangesResult.rows
-		const trends = trendsResult.rows as Array<{ week: string; keyword: string; reach_pct: number | null }>
-		const leaderboard = leaderboardResult.rows as Array<{ title: string; top3: string; mid: string; best: number; rating: number | null; votes: number | null; is_mine: boolean }>
-		const totalPoints = Number(totalPointsResult.rows[0]?.n ?? 0)
-		const reachRows = reachRowsResult.rows as Array<{ week: string; keyword: string; reached: string; metro: string }>
-		const rankHomes = rankHomesResult.rows as Array<{ week: string; keyword: string; best_rank: number; homes: string }>
-		const totalsRv = totalsRvResult.rows as Array<{ week: string; keyword: string; total_homes: string }>
-		const clientValues = clientValuesResult.rows as Array<{ category: string; value: string }>
-		const competitorTrend = competitorTrendResult
-			? competitorTrendResult.rows.map(r => ({ week: r.week, pct: r.pct == null ? null : Number(r.pct) }))
-			: null
 
 		return json({
 			configured: true as const,
 			weeks, keywords, week, keyword, brand, brands: BRANDS,
-			competitor, competitorTrend,
 			grid, ranges, trends,
 			leaderboard, totalPoints, reachRows,
 			rankHomes, totalsRv,
@@ -490,14 +429,10 @@ export default function GeoRank() {
 		trendByKeyword.get(t.keyword)!.push({ week: t.week, v: Number(t.reach_pct ?? 0) })
 	}
 
-	// Theme tokens only (bg-background / text-foreground / border-input) so a
-	// dark page can never pair the UA's white select with white text again.
-	const selectCls =
-		'rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground'
 	return (
-		<div className="bg-background text-foreground" style={{ fontFamily: 'system-ui, sans-serif', margin: 0 }}>
+		<div style={{ fontFamily: 'system-ui, sans-serif', margin: 0 }}>
 			<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-			<form method="get" className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2.5">
+			<form method="get" style={{ display: 'flex', gap: 12, padding: '10px 16px', alignItems: 'center', borderBottom: '1px solid #e5e7eb', flexWrap: 'wrap' }}>
 				<strong>Geo Rank</strong>
 				{[
 					{ name: 'brand', value: brand, options: brands as readonly string[] },
@@ -506,42 +441,22 @@ export default function GeoRank() {
 				].map(sel => (
 					<select key={sel.name} name={sel.name} value={sel.value}
 						onChange={e => submit(e.currentTarget.form)}
-						className={selectCls}>
+						style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db' }}>
 						{sel.options.map(o => <option key={o} value={o}>{o}</option>)}
 					</select>
 				))}
-				{/* Competitor view: options are this keyword+week's leaderboard. */}
-				<select name="competitor" value={data.competitor ?? ''}
-					onChange={e => submit(e.currentTarget.form)}
-					className={
-						data.competitor
-							? 'rounded-md border border-amber-500 bg-amber-100 px-2 py-1.5 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200'
-							: selectCls
-					}>
-					<option value="">Compare: competitor…</option>
-					{data.leaderboard.filter(r => !r.is_mine).map(r => (
-						<option key={r.title} value={r.title}>{r.title}</option>
-					))}
-				</select>
-				{data.competitor ? (
-					<span className="inline-flex items-center gap-2 rounded-full border border-amber-500 bg-amber-100 px-3 py-1 text-[13px] text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-						Viewing competitor: <strong>{data.competitor}</strong>
-						<a href={`?brand=${encodeURIComponent(brand)}&keyword=${encodeURIComponent(keyword)}&week=${encodeURIComponent(week)}`}
-							className="font-bold text-amber-700 no-underline dark:text-amber-300">✕ back to us</a>
-					</span>
-				) : null}
 				<button type="button" disabled={refresher.state !== 'idle'}
 					onClick={() => {
 						if (confirm('Capture a fresh reach snapshot now? (~$4.50 of DataForSEO tasks; fresh ranks land in ~1-2h as a NEW date in the date dropdown, existing data is never touched.)'))
 							refresher.submit({}, { method: 'post' })
 					}}
-					className="cursor-pointer rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white disabled:bg-blue-400">
+					style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #2563eb', background: refresher.state !== 'idle' ? '#93c5fd' : '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 13 }}>
 					{refresher.state !== 'idle' ? 'Queuing…' : 'Refresh reach'}
 				</button>
 				{refresher.data ? (
-					<span className={`text-xs ${refresher.data.ok ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>{refresher.data.message}</span>
+					<span style={{ fontSize: 12, color: refresher.data.ok ? '#15803d' : '#b91c1c' }}>{refresher.data.message}</span>
 				) : null}
-				<span className="ml-auto flex gap-3.5 text-[13px]">
+				<span style={{ marginLeft: 'auto', display: 'flex', gap: 14, fontSize: 13 }}>
 					<span><i style={{ background: COLORS.top3, display: 'inline-block', width: 10, height: 10, borderRadius: 5, marginRight: 4 }} />top 3</span>
 					<span><i style={{ background: COLORS.mid, display: 'inline-block', width: 10, height: 10, borderRadius: 5, marginRight: 4 }} />4–10</span>
 					<span><i style={{ background: COLORS.low, display: 'inline-block', width: 10, height: 10, borderRadius: 5, marginRight: 4 }} />11–20</span>
@@ -550,46 +465,46 @@ export default function GeoRank() {
 			</form>
 			<div id="geo-map" ref={mapRef} style={{ height: 'calc(100vh - 54px)', width: '100%' }} />
 
-			<section className="mx-auto max-w-[1100px] p-4">
-				<h2 className="text-lg">Ranges, {brand} ({week})</h2>
-				<div className="overflow-x-auto">
-					<table className="w-full border-collapse [font-variant-numeric:tabular-nums]">
+			<section style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
+				<h2 style={{ fontSize: 18 }}>Ranges, {brand} ({week})</h2>
+				<div style={{ overflowX: 'auto' }}>
+					<table style={{ borderCollapse: 'collapse', width: '100%', fontVariantNumeric: 'tabular-nums' }}>
 						<thead><tr>{['keyword', 'listing', 'points', '% of metro', 'top-3 pts', '4–10 pts', 'best', 'median'].map(h => (
-							<th key={h} className="border-b-2 border-foreground px-2.5 py-1.5 text-left text-[13px]">{h}</th>
+							<th key={h} style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #111', fontSize: 13 }}>{h}</th>
 						))}</tr></thead>
 						<tbody>{ranges.map((r: any, i: number) => (
 							<tr key={i}>
-								<td className="border-b border-border px-2.5 py-1">{r.keyword}</td>
-								<td className="border-b border-border px-2.5 py-1">{r.listing}</td>
-								<td className="border-b border-border px-2.5 py-1">{r.points}</td>
-								<td className="border-b border-border px-2.5 py-1">{r.metro_pct}%</td>
-								<td className="border-b border-border px-2.5 py-1" style={{ color: COLORS.top3 }}>{r.top3}</td>
-								<td className="border-b border-border px-2.5 py-1 text-amber-700 dark:text-amber-400">{r.mid}</td>
-								<td className="border-b border-border px-2.5 py-1">{r.best}</td>
-								<td className="border-b border-border px-2.5 py-1">{r.median}</td>
+								<td style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>{r.keyword}</td>
+								<td style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>{r.listing}</td>
+								<td style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>{r.points}</td>
+								<td style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>{r.metro_pct}%</td>
+								<td style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', color: COLORS.top3 }}>{r.top3}</td>
+								<td style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', color: '#a16207' }}>{r.mid}</td>
+								<td style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>{r.best}</td>
+								<td style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>{r.median}</td>
 							</tr>
 						))}</tbody>
 					</table>
 				</div>
 
-				<h2 className="mt-7 text-lg">Reach trends, {brand} (top-3 household reach %)</h2>
-				<div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(320px,1fr))]">
+				<h2 style={{ fontSize: 18, marginTop: 28 }}>Reach trends, {brand} (top-3 household reach %)</h2>
+				<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
 					{[...trendByKeyword.entries()].map(([kw, pts]) => {
 						const max = Math.max(1, ...pts.map(p => p.v))
 						const W = 300, H = 90, PAD = 8
 						const x = (i: number) => PAD + (i * (W - 2 * PAD)) / Math.max(1, pts.length - 1)
 						const y = (v: number) => H - PAD - (v / max) * (H - 2 * PAD)
 						return (
-							<div key={kw} className="rounded-lg border border-border p-3">
-								<div className="mb-1 text-[13px] font-semibold">{kw}</div>
+							<div key={kw} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12 }}>
+								<div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{kw}</div>
 								<svg width={W} height={H} role="img" aria-label={`Reach trend for ${kw}`}>
 									<polyline fill="none" stroke="#2563eb" strokeWidth="2"
 										points={pts.map((p, i) => `${x(i)},${y(p.v)}`).join(' ')} />
 									{pts.map((p, i) => (
 										<g key={p.week}>
 											<circle cx={x(i)} cy={y(p.v)} r={3} fill="#2563eb" />
-											<text x={x(i)} y={y(p.v) - 6} fontSize="10" textAnchor="middle" fill="currentColor">{p.v}%</text>
-											<text x={x(i)} y={H - 1} fontSize="9" textAnchor="middle" fill="currentColor" opacity={0.55}>{p.week.slice(5)}</text>
+											<text x={x(i)} y={y(p.v) - 6} fontSize="10" textAnchor="middle">{p.v}%</text>
+											<text x={x(i)} y={H - 1} fontSize="9" textAnchor="middle" fill="#6b7280">{p.week.slice(5)}</text>
 										</g>
 									))}
 								</svg>
@@ -619,10 +534,7 @@ function ConsolidatedSections({
 		week, keyword, brand,
 		leaderboard, totalPoints, reachRows,
 		rankHomes, totalsRv, valueByCategory, actualWeb, actualPhone,
-		competitor, competitorTrend,
 	} = data
-	const viewHref = (title: string) =>
-		`?brand=${encodeURIComponent(brand)}&keyword=${encodeURIComponent(keyword)}&week=${encodeURIComponent(week)}&competitor=${encodeURIComponent(title)}`
 
 	// Household reach, latest week vs prior, per keyword (brand-scoped).
 	const reachWeeks = [...new Set(reachRows.map(r => r.week))].sort()
@@ -742,16 +654,7 @@ function ConsolidatedSections({
 						<tbody>
 							{leaderboard.map(r => (
 								<tr key={r.title} style={r.is_mine ? { fontWeight: 700 } : undefined}>
-									<td>
-										{r.is_mine ? (
-											<>{r.title} ★</>
-										) : (
-											<a href={viewHref(r.title)} title="View this business on the map" style={{ textDecoration: 'none' }}>
-												{r.title} <span className="mini">map ↗</span>
-											</a>
-										)}
-										{competitor === r.title ? <span className="mini"> (viewing)</span> : null}
-									</td>
+									<td>{r.title}{r.is_mine ? ' ★' : ''}</td>
 									<td className="num">{r.top3}</td>
 									<td className="num">
 										{totalPoints ? `${((100 * Number(r.top3)) / totalPoints).toFixed(1)}%` : '-'}
@@ -765,19 +668,6 @@ function ConsolidatedSections({
 						</tbody>
 					</table>
 				</div>
-				{competitor && competitorTrend?.length ? (
-					<div style={{ marginTop: 12 }}>
-						<h3 style={{ fontSize: 14 }}>
-							{competitor}, share of grid points in the top 3 for "{keyword}" over time
-						</h3>
-						<div className="rtable-wrap">
-							<table className="rtable">
-								<thead><tr>{competitorTrend.map(t => <th key={t.week} className="num">{t.week.slice(5)}</th>)}</tr></thead>
-								<tbody><tr>{competitorTrend.map(t => <td key={t.week} className="num">{t.pct == null ? '-' : `${t.pct}%`}</td>)}</tr></tbody>
-							</table>
-						</div>
-					</div>
-				) : null}
 			</section>
 
 			<section>

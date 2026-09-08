@@ -3,7 +3,6 @@ import { getDomainUrl } from '#app/utils/misc.tsx'
 import { locations } from '#app/utils/locations.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { sitePages } from '#app/utils/site-pages.server.js'
-import { blogPosts } from '#app/utils/blog-posts.ts'
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const siteUrl = getDomainUrl(request)
@@ -20,8 +19,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		'careers',
 		'privacy',
 		'tos',
-		'blog',
-		...blogPosts.map(p => `blog/${p.slug}`),
 	]
 
 	// All enabled service pages (directly served, Knoxville-optimized)

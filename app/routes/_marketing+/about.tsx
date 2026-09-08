@@ -15,12 +15,12 @@ export default function About() {
 	const blvdUrl = useBlvdUrl()
 
 	return (
-		<div className="font-poppins bg-background py-16 lg:py-24">
+		<div className="font-poppins bg-white py-16 lg:py-24">
 			<div className="mx-auto max-w-7xl px-6 lg:px-8">
 				<div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
 					{/* Image Column */}
 					<div className="relative mx-auto w-full max-w-md lg:max-w-none">
-						<div className="aspect-[3/4] overflow-hidden rounded-2xl bg-muted shadow-xl">
+						<div className="aspect-[3/4] overflow-hidden rounded-2xl bg-gray-100 shadow-xl">
 							<img
 								src="/img/sarah.jpg"
 								alt="Sarah Hitchcox, RN - Aesthetic Injector"
@@ -28,13 +28,13 @@ export default function About() {
 							/>
 						</div>
 						{/* Optional decorative element */}
-						<div className="absolute -bottom-6 -right-6 -z-10 h-full w-full rounded-2xl bg-muted/50" />
+						<div className="absolute -bottom-6 -right-6 -z-10 h-full w-full rounded-2xl bg-gray-50" />
 					</div>
 
 					{/* Content Column */}
 					<div className="flex flex-col space-y-8">
 						<div>
-							<h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+							<h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
 								Meet Sarah Hitchcox, RN
 							</h1>
 							<h2 className="mt-4 text-xl font-medium text-primary">
@@ -42,7 +42,7 @@ export default function About() {
 							</h2>
 						</div>
 
-						<div className="space-y-6 text-lg leading-relaxed text-muted-foreground">
+						<div className="space-y-6 text-lg leading-relaxed text-gray-600">
 							<p>
 								Sarah Hitchcox is a Knoxville native and dedicated Registered
 								Nurse specializing in medical aesthetics. She brings a unique
@@ -62,7 +62,7 @@ export default function About() {
 								Sarah is committed to staying at the forefront of nursing
 								practice and education.
 							</p>
-							<blockquote className="border-l-4 border-primary pl-6 italic text-foreground">
+							<blockquote className="border-l-4 border-primary pl-6 italic text-gray-800">
 								"My practice is grounded in nurturing a trusting relationship
 								with each client, ensuring a seamless journey to enhanced
 								natural beauty."

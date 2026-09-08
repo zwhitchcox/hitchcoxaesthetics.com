@@ -66,12 +66,10 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	// Toggle without a deploy: fly secrets set REVIEW_MICROSITE_REDIRECTS=1
 	// (on) / unset (off).
 	// Category names come from getServiceProfile in review-link.server.ts.
-	// 2026-08-05 (Zane): weight loss now ALSO seeds Botox Knox. KWLC owns its
-	// keywords with ~12 reviews (name+thin field; reviews are ~weightless on
-	// WL terms), while botox is the review-hungry battlefield — so the whole
-	// review firehose feeds BK until its listings are seasoned. The svc hint
-	// keeps the sample text honest about what the customer actually had.
-	const micrositeHostFor = (_category: string) => 'https://botoxknoxvilletn.com'
+	const micrositeHostFor = (category: string) => {
+		if (category === 'Weight Loss') return 'https://weightlossknoxvilletn.com'
+		return 'https://botoxknoxvilletn.com'
+	}
 	const micrositeHost =
 		process.env.REVIEW_MICROSITE_REDIRECTS === '1' ||
 		process.env.REVIEW_MICROSITE_REDIRECTS === 'true'
@@ -98,8 +96,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 		})
 		// Carry the QR-vs-NFC marker across the hop so the brand page's own
 		// scanned event keeps the attribution.
-		const svcSlug = profile.category.toLowerCase().replace(/[^a-z]+/g, '-')
-		throw redirect(`${micrositeHost}/r/${providerId}?via=${via}&svc=${svcSlug}`)
+		throw redirect(`${micrositeHost}/r/${providerId}?via=${via}`)
 	}
 
 	// Every sample goes through the served-hash ledger so no two customers can
@@ -161,7 +158,6 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			placeId: l.placeId,
 			label: l.label,
 			address: l.address,
-			business: l.business,
 			// Each destination carries its own text, so posting to a second
 			// place never reuses the first one's words.
 			sample: samplesByPlace.get(`Google - ${l.label}`) ?? genericFallback,
@@ -200,70 +196,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	return json({ ok: true })
 }
 
-type PageLocation = {
-	placeId: string
-	label: string
-	address: string
-	business: string
-	sample: string
-	platforms: Array<{ id: string; label: string }>
-}
-
-/** Locations sharing a label (same physical spot, multiple brand listings)
- * render as one card with a chip row per business. Preserves loader order,
- * so the visited location's group stays first. */
-function groupByLabel(locations: PageLocation[]) {
-	const groups: Array<{ label: string; items: PageLocation[] }> = []
-	for (const loc of locations) {
-		const group = groups.find(g => g.label === loc.label)
-		if (group) group.items.push(loc)
-		else groups.push({ label: loc.label, items: [loc] })
-	}
-	return groups
-}
-
-/** Small brand marks for the review chips. Anything unknown gets a dot. */
-function PlatformIcon({ id }: { id: string }) {
-	if (id === 'google') {
-		return (
-			<svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-				<path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.1h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.2-2 3.7-5 3.7-8.6z"/>
-				<path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.7-2.9c-1 .7-2.4 1.2-4.2 1.2-3.1 0-5.8-2.1-6.7-5l-3.9 3C3.3 21.3 7.3 24 12 24z"/>
-				<path fill="#FBBC05" d="M5.3 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.7.4-2.4l-3.9-3C.5 8.2 0 10 0 12s.5 3.8 1.4 5.4l3.9-3z"/>
-				<path fill="#EA4335" d="M12 4.6c1.8 0 3 .8 3.7 1.4l3.3-3.2C17.9 1 15.2 0 12 0 7.3 0 3.3 2.7 1.4 6.6l3.9 3c.9-2.9 3.6-5 6.7-5z"/>
-			</svg>
-		)
-	}
-	if (id === 'yelp') {
-		return (
-			<svg viewBox="0 0 24 24" className="h-4 w-4" fill="#d32323" aria-hidden>
-				<path d="M12.9 0c-.8 0-1.5.5-1.7 1.3L9.3 9.7c-.2.9.5 1.8 1.4 1.8h.3l7.5-2.1c.8-.2 1.3-1 1.2-1.8C19.2 4 16.5 1 12.9 0zM8.6 13.1l-6.1 1.7c-.8.2-1.3 1.1-1 1.9.9 2.4 2.7 4.4 5 5.5.8.4 1.7 0 2-.8l2.1-6c.3-1-.6-2-1.6-1.9l-.4-.4zm4.5 2.1c-.9-.3-1.9.4-1.9 1.4l.1 6.3c0 .9.8 1.5 1.7 1.4 2.6-.4 4.9-1.8 6.4-3.9.5-.7.3-1.7-.5-2.1l-5.5-3-.3-.1z"/>
-			</svg>
-		)
-	}
-	if (id === 'nextdoor') {
-		return (
-			<svg viewBox="0 0 24 24" className="h-4 w-4" fill="#8ed500" aria-hidden>
-				<path d="M12 2 1 11h3v11h7v-7h2v7h7V11h3L12 2z"/>
-			</svg>
-		)
-	}
-	if (id === 'trustpilot') {
-		return (
-			<svg viewBox="0 0 24 24" className="h-4 w-4" fill="#00b67a" aria-hidden>
-				<path d="M12 1.7 14.9 8l6.9.6-5.2 4.6 1.6 6.8L12 16.4 5.8 20l1.6-6.8L2.2 8.6 9.1 8 12 1.7z"/>
-			</svg>
-		)
-	}
-	if (id === 'healthgrades') {
-		return <span className="h-2.5 w-2.5 rounded-full bg-[#0071bc]" aria-hidden />
-	}
-	if (id === 'zocdoc') {
-		return <span className="h-2.5 w-2.5 rounded-full bg-[#ffc107]" aria-hidden />
-	}
-	return <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground" aria-hidden />
-}
-
 export default function ReviewLinkPage() {
 	const data = useLoaderData<typeof loader>()
 	const fetcher = useFetcher()
@@ -299,7 +231,7 @@ export default function ReviewLinkPage() {
 				</p>
 			</header>
 
-			<section className="flex flex-col gap-3 rounded-xl bg-card p-4 shadow-sm">
+			<section className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow-sm">
 				<Textarea
 					key={placeId}
 					ref={textareaRef}
@@ -313,90 +245,54 @@ export default function ReviewLinkPage() {
 				</Button>
 			</section>
 
-			<section className="flex flex-col gap-4">
+			<section className="flex flex-col gap-3">
 				<h2 className="text-center text-lg font-medium">
 					Where would you like to leave it?
 				</h2>
-				{/* Grouped by location, then by business: microsite listings share
-				    an address with the SHA listing there, so each location card
-				    holds one chip row per business. Tapping a chip on an
-				    unselected listing selects it first (swapping in its own
-				    sample text); tapping again opens the review site. */}
-				{groupByLabel(data.locations).map(group => {
-					const recommended = group.items.some(
-						l => l.placeId === data.matchedPlaceId,
-					)
+				{data.locations.map(loc => {
+					const recommended = loc.placeId === data.matchedPlaceId
+					const href = `/resources/review-go?provider=${encodeURIComponent(
+						data.providerId,
+					)}&place=${encodeURIComponent(loc.placeId)}${
+						data.appointmentId
+							? `&appt=${encodeURIComponent(data.appointmentId)}`
+							: ''
+					}&via=${encodeURIComponent(data.via)}`
+					const selected = loc.placeId === placeId
 					return (
 						<div
-							key={group.label}
+							key={loc.placeId}
 							className={cn(
-								'flex flex-col rounded-2xl border bg-card p-4 shadow-sm transition',
-								recommended && 'border-primary ring-1 ring-primary',
+								'flex flex-col items-center rounded-xl border bg-white p-4 text-center shadow-sm transition',
+								(recommended || selected) && 'border-primary ring-1 ring-primary',
 							)}
 						>
-							<div className="flex items-baseline justify-between gap-2">
-								<span className="text-lg font-semibold">{group.label}</span>
-								{recommended ? (
-									<span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-										You visited here
-									</span>
-								) : null}
-							</div>
-							<span className="text-sm text-muted-foreground">
-								{group.items[0]?.address}
-							</span>
-							<div className="mt-3 flex flex-col gap-3">
-								{group.items.map(loc => {
-									const selected = loc.placeId === placeId
-									const href = `/resources/review-go?provider=${encodeURIComponent(
-										data.providerId,
-									)}&place=${encodeURIComponent(loc.placeId)}${
-										data.appointmentId
-											? `&appt=${encodeURIComponent(data.appointmentId)}`
-											: ''
-									}&via=${encodeURIComponent(data.via)}`
-									return (
-										<div key={loc.placeId}>
-											{group.items.length > 1 ? (
-												<div
-													className={cn(
-														'mb-1.5 text-xs font-semibold uppercase tracking-wide',
-														selected ? 'text-primary' : 'text-muted-foreground',
-													)}
-												>
-													{loc.business}
-												</div>
-											) : null}
-											<div className="flex flex-wrap gap-2">
-												{loc.platforms.map(platform => (
-													<a
-														key={platform.id}
-														href={`${href}&platform=${encodeURIComponent(platform.id)}`}
-														onClick={event => {
-															if (!selected) {
-																event.preventDefault()
-																setPlaceId(loc.placeId)
-																setCopied(false)
-															}
-														}}
-														className={cn(
-															'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition',
-															platform.id === 'google'
-																? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-700'
-																: 'border-border bg-card text-foreground hover:border-gray-500',
-															!selected && 'opacity-70',
-														)}
-													>
-														<PlatformIcon id={platform.id} />
-														{platform.id === 'google'
-															? 'Google Reviews'
-															: platform.label}
-													</a>
-												))}
-											</div>
-										</div>
-									)
-								})}
+							{recommended ? (
+								<span className="mb-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+									You visited here
+								</span>
+							) : null}
+							<span className="text-lg font-semibold">{loc.label}</span>
+							<span className="text-sm text-muted-foreground">{loc.address}</span>
+							{/* One button per site that actually takes reviews. Choosing a
+							    location first swaps in that location's own sample text. */}
+							<div className="mt-3 flex w-full flex-wrap justify-center gap-2">
+								{loc.platforms.map(platform => (
+									<a
+										key={platform.id}
+										href={`${href}&platform=${encodeURIComponent(platform.id)}`}
+										onClick={event => {
+											if (!selected) {
+												event.preventDefault()
+												setPlaceId(loc.placeId)
+												setCopied(false)
+											}
+										}}
+										className="rounded-lg border border-primary/40 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/5"
+									>
+										{selected ? platform.label : `Use ${platform.label} text`}
+									</a>
+								))}
 							</div>
 						</div>
 					)

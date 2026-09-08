@@ -24,11 +24,9 @@ import {
 	SERIES,
 	StatTile,
 	usd,
-	usePersistedSearch,
 	useSortable,
 } from '#app/components/report-ui'
 import { ET_STAMP, WindowControls } from '#app/components/revenue-by-source.tsx'
-import { syncBlvdAppointments } from '#app/utils/blvd-appointment-sync.server.ts'
 import { syncBoulevardRealRevenue } from '#app/utils/blvd-revenue-sync.server.ts'
 import { ensurePrimary } from '#app/utils/litefs.server.ts'
 import { getGoogleAdsSpendByDay } from '#app/utils/google-ads-spend.server.ts'
@@ -42,10 +40,6 @@ import {
 	type ServiceCategoryRow,
 } from '#app/utils/revenue-by-source.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
-import {
-	cogsRatioForCategory,
-	loadDailyProfitModel,
-} from '#app/utils/daily-profit.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
 
@@ -114,7 +108,7 @@ function getCurrentWeekDays() {
 /** Actual Boulevard revenue per ET day (past days + today only; future null). */
 async function getActualRevenueByDays(days: string[], since: Date, until: Date) {
 	const today = toEtDay(new Date())
-	const items = await prisma.revenueItem.findMany({
+	const items = await prisma.blvdRevenueItem.findMany({
 		where: { occurredAt: { gte: since, lt: until } },
 		select: { occurredAt: true, grossAmountUsd: true },
 	})
@@ -187,7 +181,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		thisWeekProj,
 		accuracy,
 		expensesRows,
-		expenseClassRows,
 		summary,
 		thisWeekExpected,
 		actualByDay,
@@ -197,10 +190,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		weekLost,
 		chartCells,
 		ads,
-		weekItems,
 		todayProgress,
-		revenueCoverageFromDay,
-		projCatRows,
 	] = await Promise.all([
 		tryQuery<{ week: string; revenue: string }>(
 			`SELECT to_char(week, 'YYYY-MM-DD') AS week, round(revenue) AS revenue
@@ -243,20 +233,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		),
 		tryQuery<{ month: string; expenses: string }>(
 			`SELECT month, round(expenses) AS expenses FROM business_pnl_monthly ORDER BY month`,
-		),
-		// Separate query: these columns only exist once the finance sync has
-		// run with the class split, and the plain series must survive that gap.
-		tryQuery<{
-			month: string
-			cogs: string
-			overhead_monthly: string
-			annual_amortized: string
-			irregular: string
-		}>(
-			`SELECT month, round(cogs) AS cogs,
-				round(overhead_monthly) AS overhead_monthly,
-				round(annual_amortized) AS annual_amortized, round(irregular) AS irregular
-			 FROM business_pnl_monthly WHERE cogs IS NOT NULL ORDER BY month`,
 		),
 		tryQuery<{
 			window_start: string
@@ -314,84 +290,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			}
 		}),
 		getGoogleAdsSpendByDay(win.fromDay, win.toDay),
-		// Per-week breakdown behind each accuracy row: how many appointments,
-		// of what type, and what they actually earned. Our own revenue items,
-		// so this costs a single fast query rather than a Boulevard round trip.
-		prisma.blvdRevenueItem
-			.findMany({
-				where: { occurredAt: { gte: new Date('2025-06-01') } },
-				select: {
-					occurredAt: true,
-					serviceCategory: true,
-					grossAmountUsd: true,
-					boulevardAppointmentId: true,
-				},
-			})
-			.catch(() => [] as Array<{
-				occurredAt: Date
-				serviceCategory: string | null
-				grossAmountUsd: number
-				boulevardAppointmentId: string | null
-			}>),
 		loadTodayProgress(win.todayEt).catch(error => {
 			console.error('Failed to load today progress', error)
 			return null
 		}),
-		// First day the Boulevard revenue mirror covers: buckets before it
-		// have no actual-revenue data at all (pre-import, and pre-migration
-		// months lived in Jane), so the chart must not render them as $0.
-		prisma.revenueItem
-			.findFirst({ orderBy: { occurredAt: 'asc' }, select: { occurredAt: true } })
-			.then(r => (r ? toEtDay(r.occurredAt) : null))
-			.catch(() => null),
-		// Pre-week per-service-type projection snapshots (frozen once the
-		// week starts) written by the finance-reports sync.
-		tryQuery<{ week: string; category: string; appts: string; usd: string }>(
-			`SELECT to_char(week, 'YYYY-MM-DD') AS week, category,
-				appts::text AS appts, round(expected_usd)::text AS usd
-			 FROM revenue_projection_week_category
-			 ORDER BY week, expected_usd DESC`,
-		),
 	])
-
-	// Per-week appointment counts and revenue by service category, keyed by
-	// the Monday of the ET week so it lines up with the accuracy table.
-	const weekBreakdown: Record<
-		string,
-		Array<{ cat: string; appts: number; usd: number }>
-	> = {}
-	{
-		const byWeek = new Map<string, Map<string, { appts: Set<string>; usd: number }>>()
-		for (const it of weekItems) {
-			const day = toEtDay(it.occurredAt)
-			const dow = (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7 // Mon=0
-			const monday = shiftDay(day, -dow)
-			const cat = it.serviceCategory?.trim() || 'Uncategorized'
-			let cats = byWeek.get(monday)
-			if (!cats) byWeek.set(monday, (cats = new Map()))
-			let row = cats.get(cat)
-			if (!row) cats.set(cat, (row = { appts: new Set(), usd: 0 }))
-			row.usd += it.grossAmountUsd
-			if (it.boulevardAppointmentId) row.appts.add(it.boulevardAppointmentId)
-		}
-		for (const [monday, cats] of byWeek) {
-			weekBreakdown[monday] = [...cats.entries()]
-				.map(([cat, v]) => ({ cat, appts: v.appts.size, usd: Math.round(v.usd) }))
-				.sort((a, b) => b.usd - a.usd)
-		}
-	}
-	// Pre-week projected appts/revenue per service type, same week keying.
-	const projBreakdown: Record<
-		string,
-		Array<{ cat: string; appts: number; usd: number }>
-	> = {}
-	for (const r of projCatRows ?? []) {
-		;(projBreakdown[r.week] ??= []).push({
-			cat: r.category,
-			appts: Number(r.appts),
-			usd: Number(r.usd),
-		})
-	}
 
 	// Tiles stay pinned to the current week regardless of the chart window.
 	const expectedByDay = new Map(
@@ -407,27 +310,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				}))
 			: null
 
-	// Per-category fitted COGS ratios (daily-profit model): when the chart is
-	// filtered to one service, its expense bar is that service's estimated
-	// COGS rather than the whole business's spend that day.
-	const profitModel = await loadDailyProfitModel().catch(() => null)
-	const cogsRatioByCategory = profitModel
-		? Object.fromEntries(
-				chartCells.categories.map(cat => [
-					cat,
-					cogsRatioForCategory(profitModel, cat),
-				]),
-			)
-		: null
-
 	return json({
 		configured: true as const,
 		currentMonday: weekDays[0]!,
 		lastFullWeek: lastWeekRow?.[0] ?? null,
 		thisWeekProj: thisWeekProj?.[0] ?? null,
 		accuracy: accuracy?.slice(-12) ?? null,
-		weekBreakdown,
-		projBreakdown,
 		summary: summary?.[0] ?? null,
 		thisWeekDaily,
 		todayProgress,
@@ -439,8 +327,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			todayEt: win.todayEt,
 		},
 		chart: {
-			revenueCoverageFromDay,
-			cogsRatioByCategory,
 			days: rangeDays,
 			expected: (rangeExpected ?? []).map(r => ({
 				day: r.day,
@@ -456,38 +342,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			expensesByMonth: Object.fromEntries(
 				(expensesRows ?? []).map(r => [r.month, Number(r.expenses)]),
 			) as Record<string, number>,
-			// Class stack per month (annual fees already amortized); empty until
-			// the finance sync first writes the class columns.
-			expenseClassesByMonth: Object.fromEntries(
-				(expenseClassRows ?? []).map(r => [
-					r.month,
-					{
-						cogs: Number(r.cogs),
-						overhead: Number(r.overhead_monthly),
-						annual: Number(r.annual_amortized),
-						irregular: Number(r.irregular),
-					},
-				]),
-			) as Record<
-				string,
-				{ cogs: number; overhead: number; annual: number; irregular: number }
-			>,
 			avgMonthlyExpenses: avgExp?.[0]?.avg != null ? Number(avgExp[0].avg) : null,
-			avgExpenseClasses: (() => {
-				const curMonth2 = new Date().toISOString().slice(0, 7)
-				const recent = (expenseClassRows ?? [])
-					.filter(r => r.month < curMonth2)
-					.slice(-6)
-				if (!recent.length) return null
-				const mean = (pick: (r: (typeof recent)[number]) => number) =>
-					Math.round(recent.reduce((s, r) => s + pick(r), 0) / recent.length)
-				return {
-					cogs: mean(r => Number(r.cogs)),
-					overhead: mean(r => Number(r.overhead_monthly)),
-					annual: mean(r => Number(r.annual_amortized)),
-					irregular: mean(r => Number(r.irregular)),
-				}
-			})(),
 			adsByDay: ads.byDay,
 			adsError: ads.error,
 		},
@@ -500,14 +355,7 @@ export async function action({ request }: ActionFunctionArgs) {
 	await ensurePrimary()
 	const form = await request.formData()
 	if (form.get('intent') === 'refresh') {
-		// Freshen the appointment mirror too so booked-by labels and today's
-		// schedule reflect the latest bookings, not just collected revenue.
-		const [result] = await Promise.all([
-			syncBoulevardRealRevenue(),
-			syncBlvdAppointments('hot').catch(error => {
-				console.error('Appointment mirror refresh failed', error)
-			}),
-		])
+		const result = await syncBoulevardRealRevenue()
 		return json({ ok: result.ok })
 	}
 	return json({ ok: false })
@@ -581,7 +429,6 @@ function apptBucketRange(
 }
 
 export default function Revenue() {
-	usePersistedSearch()
 	const data = useLoaderData<typeof loader>()
 	const [searchParams, setSearchParams] = useSearchParams()
 	// Hooks must run unconditionally: the fetchers live up here, ahead of the
@@ -679,8 +526,6 @@ export default function Revenue() {
 		lastFullWeek,
 		thisWeekProj,
 		accuracy,
-		weekBreakdown,
-		projBreakdown,
 		summary,
 		thisWeekDaily,
 		window: win,
@@ -737,11 +582,6 @@ export default function Revenue() {
 	const bucketIndex = new Map(bucketKeys.map((k, i) => [k, i]))
 	const bucketStartDay = (key: string) =>
 		win.granularity === 'month' ? `${key}-01` : key
-	const shiftDayClient = (day: string, n: number) => {
-		const d = new Date(`${day}T12:00:00Z`)
-		d.setUTCDate(d.getUTCDate() + n)
-		return d.toISOString().slice(0, 10)
-	}
 	const bucketLabel = (key: string) => {
 		if (win.granularity === 'month') return key
 		if (win.granularity === 'week') return `wk ${key.slice(5)}`
@@ -777,20 +617,6 @@ export default function Revenue() {
 	for (const c of filteredCells) {
 		sumInto(actualVals, bucketKeyOfDay(c.day), metric === 'revenue' ? c.usd : c.appts)
 	}
-	// Buckets that end before the revenue mirror's coverage have no actual
-	// data (not zero revenue) - blank them so pre-import months don't render
-	// as $0 with a fabricated "net loss".
-	if (chart.revenueCoverageFromDay) {
-		const bucketEndDay = (key: string) =>
-			win.granularity === 'month'
-				? `${key}-31`
-				: win.granularity === 'week'
-					? shiftDayClient(key, 6)
-					: key
-		bucketKeys.forEach((key, i) => {
-			if (bucketEndDay(key) < chart.revenueCoverageFromDay!) actualVals[i] = null
-		})
-	}
 	const cancelledVals: Array<number | null> = Array.from({ length: n }, () => null)
 	if (chart.cancelled) {
 		chart.days.forEach((day, i) => {
@@ -810,41 +636,6 @@ export default function Revenue() {
 		const perDay = avgExpenses / AVG_DAYS_PER_MONTH
 		return Math.round(win.granularity === 'week' ? perDay * 7 : perDay)
 	})
-	// Same allocation per expense class (annual fees pre-amortized by the
-	// sync). Null until the P&L sync has written the class columns.
-	type ExpenseClassKey = 'cogs' | 'overhead' | 'annual' | 'irregular'
-	const classVals = chart.avgExpenseClasses
-		? (cls: ExpenseClassKey): Array<number | null> =>
-				bucketKeys.map(key => {
-					if (win.granularity === 'month') {
-						const c = chart.expenseClassesByMonth[key] ?? chart.avgExpenseClasses
-						return c ? Math.round(c[cls]) : null
-					}
-					const perDay = chart.avgExpenseClasses![cls] / AVG_DAYS_PER_MONTH
-					return Math.round(win.granularity === 'week' ? perDay * 7 : perDay)
-				})
-		: null
-	// Accrual COGS: revenue x fitted per-category ratio, assigned to the
-	// bucket the revenue happened in - a restock month no longer reads as a
-	// disaster and a coasting-on-inventory month no longer reads as cheap
-	// (Zane 2026-08-29). The bank-timed number remains as Free cash flow.
-	const estCogsVals: Array<number | null> = bucketKeys.map(k =>
-		bucketStartDay(k) <= win.todayEt ? 0 : null,
-	)
-	if (chart.cogsRatioByCategory) {
-		for (const c of filteredCells) {
-			sumInto(
-				estCogsVals,
-				bucketKeyOfDay(c.day),
-				c.usd * (chart.cogsRatioByCategory[c.cat] ?? 0),
-			)
-		}
-	}
-	bucketKeys.forEach((_, i) => {
-		if (actualVals[i] == null) estCogsVals[i] = null
-		else if (estCogsVals[i] != null) estCogsVals[i] = Math.round(estCogsVals[i]!)
-	})
-
 	const adsVals: Array<number | null> | null = chart.adsByDay
 		? (() => {
 				const vals: Array<number | null> = Array.from({ length: n }, () => null)
@@ -856,27 +647,12 @@ export default function Revenue() {
 			})()
 		: null
 
-	// Window-aware totals: the tiles describe whatever range is selected, not
-	// always the current week, so "This year" stops showing a week's numbers.
-	const rangeIsThisWeek = win.windowKey === 'thisWeek'
-	const sumVals = (vals: Array<number | null> | null) =>
-		(vals ?? []).reduce<number>((sum, v) => sum + (v ?? 0), 0)
-	const rangeActual = sumVals(actualVals)
-	const rangeExpected = sumVals(expectedVals)
-	const rangeExpenses = sumVals(expensesVals)
-	const rangeAds = sumVals(adsVals)
-
 	const showDollarsOnly = metric === 'revenue'
 	const expectedName =
 		metric === 'revenue' ? 'Expected (net of cancellations)' : 'Expected'
 	const cancelledName =
 		metric === 'revenue' ? 'Cancelled / no-show (est.)' : 'Cancelled / no-show'
-	const totalsSeries: Array<{
-		name: string
-		color: string
-		values: Array<number | null>
-		stackGroup?: string
-	}> = []
+	const totalsSeries: Array<{ name: string; color: string; values: Array<number | null> }> = []
 	if (!hidden.has('expected') && !serviceFiltered) {
 		totalsSeries.push({ name: expectedName, color: 'var(--series-3)', values: expectedVals })
 	}
@@ -886,84 +662,11 @@ export default function Revenue() {
 	if (!hidden.has('cancelled') && !serviceFiltered && chart.cancelled) {
 		totalsSeries.push({ name: cancelledName, color: 'var(--series-6)', values: cancelledVals })
 	}
-	// Ad spend is part of expenses, so it stacks inside the same bar with its
-	// own color rather than standing beside it as if it were separate money.
-	// "Expenses" here is the non-ad remainder so the stack totals correctly.
-	const showAds = !hidden.has('adspend') && showDollarsOnly && !!adsVals && !serviceFiltered
-	const filteredCogsRatio = serviceFiltered
-		? (chart.cogsRatioByCategory?.[service] ?? null)
-		: null
-	if (serviceFiltered && showDollarsOnly && filteredCogsRatio != null && !hidden.has('expenses')) {
-		// One service selected: business-wide overhead/ads say nothing about
-		// this service, so the expense bar is its estimated COGS (fitted
-		// ratio x its own revenue) and the tooltip shows gross profit.
-		totalsSeries.push({
-			name: `Est. COGS (${Math.round(filteredCogsRatio * 100)}% fitted)`,
-			color: 'var(--series-8)',
-			values: actualVals.map(v => (v == null ? null : Math.round(v * filteredCogsRatio))),
-			stackGroup: 'expenses',
-		})
-	} else if (!hidden.has('expenses') && showDollarsOnly && expensesVals.some(v => v != null)) {
-		if (classVals) {
-			// Colored expense stack: COGS moves with revenue; overhead is the
-			// monthly bill stack (ads carved out into their own segment);
-			// annual fees show amortized so one August doesn't read as a
-			// disaster; one-time lumps keep their real dates.
-			const overhead = classVals('overhead')
-			const overheadExAds = showAds
-				? overhead.map((v, i) =>
-						v == null ? null : Math.max(0, v - (adsVals![i] ?? 0)),
-					)
-				: overhead
-			const useEstCogs =
-				metric === 'revenue' && !!chart.cogsRatioByCategory
-			totalsSeries.push(
-				{
-					name: useEstCogs ? 'COGS (est. from revenue)' : 'COGS (meds & supplies)',
-					color: 'var(--series-8)',
-					values: useEstCogs ? estCogsVals : classVals('cogs'),
-					stackGroup: 'expenses',
-				},
-				{
-					name: showAds ? 'Overhead (excl. ads)' : 'Overhead (monthly)',
-					color: 'var(--series-7)',
-					values: overheadExAds,
-					stackGroup: 'expenses',
-				},
-				{
-					name: 'Annual fees (amortized)',
-					color: 'var(--series-4)',
-					values: classVals('annual'),
-					stackGroup: 'expenses',
-				},
-				{
-					name: 'One-time',
-					color: 'var(--series-2)',
-					values: classVals('irregular'),
-					stackGroup: 'expenses',
-				},
-			)
-		} else {
-			const otherExpenses = showAds
-				? expensesVals.map((v, i) =>
-						v == null ? null : Math.max(0, v - (adsVals![i] ?? 0)),
-					)
-				: expensesVals
-			totalsSeries.push({
-				name: showAds ? 'Expenses (excl. ads)' : 'Expenses',
-				color: 'var(--series-8)',
-				values: otherExpenses,
-				stackGroup: 'expenses',
-			})
-		}
+	if (!hidden.has('expenses') && showDollarsOnly && expensesVals.some(v => v != null)) {
+		totalsSeries.push({ name: 'Expenses', color: 'var(--series-8)', values: expensesVals })
 	}
-	if (showAds) {
-		totalsSeries.push({
-			name: 'Ad spend',
-			color: 'var(--series-5)',
-			values: adsVals,
-			stackGroup: 'expenses',
-		})
+	if (!hidden.has('adspend') && showDollarsOnly && adsVals) {
+		totalsSeries.push({ name: 'Ad spend', color: 'var(--series-5)', values: adsVals })
 	}
 
 	// By-source view: actual only, stacked by aggregated source (top 7 + Other).
@@ -1075,24 +778,12 @@ export default function Revenue() {
 				})}
 			</WindowControls>
 			<div className="tiles">
-				{rangeIsThisWeek ? (
-					<StatTile
-						label={`This week (${currentMonday})`}
-						value={`${usd(weekToDate?.actual ?? 0)} of ${usd(Number(thisWeekProj?.net ?? 0))}`}
-						whisper={`actual so far vs projected net · ${usd(Number(thisWeekProj?.booked ?? 0))} booked on the calendar`}
-					/>
-				) : (
-					<StatTile
-						label={`Selected range (${win.fromDay} to ${win.toDay})`}
-						value={`${usd(rangeActual)}${rangeExpected > 0 ? ` of ${usd(rangeExpected)}` : ''}`}
-						whisper={
-							rangeExpected > 0
-								? `actual vs expected across the whole window · ${Math.round((100 * rangeActual) / rangeExpected)}% of it`
-								: 'actual across the whole selected window'
-						}
-					/>
-				)}
-				{rangeIsThisWeek && weekToDate ? (
+				<StatTile
+					label={`This week (${currentMonday})`}
+					value={`${usd(weekToDate?.actual ?? 0)} of ${usd(Number(thisWeekProj?.net ?? 0))}`}
+					whisper={`actual so far vs projected net · ${usd(Number(thisWeekProj?.booked ?? 0))} booked on the calendar`}
+				/>
+				{weekToDate ? (
 					<StatTile
 						label="Expected by now"
 						value={usd(weekToDate.expected)}
@@ -1107,29 +798,11 @@ export default function Revenue() {
 						} of it`}
 					/>
 				) : null}
-				{rangeIsThisWeek && nowTracking != null ? (
+				{nowTracking != null ? (
 					<StatTile
 						label="Now tracking"
 						value={usd(nowTracking)}
 						whisper="re-projected week: actual so far + forecast for the remaining days"
-					/>
-				) : null}
-				{!rangeIsThisWeek && rangeExpenses > 0 ? (
-					<StatTile
-						label="Expenses in range"
-						value={usd(rangeExpenses)}
-						whisper={
-							rangeAds > 0
-								? `${usd(rangeAds)} of it ad spend (${Math.round((100 * rangeAds) / rangeExpenses)}%)`
-								: 'bank-verified actuals where available'
-						}
-					/>
-				) : null}
-				{!rangeIsThisWeek && rangeActual > 0 && rangeExpenses > 0 ? (
-					<StatTile
-						label="Net in range"
-						value={usd(rangeActual - rangeExpenses)}
-						whisper="actual revenue minus expenses over the selected window"
 					/>
 				) : null}
 				<StatTile
@@ -1248,84 +921,6 @@ export default function Revenue() {
 					tickEvery={bucketKeys.length > 21 ? 7 : 1}
 					showTotal={view === 'by-source'}
 					onBarClick={handleBarClick}
-					extraTipRows={
-						// Do the subtraction the tooltip otherwise makes you do in
-						// your head: total expenses (the stacked bar) and actual
-						// minus them = net profit for the bucket.
-						view === 'totals' && metric === 'revenue'
-							? i => {
-									const expenses = chartSeries
-										.filter(
-											s =>
-												(s as { stackGroup?: string }).stackGroup ===
-												'expenses',
-										)
-										.reduce((sum, s) => sum + (s.values[i] ?? 0), 0)
-									const actual = chartSeries.find(s => s.name === 'Actual')
-										?.values[i]
-									if (!expenses || actual == null) return []
-									const net = actual - expenses
-									if (serviceFiltered) {
-										// Only this service's est. COGS is subtracted, so
-										// the honest label is gross profit; overhead and
-										// taxes are business-wide and not shown here.
-										return [
-											{
-												name: net >= 0 ? 'Gross profit' : 'Gross loss',
-												color: '',
-												value: usd(Math.round(net)),
-											},
-										]
-									}
-									// Same accrual model as the household report: 30%
-									// federal+SE on positive profit, 0.375% TN business
-									// tax on gross receipts.
-									const afterTax =
-										net - Math.max(net, 0) * 0.3 - actual * 0.00375
-									return [
-										{ name: 'Total expenses', color: '', value: usd(Math.round(expenses)) },
-										{
-											name: net >= 0 ? 'Net profit' : 'Net loss',
-											color: '',
-											value: usd(Math.round(net)),
-										},
-										// One-offs (equipment, filings, shopping) hit the
-										// month they were bought; this line removes them so
-										// months compare like-for-like on operations.
-										...(() => {
-											const oneTime = totalsSeries.find(
-												ts => ts.name === 'One-time',
-											)?.values[i]
-											return oneTime
-												? [
-														{
-															name: 'Operating profit (excl. one-time)',
-															color: '',
-															value: usd(Math.round(net + oneTime)),
-														},
-													]
-												: []
-										})(),
-										{
-											name: 'Net after taxes',
-											color: '',
-											value: usd(Math.round(afterTax)),
-										},
-										// Bank-timed view: what cash actually moved this
-										// bucket (expenses at purchase time, ads actual).
-										...(expensesVals[i] != null
-											? [
-													{
-														name: 'Free cash flow',
-														color: '',
-														value: usd(Math.round(actual - expensesVals[i]!)),
-													},
-												]
-											: []),
-									]
-								}
-							: undefined
-					}
 				/>
 				{chartSeries.length === 0 ? (
 					<p className="note">No visible series: re-enable one above.</p>
@@ -1348,15 +943,6 @@ export default function Revenue() {
 						Expected only exists inside the projection window; actual bars stop
 						at today. Expenses are the month's bank-verified actuals when
 						present, else the trailing-6-month average scaled to the bucket.
-						{chart.avgExpenseClasses ? (
-							<>
-								{' '}
-								COGS in the stack is ESTIMATED from each service's revenue at its fitted ratio (true profitability - a restock month is not a bad month); Free cash flow in the tooltip uses purchase-timed spend instead. The expense stack shows annual fees AMORTIZED (÷12) so a
-								once-a-year renewal doesn't crater its month; cash out (FCF)
-								is the P&L "expenses" column on the household-profit report,
-								which stays cash-true.
-							</>
-						) : null}
 					</p>
 				) : null}
 				{view === 'by-source' ? (
@@ -1465,185 +1051,6 @@ export default function Revenue() {
 					</>
 				)}
 			</section>
-
-			{accuracy ? (
-				<section>
-					<h2>
-						Projections{' '}
-						<span className="mini">
-							booked + forecast for coming weeks; frozen pre-week forecast vs actual for past weeks
-						</span>
-					</h2>
-					<div className="rtable-wrap">
-						<table className="rtable">
-							<thead>
-								<tr>
-									<th>Week</th>
-									<th className="num">Proj appts</th>
-									<th className="num">Projected</th>
-									<th className="num">Range</th>
-									<th className="num">Actual appts</th>
-									<th className="num">Actual</th>
-									<th className="num">Error</th>
-								</tr>
-							</thead>
-							<tbody>
-								{accuracy.map(a => {
-									const actRows = weekBreakdown[a.week] ?? []
-									const projRows = projBreakdown[a.week] ?? []
-									// Live scoring for the in-progress week: actual-so-far
-									// against the forecast prorated to this point in the
-									// week (same intraday proration as the tiles). Once the
-									// week completes, a.actual exists and frac pins to 1,
-									// so the error freezes on its own.
-									const isCurrent = a.week === currentMonday && a.actual == null
-									const weekTotalExpected =
-										thisWeekDaily?.reduce((t, d) => t + (d.expected ?? 0), 0) ?? 0
-									const frac = isCurrent
-										? weekToDate && weekTotalExpected > 0
-											? weekToDate.expected / weekTotalExpected
-											: null
-										: 1
-									const actualUsd =
-										a.actual != null
-											? Number(a.actual)
-											: isCurrent && weekToDate
-												? Math.round(weekToDate.actual)
-												: null
-									const weekBase =
-										frac != null && Number(a.projected) > 0
-											? Number(a.projected) * frac
-											: null
-									const weekErr =
-										actualUsd != null && weekBase
-											? Math.round(((actualUsd - weekBase) / weekBase) * 100)
-											: null
-									// One line per service type: projected side, actual
-									// side, and the per-type error when both exist.
-									const cats = [
-										...new Set([
-											...projRows.map(r => r.cat),
-											...actRows.map(r => r.cat),
-										]),
-									]
-									const actBy = new Map(actRows.map(r => [r.cat, r]))
-									const projBy = new Map(projRows.map(r => [r.cat, r]))
-									const merged = cats
-										.map(cat => ({
-											cat,
-											proj: projBy.get(cat) ?? null,
-											act: actBy.get(cat) ?? null,
-										}))
-										.sort(
-											(x, y) =>
-												(y.act?.usd ?? y.proj?.usd ?? 0) -
-												(x.act?.usd ?? x.proj?.usd ?? 0),
-										)
-									// Booked-by-type never covers the whole projection: the
-									// remainder is the fill model's expectation for slots
-									// not booked yet at snapshot time.
-									const projCatTotal = projRows.reduce((t, r) => t + r.usd, 0)
-									const fillUsd = Math.round(Number(a.projected) - projCatTotal)
-									// Week-level counts: booked appointments at snapshot time
-									// (pre-snapshot weeks have none) and paid visits to date.
-									const projAppts = projRows.length
-										? projRows.reduce((t, r) => t + r.appts, 0)
-										: null
-									const actAppts = actRows.length
-										? actRows.reduce((t, r) => t + r.appts, 0)
-										: null
-									return (
-									<tr key={a.week}>
-										<td>
-											{merged.length ? (
-												<details>
-													<summary style={{ cursor: 'pointer' }}>{a.week}</summary>
-													<table className="rtable" style={{ margin: '6px 0 2px' }}>
-														<thead>
-															<tr>
-																<th>Type</th>
-																<th className="num">Proj appts</th>
-																<th className="num">Proj $</th>
-																<th className="num">Actual appts</th>
-																<th className="num">Actual $</th>
-																<th className="num">Error</th>
-															</tr>
-														</thead>
-														<tbody>
-															{merged.map(r => {
-																// Same live proration per type: actual-so-far vs
-																// the type's forecast scaled to how far into the
-																// week we are. Positive = the type beat its line.
-																const base =
-																	r.proj && frac != null && r.proj.usd > 0
-																		? r.proj.usd * frac
-																		: null
-																const err =
-																	base && r.act
-																		? Math.round(((r.act.usd - base) / base) * 100)
-																		: null
-																return (
-																	<tr key={r.cat}>
-																		<td>{r.cat}</td>
-																		<td className="num">{r.proj ? r.proj.appts : '-'}</td>
-																		<td className="num">{r.proj ? usd(r.proj.usd) : '-'}</td>
-																		<td className="num">{r.act ? r.act.appts : '-'}</td>
-																		<td className="num">{r.act ? usd(r.act.usd) : '-'}</td>
-																		<td
-																			className={`num ${err == null ? '' : err >= 0 ? 'good' : 'bad'}`}
-																		>
-																			{err == null ? '-' : `${err > 0 ? '+' : ''}${err}%`}
-																		</td>
-																	</tr>
-																)
-															})}
-															{projRows.length && fillUsd > 200 ? (
-																<tr>
-																	<td className="dim">Unbooked (fill model)</td>
-																	<td className="num dim">-</td>
-																	<td className="num dim">{usd(fillUsd)}</td>
-																	<td className="num dim">-</td>
-																	<td className="num dim">-</td>
-																	<td className="num dim">-</td>
-																</tr>
-															) : null}
-														</tbody>
-													</table>
-												</details>
-											) : (
-												a.week
-											)}
-										</td>
-										<td className="num">{projAppts == null ? '-' : projAppts}</td>
-										<td className="num">{usd(Number(a.projected))}</td>
-										<td className="num">
-											{a.lo != null && a.hi != null ? `${usd(Number(a.lo))} – ${usd(Number(a.hi))}` : '-'}
-										</td>
-										<td className="num">
-											{actAppts == null ? '-' : `${actAppts}${isCurrent ? ' so far' : ''}`}
-										</td>
-										<td className="num">
-											{actualUsd == null
-												? '-'
-												: `${usd(actualUsd)}${isCurrent ? ' so far' : ''}`}
-										</td>
-										<td className={`num ${weekErr == null ? '' : weekErr >= 0 ? 'good' : 'bad'}`}>
-											{weekErr == null ? '-' : `${weekErr > 0 ? '+' : ''}${weekErr}%`}
-										</td>
-									</tr>
-									)
-								})}
-							</tbody>
-						</table>
-					</div>
-					<p className="note">
-						Positive (green) = actual beat the forecast; negative (red) = came
-						in under. The current week scores what has happened so far against
-						the forecast prorated to this point in the week, then freezes when
-						the week ends.
-					</p>
-				</section>
-			) : null}
 
 			<section>
 				<h2>
@@ -1824,6 +1231,43 @@ export default function Revenue() {
 					so neither shows as a miss.
 				</p>
 			</section>
+
+			{accuracy ? (
+				<section>
+					<h2>
+						Projection accuracy <span className="mini">pre-week snapshot vs what actually happened</span>
+					</h2>
+					<div className="rtable-wrap">
+						<table className="rtable">
+							<thead>
+								<tr>
+									<th>Week</th>
+									<th className="num">Projected</th>
+									<th className="num">Range</th>
+									<th className="num">Actual</th>
+									<th className="num">Error</th>
+								</tr>
+							</thead>
+							<tbody>
+								{accuracy.map(a => (
+									<tr key={a.week}>
+										<td>{a.week}</td>
+										<td className="num">{usd(Number(a.projected))}</td>
+										<td className="num">
+											{a.lo != null && a.hi != null ? `${usd(Number(a.lo))} – ${usd(Number(a.hi))}` : '-'}
+										</td>
+										<td className="num">{a.actual == null ? '-' : usd(Number(a.actual))}</td>
+										<td className={`num ${a.err_pct == null ? '' : Math.abs(Number(a.err_pct)) > 15 ? 'bad' : 'good'}`}>
+											{a.err_pct == null ? '-' : `${Number(a.err_pct) > 0 ? '+' : ''}${a.err_pct}%`}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+					<p className="note">Positive error = the projection was optimistic.</p>
+				</section>
+			) : null}
 
 		</ReportPage>
 	)

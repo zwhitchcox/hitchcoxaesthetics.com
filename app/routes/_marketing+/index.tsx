@@ -56,7 +56,7 @@ export default function Index() {
 	}>()
 
 	return (
-		<div className="font-poppins flex w-full flex-col bg-background">
+		<div className="font-poppins flex w-full flex-col bg-white">
 			<Hero
 				image="/img/sarah.jpg"
 				imageAlt="Sarah Hitchcox"
@@ -71,15 +71,15 @@ export default function Index() {
 			/>
 
 			{/* Welcome / Intro Section */}
-			<div className="bg-background py-16 text-center">
+			<div className="bg-white py-16 text-center">
 				<div className="mx-auto max-w-3xl px-6">
 					<div className="mb-4 flex justify-center">
 						<GoogleRatingBadge summary={reviewSummary} />
 					</div>
-					<h2 className="mb-6 text-3xl font-bold text-foreground">
+					<h2 className="mb-6 text-3xl font-bold text-gray-900">
 						Enhance Your Natural Beauty
 					</h2>
-					<p className="text-lg leading-relaxed text-muted-foreground">
+					<p className="text-lg leading-relaxed text-gray-600">
 						At Sarah Hitchcox Aesthetics, we believe in subtle, natural-looking
 						results that help you look and feel your best. Specializing in
 						injectables, laser treatments, and medical grade skincare, our goal
@@ -99,7 +99,7 @@ export default function Index() {
 
 			{/* Reviews */}
 			{reviews.length > 0 ? (
-				<div className="bg-background pb-20">
+				<div className="bg-white pb-20">
 					<div className="mx-auto max-w-7xl px-6">
 						<ReviewQuotes reviews={reviews} summary={reviewSummary} />
 					</div>
@@ -107,9 +107,9 @@ export default function Index() {
 			) : null}
 
 			{/* Popular Services */}
-			<div className="bg-muted/50 py-20">
+			<div className="bg-gray-50 py-20">
 				<div className="mx-auto max-w-7xl px-6">
-					<h2 className="mb-12 text-center text-3xl font-bold text-foreground">
+					<h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
 						Popular Knoxville Med Spa Treatments
 					</h2>
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -117,7 +117,7 @@ export default function Index() {
 							<Link
 								key={service!.path}
 								to={`/${service!.path}`}
-								className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-all hover:shadow-md"
+								className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white p-4 transition-all hover:shadow-md"
 							>
 								{service!.heroImage && (
 									<img
@@ -128,10 +128,10 @@ export default function Index() {
 									/>
 								)}
 								<div>
-									<h4 className="font-semibold text-foreground hover:text-primary">
+									<h4 className="font-semibold text-gray-900 hover:text-primary">
 										{service!.name}
 									</h4>
-									<p className="text-sm text-muted-foreground">
+									<p className="text-sm text-gray-500">
 										{service!.shortDescription}
 									</p>
 								</div>
@@ -144,7 +144,7 @@ export default function Index() {
 			{/* Services Section */}
 			<div id="services" className="py-20">
 				<div className="mx-auto max-w-7xl px-6">
-					<h2 className="mb-12 text-center text-3xl font-bold text-foreground">
+					<h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
 						Knoxville Medical Aesthetic Services
 					</h2>
 					<ServiceCardGrid services={serviceCategories} variant="thumbnail" />
@@ -154,7 +154,7 @@ export default function Index() {
 			{/* Locations Section */}
 			<div className="py-20">
 				<div className="mx-auto max-w-7xl px-6">
-					<h2 className="mb-12 text-center text-3xl font-bold text-foreground">
+					<h2 className="mb-12 text-center text-3xl font-bold text-gray-900">
 						Our Knoxville Area Locations
 					</h2>
 					<div className="grid gap-8 md:grid-cols-2">
