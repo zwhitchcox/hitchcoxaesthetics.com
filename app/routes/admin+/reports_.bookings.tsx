@@ -41,16 +41,17 @@ export default function BookingsFunnel() {
 			? allRows
 			: allRows.filter(r => r.newClient === (who === 'new'))
 
-	const bySource = new Map<string, Agg & { n: number }>()
+	const bySource = new Map<string, Agg & { n: number; act: number }>()
 	const byBucketSource = new Map<string, { n: number; usd: number }>()
 	const byBucket = new Map<string, { n: number; usd: number }>()
 	let totalExpected = 0
 	for (const r of rows) {
 		totalExpected += r.expectedUsd
-		if (!bySource.has(r.source)) bySource.set(r.source, { ...makeAgg(), n: 0 })
+		if (!bySource.has(r.source)) bySource.set(r.source, { ...makeAgg(), n: 0, act: 0 })
 		const s = bySource.get(r.source)!
 		addTo(s, { usd: r.expectedUsd })
 		s.n++
+		s.act += r.actualUsd ?? 0
 		const bk = `${r.bucket}|${r.source}`
 		if (!byBucketSource.has(bk)) byBucketSource.set(bk, { n: 0, usd: 0 })
 		const b = byBucketSource.get(bk)!
@@ -63,7 +64,7 @@ export default function BookingsFunnel() {
 	}
 	for (const slug of GBP_LISTING_SLUGS) {
 		const label = `GBP · ${slug}`
-		if (!bySource.has(label)) bySource.set(label, { ...makeAgg(), n: 0 })
+		if (!bySource.has(label)) bySource.set(label, { ...makeAgg(), n: 0, act: 0 })
 	}
 	const sources = [...bySource.entries()].sort((a, b) => b[1].usd - a[1].usd)
 	const buckets = [...byBucket.keys()].sort().reverse()
@@ -129,6 +130,7 @@ export default function BookingsFunnel() {
 								<th>Source</th>
 								<th className="num">Bookings</th>
 								<th className="num">Expected value</th>
+								<th className="num">Actual so far</th>
 								<th className="num">Share</th>
 							</tr>
 						</thead>
@@ -138,6 +140,7 @@ export default function BookingsFunnel() {
 									<td>{s}</td>
 									<td className="num">{a.n}</td>
 									<td className="num">{usd(a.usd)}</td>
+									<td className="num">{usd(a.act)}</td>
 									<td className="num">
 										{rows.length ? Math.round((100 * a.n) / rows.length) : 0}%
 									</td>
@@ -203,6 +206,7 @@ export default function BookingsFunnel() {
 								<Th k="location">Location</Th>
 								<Th k="source">Source</Th>
 								<Th k="expectedUsd" num>Est. value</Th>
+								<Th k="actualUsd" num>Actual</Th>
 								<th>Links</th>
 							</tr>
 						</thead>
@@ -223,6 +227,7 @@ export default function BookingsFunnel() {
 									<td>{b.location ?? '-'}</td>
 									<td>{b.source}</td>
 									<td className="num">{usd(b.expectedUsd)}</td>
+									<td className="num">{b.actualUsd == null ? '-' : usd(b.actualUsd)}</td>
 									<td>
 										{b.blvdUrl ? (
 											<a href={b.blvdUrl} target="_blank" rel="noreferrer">

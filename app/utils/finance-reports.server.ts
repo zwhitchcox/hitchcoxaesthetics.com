@@ -18,6 +18,7 @@ import pg from 'pg'
 import { runRevenueProjection } from '../../scripts/blvd-project-weekly-revenue.ts'
 import { computeHouseholdBudget } from '../../scripts/household-budget.ts'
 import { computeBusinessPnl } from '../../scripts/plaid-expenses.ts'
+import { shiftDay } from '#app/utils/revenue-by-source.server.ts'
 
 export function hasFinanceReportsConfig() {
 	return Boolean(process.env.REPORTS_DATABASE_URL?.trim())
@@ -218,6 +219,114 @@ export async function syncFinanceReports(): Promise<{
 			 group by 1 order by 1 limit 4`,
 		)
 
+		// Per-service-type projection snapshot for the accuracy table: booked
+		// appointments for the current + next 3 weeks, valued with the same
+		// v4 valuation as every other surface, grouped by revenue category.
+		// Future weeks refresh on every run; a week FREEZES once it starts,
+		// so past rows stay the honest pre-week projection (never recomputed:
+		// cancelled appointments would silently vanish from history).
+		await q(`create table if not exists revenue_projection_week_category (
+			week date not null,
+			category text not null,
+			appts integer not null,
+			expected_usd numeric not null,
+			captured_at timestamptz not null default now(),
+			primary key (week, category)
+		)`)
+		{
+			const { prisma: appDb } = await import('#app/utils/db.server.ts')
+			const { valueAppointments } = await import(
+				'#app/utils/appointment-performance.server.ts'
+			)
+			const { inferRevenueServiceCategory } = await import(
+				'#app/utils/blvd-revenue-sync.server.ts'
+			)
+			const toEt = (d: Date) =>
+				d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+			const todayEt = toEt(new Date())
+			const dow = (new Date(`${todayEt}T12:00:00Z`).getUTCDay() + 6) % 7
+			const monday = shiftDay(todayEt, -dow)
+			const horizon = shiftDay(monday, 28)
+			const appts = await appDb.blvdAppointment.findMany({
+				where: {
+					startAt: {
+						gte: new Date(`${monday}T00:00:00-04:00`),
+						lt: new Date(`${horizon}T00:00:00-04:00`),
+					},
+					cancelled: false,
+					NOT: { state: 'NO_SHOW' },
+				},
+				select: {
+					id: true,
+					startAt: true,
+					clientId: true,
+					clientAppointmentCount: true,
+					clientCreatedAt: true,
+					services: true,
+				},
+			})
+			const parsed = appts.map(a => {
+				let services: Array<{ name: string; minutes: number | null }> = []
+				try {
+					services = JSON.parse(a.services) as Array<{
+						name: string
+						minutes: number | null
+					}>
+				} catch {}
+				return { ...a, parsedServices: services }
+			})
+			const values = await valueAppointments(
+				parsed.map(a => ({
+					id: a.id,
+					startAtMs: a.startAt.getTime(),
+					clientId: a.clientId,
+					clientAppointmentCount: a.clientAppointmentCount,
+					clientCreatedAtMs: a.clientCreatedAt?.getTime() ?? null,
+					services: a.parsedServices.map(s => ({ name: s.name })),
+				})),
+			)
+			// Same primary-service rule as the revenue rollup: the appointment
+			// (and its whole value) lands under its longest service.
+			const byWeekCat = new Map<string, { appts: number; usd: number }>()
+			for (const a of parsed) {
+				const day = toEt(a.startAt)
+				const wdow = (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7
+				const week = shiftDay(day, -wdow)
+				const primary = [...a.parsedServices].sort(
+					(x, y) => (y.minutes ?? 0) - (x.minutes ?? 0),
+				)[0]
+				const cat = inferRevenueServiceCategory(primary?.name) ?? 'Uncategorized'
+				const key = `${week}|${cat}`
+				const row = byWeekCat.get(key) ?? { appts: 0, usd: 0 }
+				row.appts++
+				row.usd += values.get(a.id)?.usd ?? 0
+				byWeekCat.set(key, row)
+			}
+			// Refresh strictly-future weeks; keep the started week frozen. The
+			// seed insert backfills the current week only if it has no snapshot
+			// yet (first deploy landed mid-week).
+			await q(`delete from revenue_projection_week_category where week > $1`, [monday])
+			for (const [key, row] of byWeekCat) {
+				const [week, category] = key.split('|') as [string, string]
+				await q(
+					`insert into revenue_projection_week_category (week, category, appts, expected_usd)
+					 values ($1, $2, $3, $4) on conflict (week, category) do nothing`,
+					[week, category, row.appts, Math.round(row.usd)],
+				)
+			}
+		}
+
+		// Daily-profit model: per-line COGS ratios from measured vendor spend /
+		// revenue, plus overhead per Mon-Sat workday (daily-profit.server.ts).
+		{
+			const { computeDailyProfitModel, storeDailyProfitModel } = await import(
+				'#app/utils/daily-profit.server.ts'
+			)
+			await storeDailyProfitModel(await computeDailyProfitModel()).catch(
+				error => console.error('Daily profit model failed', error),
+			)
+		}
+
 		await q(`create view report_revenue_projection_monthly as
 			select to_char(day, 'YYYY-MM') as month,
 			       round(sum(booked_usd)) as booked_usd,
@@ -227,16 +336,95 @@ export async function syncFinanceReports(): Promise<{
 			from revenue_projection_daily group by 1 order by 1`)
 
 		// ---- business P&L (Sarah's accounts, cache/rules classification) ----
+		// Boulevard money the register collected but the bank has not seen
+		// yet reads as missing revenue: payouts lag 2-3 business days and
+		// Plaid trails the bank by about another day. A date cutoff misses
+		// both lags, so pending = CUMULATIVE collected minus CUMULATIVE
+		// banked since the first full mirror month, added to the current
+		// month (Zane 2026-08-19). Any deposit Plaid has not synced yet just
+		// stays in pending, so the two always sum to what was really earned,
+		// and the number self-corrects as deposits post. Banked starts 3
+		// days later than collected so the prior month's payout tail does
+		// not deflate it.
+		const { prisma } = await import('#app/utils/db.server.ts')
+		const MIRROR_FULL_FROM = '2026-06-01' // BlvdRevenueItem coverage starts 2026-05-04
+		const BANKED_FROM = '2026-06-04'
+		// Collected runs above banked even at rest: card fees come out of the
+		// payout, and Cherry-financed / cash orders never arrive via a
+		// "BOULEVARD" deposit at all. Expected-banked = collected x the ratio
+		// observed over SETTLED months (banked window shifted 3 days for the
+		// payout lag), so pending only counts money genuinely in transit.
+		const bankedBlvd = async (fromDay: string, toDay?: string) =>
+			Number(
+				(
+					(await prisma.$queryRawUnsafe(
+						`SELECT COALESCE(SUM(-amount), 0) usd FROM PlaidTransaction
+						 WHERE owner = 'sarah' AND accountType = 'depository' AND amount < 0
+						   AND (LOWER(name) LIKE '%boulevard%' OR LOWER(COALESCE(merchant, '')) LIKE '%boulevard%')
+						   AND date >= '${fromDay}'${toDay ? ` AND date < '${toDay}'` : ''}`,
+					)) as Array<{ usd: number }>
+				)[0]?.usd ?? 0,
+			)
+		const collectedBlvd = async (fromDay: string, toDay?: string) =>
+			(
+				await prisma.blvdRevenueItem.aggregate({
+					_sum: { grossAmountUsd: true },
+					where: {
+						occurredAt: {
+							gte: new Date(`${fromDay}T04:00:00Z`),
+							...(toDay ? { lt: new Date(`${toDay}T04:00:00Z`) } : {}),
+						},
+					},
+				})
+			)._sum.grossAmountUsd ?? 0
+		const curMonthFirst = `${new Date().toISOString().slice(0, 7)}-01`
+		const settledBankedTo = shiftDay(curMonthFirst, 3)
+		const [settledBanked, settledCollected, totalBanked, totalCollected] =
+			await Promise.all([
+				bankedBlvd(BANKED_FROM, settledBankedTo),
+				collectedBlvd(MIRROR_FULL_FROM, curMonthFirst),
+				bankedBlvd(BANKED_FROM),
+				collectedBlvd(MIRROR_FULL_FROM),
+			])
+		const settledRatio =
+			settledCollected > 0
+				? Math.min(1, Math.max(0.9, settledBanked / settledCollected))
+				: 0.97
+		const pendingUsd = Math.max(0, totalCollected * settledRatio - totalBanked)
+		const currentMonthRow = pnl.monthly.find(
+			r => r.month === new Date().toISOString().slice(0, 7),
+		)
+		if (currentMonthRow && pendingUsd > 0) {
+			currentMonthRow.revenue += pendingUsd
+			currentMonthRow.net += pendingUsd
+			currentMonthRow.netSmoothed += pendingUsd
+		}
+		// expenses = true cash out (FCF stays visible); the class columns
+		// split it into COGS / monthly overhead / annual fees / one-time, and
+		// the *_smoothed pair spreads annual fees over 12 months so a $1,125
+		// .pharmacy renewal doesn't crater one August.
 		await q(`drop table if exists business_pnl_monthly`)
-		await q(`create table business_pnl_monthly (month text primary key, revenue numeric, expenses numeric, net numeric)`)
-		for (const m of pnl.monthly) await q(`insert into business_pnl_monthly values ($1,$2,$3,$4)`, [m.month, m.revenue, m.expenses, m.net])
+		await q(`create table business_pnl_monthly (
+			month text primary key, revenue numeric, expenses numeric, net numeric,
+			cogs numeric, overhead_monthly numeric, annual_fees numeric,
+			irregular numeric, annual_amortized numeric,
+			expenses_smoothed numeric, net_smoothed numeric)`)
+		for (const m of pnl.monthly)
+			await q(
+				`insert into business_pnl_monthly values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+				[
+					m.month, m.revenue, m.expenses, m.net,
+					m.cogs, m.overheadMonthly, m.annualCash,
+					m.irregular, m.annualAmortized,
+					m.expensesSmoothed, m.netSmoothed,
+				],
+			)
 
 		await q(`drop table if exists business_pnl_meta`)
 		await q(`create table business_pnl_meta (id int primary key, period_start text, period_end text, total_revenue numeric, total_expense numeric, net_profit numeric, loaded_at timestamptz)`)
 		await q(`insert into business_pnl_meta values (1,$1,$2,$3,$4,$5, now())`, [pnl.start, pnl.end, pnl.totalRevenue, pnl.totalExpense, pnl.netProfit])
 
 		// ---- household income (Zane's take-home: INCOME deposits on his accounts) ----
-		const { prisma } = await import('#app/utils/db.server.ts')
 		// Zane's paychecks are paper checks deposited by phone (often several
 		// weeks at once), Plaid tags them TRANSFER_IN_DEPOSIT, not INCOME. So
 		// take-home = mobile deposits + INCOME rows, excluding tax refunds
@@ -283,7 +471,14 @@ export async function syncFinanceReports(): Promise<{
 			  17 as est_tax_tn_fe,
 			  round(greatest(b.net, 0) * 0.30 + b.revenue * 0.00375 + 17) as est_tax_accrual,
 			  round(b.net + coalesce(i.takehome, 0) - coalesce(h.total, 0)
-			        - greatest(b.net, 0) * 0.30 - b.revenue * 0.00375 - 17) as net_household_profit
+			        - greatest(b.net, 0) * 0.30 - b.revenue * 0.00375 - 17) as net_household_profit,
+			  round(b.expenses_smoothed) as business_expenses_smoothed,
+			  -- Same cash math with annual fees amortized: the trend view.
+			  -- Tax accrual stays as computed on cash net (taxes are annual
+			  -- anyway; their monthly split is already synthetic).
+			  round(b.net + coalesce(i.takehome, 0) - coalesce(h.total, 0)
+			        - greatest(b.net, 0) * 0.30 - b.revenue * 0.00375 - 17
+			        + (b.expenses - b.expenses_smoothed)) as net_household_profit_smoothed
 			from business_pnl_monthly b
 			left join household_income_monthly i using (month)
 			left join household_monthly_totals h using (month)

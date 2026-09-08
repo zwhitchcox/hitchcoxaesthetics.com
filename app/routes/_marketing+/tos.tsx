@@ -16,7 +16,7 @@ export default function TermsOfServiceRoute() {
 			<h1 className="mb-4 text-center text-2xl font-bold">
 				Terms and Conditions
 			</h1>
-			<div className="h-96 overflow-auto rounded-lg bg-white p-6 shadow-md">
+			<div className="h-96 overflow-auto rounded-lg bg-card p-6 shadow-md">
 				<h2 className="text-xl font-semibold">1. Introduction</h2>
 				<p>
 					Welcome to Sarah Hitchcox Aesthetics! These Terms and Conditions

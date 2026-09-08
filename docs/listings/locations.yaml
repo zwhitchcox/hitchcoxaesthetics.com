@@ -123,3 +123,77 @@ brands:
       - office: farragut
         address: 102 S Campbell Station Rd, Suite 8C, Knoxville, TN 37934
         phone_listing: "(865) 500-3510"
+
+# Sibling brands (same LLC/EIN as Sarah Hitchcox Aesthetics). Same phone rule:
+# listing phone = GBP secondary (real office line); primary is CallRail,
+# Google only. Verified against the GBP API on 2026-09-04.
+sibling_brands:
+  - slug: botox-knox-bearden
+    business_name: Botox Knox Med Spa
+    website: https://botoxknoxvilletn.com
+    address:
+      line1: 5113 Kingston Pike
+      line2: Suite 15b
+      city: Knoxville
+      state: TN
+      zip: "37919"
+    phone_listing: "(865) 370-2246"      # GBP secondary. Use this.
+    phone_gbp_primary: "(865) 378-6815"  # Tracking. Google only.
+    gbp:
+      location_id: locations/8814118436068854281
+      place_id: ChIJd1SN2ZQ9XIgRB5F_naTr2pM
+
+  - slug: botox-knox-farragut
+    business_name: Botox Knox Med Spa
+    website: https://botoxknoxvilletn.com
+    address:
+      line1: 102 S Campbell Station Rd
+      line2: Suite 8b
+      city: Farragut
+      state: TN
+      zip: "37934"
+    phone_listing: "(865) 370-2639"      # GBP secondary. Use this.
+    phone_gbp_primary: "(865) 234-9183"  # Tracking. Google only.
+    gbp:
+      location_id: locations/8388106535416305139
+      place_id: ChIJ6_7_utMvXIgRpP1LXfKVvn4
+    notes: |
+      The Farragut Chamber membership (joined 2026-09-04) is registered under
+      Sarah Hitchcox Aesthetics, our main business, not under Botox Knox. The
+      chamber Enhanced Directory Listing links all three brand sites.
+
+  - slug: kwlc-bearden
+    business_name: Knoxville Weight Loss Clinic
+    website: https://weightlossknoxvilletn.com
+    address:
+      line1: 5113 Kingston Pike
+      line2: Suite 15c
+      city: Knoxville
+      state: TN
+      zip: "37919"
+    phone_listing: "(865) 500-3135"      # GBP secondary. Use this.
+    phone_gbp_primary: "(865) 346-4287"  # Tracking. Google only.
+    gbp:
+      location_id: locations/15016055128629417766
+      place_id: ChIJkWEu2yk9XIgR0d0tkwaQ2ac  # CAVEAT: shared with a Farragut row, see below
+
+  - slug: kwlc-farragut
+    business_name: Knoxville Weight Loss Clinic
+    website: https://weightlossknoxvilletn.com
+    address:
+      line1: 102 S Campbell Station Rd
+      line2: Suite 8c
+      city: Farragut
+      state: TN
+      zip: "37934"
+    phone_listing: "(865) 500-3510"      # GBP secondary. Use this.
+    phone_gbp_primary: "(865) 346-4287"  # Tracking. Google only.
+    gbp:
+      location_id: locations/5772695199180090933
+      place_id: ChIJn1HGW2YvXIgRoEaM1pxtrjg
+    notes: |
+      GBP DATA WART (2026-09-04): a second location id
+      (locations/11750979648218741829, tracking (865) 503-6883) exists at this
+      same address, and its place_id matches KWLC Bearden's. Looks like a
+      duplicate or mis-merged listing pair in the GBP account. Resolve per the
+      gbp-playbook before citing place ids for KWLC anywhere.

@@ -205,11 +205,19 @@ async function saveReviewsToDB(reviews, locationId) {
 			? new Date(review.reviewReply.updateTime)
 			: null
 
+		// The rest of the review stack (reports Postgres, review funnel) keys
+		// reviews by the SHORT id (the part after /reviews/). Some old rows
+		// carried the long resource name in reviewId, which made a
+		// reviewId-keyed upsert collide with its own row on `id` (P2002) and
+		// fail the nightly job. Upsert by primary key and converge reviewId
+		// to the short form.
+		const shortReviewId = review.name.split('/reviews/').pop() ?? review.name
 		try {
 			// Save or update review in the database
 			await prisma.googleReview.upsert({
-				where: { reviewId: review.name },
+				where: { id: review.name },
 				update: {
+					reviewId: shortReviewId,
 					starRating,
 					comment: review.comment || null,
 					updateTime,
@@ -221,7 +229,7 @@ async function saveReviewsToDB(reviews, locationId) {
 				},
 				create: {
 					id: review.name,
-					reviewId: review.name,
+					reviewId: shortReviewId,
 					starRating,
 					comment: review.comment || null,
 					createTime,

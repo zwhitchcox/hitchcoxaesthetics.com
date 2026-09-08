@@ -51,14 +51,48 @@ const KEYWORD_CATEGORY: Record<string, string> = {
 	'semaglutide near me': 'Weight Loss',
 }
 
+// Stale-while-revalidate for report_reach_weekly: serve the view as-is and
+// re-aggregate it in the background at most once per 12 hours. Grid captures
+// land weekly, so worst case the page shows data 12 hours older than the
+// newest capture, and no request ever waits the ~25s the refresh takes.
+let reachRefreshInFlight = false
+function maybeRefreshReachView() {
+	if (reachRefreshInFlight) return
+	reachRefreshInFlight = true
+	void (async () => {
+		try {
+			const stale = await reportsQuery<{ id: number }>(
+				`SELECT id FROM report_reach_meta
+				 WHERE id = 1 AND refreshed_at < now() - interval '12 hours'`,
+			)
+			if (stale.length) {
+				await reportsQuery(
+					'REFRESH MATERIALIZED VIEW CONCURRENTLY report_reach_weekly',
+				)
+				await reportsQuery(
+					'UPDATE report_reach_meta SET refreshed_at = now() WHERE id = 1',
+				)
+			}
+		} catch (error) {
+			console.error('[reach] view refresh failed:', error)
+		} finally {
+			reachRefreshInFlight = false
+		}
+	})()
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	if (!hasReportsDb()) return json({ configured: false as const })
+	maybeRefreshReachView()
 
 	const [reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals, linkPages] = await Promise.all([
 		// Homes-weighted combined reach (any of our listings top-3) per
-		// keyword per capture date. homes=1 fallback keeps cells without
-		// census data counted while geo_grid_homes back-fills.
+		// keyword per capture date, read from the report_reach_weekly
+		// materialized view. The underlying aggregate scans every grid
+		// capture and took 18s live (measured 2026-08-03); the view reads in
+		// ~80ms and maybeRefreshReachView() below re-aggregates it in the
+		// background when captures land.
 		reportsQuery<{
 			week: string
 			keyword: string
@@ -66,20 +100,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			total_homes: string
 			reach_pct: string | null
 		}>(
-			`WITH pts AS (
-			   SELECT week, keyword, "gridRow", "gridCol",
-			     max(COALESCE(h.homes, 1)) AS homes,
-			     bool_or(m.place_id IS NOT NULL AND r."rankAbsolute" <= 3) AS hit
-			   FROM raw_dataforseo_region r
-			   LEFT JOIN geo_my_listing m ON m.place_id = r."placeId"
-			   LEFT JOIN geo_grid_homes h
-			     ON h.grid_lat = round(r."gridLat"::numeric, 4) AND h.grid_lng = round(r."gridLng"::numeric, 4)
-			   GROUP BY 1, 2, 3, 4)
-			 SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
-			   COALESCE(sum(homes) FILTER (WHERE hit), 0)::int AS homes_reached,
-			   sum(homes)::int AS total_homes,
-			   round(100.0 * COALESCE(sum(homes) FILTER (WHERE hit), 0) / nullif(sum(homes), 0), 1) AS reach_pct
-			 FROM pts GROUP BY 1, 2 ORDER BY 1, 2`,
+			`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
+			   homes_reached, total_homes, reach_pct
+			 FROM report_reach_weekly ORDER BY 1, 2`,
 		),
 		reportsQuery<{
 			keyword: string
@@ -171,9 +194,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			   referring_domains, clean_referring_domains, spam_referring_domains
 			 FROM raw_competitor_authority ORDER BY day, domain`,
 		),
-		// Map-pack rivals per keyword: same homes-weighted reach math as our
-		// own number, computed for every business in the latest grid capture.
-		// Listings sharing a domain count as one business (multi-location).
+		// Map-pack rivals per keyword (latest capture), from mv_pack_rivals —
+		// the live five-CTE aggregate cost ~1.6s per view; the worker refreshes
+		// the MV post-capture. Listings sharing a domain count as one business.
 		reportsQuery<{
 			keyword: string
 			title: string
@@ -186,48 +209,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			total_homes: string
 			reach_pct: string | null
 		}>(
-			`WITH latest AS (SELECT max(week) AS week FROM raw_dataforseo_region),
-			 cellhomes AS (
-			   SELECT r.keyword, r."gridRow" gr, r."gridCol" gc,
-			     max(COALESCE(h.homes, 1)) AS homes
-			   FROM raw_dataforseo_region r
-			   JOIN latest ON r.week = latest.week
-			   LEFT JOIN geo_grid_homes h
-			     ON h.grid_lat = round(r."gridLat"::numeric, 4)
-			    AND h.grid_lng = round(r."gridLng"::numeric, 4)
-			   GROUP BY 1, 2, 3),
-			 tot AS (SELECT keyword, sum(homes) AS total_homes FROM cellhomes GROUP BY 1),
-			 bizcell AS (
-			   SELECT r.keyword, COALESCE(nullif(r.domain, ''), r."placeId") AS biz,
-			     r."gridRow" gr, r."gridCol" gc, bool_or(r."rankAbsolute" <= 3) AS hit
-			   FROM raw_dataforseo_region r JOIN latest ON r.week = latest.week
-			   WHERE r."placeId" IS NOT NULL
-			   GROUP BY 1, 2, 3, 4),
-			 bizmeta AS (
-			   SELECT keyword, COALESCE(nullif(domain, ''), "placeId") AS biz,
-			     max(title) AS title, max(domain) AS domain, bool_or("isMine") AS is_mine,
-			     round(avg("rankAbsolute"), 1) AS avg_rank,
-			     max(rating) AS rating, max("ratingVotes") AS reviews
-			   FROM raw_dataforseo_region r JOIN latest ON r.week = latest.week
-			   WHERE "placeId" IS NOT NULL GROUP BY 1, 2),
-			 ranked AS (
-			   SELECT m.keyword, m.title, m.domain, m.is_mine, m.avg_rank, m.rating,
-			     m.reviews,
-			     COALESCE(sum(ch.homes) FILTER (WHERE bc.hit), 0)::int AS homes_reached,
-			     t.total_homes::int AS total_homes,
-			     round(100.0 * COALESCE(sum(ch.homes) FILTER (WHERE bc.hit), 0)
-			       / nullif(t.total_homes, 0), 1) AS reach_pct,
-			     row_number() OVER (
-			       PARTITION BY m.keyword
-			       ORDER BY COALESCE(sum(ch.homes) FILTER (WHERE bc.hit), 0) DESC
-			     ) AS rn
-			   FROM bizcell bc
-			   JOIN cellhomes ch ON ch.keyword = bc.keyword AND ch.gr = bc.gr AND ch.gc = bc.gc
-			   JOIN bizmeta m ON m.keyword = bc.keyword AND m.biz = bc.biz
-			   JOIN tot t ON t.keyword = bc.keyword
-			   GROUP BY m.keyword, m.title, m.domain, m.is_mine, m.avg_rank, m.rating,
-			     m.reviews, t.total_homes
-			   HAVING COALESCE(sum(ch.homes) FILTER (WHERE bc.hit), 0) > 0)
+			`WITH ranked AS (
+			   SELECT *, row_number() OVER (
+			     PARTITION BY keyword ORDER BY homes_reached DESC) AS rn
+			   FROM mv_pack_rivals WHERE homes_reached > 0)
 			 SELECT keyword, title, domain, is_mine, avg_rank, rating, reviews,
 			   homes_reached, total_homes, reach_pct
 			 FROM ranked WHERE rn <= 10 OR is_mine

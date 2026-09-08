@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://mesolaserclinic.com/sitemap.xml

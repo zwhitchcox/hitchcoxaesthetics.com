@@ -24,6 +24,10 @@ interface Row {
 	household_spend: number
 	est_tax_accrual: number
 	net_household_profit: number
+	/** Cash net with once-a-year business fees spread ÷12; NaN before the
+	 * finance sync first writes the column. The cash column above stays the
+	 * FCF truth. */
+	net_household_profit_smoothed?: number
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -46,10 +50,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		.slice(0, 7)
 	const full = rows.filter(r => r.month < curMonth)
 	const last12 = full.slice(-12)
+	const lastRow = full.find(r => r.month === lastMonth)
 	return json({
 		configured: true as const,
 		rows,
-		last: full.find(r => r.month === lastMonth)?.net_household_profit ?? null,
+		last: lastRow?.net_household_profit ?? null,
+		lastCash: lastRow
+			? lastRow.net_household_profit + lastRow.est_tax_accrual
+			: null,
 		lastMonth,
 		avg12: last12.length
 			? last12.reduce((s, r) => s + r.net_household_profit, 0) / last12.length
@@ -67,7 +75,7 @@ export default function HouseholdProfit() {
 	const data = useLoaderData<typeof loader>()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { rows, last, lastMonth, avg12, ytd, ytdCash } = data
+	const { rows, last, lastCash, lastMonth, avg12, ytd, ytdCash } = data
 	return (
 		<ReportPage
 			title="Household profit"
@@ -75,7 +83,13 @@ export default function HouseholdProfit() {
 		>
 			<div className="tiles">
 				<StatTile
-					label={`${lastMonth} net`}
+					label={`${lastMonth} cash kept`}
+					value={usd(lastCash)}
+					tone={lastCash != null && lastCash < 0 ? 'bad' : 'good'}
+					whisper="pre-tax, the money that moved"
+				/>
+				<StatTile
+					label={`${lastMonth} net after taxes`}
 					value={usd(last)}
 					tone={last != null && last < 0 ? 'bad' : 'good'}
 				/>
@@ -101,18 +115,28 @@ export default function HouseholdProfit() {
 
 			<section>
 				<h2>
-					What we kept, by month <span className="mini">positive = money accumulated</span>
+					What we kept, by month{' '}
+					<span className="mini">
+						cash kept = actual cash flow; after taxes = with 30% of biz net set aside
+					</span>
 				</h2>
 				<BarChart
 					labels={rows.map(r => r.month)}
 					series={[
 						{
-							name: 'Net profit',
-							color: 'var(--pos)',
+							name: 'Cash kept (pre-tax)',
+							color: 'var(--series-1)',
+							values: rows.map(
+								r => r.net_household_profit + r.est_tax_accrual,
+							),
+						},
+						{
+							name: 'Net after taxes',
+							color: 'var(--series-3)',
 							values: rows.map(r => r.net_household_profit),
 						},
 					]}
-					colorBy={v => (v >= 0 ? 'var(--pos)' : 'var(--neg)')}
+					showTotal={false}
 					height={190}
 				/>
 			</section>
@@ -132,6 +156,7 @@ export default function HouseholdProfit() {
 								<th className="num">Cash kept (pre-tax)</th>
 								<th className="num">Est. taxes (30%)</th>
 								<th className="num">Net after taxes</th>
+								<th className="num">Net, annual fees ÷12</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -152,6 +177,14 @@ export default function HouseholdProfit() {
 									<td className={`num ${r.net_household_profit < 0 ? 'bad' : 'good'}`}>
 										{usd(r.net_household_profit)}
 									</td>
+									<td
+										className={`num ${(r.net_household_profit_smoothed ?? 0) < 0 ? 'bad' : 'good'}`}
+									>
+										{r.net_household_profit_smoothed != null &&
+										!Number.isNaN(r.net_household_profit_smoothed)
+											? usd(r.net_household_profit_smoothed)
+											: '-'}
+									</td>
 								</tr>
 							))}
 						</tbody>
@@ -160,10 +193,19 @@ export default function HouseholdProfit() {
 				<p className="note">
 					Reading a row left to right is the equation: revenue minus expenses is business
 					net; plus take-home, minus household spending, equals <strong>cash kept</strong> -
-					the money that actually moved. The tax column is an <strong>accrual</strong>, not a
+					the money that actually moved. The last column re-states net with
+					once-a-year business fees (.pharmacy domain, IAPAM, TNSOS report)
+					spread ÷12 - the trend view; every other column stays cash-true so
+					FCF is always visible. The tax column is an <strong>accrual</strong>, not a
 					payment: no quarterlies have been paid, so "net after taxes" is what's left once
 					the April bill is honestly set aside. Cash kept ≈ $0 is why the cards can be paid
-					in full each month while nothing accumulates.
+					in full each month while nothing accumulates. For the current partial
+					month, fixed monthly business bills (rent, software, insurance) are
+					accrued evenly across the month instead of on their payment date;
+					variable spend (supplies etc.) stays on actual dates. Revenue for the
+					current month also includes Boulevard money collected after the last
+					banked payout (payouts lag 2-3 business days), so a busy day shows up
+					the same day instead of when the deposit lands.
 				</p>
 			</section>
 		</ReportPage>

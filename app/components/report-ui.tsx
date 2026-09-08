@@ -4,7 +4,8 @@
  * hover layer. Palette follows the dataviz reference instance: categorical
  * slots in fixed order, diverging blue↔red, status colors reserved.
  */
-import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useSearchParams } from '@remix-run/react'
 
 /** Categorical slots, fixed order, never cycled. */
 export const SERIES = [
@@ -159,6 +160,13 @@ export interface Series {
 	name: string
 	color: string
 	values: Array<number | null>
+	/**
+	 * Series sharing a stackGroup render as ONE bar, stacked, keeping their
+	 * own colors. Ungrouped series each get their own bar beside it. Lets a
+	 * chart show "expenses, of which ad spend" without turning every series
+	 * into a stack.
+	 */
+	stackGroup?: string
 }
 
 interface Tip {
@@ -247,6 +255,37 @@ const PAD_T = 8
  * `stacked`); a single series may carry per-value colors via `colorBy`
  * (e.g. diverging pos/neg). 4px rounded top on the data end, 2px surface gaps.
  */
+/**
+ * Keeps a report's filters across refreshes. The reports hub embeds each
+ * page in an iframe whose src carries no query string, so a hub refresh
+ * loses every URL-backed filter; this restores the last-used search from
+ * sessionStorage when the page loads bare, and records it on every change.
+ * Emptying the params on purpose (reset) clears the saved copy instead of
+ * restoring it.
+ */
+export function usePersistedSearch() {
+	const [searchParams, setSearchParams] = useSearchParams()
+	const firstRender = useRef(true)
+	useEffect(() => {
+		const key = `report-search:${window.location.pathname}`
+		try {
+			const qs = searchParams.toString()
+			if (firstRender.current) {
+				firstRender.current = false
+				if (!qs) {
+					const saved = sessionStorage.getItem(key)
+					if (saved) {
+						setSearchParams(new URLSearchParams(saved), { replace: true })
+					}
+					return
+				}
+			}
+			if (qs) sessionStorage.setItem(key, qs)
+			else sessionStorage.removeItem(key)
+		} catch {}
+	}, [searchParams, setSearchParams])
+}
+
 export function BarChart({
 	labels,
 	series,
@@ -257,6 +296,7 @@ export function BarChart({
 	tickEvery,
 	showTotal = true,
 	onBarClick,
+	extraTipRows,
 }: {
 	labels: string[]
 	series: Series[]
@@ -272,19 +312,44 @@ export function BarChart({
 	 * clicking elsewhere in the bucket (the hover rect) reports ''.
 	 */
 	onBarClick?: (seriesName: string, labelIndex: number) => void
+	/** Computed rows appended to the tooltip (e.g. net profit). */
+	extraTipRows?: (
+		labelIndex: number,
+	) => Array<{ name: string; color: string; value: string }>
 }) {
 	const { tip, setTip, ref, clampX } = useTip()
 	const H = height
 	const plotH = H - PAD_T - 20
-	const all = stacked
-		? labels.map((_, i) => series.reduce((s, sr) => s + Math.max(0, sr.values[i] ?? 0), 0))
+	// Columns are what actually sit side by side: either every series (plain
+	// grouped), one column (fully stacked), or a mix where stackGroup members
+	// share a column and stack inside it.
+	const columns: number[][] = stacked
+		? [series.map((_, si) => si)]
+		: (() => {
+				const out: number[][] = []
+				const byGroup = new Map<string, number>()
+				series.forEach((s, si) => {
+					if (!s.stackGroup) return void out.push([si])
+					const at = byGroup.get(s.stackGroup)
+					if (at == null) {
+						byGroup.set(s.stackGroup, out.length)
+						out.push([si])
+					} else out[at]!.push(si)
+				})
+				return out
+			})()
+	const colTotal = (col: number[], i: number) =>
+		col.reduce((sum, si) => sum + Math.max(0, series[si]!.values[i] ?? 0), 0)
+	const anyStacking = stacked || columns.some(c => c.length > 1)
+	const all = anyStacking
+		? labels.flatMap((_, i) => columns.map(c => colTotal(c, i)))
 		: series.flatMap(s => s.values.map(v => v ?? 0))
-	const hasNeg = !stacked && series.some(s => s.values.some(v => (v ?? 0) < 0))
+	const hasNeg = !anyStacking && series.some(s => s.values.some(v => (v ?? 0) < 0))
 	const maxV = niceMax(Math.max(...all.map(v => Math.abs(v)), 1))
 	const zeroY = hasNeg ? PAD_T + plotH / 2 : PAD_T + plotH
 	const scale = (hasNeg ? plotH / 2 : plotH) / maxV
 	const slot = (W - PAD_L - PAD_R) / labels.length
-	const groupN = stacked ? 1 : series.length
+	const groupN = columns.length
 	const barW = Math.max(2, Math.min(26, (slot - 4) / groupN - 2))
 	const every = tickEvery ?? Math.ceil(labels.length / 12)
 	const gridVals = hasNeg ? [-maxV, -maxV / 2, 0, maxV / 2, maxV] : [0, maxV / 2, maxV]
@@ -326,6 +391,7 @@ export function BarChart({
 								),
 							})
 						}
+						if (extraTipRows) rows.push(...extraTipRows(i))
 						setTip({
 							x: evt.clientX - box.left,
 							y: evt.clientY - box.top,
@@ -333,13 +399,20 @@ export function BarChart({
 							rows,
 						})
 					}
-					let stackY = zeroY
-					// topmost non-zero segment gets the rounded cap; the rest stay
-					// flat so the stack reads as one bar, and zero segments are
-					// skipped entirely (no phantom gaps).
-					const topSi = stacked
-						? series.reduce((acc, s, si) => ((s.values[i] ?? 0) > 0 ? si : acc), -1)
-						: -1
+					// topmost non-zero segment of each column gets the rounded cap;
+					// the rest stay flat so a stack reads as one bar, and zero
+					// segments are skipped entirely (no phantom gaps).
+					const stackY = new Map<number, number>()
+					const topOf = new Map<number, number>()
+					columns.forEach((col, ci) => {
+						stackY.set(ci, zeroY)
+						topOf.set(
+							ci,
+							col.reduce((acc, si) => ((series[si]!.values[i] ?? 0) > 0 ? si : acc), -1),
+						)
+					})
+					const colOf = new Map<number, number>()
+					columns.forEach((col, ci) => col.forEach(si => colOf.set(si, ci)))
 					return (
 						<g
 							key={i}
@@ -350,20 +423,23 @@ export function BarChart({
 							<rect x={PAD_L + slot * i} y={PAD_T} width={slot} height={H - PAD_T - 16} fill="transparent" />
 							{series.map((s, si) => {
 								const v = s.values[i]
-								if (v == null || (stacked && v === 0)) return null
+								const ci = colOf.get(si)!
+								const inStack = columns[ci]!.length > 1 || stacked
+								if (v == null || (inStack && v === 0)) return null
 								const h = Math.abs(v) * scale
+								const colX = cx - (groupN * (barW + 2)) / 2 + ci * (barW + 2)
 								let x: number, y: number
-								if (stacked) {
-									x = cx - barW / 2
-									y = stackY - h
-									stackY -= h + 1
+								if (inStack) {
+									x = groupN === 1 ? cx - barW / 2 : colX
+									y = stackY.get(ci)! - h
+									stackY.set(ci, stackY.get(ci)! - h - 1)
 								} else {
-									x = cx - (groupN * (barW + 2)) / 2 + si * (barW + 2)
+									x = colX
 									y = v >= 0 ? zeroY - h : zeroY
 								}
 								const fill = colorBy && series.length === 1 ? colorBy(v) : s.color
-								const r = stacked && si !== topSi ? 0 : Math.min(4, barW / 2, h)
-								const up = v >= 0 || stacked
+								const r = inStack && si !== topOf.get(ci) ? 0 : Math.min(4, barW / 2, h)
+								const up = v >= 0 || inStack
 								// rounded corners only on the data end
 								const d = up
 									? `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + barW - r},${y} Q${x + barW},${y} ${x + barW},${y + r} L${x + barW},${y + h} Z`

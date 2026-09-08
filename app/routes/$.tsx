@@ -82,6 +82,23 @@ function getTreatmentLabel(pageName: string) {
 export async function loader({ params, request }: LoaderFunctionArgs) {
 	const splat = params['*'] ?? ''
 
+	// Directory sites copy our GBP link with the "?" percent-encoded
+	// (/%3Futm_campaign=gmb), which lands here as a 404 that Google then
+	// indexes. 301 to the decoded URL so the bad copies deindex and any link
+	// equity flows to the real page.
+	{
+		const rawPath = new URL(request.url).pathname
+		if (/%3F/i.test(rawPath)) {
+			const url = new URL(request.url)
+			const decodedPath = rawPath.replace(/%3F/i, '?')
+			const extraQuery = url.search ? `&${url.search.slice(1)}` : ''
+			return new Response(null, {
+				status: 301,
+				headers: { Location: `${decodedPath}${extraQuery}` },
+			})
+		}
+	}
+
 	if (splat === 'microneedling/face') {
 		return redirectPreservingQuery(request, '/microneedling/facial', {
 			status: 301,
@@ -149,8 +166,11 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data, location }) => {
-	if (!data) return [{ title: 'Not Found | Sarah Hitchcox Aesthetics' }]
-	const { page } = data
+	// The loader's redirect branches degrade the inferred data type to `{}`,
+	// so narrow by hand; the runtime shape on the rendering branch is
+	// LoaderData either way.
+	const page = (data as unknown as Partial<LoaderData> | undefined)?.page ?? null
+	if (!page) return [{ title: 'Not Found | Sarah Hitchcox Aesthetics' }]
 	return getSocialMetas({
 		title: page.title,
 		description: page.metaDescription,
@@ -239,9 +259,9 @@ export default function DynamicPage() {
 						<ServiceHeader>What Our Clients Say</ServiceHeader>
 						<div className="grid gap-6 md:grid-cols-2">
 							{section.items.map((item, i) => (
-								<div key={i} className="rounded-lg bg-white p-6 shadow-sm">
-									<p className="mb-4 italic text-gray-600">"{item.quote}"</p>
-									<p className="font-semibold text-gray-900">- {item.author}</p>
+								<div key={i} className="rounded-lg bg-card p-6 shadow-sm">
+									<p className="mb-4 italic text-muted-foreground">"{item.quote}"</p>
+									<p className="font-semibold text-foreground">- {item.author}</p>
 								</div>
 							))}
 						</div>
@@ -293,7 +313,7 @@ export default function DynamicPage() {
 			)}
 
 			{/* Breadcrumb: Home / Category / Current */}
-			<nav className="mb-6 text-sm text-gray-500">
+			<nav className="mb-6 text-sm text-muted-foreground">
 				{breadcrumbItems.map(item => (
 					<span key={item.path}>
 						<Link
@@ -306,7 +326,7 @@ export default function DynamicPage() {
 						<span className="mx-2">/</span>
 					</span>
 				))}
-				<span className="font-medium text-gray-800">{page.name}</span>
+				<span className="font-medium text-foreground">{page.name}</span>
 			</nav>
 
 			{/* Main Content */}
@@ -314,11 +334,11 @@ export default function DynamicPage() {
 
 			{/* Ancestor Links (keyword-rich, in content body) */}
 			{(ancestors ?? []).length > 0 && (
-				<div className="mt-8 rounded-lg border border-gray-100 bg-white p-6">
-					<h3 className="mb-4 text-lg font-semibold text-gray-900">
+				<div className="mt-8 rounded-lg border border-border bg-card p-6">
+					<h3 className="mb-4 text-lg font-semibold text-foreground">
 						Explore More {page.name} Treatments
 					</h3>
-					<p className="text-gray-600">
+					<p className="text-muted-foreground">
 						{page.name} is part of our{' '}
 						{(ancestors ?? []).map((ancestor, i) => (
 							<span key={ancestor.path}>
@@ -380,7 +400,7 @@ export default function DynamicPage() {
 							<Link
 								key={sibling.path}
 								to={`/${sibling.path}`}
-								className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white p-4 transition-all hover:shadow-md"
+								className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-all hover:shadow-md"
 							>
 								{sibling.heroImage && (
 									<img
@@ -391,10 +411,10 @@ export default function DynamicPage() {
 									/>
 								)}
 								<div>
-									<h4 className="font-semibold text-gray-900 hover:text-primary">
+									<h4 className="font-semibold text-foreground hover:text-primary">
 										{sibling.name}
 									</h4>
-									<p className="text-sm text-gray-500">
+									<p className="text-sm text-muted-foreground">
 										{sibling.shortDescription}
 									</p>
 								</div>
@@ -406,8 +426,8 @@ export default function DynamicPage() {
 
 			{/* Location links */}
 			{!isStatewide ? (
-				<div className="mt-8 rounded-lg border border-gray-100 bg-white p-6">
-					<p className="text-gray-600">
+				<div className="mt-8 rounded-lg border border-border bg-card p-6">
+					<p className="text-muted-foreground">
 						Available at both of our Knoxville area locations:{' '}
 						<Link
 							to="/bearden"
@@ -431,7 +451,7 @@ export default function DynamicPage() {
 			<div className="mt-12 flex flex-col items-center justify-center">
 				<a
 					href={blvdUrl}
-					className="rounded-full bg-black px-10 py-4 text-lg font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-gray-900 hover:shadow-xl"
+					className="rounded-full bg-primary px-10 py-4 text-lg font-bold uppercase tracking-wider text-primary-foreground shadow-lg transition-all hover:-translate-y-1 hover:bg-primary/90 hover:shadow-xl"
 				>
 					{page.ctaText || 'Book Your Consultation'}
 				</a>

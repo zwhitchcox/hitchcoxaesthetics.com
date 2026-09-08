@@ -41,7 +41,7 @@ export function GoogleRatingBadge({
 				'inline-flex items-center gap-2 text-sm font-medium',
 				dark
 					? 'text-gray-300 hover:text-white'
-					: 'text-gray-600 hover:text-gray-900',
+					: 'text-muted-foreground hover:text-foreground',
 				className,
 			)}
 			aria-label={`Rated ${rounded} stars from ${summary.totalReviews} Google reviews`}
@@ -67,7 +67,7 @@ export function ReviewQuotes({
 	return (
 		<div className={cn('space-y-6', className)}>
 			<div className="flex flex-col items-center gap-1 text-center">
-				<h2 className="text-2xl font-semibold text-gray-900">
+				<h2 className="text-2xl font-semibold text-foreground">
 					Five-Star Google Reviews
 				</h2>
 				{summary ? <GoogleRatingBadge summary={summary} /> : null}
@@ -76,13 +76,13 @@ export function ReviewQuotes({
 				{reviews.map(review => (
 					<figure
 						key={review.id}
-						className="flex h-full flex-col rounded-xl border border-gray-100 bg-white p-6 shadow-sm"
+						className="flex h-full flex-col rounded-xl border border-border bg-card p-6 shadow-sm"
 					>
 						<Stars className="mb-3" />
-						<blockquote className="flex-1 text-gray-600">
+						<blockquote className="flex-1 text-muted-foreground">
 							“{truncate(review.comment, 240)}”
 						</blockquote>
-						<figcaption className="mt-4 font-semibold text-gray-900">
+						<figcaption className="mt-4 font-semibold text-foreground">
 							{review.reviewerName}
 						</figcaption>
 					</figure>

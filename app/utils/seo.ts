@@ -1,6 +1,5 @@
 const SITE_NAME = 'Sarah Hitchcox Aesthetics'
 const SITE_URL = 'https://hitchcoxaesthetics.com'
-const DEFAULT_OG_IMAGE = `${SITE_URL}/img/og-image.jpg`
 
 /**
  * Builds a complete set of meta descriptors (title, description, Open Graph,
@@ -12,8 +11,10 @@ export function getSocialMetas({
 	title,
 	description,
 	pathname = '/',
-	image = DEFAULT_OG_IMAGE,
+	image,
 	noIndex = false,
+	siteName = SITE_NAME,
+	siteUrl = SITE_URL,
 }: {
 	title: string
 	description: string
@@ -21,14 +22,20 @@ export function getSocialMetas({
 	pathname?: string
 	image?: string
 	noIndex?: boolean
+	/** Brand overrides: microsite-branded pages (proxied /book) must not
+	 * emit hitchcoxaesthetics.com in og tags. /img/* is proxied by the
+	 * microsites, so the default image path works on every brand domain. */
+	siteName?: string
+	siteUrl?: string
 }) {
-	const url = `${SITE_URL}${pathname}`
+	const url = `${siteUrl}${pathname}`
+	image ??= `${siteUrl}/img/og-image.jpg`
 	return [
 		{ title },
 		{ name: 'description', content: description },
 		...(noIndex ? [{ name: 'robots', content: 'noindex, nofollow' }] : []),
 		{ property: 'og:type', content: 'website' },
-		{ property: 'og:site_name', content: SITE_NAME },
+		{ property: 'og:site_name', content: siteName },
 		{ property: 'og:title', content: title },
 		{ property: 'og:description', content: description },
 		{ property: 'og:url', content: url },

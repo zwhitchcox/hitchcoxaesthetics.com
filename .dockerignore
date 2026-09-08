@@ -21,9 +21,11 @@ candidates
 reviews
 downloads
 .playwright-mcp
-# Local financial credentials/data — must never ship in an image
+# Local financial credentials — must never ship in an image
 .plaid-tokens.json
-.plaid-vendor-categories.json
+# .plaid-vendor-categories.json DOES ship: it is vendor-name -> category only
+# (no credentials) and prod's P&L classification + fixed-bill amortization
+# are rules-only without it (rent and retainers went unclassified).
 .git
 .github
 .vscode

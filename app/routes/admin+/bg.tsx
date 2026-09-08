@@ -37,7 +37,7 @@ const JOB_DESCRIPTIONS = {
 	reviewsFetch:
 		'Fetches Google reviews and stores them in the database with statistical analysis.',
 	financeReports:
-		'Recomputes the household budget + 6-month revenue projection and loads them into the Metabase reports warehouse.',
+		'Recomputes the household budget + 6-month revenue projection and loads them into the reports database.',
 }
 
 // Maps the job status to the StatusButton status
@@ -125,9 +125,38 @@ export async function loader({ request }: Route['LoaderArgs']) {
 	// Require admin role before showing background jobs status
 	await requireUserWithRole(request, 'admin')
 
-	return json({
-		jobStatuses: getJobStatuses(),
-	})
+	// The in-process registry only knows about manual "Run Now" runs since the
+	// last deploy; the real schedules live in Temporal. Merge Temporal's
+	// last/next run per job so the page stops reading "Never / Not scheduled".
+	const jobStatuses = getJobStatuses().map(job => ({ ...job }))
+	const temporalAddress = process.env.TEMPORAL_ADDRESS?.trim()
+	if (temporalAddress) {
+		const { describeSchedules } = await import(
+			'#app/temporal/schedules.server.ts'
+		)
+		const schedules = await describeSchedules(temporalAddress).catch(error => {
+			console.error('Failed to describe Temporal schedules', error)
+			return []
+		})
+		const byJobId = new Map(schedules.map(s => [s.jobId, s]))
+		for (const job of jobStatuses) {
+			const schedule = byJobId.get(job.id)
+			if (!schedule) continue
+			if (schedule.lastRun && (!job.lastRun || schedule.lastRun > job.lastRun)) {
+				job.lastRun = schedule.lastRun
+			}
+			job.nextRun = schedule.paused ? null : schedule.nextRun
+			if (job.status === 'idle') {
+				job.status = schedule.running
+					? 'running'
+					: job.lastRun
+						? 'completed'
+						: 'idle'
+			}
+		}
+	}
+
+	return json({ jobStatuses })
 }
 
 // Define a loader type
