@@ -54,6 +54,7 @@ import {
 	getLocationById,
 	PHONE,
 } from '#/app/utils/locations.ts'
+import { BRANDS, DEFAULT_BRAND_ID } from '#/app/config/brands.ts'
 import { getBrandIdFromRequest } from '#/app/utils/brand.server.ts'
 import { menuLinks } from '#/app/utils/menu-links.server.ts'
 import { combineHeaders, getDomainUrl } from '#/app/utils/misc.tsx'
@@ -149,12 +150,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const isOverlayPage =
 		staticOverlayPages.has(pathname) || isServicePage(pathWithoutLeadingSlash)
 
+	// Microsite-proxied requests (X-Brand from their Caddy) render without
+	// the SHA site chrome, the route supplies its own brand header.
+	const brandId = getBrandIdFromRequest(request)
+
 	return json(
 		{
 			user,
-			// Microsite-proxied requests (X-Brand from their Caddy) render without
-			// the SHA site chrome, the route supplies its own brand header.
-			brandId: getBrandIdFromRequest(request),
+			brandId,
 			requestInfo: {
 				hints: getHints(request),
 				origin: getDomainUrl(request),
@@ -167,7 +170,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			toast,
 			honeyProps,
 			isOverlayPage,
-			menuLinks,
+			// The SHA nav (SkinMedica shop, about-Sarah hints) must not ship in
+			// the payload of a microsite-branded page; the chrome is hidden
+			// there anyway.
+			menuLinks: brandId === DEFAULT_BRAND_ID ? menuLinks : [],
 		},
 		{
 			headers: combineHeaders(
@@ -207,6 +213,39 @@ export async function action({ request }: ActionFunctionArgs) {
 
 // add dataLayer to window
 
+declare global {
+	interface Window {
+		CallTrk?: { swap: () => void }
+	}
+}
+
+const CALLRAIL_SWAP_SRC =
+	'//cdn.callrail.com/companies/537900585/0c3f6789c4c11b8e98b9/12/swap.js'
+
+/**
+ * Load CallRail's swap.js after hydration. As an async head script it can
+ * rewrite phone numbers before React hydrates, which causes a hydration
+ * mismatch (React error #418). React then discards the server DOM and
+ * re-renders the whole tree client-side, which recreates the hero image and
+ * replays its fade-in - visible as a flicker on page load. Loading the
+ * script post-hydration removes the race. On client-side navigations we call
+ * CallTrk.swap() so newly rendered numbers get swapped too.
+ */
+function useCallRailSwap() {
+	const { pathname } = useLocation()
+	useEffect(() => {
+		if (document.getElementById('callrail-swap')) {
+			window.CallTrk?.swap()
+			return
+		}
+		const script = document.createElement('script')
+		script.id = 'callrail-swap'
+		script.async = true
+		script.src = CALLRAIL_SWAP_SRC
+		document.head.appendChild(script)
+	}, [pathname])
+}
+
 function Document({
 	children,
 	nonce,
@@ -220,7 +259,13 @@ function Document({
 }) {
 	const location = useLocation()
 	const data = useLoaderData<typeof loader>()
-	const origin = data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com'
+	const brandId = data?.brandId ?? DEFAULT_BRAND_ID
+	// Microsite-branded requests (proxied /book) canonicalize to the brand's
+	// own domain; the request origin is the proxy's, not the brand's.
+	const origin =
+		brandId === DEFAULT_BRAND_ID
+			? (data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com')
+			: BRANDS[brandId].homeUrl
 	const canonicalUrl = `${origin}${location.pathname}`
 
 	// JSON-LD: Knoxville-focused med spa. MedicalClinic is included because
@@ -265,6 +310,12 @@ function Document({
 		<html
 			lang="en"
 			className={`${theme} h-full overflow-x-hidden`}
+			// Overlay pages open on the black hero. Painting the canvas black
+			// via an inline style means even the frame before the stylesheet
+			// applies is black, so the load never flashes white.
+			style={
+				data?.isOverlayPage ? { backgroundColor: '#070707' } : undefined
+			}
 			suppressHydrationWarning
 		>
 			<head>
@@ -274,18 +325,18 @@ function Document({
 				<Meta />
 				<link rel="canonical" href={canonicalUrl} />
 				<Links />
-				<script
-					nonce={nonce}
-					type="application/ld+json"
-					dangerouslySetInnerHTML={{
-						__html: JSON.stringify(localBusinessJsonLd),
-					}}
-				/>
-				<script
-					async
-					type="text/javascript"
-					src="//cdn.callrail.com/companies/537900585/0c3f6789c4c11b8e98b9/12/swap.js"
-				/>
+				{/* SHA's business schema must never render on a microsite-branded
+				    page: the brands are separate businesses with their own GBP
+				    listings, and entity-graph ties between them are not allowed. */}
+				{brandId === DEFAULT_BRAND_ID ? (
+					<script
+						nonce={nonce}
+						type="application/ld+json"
+						dangerouslySetInnerHTML={{
+							__html: JSON.stringify(localBusinessJsonLd),
+						}}
+					/>
+				) : null}
 			</head>
 			<body className="bg-background text-foreground">
 				{children}
@@ -319,6 +370,7 @@ function App() {
 	const theme = useTheme()
 
 	useToast(data.toast)
+	useCallRailSwap()
 
 	useEffect(() => {
 		trackBookingAnalyticsPageView({

@@ -910,3 +910,67 @@ model ArticleImage {
   @@unique([articleId, fileName])
   @@index([articleId])
 }
+
+// Boulevard appointments mirrored by the blvd-appointment-sync background job
+// (hot window every few minutes + daily full backfill). Report loaders read
+// THIS table; they never call the Boulevard API at request time.
+model BlvdAppointment {
+  id                     String    @id // urn:blvd:Appointment:...
+  locationId             String
+  locationName           String?
+  startAt                DateTime
+  createdAt              DateTime? // when the booking was made
+  state                  String?
+  cancelled              Boolean   @default(false)
+  cancellationReason     String?
+  cancellationNotes      String?
+  cancelledAt            DateTime?
+  bookedByType           String?
+  manageUrl              String?
+  durationMinutes        Int?
+  clientId               String?
+  clientName             String?
+  clientMobilePhone      String?
+  clientAppointmentCount Int?
+  clientCreatedAt        DateTime?
+  // JSON text: [{ name, price, minutes }] snapshot of appointmentServices
+  services               String
+
+  syncedAt DateTime @updatedAt
+
+  @@index([startAt])
+  @@index([createdAt])
+  @@index([clientId])
+}
+
+// Google Ads spend per day, written by the google-ads-spend-sync job. The
+// revenue/bookings reports read this instead of querying the Ads API live.
+model GoogleAdsSpendDay {
+  day      String   @id // YYYY-MM-DD
+  usd      Float
+  syncedAt DateTime @updatedAt
+}
+
+// The OFFICIAL revenue table (Zane 2026-08-31): one row per revenue line
+// across systems. Boulevard rows mirror BlvdRevenueItem (written by the same
+// sync); Jane rows come from scripts/import-jane-revenue.ts (Sales export,
+// pre-migration era). Attribution stays on BlvdRevenueItem; this table is
+// the canonical "how much did we earn, when, for what" across all time.
+model RevenueItem {
+  id              String   @id @default(cuid())
+  source          String // 'boulevard' | 'jane'
+  sourceId        String   @unique
+  occurredAt      DateTime
+  itemName        String
+  serviceCategory String?
+  clientName      String?
+  grossAmountUsd  Float
+
+  boulevardAppointmentId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([occurredAt])
+  @@index([source])
+}

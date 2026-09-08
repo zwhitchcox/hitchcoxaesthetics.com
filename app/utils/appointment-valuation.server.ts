@@ -69,6 +69,16 @@ export async function getAppointmentValuation(
 		.finally(() => {
 			inFlight = null
 		})
+	// Stale-while-revalidate: an EXPIRED valuation is still yesterday's
+	// averages, fine for one page view. Serve it instantly and let the
+	// rebuild land in the background; only the very first call of a process
+	// (no cache at all) has to wait, and the boot warmup covers that.
+	if (cached) {
+		inFlight.catch(error =>
+			console.error('Appointment valuation refresh failed', error),
+		)
+		return cached.value
+	}
 	return await inFlight
 }
 

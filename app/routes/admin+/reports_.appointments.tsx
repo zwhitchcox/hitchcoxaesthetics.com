@@ -27,6 +27,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const rows = (
 		await loadAppointmentPerformance(dayToDate(from), dayToDate(to, true))
 	).filter(r => r.status !== 'upcoming')
+	// Reasons mined from the CallRail call near each cancellation (for
+	// cancels that did not go through the AI receptionist, which records the
+	// caller's stated reason into Boulevard notes directly).
+	const { getMinedCancellationReasons } = await import(
+		'#app/utils/cancellation-reasons.server.ts'
+	)
+	const mined = await getMinedCancellationReasons(
+		rows.filter(r => r.status === 'cancelled').map(r => r.appointmentId),
+	)
+	for (const r of rows) {
+		const reason = mined.get(r.appointmentId)
+		if (reason) r.reason = `${r.reason} · from call: ${reason}`
+	}
 	// The ledger is our own append-only record (diffed hourly from Boulevard),
 	// so cancellations show here even when Boulevard deletes the appointment
 	// outright, the case a live query can never see.

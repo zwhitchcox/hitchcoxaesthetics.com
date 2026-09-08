@@ -6,6 +6,7 @@
  * funnel rows are keyed by when the BOOKING was made.
  */
 import { normalizeBlvdEntityId } from '#app/utils/blvd-attribution.server.ts'
+import { listInboundCallsSince } from '#app/utils/callrail-booking.server.ts'
 import {
 	boulevardAdminFetch,
 	listBlvdAdminLocations,
@@ -14,6 +15,8 @@ import { prisma } from '#app/utils/db.server.ts'
 import { getGoogleAdsSpendUsd } from '#app/utils/google-ads-spend.server.ts'
 import { inferRevenueServiceCategory } from '#app/utils/blvd-revenue-sync.server.ts'
 import { valueAppointments } from '#app/utils/appointment-performance.server.ts'
+import { hasBlvdAppointmentMirror } from '#app/utils/blvd-appointment-sync.server.ts'
+import { ttlCache } from '#app/utils/ttl-cache.server.ts'
 import {
 	GRANULARITIES,
 	WINDOWS,
@@ -52,9 +55,15 @@ const CHANNEL_LABELS: Record<string, string> = {
 	paid_search: 'Google Ads',
 	gmb: 'Google Business Profile',
 	organic_search: 'Organic search',
+	ai_assistant: 'AI (ChatGPT etc.)',
 	referral: 'Referral',
 	direct: 'Direct',
 }
+
+/** Bookings recorded before the ai_assistant channel existed carry the AI
+ * referrer only inside rawProperties; relabel them so history shows up. */
+const AI_REFERRER_PATTERN =
+	/chatgpt|chat\.openai|perplexity|claude\.ai|copilot\.microsoft|gemini\.google/i
 
 export function getSourceLabel(touch?: {
 	trafficChannel: string | null
@@ -74,6 +83,13 @@ export function getSourceLabel(touch?: {
 		return touch.utmContent
 			? `GBP · ${touch.utmContent}`
 			: 'Google Business Profile'
+	}
+	if (
+		(touch.trafficChannel === 'referral' || !touch.trafficChannel) &&
+		touch.rawProperties &&
+		AI_REFERRER_PATTERN.test(touch.rawProperties)
+	) {
+		return CHANNEL_LABELS.ai_assistant!
 	}
 	return CHANNEL_LABELS[touch.trafficChannel ?? ''] ?? 'Website (other)'
 }
@@ -157,10 +173,12 @@ export function getUnattributedLabel(
 ) {
 	if (bookedByType === 'STAFF') {
 		// Staff create bookings for two very different reasons: rebooking an
-		// existing client at checkout, or taking a NEW client over the phone /
-		// at the desk. Calling a first-timer a "rebook" mislabels the lead.
+		// existing client at checkout, or finishing a NEW client's phone call.
+		// New clients get their real source resolved first (same-client web
+		// touch, then a CallRail call from their number); this label is only
+		// the leftover when neither exists.
 		return newClient === true
-			? 'Phone / walk-in (staff-booked, new client)'
+			? 'New client (untracked phone / walk-in)'
 			: 'Rebook (staff-booked)'
 	}
 	if (bookedByType === 'CLIENT') return 'Online (unattributed)'
@@ -306,6 +324,7 @@ export type BlvdAppointmentMeta = {
 	bookedByType: string | null
 	clientId: string | null
 	clientName: string | null
+	clientMobilePhone: string | null
 	clientAppointmentCount: number | null
 	clientCreatedAt: Date | null
 	locationName: string | null
@@ -316,7 +335,7 @@ export type BlvdAppointmentMeta = {
 }
 
 const APPOINTMENT_FIELDS = `id startAt createdAt state cancelled bookedByType manageUrl duration
-	location { name } client { id name appointmentCount createdAt }
+	location { name } client { id name mobilePhone appointmentCount createdAt }
 	appointmentServices { price duration service { name } }`
 
 function toAppointmentMeta(node: any): BlvdAppointmentMeta | null {
@@ -329,6 +348,7 @@ function toAppointmentMeta(node: any): BlvdAppointmentMeta | null {
 		bookedByType: node.bookedByType ?? null,
 		clientId: node.client?.id ?? null,
 		clientName: node.client?.name ?? null,
+		clientMobilePhone: node.client?.mobilePhone ?? null,
 		clientAppointmentCount:
 			typeof node.client?.appointmentCount === 'number'
 				? node.client.appointmentCount
@@ -345,48 +365,154 @@ function toAppointmentMeta(node: any): BlvdAppointmentMeta | null {
 	}
 }
 
-async function fetchAppointments(query: string): Promise<BlvdAppointmentMeta[]> {
-	const locations = await listBlvdAdminLocations()
-	const appointments: BlvdAppointmentMeta[] = []
-	for (const location of locations) {
-		let after: string | null = null
-		for (let page = 0; page < 15; page++) {
-			const res: any = await boulevardAdminFetch(
-				`query RangeAppointments($after: String, $locationId: ID!) {
-					appointments(first: 100, after: $after, locationId: $locationId, query: "${query}") {
-						pageInfo { endCursor hasNextPage }
-						edges { node { ${APPOINTMENT_FIELDS} } }
-					}
-				}`,
-				{ after, locationId: location.id },
-			)
-			for (const edge of res.appointments?.edges ?? []) {
-				const meta = toAppointmentMeta(edge?.node)
-				if (meta) appointments.push(meta)
+// Live Boulevard walk. Only the fallback path uses this now (mirror not yet
+// populated right after the first deploy); the cache keeps concurrent panes
+// from racing into the rate limit while in that state.
+const appointmentsCache = ttlCache<BlvdAppointmentMeta[]>({
+	ttlMs: 2 * 60 * 1000,
+})
+
+async function fetchAppointmentsLive(
+	query: string,
+): Promise<BlvdAppointmentMeta[]> {
+	return appointmentsCache(query, async () => {
+		const locations = await listBlvdAdminLocations()
+		const appointments: BlvdAppointmentMeta[] = []
+		for (const location of locations) {
+			let after: string | null = null
+			for (let page = 0; page < 15; page++) {
+				const res: any = await boulevardAdminFetch(
+					`query RangeAppointments($after: String, $locationId: ID!) {
+						appointments(first: 100, after: $after, locationId: $locationId, query: "${query}") {
+							pageInfo { endCursor hasNextPage }
+							edges { node { ${APPOINTMENT_FIELDS} } }
+						}
+					}`,
+					{ after, locationId: location.id },
+				)
+				for (const edge of res.appointments?.edges ?? []) {
+					const meta = toAppointmentMeta(edge?.node)
+					if (meta) appointments.push(meta)
+				}
+				if (!res.appointments?.pageInfo?.hasNextPage) break
+				after = res.appointments.pageInfo.endCursor
 			}
-			if (!res.appointments?.pageInfo?.hasNextPage) break
-			after = res.appointments.pageInfo.endCursor
 		}
+		return appointments
+	})
+}
+
+/** BlvdAppointment row → the meta shape the report code consumes. Cancelled
+ * and no-show rows are dropped, matching toAppointmentMeta. */
+function rowToMeta(row: {
+	id: string
+	startAt: Date
+	createdAt: Date | null
+	state: string | null
+	cancelled: boolean
+	bookedByType: string | null
+	clientId: string | null
+	clientName: string | null
+	clientMobilePhone: string | null
+	clientAppointmentCount: number | null
+	clientCreatedAt: Date | null
+	locationName: string | null
+	manageUrl: string | null
+	durationMinutes: number | null
+	services: string
+}): BlvdAppointmentMeta | null {
+	if (row.cancelled || row.state === 'NO_SHOW') return null
+	let services: BlvdAppointmentMeta['services'] = []
+	try {
+		services = JSON.parse(row.services) as BlvdAppointmentMeta['services']
+	} catch {
+		services = []
 	}
-	return appointments
+	return {
+		id: row.id,
+		startAt: row.startAt,
+		createdAt: row.createdAt,
+		bookedByType: row.bookedByType,
+		clientId: row.clientId,
+		clientName: row.clientName,
+		clientMobilePhone: row.clientMobilePhone,
+		clientAppointmentCount: row.clientAppointmentCount,
+		clientCreatedAt: row.clientCreatedAt,
+		locationName: row.locationName,
+		manageUrl: row.manageUrl,
+		durationMinutes: row.durationMinutes,
+		services,
+	}
 }
 
 /**
  * Appointments whose START is in the window, booked-by labels + projecting
  * unpaid appointments. Cancelled/no-show excluded; page-capped.
  */
+/**
+ * Boulevard appointment metadata, cached in process.
+ *
+ * The revenue report called this live on every page load, twice: once for a
+ * 120-day metadata window and once for today. Measured 2026-08-02, the
+ * 120-day call alone took 1.57s for 673 appointments, which was most of the
+ * report's load time. Nothing else in the loader came close.
+ *
+ * A window that ends before today can never change, so it is cached
+ * indefinitely. Any window touching today or the future gets a short TTL so
+ * new bookings still show up promptly.
+ */
+const apptRangeCache = new Map<
+	string,
+	{ at: number; rows: BlvdAppointmentMeta[] }
+>()
+const APPT_LIVE_TTL_MS = 5 * 60 * 1000
+
 export async function getBlvdAppointmentsInRange(
 	fromDay: string,
 	toDay: string,
 ): Promise<BlvdAppointmentMeta[]> {
 	if (toDay < fromDay) return []
-	const all = await fetchAppointments(
+	// Primary path: the BlvdAppointment mirror kept fresh by the
+	// blvd-appointment-sync job. A SQLite range read needs no extra caching.
+	if (await hasBlvdAppointmentMirror()) {
+		const rows = await prisma.blvdAppointment.findMany({
+			where: {
+				startAt: {
+					gte: new Date(`${shiftDay(fromDay, -1)}T00:00:00Z`),
+					lte: new Date(`${shiftDay(toDay, 1)}T23:59:59Z`),
+				},
+			},
+		})
+		return rows
+			.map(rowToMeta)
+			.filter((a): a is BlvdAppointmentMeta => a != null)
+			.filter(a => {
+				const day = toEtDay(a.startAt)
+				return day >= fromDay && day <= toDay
+			})
+	}
+	// Fallback until the first sync lands: live Boulevard, window-cached.
+	const key = `${fromDay}|${toDay}`
+	const todayEt = toEtDay(new Date())
+	const settled = toDay < todayEt
+	const hit = apptRangeCache.get(key)
+	if (hit && (settled || Date.now() - hit.at < APPT_LIVE_TTL_MS)) {
+		return hit.rows
+	}
+	const all = await fetchAppointmentsLive(
 		`startAt >= '${shiftDay(fromDay, -1)}T00:00:00Z' AND startAt <= '${shiftDay(toDay, 1)}T23:59:59Z'`,
 	)
-	return all.filter(a => {
+	const rows = all.filter(a => {
 		const day = toEtDay(a.startAt)
 		return day >= fromDay && day <= toDay
 	})
+	apptRangeCache.set(key, { at: Date.now(), rows })
+	// Keep the map from growing without bound across many window choices.
+	if (apptRangeCache.size > 40) {
+		const oldest = [...apptRangeCache.entries()].sort((a, b) => a[1].at - b[1].at)[0]
+		if (oldest) apptRangeCache.delete(oldest[0])
+	}
+	return rows
 }
 
 /** Appointments whose BOOKING was made in the window (funnel view). */
@@ -394,9 +520,17 @@ export async function getBlvdAppointmentsCreatedInRange(
 	since: Date,
 	until: Date,
 ): Promise<BlvdAppointmentMeta[]> {
-	const all = await fetchAppointments(
-		`createdAt >= '${since.toISOString()}' AND createdAt <= '${until.toISOString()}'`,
-	)
+	const all = (await hasBlvdAppointmentMirror())
+		? (
+				await prisma.blvdAppointment.findMany({
+					where: { createdAt: { gte: since, lt: until } },
+				})
+			)
+				.map(rowToMeta)
+				.filter((a): a is BlvdAppointmentMeta => a != null)
+		: await fetchAppointmentsLive(
+				`createdAt >= '${since.toISOString()}' AND createdAt <= '${until.toISOString()}'`,
+			)
 	return all.filter(a => a.createdAt && a.createdAt >= since && a.createdAt < until)
 }
 
@@ -455,6 +589,27 @@ async function getFirstAppointmentIdByClient(clientIds: string[]) {
 	const pending = unique
 		.filter(id => !firstAppointmentByClient.has(id))
 		.slice(0, MAX_FIRST_APPOINTMENT_LOOKUPS)
+	if (pending.length && (await hasBlvdAppointmentMirror())) {
+		// One indexed read over the mirror replaces a Boulevard round trip per
+		// client per location.
+		const rows = await prisma.blvdAppointment.findMany({
+			where: {
+				clientId: { in: pending },
+				cancelled: false,
+				NOT: { state: 'NO_SHOW' },
+			},
+			select: { id: true, clientId: true, createdAt: true, startAt: true },
+		})
+		const earliest = new Map<string, { id: string; at: number }>()
+		for (const r of rows) {
+			const at = (r.createdAt ?? r.startAt).getTime()
+			const cur = earliest.get(r.clientId!)
+			if (!cur || at < cur.at) earliest.set(r.clientId!, { id: r.id, at })
+		}
+		for (const clientId of pending)
+			firstAppointmentByClient.set(clientId, earliest.get(clientId)?.id ?? null)
+		return firstAppointmentByClient
+	}
 	if (pending.length) {
 		const locations = await listBlvdAdminLocations()
 		await mapWithConcurrency(pending, 6, async clientId => {
@@ -714,6 +869,15 @@ export async function loadRevenueChartCells(win: ReportWindow): Promise<{
 			return [] as BlvdAppointmentMeta[]
 		}),
 	])
+	// Jane-era revenue (official RevenueItem table, source 'jane') joins the
+	// chart as its own source so pre-migration months show real actuals
+	// instead of $0. No attribution or appointment ids exist for that era.
+	const janeItems = await prisma.revenueItem
+		.findMany({
+			where: { source: { in: ['jane', 'jane-bank'] }, occurredAt: { gte: since, lt: until } },
+			select: { occurredAt: true, serviceCategory: true, grossAmountUsd: true },
+		})
+		.catch(() => [] as Array<{ occurredAt: Date; serviceCategory: string | null; grossAmountUsd: number }>)
 	const touchIds = [
 		...new Set(items.map(i => i.attributionTouchId).filter(Boolean)),
 	] as string[]
@@ -774,6 +938,17 @@ export async function loadRevenueChartCells(win: ReportWindow): Promise<{
 		}
 		if (bestKey) cellByKey.get(bestKey)!.appts++
 	}
+	for (const item of janeItems) {
+		const day = toEtDay(item.occurredAt)
+		const cat = item.serviceCategory?.trim() || 'Uncategorized'
+		const key = `${day}|${cat}|Jane (pre-migration)|none`
+		let cell = cellByKey.get(key)
+		if (!cell) {
+			cell = { day, cat, source: 'Jane (pre-migration)', channel: 'none', usd: 0, appts: 0 }
+			cellByKey.set(key, cell)
+		}
+		cell.usd += item.grossAmountUsd
+	}
 	const cells = [...cellByKey.values()].map(c => ({ ...c, usd: Math.round(c.usd) }))
 	const byCategory = await rollUpByServiceCategory(rangeAppointments, cells)
 	return {
@@ -801,6 +976,116 @@ export type FunnelRow = {
 	/** true = the client's first-ever booking, false = they had booked before,
 	 * null = no client history to judge by */
 	newClient: boolean | null
+	boulevardAppointmentId: string | null
+	/** Collected revenue for the booked appointment; null until it happens. */
+	actualUsd: number | null
+}
+
+const digitsOf = (s: string | null | undefined) =>
+	(s ?? '').replace(/\D/g, '').slice(-10)
+const bareBlvdId = (s: string | null | undefined) =>
+	(s ?? '').replace(/^urn:blvd:\w+:/, '')
+
+/** How far back a client's web touch or phone call can be and still explain
+ * a staff-created booking. */
+const STAFF_SOURCE_LOOKBACK_MS = 30 * 24 * 3600 * 1000
+/** A touch may trail the staff booking slightly (clock skew, staff finishing
+ * a booking while the client's web session is still open). */
+const STAFF_SOURCE_GRACE_MS = 30 * 60 * 1000
+
+/**
+ * Real source for staff-created NEW-client bookings. Staff never book a
+ * true walk-in; these appointments are phone calls they answered or web
+ * bookings they finished/duplicated (verified against 90 days of data,
+ * 2026-08-11). Resolution order:
+ *   1. an attribution touch on the same Boulevard client (id or phone), the
+ *      client booked online and staff re-created the appointment;
+ *   2. a CallRail inbound call from the client's number before the booking,
+ *      labeled by its tracker (GBP listing / Google Ads / website pool).
+ */
+async function resolveStaffBookedNewClientSources(
+	appts: BlvdAppointmentMeta[],
+): Promise<Map<string, string>> {
+	const out = new Map<string, string>()
+	if (!appts.length) return out
+	const earliest = Math.min(
+		...appts.map(a => (a.createdAt ?? a.startAt).getTime()),
+	)
+	const touches = await prisma.blvdAttributionTouch.findMany({
+		where: {
+			occurredAt: { gte: new Date(earliest - STAFF_SOURCE_LOOKBACK_MS) },
+		},
+		select: {
+			occurredAt: true,
+			trafficChannel: true,
+			utmContent: true,
+			rawProperties: true,
+			callrailSource: true,
+			blvdClient: { select: { boulevardClientId: true, phone: true } },
+		},
+	})
+	const unresolved: BlvdAppointmentMeta[] = []
+	for (const a of appts) {
+		const bookedAt = (a.createdAt ?? a.startAt).getTime()
+		const clientId = bareBlvdId(a.clientId)
+		const phone = digitsOf(a.clientMobilePhone)
+		let best: { atMs: number; label: string } | null = null
+		for (const t of touches) {
+			const sameClient =
+				clientId && bareBlvdId(t.blvdClient?.boulevardClientId) === clientId
+			const samePhone = phone && digitsOf(t.blvdClient?.phone) === phone
+			if (!sameClient && !samePhone) continue
+			const atMs = t.occurredAt.getTime()
+			if (atMs > bookedAt + STAFF_SOURCE_GRACE_MS) continue
+			if (atMs < bookedAt - STAFF_SOURCE_LOOKBACK_MS) continue
+			const label =
+				!t.trafficChannel &&
+				t.callrailSource &&
+				!t.rawProperties?.includes('"booking_channel":"retell')
+					? phoneSourceLabel(t.callrailSource)
+					: getSourceLabel(t)
+			if (!best || atMs > best.atMs) best = { atMs, label }
+		}
+		if (best) out.set(a.id, best.label)
+		else unresolved.push(a)
+	}
+	if (unresolved.length) {
+		const sinceDay = toEtDay(
+			new Date(
+				Math.min(...unresolved.map(a => (a.createdAt ?? a.startAt).getTime())) -
+					STAFF_SOURCE_LOOKBACK_MS,
+			),
+		)
+		const calls = await listInboundCallsSince(sinceDay).catch(error => {
+			console.error('Failed to list CallRail calls for attribution', error)
+			return []
+		})
+		for (const a of unresolved) {
+			const phone = digitsOf(a.clientMobilePhone)
+			if (!phone) continue
+			const bookedAt = (a.createdAt ?? a.startAt).getTime()
+			let best: { atMs: number; sourceName: string | null } | null = null
+			for (const c of calls) {
+				if (c.phoneDigits !== phone) continue
+				if (c.atMs > bookedAt + STAFF_SOURCE_GRACE_MS) continue
+				if (c.atMs < bookedAt - STAFF_SOURCE_LOOKBACK_MS) continue
+				if (!best || c.atMs > best.atMs) best = c
+			}
+			if (best) out.set(a.id, phoneSourceLabel(best.sourceName))
+		}
+	}
+	return out
+}
+
+/** CallRail tracker name → the same source labels the web rows use, so one
+ * GBP listing aggregates across its web clicks and its phone calls. */
+function phoneSourceLabel(sourceName: string | null): string {
+	const normalized = normalizeTrackerName(sourceName ?? '')
+	const slug = GBP_TRACKER_TO_SLUG[normalized]
+	if (slug) return `GBP · ${slug} (phone)`
+	if (normalized.includes('ppc')) return 'Google Ads (phone)'
+	if (normalized.includes('pool')) return 'Phone (website visitor)'
+	return sourceName ? `Phone · ${sourceName}` : 'Phone call'
 }
 
 /**
@@ -885,6 +1170,14 @@ export async function loadBookingFunnel(request: Request) {
 		]),
 		resolveNewClientFlags(createdAppointments),
 	])
+	const staffNewSources = await resolveStaffBookedNewClientSources(
+		untracked.filter(
+			a => a.bookedByType === 'STAFF' && newClientFlags.get(a.id) === true,
+		),
+	).catch(error => {
+		console.error('Failed to resolve staff-booked sources', error)
+		return new Map<string, string>()
+	})
 
 	const rows: FunnelRow[] = [
 		...touches.map(t => ({
@@ -900,6 +1193,8 @@ export async function loadBookingFunnel(request: Request) {
 				null,
 			blvdUrl: blvdClientUrl(t.blvdClient?.boulevardClientId),
 			posthogUrl: posthogSessionUrl(t),
+			boulevardAppointmentId: t.appointments[0]?.boulevardAppointmentId ?? null,
+			actualUsd: null as number | null,
 			// Boulevard history first; what the client told the booking form
 			// about themselves only fills in when the appointment isn't linked
 			// yet (the sync runs a few minutes behind).
@@ -919,7 +1214,9 @@ export async function loadBookingFunnel(request: Request) {
 			bucket: bucketFor(a.createdAt ?? a.startAt, granularity),
 			service: a.services.map(s => s.name).join('; ') || 'Unknown service',
 			location: a.locationName,
-			source: getUnattributedLabel(a.bookedByType, isNew),
+			source:
+				staffNewSources.get(a.id) ??
+				getUnattributedLabel(a.bookedByType, isNew),
 			expectedUsd: a.services.reduce(
 				(sum, s) => sum + (s.price ? s.price / 100 : Math.round(avgByName.get(s.name) ?? 0)),
 				0,
@@ -928,9 +1225,43 @@ export async function loadBookingFunnel(request: Request) {
 			blvdUrl: a.manageUrl ?? blvdClientUrl(a.clientId),
 			posthogUrl: null,
 			newClient: isNew,
+			boulevardAppointmentId: a.id,
+			actualUsd: null as number | null,
 		}
 		}),
 	].sort((a, b) => b.bookedAt.localeCompare(a.bookedAt))
+
+	// Actual collected revenue per booked appointment, next to its expected
+	// value (Zane 2026-08-31). Null until the appointment has happened; 0
+	// after it happened with nothing collected (no-show, comp).
+	{
+		const ids = [
+			...new Set(
+				rows.map(r => r.boulevardAppointmentId).filter((v): v is string => Boolean(v)),
+			),
+		]
+		if (ids.length) {
+			const sums = await prisma.blvdRevenueItem.groupBy({
+				by: ['boulevardAppointmentId'],
+				where: { boulevardAppointmentId: { in: ids } },
+				_sum: { grossAmountUsd: true },
+			})
+			const byId = new Map(
+				sums.map(x => [x.boulevardAppointmentId, x._sum.grossAmountUsd ?? 0]),
+			)
+			const nowIso = new Date().toISOString()
+			for (const r of rows) {
+				if (!r.boulevardAppointmentId) continue
+				const sum = byId.get(r.boulevardAppointmentId)
+				r.actualUsd =
+					sum != null
+						? Math.round(sum)
+						: r.apptAt && r.apptAt < nowIso
+							? 0
+							: null
+			}
+		}
+	}
 
 	return { rows, windowKey, granularity, from: fromDay, to: toDay, adsSpendUsd }
 }

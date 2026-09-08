@@ -402,6 +402,72 @@ export async function getCallRailAccountIds(apiKey: string) {
 		.filter((id): id is string => typeof id === 'string' && id.length > 0)
 }
 
+export type InboundCallSummary = {
+	/** Last 10 digits of the caller's number. */
+	phoneDigits: string
+	atMs: number
+	sourceName: string | null
+}
+
+const inboundCallsCache = new Map<
+	string,
+	{ at: number; calls: InboundCallSummary[] }
+>()
+const INBOUND_CALLS_TTL_MS = 10 * 60 * 1000
+
+/**
+ * Every inbound call since a day (YYYY-MM-DD), newest first. Used to
+ * attribute staff-created bookings to the phone call that produced them:
+ * the caller's number matches the Boulevard client's mobile phone.
+ */
+export async function listInboundCallsSince(
+	sinceDay: string,
+): Promise<InboundCallSummary[]> {
+	const apiKey = process.env.CALLRAIL_API_KEY?.trim()
+	if (!apiKey) return []
+	const hit = inboundCallsCache.get(sinceDay)
+	if (hit && Date.now() - hit.at < INBOUND_CALLS_TTL_MS) return hit.calls
+	const calls: InboundCallSummary[] = []
+	for (const accountId of await getCallRailAccountIds(apiKey)) {
+		for (let page = 1; page <= 20; page++) {
+			const response = await callRailFetch(
+				apiKey,
+				`/a/${accountId}/calls.json`,
+				{
+					method: 'GET',
+					params: new URLSearchParams({
+						call_type: 'inbound',
+						start_date: sinceDay,
+						fields: 'customer_phone_number,start_time,source_name',
+						order: 'desc',
+						per_page: '250',
+						page: String(page),
+						sort: 'start_time',
+					}),
+				},
+			)
+			const pageCalls = Array.isArray(response.calls) ? response.calls : []
+			for (const call of pageCalls as Array<Record<string, unknown>>) {
+				const digits = String(call.customer_phone_number ?? '')
+					.replace(/\D/g, '')
+					.slice(-10)
+				const atMs = Date.parse(String(call.start_time ?? ''))
+				if (!digits || Number.isNaN(atMs)) continue
+				calls.push({
+					phoneDigits: digits,
+					atMs,
+					sourceName:
+						typeof call.source_name === 'string' ? call.source_name : null,
+				})
+			}
+			const totalPages = Number(response.total_pages ?? 1)
+			if (page >= totalPages) break
+		}
+	}
+	inboundCallsCache.set(sinceDay, { at: Date.now(), calls })
+	return calls
+}
+
 async function findCallByPhone(
 	apiKey: string,
 	accountId: string,

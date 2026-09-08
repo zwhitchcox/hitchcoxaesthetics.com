@@ -27,7 +27,7 @@ export default function ReviewQrIndex() {
 					<li key={p.id}>
 						<Link
 							to={`/review-qr/${p.uuid}`}
-							className="flex items-center justify-between rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary"
+							className="flex items-center justify-between rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary"
 						>
 							<span className="font-medium">{p.name}</span>
 							<span className="text-sm text-primary">Open QR →</span>

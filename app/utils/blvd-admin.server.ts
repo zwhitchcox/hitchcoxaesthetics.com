@@ -1,5 +1,7 @@
 import { createHmac } from 'node:crypto'
 
+import { ttlCache } from '#app/utils/ttl-cache.server.ts'
+
 export type BlvdAdminLocation = {
 	id: string
 	name?: string | null
@@ -68,31 +70,37 @@ async function boulevardAdminFetchOnce<TData>(
 	return payload.data
 }
 
+// Locations change ~never but are fetched by every report loader; cache them
+// so each Boulevard round-trip goes to real data instead.
+const locationsCache = ttlCache<BlvdAdminLocation[]>({ ttlMs: 60 * 60 * 1000 })
+
 export async function listBlvdAdminLocations() {
-	const response = await boulevardAdminFetch<{
-		locations?: {
-			edges?: Array<{
-				node?: BlvdAdminLocation | null
-			}>
-		}
-	}>(`query Locations {
-		locations(first: 100) {
-			edges {
-				node {
-					id
-					name
-					tz
+	return locationsCache('locations', async () => {
+		const response = await boulevardAdminFetch<{
+			locations?: {
+				edges?: Array<{
+					node?: BlvdAdminLocation | null
+				}>
+			}
+		}>(`query Locations {
+			locations(first: 100) {
+				edges {
+					node {
+						id
+						name
+						tz
+					}
 				}
 			}
-		}
-	}`)
-	return (
-		response.locations?.edges
-			?.map(edge => edge.node)
-			.filter((location): location is BlvdAdminLocation =>
-				Boolean(location?.id),
-			) ?? []
-	)
+		}`)
+		return (
+			response.locations?.edges
+				?.map(edge => edge.node)
+				.filter((location): location is BlvdAdminLocation =>
+					Boolean(location?.id),
+				) ?? []
+		)
+	})
 }
 
 async function boulevardAdminRequest(

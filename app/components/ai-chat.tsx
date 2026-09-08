@@ -137,7 +137,7 @@ function AiChatWidget() {
 		<>
 			{open ? (
 				<div
-					className="fixed bottom-[4.25rem] left-2 right-2 z-[55] flex h-[70dvh] max-h-[34rem] flex-col overflow-hidden rounded-xl border border-gray-300 bg-background shadow-2xl sm:left-auto sm:right-4 sm:w-96"
+					className="fixed bottom-[4.25rem] left-2 right-2 z-[55] flex h-[70dvh] max-h-[34rem] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl sm:left-auto sm:right-4 sm:w-96"
 					role="dialog"
 					aria-label="AI chat with Sarah Hitchcox Aesthetics"
 				>
@@ -181,7 +181,7 @@ function AiChatWidget() {
 					</div>
 					<form
 						onSubmit={handleSend}
-						className="flex items-center gap-2 border-t border-gray-200 p-2"
+						className="flex items-center gap-2 border-t border-border p-2"
 					>
 						<input
 							ref={inputRef}
@@ -190,7 +190,7 @@ function AiChatWidget() {
 							maxLength={AI_CHAT_MAX_MESSAGE_CHARS}
 							placeholder="Ask about our services..."
 							aria-label="Message the AI assistant"
-							className="min-w-0 flex-1 rounded-md border border-gray-300 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+							className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black"
 						/>
 						<button
 							type="submit"

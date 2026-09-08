@@ -13,38 +13,38 @@ export const meta: MetaFunction = ({ location }) =>
 export default function PrivacyRoute() {
 	return (
 		<div className="font-poppins mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
-			<h1 className="mb-8 text-3xl font-bold text-gray-900">Privacy Policy</h1>
-			<p className="mb-8 text-sm text-gray-500">Last updated: February 2026</p>
+			<h1 className="mb-8 text-3xl font-bold text-foreground">Privacy Policy</h1>
+			<p className="mb-8 text-sm text-muted-foreground">Last updated: February 2026</p>
 
 			{/* SMS / Text Message Consent */}
 			<section className="mb-12">
-				<h2 className="mb-4 text-2xl font-semibold text-gray-900">
+				<h2 className="mb-4 text-2xl font-semibold text-foreground">
 					SMS / Text Message Consent &amp; Policy
 				</h2>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					By providing your phone number and opting in, you consent to receive
 					text messages (SMS and MMS) from Sarah Hitchcox Aesthetics. Messages
 					may include:
 				</p>
-				<ul className="mb-4 list-disc space-y-1 pl-6 text-gray-700">
+				<ul className="mb-4 list-disc space-y-1 pl-6 text-foreground/80">
 					<li>Appointment reminders and confirmations</li>
 					<li>Follow-up care instructions</li>
 					<li>Promotional offers and special event invitations</li>
 					<li>Responses to your inquiries</li>
 				</ul>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					<strong>Message frequency varies.</strong> Message and data rates may
 					apply depending on your mobile carrier and plan. You are not required
 					to consent to text messaging as a condition of purchasing any
 					services.
 				</p>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					<strong>To opt out</strong> of text messages at any time, reply{' '}
 					<strong>STOP</strong> to any message you receive from us. After opting
 					out, you will receive a one-time confirmation message. You will no
 					longer receive text messages from us unless you opt in again.
 				</p>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					<strong>For help,</strong> reply <strong>HELP</strong> to any message
 					or contact us at{' '}
 					<Link
@@ -64,11 +64,11 @@ export default function PrivacyRoute() {
 					</Link>
 					.
 				</p>
-				<div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-					<p className="font-semibold text-gray-900">
+				<div className="mb-4 rounded-lg border border-border bg-muted/50 p-4">
+					<p className="font-semibold text-foreground">
 						SMS consent is not shared with third parties or affiliates.
 					</p>
-					<p className="mt-2 text-gray-700">
+					<p className="mt-2 text-foreground/80">
 						No mobile information, including SMS consent or opt-in data, will be
 						shared with third parties or affiliates for marketing or promotional
 						purposes. Disclosure of mobile information is strictly limited to:
@@ -77,7 +77,7 @@ export default function PrivacyRoute() {
 						to protect our rights.
 					</p>
 				</div>
-				<p className="text-gray-700">
+				<p className="text-foreground/80">
 					Supported carriers include but are not limited to AT&amp;T, T-Mobile,
 					Verizon, Sprint, and other major U.S. carriers. Carriers are not
 					liable for delayed or undelivered messages.
@@ -86,13 +86,13 @@ export default function PrivacyRoute() {
 
 			{/* General Privacy Practices */}
 			<section className="mb-12">
-				<h2 className="mb-4 text-2xl font-semibold text-gray-900">
+				<h2 className="mb-4 text-2xl font-semibold text-foreground">
 					Information We Collect
 				</h2>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					We collect personal information you provide directly to us, including:
 				</p>
-				<ul className="mb-4 list-disc space-y-1 pl-6 text-gray-700">
+				<ul className="mb-4 list-disc space-y-1 pl-6 text-foreground/80">
 					<li>
 						Name, email address, phone number, and mailing address when you book
 						an appointment or contact us
@@ -115,13 +115,13 @@ export default function PrivacyRoute() {
 			</section>
 
 			<section className="mb-12">
-				<h2 className="mb-4 text-2xl font-semibold text-gray-900">
+				<h2 className="mb-4 text-2xl font-semibold text-foreground">
 					How We Use Your Information
 				</h2>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					We use the information we collect to:
 				</p>
-				<ul className="mb-4 list-disc space-y-1 pl-6 text-gray-700">
+				<ul className="mb-4 list-disc space-y-1 pl-6 text-foreground/80">
 					<li>Provide, maintain, and improve our services</li>
 					<li>
 						Send appointment reminders, follow-up care instructions, and service
@@ -141,14 +141,14 @@ export default function PrivacyRoute() {
 			</section>
 
 			<section className="mb-12">
-				<h2 className="mb-4 text-2xl font-semibold text-gray-900">
+				<h2 className="mb-4 text-2xl font-semibold text-foreground">
 					Who We Share Your Information With
 				</h2>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					We do not sell your personal information. We may share your
 					information only in the following limited circumstances:
 				</p>
-				<ul className="mb-4 list-disc space-y-1 pl-6 text-gray-700">
+				<ul className="mb-4 list-disc space-y-1 pl-6 text-foreground/80">
 					<li>
 						<strong>Service providers:</strong> Third-party vendors who assist
 						us in operating our business, such as appointment scheduling
@@ -170,17 +170,17 @@ export default function PrivacyRoute() {
 						the public.
 					</li>
 				</ul>
-				<p className="font-semibold text-gray-900">
+				<p className="font-semibold text-foreground">
 					SMS consent and mobile information are never shared with third parties
 					or affiliates for marketing or promotional purposes.
 				</p>
 			</section>
 
 			<section className="mb-12">
-				<h2 className="mb-4 text-2xl font-semibold text-gray-900">
+				<h2 className="mb-4 text-2xl font-semibold text-foreground">
 					Data Security
 				</h2>
-				<p className="text-gray-700">
+				<p className="text-foreground/80">
 					We implement appropriate technical and organizational measures to
 					protect your personal information against unauthorized access,
 					alteration, disclosure, or destruction. This includes encryption of
@@ -191,15 +191,15 @@ export default function PrivacyRoute() {
 
 			{/* HIPAA Notice */}
 			<section className="mb-12">
-				<h2 className="mb-4 text-2xl font-semibold text-gray-900">
+				<h2 className="mb-4 text-2xl font-semibold text-foreground">
 					HIPAA Notice of Privacy Practices
 				</h2>
-				<p className="mb-4 text-sm font-semibold uppercase text-gray-600">
+				<p className="mb-4 text-sm font-semibold uppercase text-muted-foreground">
 					This notice describes how medical information about you may be used
 					and disclosed and how you can get access to this information. Please
 					review it carefully.
 				</p>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					This Notice of Privacy Practices describes how we may use and disclose
 					your protected health information to carry out treatment, payment or
 					health care operations and for other purposes that are permitted or
@@ -210,7 +210,7 @@ export default function PrivacyRoute() {
 					present or future physical or mental health or condition and related
 					health care services.
 				</p>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					We are required to abide by the terms of this Notice of Privacy
 					Practices. We may change the terms of our notice at any time. The new
 					notice will be effective for all protected health information that we
@@ -218,10 +218,10 @@ export default function PrivacyRoute() {
 					revised Notice of Privacy Practices.
 				</p>
 
-				<h3 className="mb-3 mt-8 text-xl font-semibold text-gray-900">
+				<h3 className="mb-3 mt-8 text-xl font-semibold text-foreground">
 					1. Uses and Disclosures of Protected Health Information
 				</h3>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					Your protected health information may be used and disclosed by your
 					provider, our office staff and others outside of our office who are
 					involved in your care and treatment for the purpose of providing
@@ -230,8 +230,8 @@ export default function PrivacyRoute() {
 					support the operation of our practice.
 				</p>
 
-				<h4 className="mb-2 mt-4 font-semibold text-gray-900">Treatment</h4>
-				<p className="mb-4 text-gray-700">
+				<h4 className="mb-2 mt-4 font-semibold text-foreground">Treatment</h4>
+				<p className="mb-4 text-foreground/80">
 					We will use and disclose your protected health information to provide,
 					coordinate, or manage your health care and any related services. This
 					includes the coordination or management of your health care with
@@ -239,8 +239,8 @@ export default function PrivacyRoute() {
 					to other providers who may be treating you.
 				</p>
 
-				<h4 className="mb-2 mt-4 font-semibold text-gray-900">Payment</h4>
-				<p className="mb-4 text-gray-700">
+				<h4 className="mb-2 mt-4 font-semibold text-foreground">Payment</h4>
+				<p className="mb-4 text-foreground/80">
 					Your protected health information will be used and disclosed, as
 					needed, to obtain payment for your health care services provided by us
 					or by another provider. This may include certain activities that your
@@ -248,10 +248,10 @@ export default function PrivacyRoute() {
 					health care services we recommend for you.
 				</p>
 
-				<h4 className="mb-2 mt-4 font-semibold text-gray-900">
+				<h4 className="mb-2 mt-4 font-semibold text-foreground">
 					Health Care Operations
 				</h4>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					We may use or disclose, as needed, your protected health information
 					in order to support the business activities of our practice. These
 					activities include, but are not limited to, quality assessment
@@ -260,10 +260,10 @@ export default function PrivacyRoute() {
 					activities.
 				</p>
 
-				<h4 className="mb-2 mt-4 font-semibold text-gray-900">
+				<h4 className="mb-2 mt-4 font-semibold text-foreground">
 					Other Permitted Uses and Disclosures
 				</h4>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					We may use or disclose your protected health information without your
 					authorization in situations including: as required by law, for public
 					health activities, communicable disease reporting, health oversight
@@ -274,20 +274,20 @@ export default function PrivacyRoute() {
 					compensation, and for inmates of correctional facilities.
 				</p>
 
-				<h4 className="mb-2 mt-4 font-semibold text-gray-900">
+				<h4 className="mb-2 mt-4 font-semibold text-foreground">
 					Uses Requiring Your Written Authorization
 				</h4>
-				<p className="mb-4 text-gray-700">
+				<p className="mb-4 text-foreground/80">
 					Other uses and disclosures of your protected health information will
 					be made only with your written authorization, unless otherwise
 					permitted or required by law. You may revoke this authorization in
 					writing at any time.
 				</p>
 
-				<h3 className="mb-3 mt-8 text-xl font-semibold text-gray-900">
+				<h3 className="mb-3 mt-8 text-xl font-semibold text-foreground">
 					2. Your Rights
 				</h3>
-				<ul className="mb-4 list-disc space-y-3 pl-6 text-gray-700">
+				<ul className="mb-4 list-disc space-y-3 pl-6 text-foreground/80">
 					<li>
 						<strong>Right to inspect and copy</strong> your protected health
 						information. We may charge a reasonable fee for copies.
@@ -318,14 +318,14 @@ export default function PrivacyRoute() {
 
 			{/* Contact */}
 			<section className="mb-12">
-				<h2 className="mb-4 text-2xl font-semibold text-gray-900">
+				<h2 className="mb-4 text-2xl font-semibold text-foreground">
 					Contact Us
 				</h2>
-				<p className="text-gray-700">
+				<p className="text-foreground/80">
 					If you have questions about this Privacy Policy, your rights, or our
 					practices, please contact us:
 				</p>
-				<ul className="mt-4 space-y-2 text-gray-700">
+				<ul className="mt-4 space-y-2 text-foreground/80">
 					<li>
 						<strong>Phone:</strong>{' '}
 						<Link

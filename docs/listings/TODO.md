@@ -1,6 +1,6 @@
 # Business Listing TODO
 
-Last reviewed: 2026-07-30
+Last reviewed: 2026-08-03
 
 This is the master checklist for unfinished citation and directory work. The
 individual location records remain the source of truth for canonical NAP, public
@@ -50,13 +50,27 @@ per brand and the record explicitly includes both branches.
       2026-07-30 listings was moved into the Sarah Hitchcox Aesthetics
       1Password vault on 2026-07-30. The temporary macOS Keychain item and
       `/tmp/codex-bizhwy-password` were removed.
-- [x] ThreeBestRated: submissions were completed on 2026-07-29 for Sarah
-      Hitchcox Aesthetics, Botox Knox Med Spa, and Knoxville Weight Loss
-      Clinic. Each brand submission includes both Bearden and Farragut, with
-      current services, pricing, hours, reviews, and three photos. All three
-      reCAPTCHAs passed and the forms were submitted for review. No public
-      listing URLs have arrived yet; monitor the business inbox and verify
-      every website link after publication.
+- [ ] ThreeBestRated: the Knoxville Med Spa application was rejected by email
+      on 2026-08-03. Reapply no earlier than 2026-11-03. Before retrying,
+      confirm whether the rejection covered only Sarah Hitchcox Aesthetics or
+      also the Botox Knox and Knoxville Weight Loss Clinic submissions.
+- [ ] ProvenExpert (provenexpert.com, DA ~70): review platform with free
+      business profiles. Our own backlink data (agelessyoumedspa purchase,
+      2026-08-04) confirms the profile's website link is DOFOLLOW. Value it
+      as a citation, not editorial. Free plan is one profile per business:
+      create one per brand (SHA, Botox Knox, Knoxville Weight Loss Clinic),
+      Bearden address leads, both branches in the description. Use canonical
+      NAP from docs/listings/locations/; root website for SHA, microsite
+      domains for the brands; never the tracking phone. Account creation
+      required, so this is for Zane or the Codex packet; save the login in
+      1Password.
+- [x] cience.com: evaluated 2026-08-04, NO submission path. It is a B2B
+      lead-gen company whose site carries a programmatic company database
+      aggregated from directories and public records. Its company pages do
+      carry a dofollow website link (verified in raw HTML), but there is no
+      add-your-business or claim flow, and SHA has no page there. Businesses
+      enter it through the sources it aggregates, which our normal citation
+      work already feeds. Nothing to do directly; do not re-research.
 - [ ] MapQuest: the actual Bearden record is
       `https://www.mapquest.com/us/tennessee/sarah-hitchcox-aesthetics-808453774`.
       It has the correct street address and root website, but the prohibited
@@ -193,6 +207,9 @@ per brand and the record explicitly includes both branches.
       two sub-brand Pages use their canonical brand websites.
 - [ ] Add profile and cover images to the official SHA, Botox Knox, and
       Knoxville Weight Loss Clinic Pages.
+- [ ] Audit Reviews/Recommendations on all eight public Pages. Enable the tab
+      where Meta permits it, record the public review URL for each Page, and
+      verify it while signed out.
 - [ ] Ask Meta support to enable Store Locations for Business Portfolio
       `2014119969227719`. On 2026-07-29 Meta said the main SHA Page was
       ineligible because it was less than two days old, lacked a profile and
@@ -274,11 +291,11 @@ Completed foundation:
 
 ### BBB
 
-- [ ] Monitor all eight submitted applications for approval.
-- [ ] The 2026-07-30 inbox recheck found only the generic
-      `Your Free BBB Business Profile Is on Its Way` confirmation and a
-      marketing email; no individual-location approval or public-profile email
-      has arrived.
+- [ ] Complete the approved BBB Business Account setup from the 2026-08-03
+      `Welcome to BBB` email. Its password link expires within 24 hours; use
+      BBB password recovery if it has expired. Save the login in 1Password.
+- [ ] Reconcile the approved account with all eight submitted applications and
+      determine which records it can manage.
 - [ ] Capture each public BBB profile URL when published.
 - [ ] Verify canonical name, suite, phone, website, and category on every
       approved profile.
@@ -305,6 +322,9 @@ Completed foundation:
 
 ### Apple Business Connect
 
+- [ ] Continue from the signed-in Apple Business Connect session. Complete any
+      remaining verification and audit all eight records before creating new
+      places.
 - [ ] Reconcile the owner handoff that reports Apple claimed/corrected with the
       per-location ledger. Audit SHA Bearden, SHA Farragut, SHA West Hills, SHA
       Cedar Bluff, both Botox Knox records, and both Knoxville Weight Loss
@@ -327,10 +347,17 @@ Completed foundation:
 
 ## Priority 4: Citation Cleanup
 
-- [ ] MedSpa Compass: monitor the 2026-07-30 bulk request for all eight
-      canonical records. Knoxville was absent from the publisher's city
-      selector, so the request asks the publisher to add Knoxville/Farragut and
-      create all eight records. Capture and verify every public URL returned.
+- [ ] MedSpa Compass: Knoxville is now live at
+      `https://medspacompass.com/city/knoxville/`. Claim and correct the live
+      Bearden record at
+      `https://medspacompass.com/listings/sarah-hitchcox-aesthetics-knoxville-bearden/`,
+      then submit the remaining seven records individually through
+      `https://medspacompass.com/list-your-med-spa/`. Open and verify every
+      public website link after publication. Use the current location ledgers,
+      not the stale Farragut address included in the original bulk email.
+- [ ] Foursquare: no owned claims are recorded. Search the current public
+      index first, then claim or create every applicable physical record and
+      record its public URL. Do not create duplicates.
 - [ ] Find My Cosmetic Injector: monitor the support request for the four SHA
       and two Botox Knox locations. The public registration button was broken;
       do not repeat the same form unless the publisher confirms it was fixed.
@@ -373,8 +400,12 @@ Completed foundation:
         account before it can receive a separate locator record. Tiffany was
         asked for the setup steps and whether a separate McKesson account is
         required.
-      - Evolus and Cartessa have not replied yet. Do not send duplicate
-        requests while the original emails are pending.
+      - Evolus has not replied yet. Do not send a duplicate request while the
+        original email is pending.
+      - Cartessa replied on 2026-08-03 asking whether both services belong at
+        both locations and stating that one device can be associated with only
+        one address. Get an authoritative device/service-to-location answer
+        before replying.
 - [ ] Tennessee School of Beauty "Meet the Salons": employer-profile request
       sent from `sarah@hitchcoxaesthetics.com` to
       `tsb1930@tennesseeschoolofbeauty.edu` on 2026-07-30. The requested

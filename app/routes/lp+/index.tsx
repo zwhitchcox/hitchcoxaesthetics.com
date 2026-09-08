@@ -11,7 +11,7 @@ export default function LandingPagesIndex() {
 	return (
 		<div className="container mx-auto py-12">
 			<h1 className="mb-8 text-4xl font-bold">Landing Pages Directory</h1>
-			<p className="mb-8 text-gray-600">
+			<p className="mb-8 text-muted-foreground">
 				Here are the landing pages generated for the Google Ads campaigns:
 			</p>
 			<ul className="space-y-4">

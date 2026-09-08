@@ -52,6 +52,19 @@ export async function plaidSyncWorkflow(): Promise<void> {
 	await activities.plaidSyncActivity()
 }
 
+export async function blvdAppointmentSyncWorkflow(): Promise<void> {
+	await activities.blvdAppointmentSyncActivity()
+}
+
+// Walks the entire appointment history, can run long.
+export async function blvdAppointmentBackfillWorkflow(): Promise<void> {
+	await slowActivities.blvdAppointmentBackfillActivity()
+}
+
+export async function googleAdsSpendSyncWorkflow(): Promise<void> {
+	await activities.googleAdsSpendSyncActivity()
+}
+
 // Budget aggregation + a 6-month Boulevard projection, can run long.
 export async function financeReportsWorkflow(): Promise<void> {
 	await slowActivities.financeReportsActivity()
@@ -68,4 +81,8 @@ export async function googleReviewsReportsWorkflow(): Promise<void> {
 // Full appointment-history scan, can run long.
 export async function lapsedPatientsWorkflow(): Promise<void> {
 	await slowActivities.lapsedPatientsActivity()
+}
+
+export async function scheduleHealthAlertWorkflow(): Promise<void> {
+	await activities.scheduleHealthAlertActivity()
 }

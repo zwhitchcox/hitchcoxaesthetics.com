@@ -858,6 +858,33 @@ export async function upsertBlvdRevenueItem(
 		},
 	})
 
+	// Mirror into the official cross-system revenue table (RevenueItem holds
+	// Boulevard + Jane; attribution-free by design).
+	await db.revenueItem.upsert({
+		where: { sourceId: parsed.externalId },
+		create: {
+			source: 'boulevard',
+			sourceId: parsed.externalId,
+			occurredAt: parsed.occurredAt,
+			itemName: parsed.itemName,
+			serviceCategory: normalizeOptionalString(parsed.serviceCategory),
+			clientName: null,
+			grossAmountUsd: parsed.grossAmountUsd,
+			boulevardAppointmentId: normalizeOptionalString(
+				parsed.boulevardAppointmentId,
+			),
+		},
+		update: {
+			occurredAt: parsed.occurredAt,
+			itemName: parsed.itemName,
+			serviceCategory: normalizeOptionalString(parsed.serviceCategory),
+			grossAmountUsd: parsed.grossAmountUsd,
+			boulevardAppointmentId: normalizeOptionalString(
+				parsed.boulevardAppointmentId,
+			),
+		},
+	})
+
 	if (shouldSyncToPostHog) {
 		await refreshBlvdBookingPricingAudit(db)
 		await syncBlvdRevenueItemToPostHog({ revenueItemId: revenueItem.id }, db)
