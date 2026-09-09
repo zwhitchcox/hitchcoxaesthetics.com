@@ -17,8 +17,10 @@ import {
 	getAppointmentLedgerIntervalMs,
 	getLapsedPatientsIntervalMs,
 	getPlaidSyncIntervalMs,
+	getPodcastTopicsIntervalMs,
 	getReviewAppointmentSyncIntervalMs,
 	getScheduleHealthAlertIntervalMs,
+	hasPodcastTopicsConfig,
 } from '#app/utils/background-jobs.server.ts'
 import { hasFinanceReportsConfig } from '#app/utils/finance-reports.server.ts'
 import { hasGoogleReviewsReportsConfig } from '#app/utils/google-reviews-reports.server.ts'
@@ -149,6 +151,14 @@ function getScheduleDefinitions(): Array<ScheduleDefinition> {
 			intervalMs: getScheduleHealthAlertIntervalMs(),
 			// Needs a destination number for the failure texts.
 			enabled: Boolean(process.env.SCHEDULE_ALERT_SMS_TO?.trim()),
+		},
+		{
+			scheduleId: 'podcast-topics',
+			jobId: 'podcastTopics',
+			workflowType: 'podcastTopicsWorkflow',
+			intervalMs: getPodcastTopicsIntervalMs(),
+			// Needs the OpenRouter call-intelligence config for idea generation.
+			enabled: hasPodcastTopicsConfig(),
 		},
 	]
 }

@@ -34,6 +34,7 @@ const adminMenuItems = [
 	{ path: '/admin/call-tags', label: 'Call Tags', icon: 'phone' as const },
 	{ path: '/admin/follow-ups', label: 'Follow-ups', icon: 'check' as const },
 	{ path: '/admin/articles', label: 'Articles', icon: 'file-text' as const },
+	{ path: '/admin/podcast', label: 'Podcast', icon: 'camera' as const },
 ]
 
 export async function loader({ request }: LoaderFunctionArgs) {

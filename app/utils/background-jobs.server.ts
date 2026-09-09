@@ -36,6 +36,10 @@ import {
 	syncLapsedPatients,
 } from '#app/utils/lapsed-patients.server.ts'
 import { runScheduleHealthCheck } from '#app/utils/schedule-health.server.ts'
+import {
+	hasPodcastTopicsConfig,
+	minePodcastTopics,
+} from '#app/utils/podcast-topics.server.ts'
 
 // Background job types and interfaces
 export interface JobStatus {
@@ -179,6 +183,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	scheduleHealthAlert: {
 		id: 'scheduleHealthAlert',
 		name: 'Temporal Schedule Health Alert',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	podcastTopics: {
+		id: 'podcastTopics',
+		name: 'Podcast Topic Mining',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -580,6 +593,40 @@ export async function runFinanceReportsJob(): Promise<void> {
 		).toISOString()
 	}
 }
+
+export async function runPodcastTopicsJob(): Promise<void> {
+	const job = jobStatuses['podcastTopics']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+	try {
+		const result = await minePodcastTopics()
+		console.log(
+			`Podcast topics: proposed ${result.proposed} ideas from ${result.newsItems} news items and ${result.clientQuestions} client questions`,
+		)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Podcast topic mining failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getPodcastTopicsIntervalMs(),
+		).toISOString()
+	}
+}
+
+export function getPodcastTopicsIntervalMs() {
+	const hours = Number(process.env.PODCAST_TOPICS_INTERVAL_HOURS ?? '72')
+	return (Number.isFinite(hours) && hours > 0 ? hours : 72) * 60 * 60 * 1000
+}
+
+export { hasPodcastTopicsConfig }
 
 export function initializeBackgroundJobs() {
 	if (isInitialized) return

@@ -974,3 +974,29 @@ model RevenueItem {
   @@index([occurredAt])
   @@index([source])
 }
+
+// Podcast episode ideas mined by the podcast-topics background job from
+// industry news feeds plus real client questions (CallRail texts). Sarah
+// accepts or dismisses them in /admin/podcast; accepted topics are her
+// recording queue.
+model PodcastTopic {
+  id     String @id @default(cuid())
+  title  String
+  // The angle: why this topic, why now, in one or two sentences.
+  hook   String
+  // Markdown talking-point outline for the episode.
+  outline String
+  status String @default("proposed") // proposed | accepted | dismissed | recorded
+  score  Int    @default(0)
+  // JSON: [{ title, url, publisher, publishedAt }] news items behind the idea.
+  sourcesJson String @default("[]")
+  // JSON: ["client question", ...] real questions clients texted or asked.
+  questionsJson String @default("[]")
+  // Which mining run proposed it (YYYY-MM-DD of the run).
+  batchKey String?
+
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+
+  @@index([status, createdAt])
+}

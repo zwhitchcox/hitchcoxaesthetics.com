@@ -86,3 +86,8 @@ export async function lapsedPatientsWorkflow(): Promise<void> {
 export async function scheduleHealthAlertWorkflow(): Promise<void> {
 	await activities.scheduleHealthAlertActivity()
 }
+
+export async function podcastTopicsWorkflow(): Promise<void> {
+	// Feed fetches + one LLM call: the slow tier's generous timeout fits.
+	await slowActivities.podcastTopicsActivity()
+}

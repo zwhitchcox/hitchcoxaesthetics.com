@@ -41,6 +41,13 @@ const adminQuickLinks = [
 		path: '/admin/bg',
 		color: 'bg-blue-100 dark:bg-blue-950',
 	},
+	{
+		title: 'Podcast',
+		icon: 'camera' as const,
+		description: 'Episode ideas from industry news and client questions',
+		path: '/admin/podcast',
+		color: 'bg-purple-100 dark:bg-purple-950',
+	},
 ]
 
 export default function AdminDashboard() {

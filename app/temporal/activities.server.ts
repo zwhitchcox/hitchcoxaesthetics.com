@@ -15,6 +15,7 @@ import {
 	runGoogleReviewsReportsJob,
 	runAppointmentLedgerJob,
 	runLapsedPatientsJob,
+	runPodcastTopicsJob,
 	runReviewAppointmentSyncJob,
 	runReviewsFetchJob,
 	runScheduleHealthAlertJob,
@@ -95,6 +96,9 @@ export function createActivities() {
 		},
 		async scheduleHealthAlertActivity() {
 			await runJobAndReport('scheduleHealthAlert', runScheduleHealthAlertJob)
+		},
+		async podcastTopicsActivity() {
+			await runJobAndReport('podcastTopics', runPodcastTopicsJob)
 		},
 	}
 }

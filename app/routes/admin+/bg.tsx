@@ -17,6 +17,7 @@ import {
 	runCallRailPostHogConversionSyncJob,
 	runReviewsFetchJob,
 	runFinanceReportsJob,
+	runPodcastTopicsJob,
 	getJobStatuses,
 	clearJobError,
 } from '#app/utils/background-jobs.server'
@@ -38,6 +39,8 @@ const JOB_DESCRIPTIONS = {
 		'Fetches Google reviews and stores them in the database with statistical analysis.',
 	financeReports:
 		'Recomputes the household budget + 6-month revenue projection and loads them into the reports database.',
+	podcastTopics:
+		'Mines industry news feeds and recent client questions, then proposes podcast episode ideas for /admin/podcast.',
 }
 
 // Maps the job status to the StatusButton status
@@ -72,6 +75,11 @@ export async function action({ request }: Route['ActionArgs']) {
 	if (intent === 'run-financeReports') {
 		runFinanceReportsJob().catch(console.error)
 		return json({ success: true, message: 'Finance reports job started' })
+	}
+
+	if (intent === 'run-podcastTopics') {
+		runPodcastTopicsJob().catch(console.error)
+		return json({ success: true, message: 'Podcast topic mining started' })
 	}
 
 	if (intent === 'run-callRailPostHogConversionSync') {
