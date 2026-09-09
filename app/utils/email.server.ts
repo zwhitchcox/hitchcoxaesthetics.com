@@ -24,11 +24,17 @@ const resendSuccessSchema = z.object({
 export async function sendEmail({
 	from = 'hello@hitchcoxaesthetics.com',
 	react,
+	replyTo,
+	attachments,
 	...options
 }: {
 	from?: string
 	to: string
 	subject: string
+	/** Where a reply to this mail goes (Resend `reply_to`), e.g. the applicant on the careers form. */
+	replyTo?: string
+	/** Files to attach; `content` is base64. Resend caps a mail at 40 MB. */
+	attachments?: Array<{ filename: string; content: string }>
 } & (
 	| { html: string; text: string; react?: never }
 	| { react: ReactElement; html?: never; text?: never }
@@ -36,6 +42,8 @@ export async function sendEmail({
 	const email = {
 		from,
 		...options,
+		...(replyTo ? { reply_to: replyTo } : null),
+		...(attachments?.length ? { attachments } : null),
 		...(react ? await renderReactEmail(react) : null),
 	}
 
