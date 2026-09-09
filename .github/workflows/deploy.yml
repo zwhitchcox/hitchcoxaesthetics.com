@@ -29,8 +29,6 @@ jobs:
 
       - name: setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: 📥 Download deps
         run: pnpm install
@@ -55,8 +53,6 @@ jobs:
 
       - name: setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: 📥 Download deps
         run: pnpm install
@@ -81,8 +77,6 @@ jobs:
 
       - name: setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: 📥 Download deps
         run: pnpm install
@@ -186,8 +180,6 @@ jobs:
       - name: setup pnpm
         if: ${{ github.ref == 'refs/heads/master' }}
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: 📥 Download deps for Retell deploy
         if: ${{ github.ref == 'refs/heads/master' }}
