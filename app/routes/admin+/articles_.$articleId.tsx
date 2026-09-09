@@ -262,9 +262,9 @@ export default function ArticleReview() {
 
 			{article.group === 'reference' ? (
 				<div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-					This publisher only takes human-written text. Zane rewrites this draft
-					before anything is sent. Your notes and edits here guide the rewrite,
-					and the rewrite comes back for your approval.
+					This publisher only takes human-written text. Please change this draft
+					into your own words before approving. Your approved text is what gets
+					sent, exactly as you leave it.
 				</div>
 			) : null}
 
@@ -379,7 +379,7 @@ function Editor({
 		kind === 'blog'
 			? 'Approve and publish'
 			: group === 'reference'
-				? 'Approve this draft'
+				? 'Approve in my words'
 				: group === 'sent'
 					? 'Mark approved'
 					: 'Approve'

@@ -33,9 +33,9 @@ export const ARTICLE_GROUPS: Array<{
 	},
 	{
 		key: 'reference',
-		title: 'Reference drafts',
+		title: 'Needs your own words',
 		blurb:
-			'These publishers only take human-written text. Zane rewrites each one from this draft. The rewrite comes back here for review.',
+			'These publishers only take human-written text. Read the draft, change it into your own words, then approve. Your approved text is what gets sent.',
 	},
 	{ key: 'approved', title: 'Approved', blurb: '' },
 	{ key: 'denied', title: 'Denied', blurb: '' },
