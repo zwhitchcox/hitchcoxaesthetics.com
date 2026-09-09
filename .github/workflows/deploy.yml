@@ -57,6 +57,10 @@ jobs:
       - name: 📥 Download deps
         run: pnpm install
 
+      - name: 🧬 Prisma client
+        # pnpm 10 no longer runs dependency postinstall scripts, so the client is not generated on install
+        run: pnpm prisma generate
+
       - name: 🖼 Build icons
         run: pnpm build:icons
 
