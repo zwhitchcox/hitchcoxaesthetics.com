@@ -1000,3 +1000,46 @@ model PodcastTopic {
 
   @@index([status, createdAt])
 }
+
+// What GOOGLE says links to us, pulled from the Search Console links report by
+// ~/outreach/gsc-links.py on the Mac mini and pushed here (there is no API for
+// that report, so the mini reads the page in a browser). One row per property
+// per pull, so the count is a trend and not just today's number.
+model GscLinkPull {
+  id           String   @id @default(cuid())
+  property     String // 'sha' | 'bk' | 'kwlc'
+  pulledAt     DateTime
+  sites        Int // every linking site Google lists
+  linkingPages Int
+  realSites    Int      @default(0) // after spam, our own network and search engines are removed
+  spamSites    Int      @default(0)
+  oursSites    Int      @default(0)
+  searchSites  Int      @default(0)
+  ourLiveLinks Int      @default(0) // links the outreach ledger says are live for this brand
+  pickedUp     Int      @default(0) // ...of those, how many Google has actually seen
+  source       String   @default("shade")
+  createdAt    DateTime @default(now())
+
+  links GscLinkSite[]
+
+  @@unique([property, pulledAt])
+  @@index([property, pulledAt])
+}
+
+model GscLinkSite {
+  id           String  @id @default(cuid())
+  pullId       String
+  site         String
+  root         String
+  linkingPages Int?
+  targetPages  Int?
+  klass        String? // 'Editorial', 'Directory / citation', 'Scraper / spam', ...
+  spam         Boolean @default(false)
+  ours         Boolean @default(false) // our own network or one of our three brands
+  isOurLink    Boolean @default(false) // a placement the outreach ledger claims is live
+
+  pull GscLinkPull @relation(fields: [pullId], references: [id], onDelete: Cascade)
+
+  @@index([pullId])
+  @@index([root])
+}
