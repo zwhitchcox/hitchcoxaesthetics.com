@@ -51,6 +51,17 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 			{ title: 'Maps & reach', desc: 'Rank map + competitor leaderboard, household reach, reach → $, GMB clients', path: '/geo-rank' },
 			{ title: 'Reach over time', desc: 'People reached + expected revenue, organic Google rank per site, backlinks & authority, week by week', path: '/admin/reports/reach' },
 			{ title: 'Backlinks', desc: "Google's own linking-sites report per brand: real referring domains after spam, which of our placements Google has actually seen", path: '/admin/reports/links' },
+			{
+				title: 'Competitors: link profiles',
+				desc: "Every competitor's backlinks classified, ours beside them, and the query ledger. Refreshed weekly on the Mac mini (needs the tailnet).",
+				href: 'http://zanes-mac-mini:8788/reports/link-profiles.html',
+				id: 'link-profiles',
+				children: [
+					{ title: 'Link profiles', desc: 'Competitor backlinks by class, spam filter, ours vs theirs', href: 'http://zanes-mac-mini:8788/reports/link-profiles.html', id: 'link-profiles-main' },
+					{ title: 'Trends', desc: 'Referring domains per competitor over time', href: 'http://zanes-mac-mini:8788/reports/trends.html', id: 'link-trends' },
+					{ title: 'Query ledger', desc: 'Every DataForSEO query behind the numbers', href: 'http://zanes-mac-mini:8788/reports/query-ledger.html', id: 'query-ledger' },
+				],
+			},
 			{ title: 'Reach simulator', desc: 'What-if: listings, reviews, simulated rank/reach', href: 'https://hitchcox-sim.fly.dev/', id: 'simulator' },
 		],
 	},
