@@ -12,7 +12,7 @@
  */
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
-import { ReportPage, StatTile } from '#app/components/report-ui'
+import { LineChart, ReportPage, SERIES, StatTile } from '#app/components/report-ui'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 
@@ -62,9 +62,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				current: current
 					? { ...current, pulledAt: current.pulledAt.toISOString() }
 					: null,
-				history: pulls
-					.map(p => ({ at: p.pulledAt.toISOString().slice(0, 10), real: p.realSites, all: p.sites }))
-					.reverse(),
+				// One point per day: several pulls can land on the same date (a backfill, a re-run),
+				// and a trend line with four dots on one day reads as movement that never happened.
+				history: (() => {
+					const byDay = new Map<string, { day: string; real: number; all: number; pickedUp: number }>()
+					for (const p of [...pulls].reverse()) {
+						const day = p.pulledAt.toISOString().slice(0, 10)
+						byDay.set(day, { day, real: p.realSites, all: p.sites, pickedUp: p.pickedUp })
+					}
+					return [...byDay.values()]
+				})(),
 				links,
 				gained,
 				lost,
@@ -135,6 +142,22 @@ export default function LinksReport() {
 								whisper={b.gained.length ? `new: ${b.gained.slice(0, 3).join(', ')}` : 'no new domains'}
 							/>
 						</div>
+						{b.history.length > 1 ? (
+							<LineChart
+								labels={b.history.map(h => h.day.slice(5))}
+								height={190}
+								format={(n: number) => String(Math.round(n))}
+								series={[
+									{ name: 'Real referring domains', color: SERIES[0]!, values: b.history.map(h => h.real) },
+									{ name: 'Our links Google has seen', color: SERIES[1]!, values: b.history.map(h => h.pickedUp) },
+									{ name: 'Everything Google lists', color: SERIES[2]!, values: b.history.map(h => h.all) },
+								]}
+							/>
+						) : (
+							<p className="note">
+								One snapshot so far, so there is no line to draw yet. The mini adds one every morning.
+							</p>
+						)}
 						<p className="note">
 							Pulled {new Date(c.pulledAt).toLocaleString('en-US', { timeZone: 'America/New_York' })}.
 							Not counted: {c.spamSites} spam, {c.oursSites} ours, {c.searchSites} search engines.
