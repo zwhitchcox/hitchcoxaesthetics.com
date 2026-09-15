@@ -916,6 +916,8 @@ model Article {
   publisherWaiting     Boolean @default(false)
   placementUsd         Int?
   estimatedReadSeconds Int?
+  // "Write a different article": the mini queues a clean-room draft.
+  rewriteRequested     Boolean @default(false)
 
   images ArticleImage[]
   events ArticleReviewEvent[]
@@ -962,6 +964,9 @@ model ArticleImage {
   altText     String?
   caption     String?
   blob        Bytes
+  // pixel size of the stored picture, so the page reserves the box
+  width       Int?
+  height      Int?
   createdAt   DateTime @default(now())
 
   article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)

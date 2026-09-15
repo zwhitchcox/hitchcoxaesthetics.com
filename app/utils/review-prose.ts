@@ -11,6 +11,9 @@
  * - each highlight range (body offsets from findHighlightRanges) is wrapped
  *   in a `<mark id="hl-<index>" data-claim="<index>">`, split across text
  *   nodes when a quote spans emphasis or a link;
+ * - a range with `kind: 'changed'` (the passage an AI edit just changed) is
+ *   wrapped in a `<mark class="review-changed">` with no id and no claim;
+ *   where it overlaps a claim range it wins;
  * - the "You were here" marker is inserted before the paragraph she reached.
  *
  * Browser-safe and pure: no DOM, no prisma. The offsets must come from the
@@ -18,8 +21,17 @@
  */
 import { type Paragraph } from './review-aid.ts'
 
-/** A highlight to wrap. `index` is the claim row it belongs to. */
-export type ProseRange = { start: number; end: number; index: number }
+/**
+ * A highlight to wrap. `index` is the claim row it belongs to. `kind`
+ * defaults to `claim`; a `changed` range marks text an AI edit changed and
+ * has no claim row.
+ */
+export type ProseRange = {
+	start: number
+	end: number
+	index: number
+	kind?: 'claim' | 'changed'
+}
 
 export type ReviewProseOptions = {
 	/** From splitParagraphs(body). Only start and end are read. */
@@ -33,6 +45,7 @@ export type ReviewProseOptions = {
 export const MARKER_ID = 'you-were-here'
 export const MARKER_TEXT = 'You were here'
 export const MARK_CLASS = 'review-mark'
+export const CHANGED_CLASS = 'review-changed'
 
 export function highlightId(index: number): string {
 	return `hl-${index}`
@@ -76,23 +89,37 @@ function withProperties(node: MdNode, properties: Record<string, unknown>) {
 	data.hProperties = { ...current, ...properties }
 }
 
-function markNode(
-	text: string,
-	index: number,
-	withId: boolean,
-): MdNode {
+function isChanged(range: ProseRange): boolean {
+	return range.kind === 'changed'
+}
+
+function markNode(text: string, range: ProseRange, withId: boolean): MdNode {
+	const hProperties = isChanged(range)
+		? { className: [CHANGED_CLASS] }
+		: {
+				className: [MARK_CLASS],
+				dataClaim: String(range.index),
+				...(withId ? { id: highlightId(range.index) } : {}),
+			}
 	return {
 		type: 'reviewMark',
-		data: {
-			hName: 'mark',
-			hProperties: {
-				className: [MARK_CLASS],
-				dataClaim: String(index),
-				...(withId ? { id: highlightId(index) } : {}),
-			},
-		},
+		data: { hName: 'mark', hProperties },
 		children: [{ type: 'text', value: text }],
 	}
+}
+
+/** By start; a changed range before a claim that starts at the same place. */
+function byStart(a: ProseRange, b: ProseRange): number {
+	return a.start - b.start || Number(isChanged(b)) - Number(isChanged(a))
+}
+
+/** The ranges without any claim that overlaps a changed range. */
+function changedWins(ranges: ReadonlyArray<ProseRange>): ProseRange[] {
+	const changed = ranges.filter(isChanged)
+	if (changed.length === 0) return [...ranges]
+	return ranges.filter(
+		r => isChanged(r) || !changed.some(c => c.start < r.end && c.end > r.start),
+	)
 }
 
 function markerNode(): MdNode {
@@ -122,9 +149,7 @@ function splitTextNode(
 	const e = endOffset(node)
 	// escapes and entities make the value shorter than the source; skip those
 	if (s === null || e === null || value.length !== e - s) return null
-	const hits = ranges
-		.filter(r => r.start < e && r.end > s)
-		.sort((a, b) => a.start - b.start)
+	const hits = ranges.filter(r => r.start < e && r.end > s).sort(byStart)
 	if (hits.length === 0) return null
 	const out: MdNode[] = []
 	let cursor = 0
@@ -133,8 +158,9 @@ function splitTextNode(
 		const to = Math.min(value.length, r.end - s)
 		if (to <= from || from < cursor) continue
 		if (from > cursor) out.push({ type: 'text', value: value.slice(cursor, from) })
-		out.push(markNode(value.slice(from, to), r.index, !idGiven.has(r.index)))
-		idGiven.add(r.index)
+		const claim = !isChanged(r)
+		out.push(markNode(value.slice(from, to), r, claim && !idGiven.has(r.index)))
+		if (claim) idGiven.add(r.index)
 		cursor = to
 	}
 	if (cursor < value.length) out.push({ type: 'text', value: value.slice(cursor) })
@@ -177,7 +203,8 @@ export function transformReviewProse(root: MdNode, options: ReviewProseOptions) 
 		const index = indexes[i] ?? -1
 		if (index >= 0) withProperties(block, { dataParagraph: String(index) })
 	})
-	if (ranges.length > 0) highlightChildren(root, ranges, new Set<number>())
+	if (ranges.length > 0)
+		highlightChildren(root, changedWins(ranges), new Set<number>())
 	if (typeof markerAt === 'number' && markerAt > 0) {
 		const at = indexes.findIndex(index => index >= markerAt)
 		if (at >= 0) root.children.splice(at, 0, markerNode())

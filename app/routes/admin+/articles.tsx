@@ -43,6 +43,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			answer: true,
 			incomingBody: true,
 			incomingAt: true,
+			rewriteRequested: true,
 			_count: { select: { images: true } },
 		},
 	})
@@ -254,7 +255,8 @@ export default function ArticlesAdmin() {
 											</span>
 										) : a.status === 'changes_requested' ? (
 											<span className="inline-flex items-center gap-1 text-amber-800 dark:text-amber-300">
-												<Icon name="update" className="h-4 w-4" /> Changes requested
+												<Icon name="update" className="h-4 w-4" />{' '}
+												{a.rewriteRequested ? 'New article coming' : 'Changes requested'}
 												{a.reviewedBy ? ` by ${a.reviewedBy}` : ''}
 											</span>
 										) : a.group === 'questions' ? (

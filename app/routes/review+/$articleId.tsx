@@ -1,214 +1,129 @@
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import {
 	json,
-	redirect,
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
+	type SerializeFrom,
 } from '@remix-run/node'
 import {
 	Form,
 	Link,
-	useActionData,
+	useFetcher,
 	useLoaderData,
 	useNavigate,
-	useNavigation,
-	useSubmit,
 } from '@remix-run/react'
-import { useEffect, useRef, useState } from 'react'
-import { ARTICLE_CHANGER_COPY } from '#app/components/article-changer.tsx'
+import {
+	forwardRef,
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useMemo,
+	useRef,
+	useState,
+} from 'react'
+import {
+	ARTICLE_CHANGER_COPY,
+	useDictation,
+} from '#app/components/article-changer.tsx'
 import { MarkdownContent } from '#app/components/markdown-content.tsx'
+import {
+	PassageFix,
+	type PassageApplied,
+	type PassageRequest,
+} from '#app/components/passage-fix.tsx'
 import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon'
 import { Textarea } from '#app/components/ui/textarea.tsx'
-import { ARTICLE_EDIT_CHIPS } from '#app/utils/article-edit.ts'
+import {
+	appendSpeech,
+	ARTICLE_EDIT_CHIPS,
+	saveArticleBody,
+} from '#app/utils/article-edit.ts'
+import {
+	articleImageResolver,
+	articleImageUrl,
+	countPictureLines,
+	picturesNote,
+	zoomTarget,
+	type ZoomTarget,
+} from '#app/utils/article-images.ts'
 import { reviewerName } from '#app/utils/articles.server.ts'
-import { formatDate, missingLinks, parseLinks } from '#app/utils/articles.ts'
+import { formatDate } from '#app/utils/articles.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import {
-	aboutMinutes,
 	findHighlightRanges,
-	loadReviewAid,
 	paragraphIndexAt,
 	plainQuote,
-	reviewAidNote,
 	splitParagraphs,
 } from '#app/utils/review-aid.ts'
 import { recordReviewEvent } from '#app/utils/review-events.server.ts'
 import {
 	claimRowId,
-	highlightId,
 	MARKER_ID,
 	reviewProsePlugin,
+	type ProseRange,
 } from '#app/utils/review-prose.ts'
+import { getReviewLane } from '#app/utils/review-queue.server.ts'
 import {
-	cardReadSeconds,
-	getReviewLane,
-	getReviewSitting,
-} from '#app/utils/review-queue.server.ts'
-import { redirectWithToast } from '#app/utils/toast.server.ts'
-import {
-	afterDecisionUrl,
 	approveArticle,
 	approvedSince,
 	approvedToday,
 	LATER_MS,
-	loadCards,
-	plentyNow,
+	loadArticleView,
 	reopenArticle,
 	settleSitting,
-	whereLabel,
 } from './_shared.server.ts'
 
 /**
- * S3, the article: the "things to check first" panel, every word of the
- * text with the claims marked, and one sticky bar. S4 (read to the end),
- * S6 (the "..." menu), S7 (Approved, with S8 when the sitting is spent),
- * and the lapsed-session sheet live here too.
+ * The feed at /review/:id. The deep-linked article comes first; when she
+ * decides on it, the next one that fits her time appends below, with no
+ * tap and no new page. One sticky bar acts on the article in view.
+ *
+ * Each card holds S3 (the panel, every word, the sheets), S4 (read to the
+ * end), S6 (the "..." menu), the lapsed-session sheet, and the "Change
+ * this" flow on a tapped claim or a selected passage. After a decision the
+ * card collapses to a one-line header and the decided card (S7). "That is
+ * plenty" (S8) is a card in the feed.
  */
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
 }
 
 const EVENTS_ENDPOINT = '/resources/review-events'
+const NEXT_ENDPOINT = '/resources/review-next'
 /** read_to is posted every this many paragraphs, and at the end. */
 const READ_TO_EVERY = 5
-/** The Undo link on the Approved screen stays this long. */
+/** The Undo link on an approved card stays this long. */
 const UNDO_MS = 8000
-
-function hostOf(url: string): string {
-	try {
-		return new URL(url).hostname.replace(/^www\./, '')
-	} catch {
-		return url
-	}
-}
-
-function escapeRegExp(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-/** The words the link is on in the text, or null when the link is not there. */
-function anchorTextFor(body: string, url: string): string | null {
-	const target = escapeRegExp(url.replace(/\/+$/, ''))
-	const re = new RegExp(`\\[([^\\]]+)\\]\\(\\s*${target}\\/?[^)]*\\)`, 'i')
-	return re.exec(body)?.[1]?.trim() ?? null
-}
-
-function bylineText(byline: string | null): string {
-	const text = (byline ?? 'Sarah Hitchcox, RN').trim()
-	return /^by\s/i.test(text) ? text : `By ${text}`
-}
+/** The green mark on a changed passage stays this long. */
+const CHANGED_MS = 6000
+/** Her "Write a different article" note carries this prefix on the ledger. */
+const REWRITE_PREFIX = 'NEW ARTICLE: '
+const REWRITE_DEFAULT_NOTE = 'a different article'
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
-	const userId = await requireUserWithRole(request, 'admin')
+	await requireUserWithRole(request, 'admin')
 	const id = params.articleId ?? ''
 	const url = new URL(request.url)
-	const article = await prisma.article.findUnique({
-		where: { id },
-		include: {
-			images: {
-				orderBy: { position: 'asc' },
-				select: { id: true, altText: true, caption: true },
-			},
-		},
-	})
-	if (!article) throw new Response('Not found', { status: 404 })
-	const now = new Date()
-	const body = article.body
-	const aid = loadReviewAid(article.reviewAidJson, body)
-	const links = parseLinks(article.linksJson)
-	const missing = missingLinks(body, links)
-	const paragraphs = splitParagraphs(body)
-	const ranges = findHighlightRanges(
-		body,
-		aid.claims.map(c => c.quote),
-	)
-	const readSeconds = cardReadSeconds(article)
-	const decided = article.status !== 'pending'
-	const done =
-		url.searchParams.get('done') === 'approved' && article.status === 'approved'
+	const first = await loadArticleView(id)
+	if (!first) throw new Response('Not found', { status: 404 })
 	// An own-words row has no Approve here, so the lapsed sheet never offers it.
 	const lapsedIntent =
 		url.searchParams.get('intent') === 'approve' &&
-		!decided &&
-		!article.isReference
-
-	let doneView: {
-		doneToday: number
-		approvedThisSitting: number
-		showPlenty: boolean
-		next: { id: string; about: string } | null
-	} | null = null
-	if (done) {
-		const lane = getReviewLane(request)
-		const sitting = getReviewSitting(request, lane, now)
-		const cards = (
-			await loadCards(lane, now, { ownEditsBy: await reviewerName(userId) })
-		).filter(c => c.article.id !== id)
-		const next = cards[0] ?? null
-		doneView = {
-			doneToday: await approvedToday(now),
-			approvedThisSitting: await approvedSince(new Date(sitting.startedAt)),
-			showPlenty: plentyNow(sitting, cards, now),
-			next: next
-				? { id: next.article.id, about: aboutMinutes(next.readSeconds) }
-				: null,
-		}
-	}
-
-	return json({
-		article: {
-			id: article.id,
-			kind: article.kind,
-			title: article.title,
-			slug: article.slug,
-			publication: article.publication,
-			byline: bylineText(article.byline),
-			status: article.status,
-			reviewedAt: article.reviewedAt,
-			reviewedBy: article.reviewedBy,
-			reviewNote: article.reviewNote,
-			liveUrl: article.liveUrl,
-			readToParagraph: article.readToParagraph ?? 0,
-			reachedEnd: Boolean(article.readReachedEndAt),
-			question: article.question,
-			answer: article.answer,
-			isReference: article.isReference,
-			body,
-			where: whereLabel(article),
-			about: aboutMinutes(readSeconds),
-		},
-		images: article.images,
-		aid: {
-			note: reviewAidNote(aid),
-			rules: aid.rules,
-			claims: aid.claims.map((c, index) => ({
-				quote: c.quote,
-				paragraph: paragraphIndexAt(paragraphs, c.offset),
-				highlighted: ranges.some(r => r.index === index),
-			})),
-			credentials: aid.credentials.map(c => ({
-				quote: c.quote,
-				paragraph: paragraphIndexAt(paragraphs, c.offset),
-			})),
-		},
-		links: links.map(l => ({
-			name: l.name,
-			url: l.url,
-			domain: hostOf(l.url),
-			anchor: anchorTextFor(body, l.url),
-			missing: missing.some(m => m.url === l.url),
-		})),
-		paragraphs: paragraphs.map(p => ({ start: p.start, end: p.end })),
-		ranges: ranges.map(r => ({ start: r.start, end: r.end, index: r.index })),
-		lapsedIntent,
-		doneView,
-	})
+		first.article.status === 'pending' &&
+		!first.article.isReference
+	return json({ first, lane: getReviewLane(request), lapsedIntent })
 }
 
-type SheetKey = 'more' | 'ask' | 'deny' | 'writer'
+const SHEET_KEYS = ['more', 'ask', 'deny', 'writer', 'rewrite'] as const
+type SheetKey = (typeof SHEET_KEYS)[number]
+
+function isSheetKey(value: unknown): value is SheetKey {
+	return (SHEET_KEYS as ReadonlyArray<unknown>).includes(value)
+}
+type DecidedKind = 'approved' | 'changes_requested' | 'denied' | 'rewrite'
 
 export async function action({ params, request }: ActionFunctionArgs) {
 	const userId = await requireUserWithRole(request, 'admin')
@@ -218,6 +133,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 		select: {
 			id: true,
 			kind: true,
+			slug: true,
 			title: true,
 			body: true,
 			status: true,
@@ -230,7 +146,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	if (!article) throw new Response('Not found', { status: 404 })
 	const form = await request.formData()
 	const intent = String(form.get('intent') ?? '')
-	const note = String(form.get('note') ?? '').trim()
+	const note = String(form.get('note') ?? '').trim().slice(0, 2000)
 	const now = new Date()
 	const who = await reviewerName(userId)
 	const fail = (error: string, sheet: SheetKey) =>
@@ -238,21 +154,49 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	// The publisher takes only her own words: this page never approves the
 	// draft as it is, and never sends it to the writer. Change it is the way.
 	const ownWords = `${ARTICLE_CHANGER_COPY.referenceNote} Use Change it.`
+	const blogPath = article.kind === 'blog' ? `/blog/${article.slug ?? ''}` : null
+
+	/** The JSON after a decision, with the sitting cookie. */
+	const decided = async (kind: DecidedKind) => {
+		const settled = await settleSitting(request, article, now, who)
+		return json(
+			{
+				ok: true as const,
+				decided: kind,
+				view: {
+					doneToday: await approvedToday(now),
+					approvedThisSitting: await approvedSince(
+						new Date(settled.sitting.startedAt),
+					),
+					showPlenty: settled.showPlenty,
+					blogPath,
+				},
+			},
+			{ headers: settled.headers },
+		)
+	}
 
 	switch (intent) {
 		case 'approve': {
 			if (article.status === 'approved') {
-				return redirect(`/review/${id}?done=approved`)
+				// A second tap: the first one stands. Nothing is added to the sitting.
+				return json({
+					ok: true as const,
+					decided: 'approved' as const,
+					view: {
+						doneToday: await approvedToday(now),
+						approvedThisSitting: 0,
+						showPlenty: false,
+						blogPath,
+					},
+				})
 			}
 			if (article.status !== 'pending') {
 				return fail('Reopen it first, then approve.', 'more')
 			}
 			if (article.isReference) return fail(ownWords, 'more')
 			await approveArticle(article, { userId, who, now })
-			const settled = await settleSitting(request, article, now, who)
-			return redirect(`/review/${id}?done=approved`, {
-				headers: settled.headers,
-			})
+			return decided('approved')
 		}
 		case 'changes_requested': {
 			if (article.status !== 'pending') {
@@ -277,16 +221,29 @@ export async function action({ params, request }: ActionFunctionArgs) {
 				},
 			})
 			await recordReviewEvent(id, 'changes_requested', { userId, note: text })
-			const settled = await settleSitting(request, article, now, who)
-			return redirectWithToast(
-				afterDecisionUrl(settled),
-				{
-					type: 'success',
-					description:
-						'Sent to the writer. It comes back to you as "Your change is in".',
+			return decided('changes_requested')
+		}
+		case 'rewrite': {
+			if (article.status !== 'pending') {
+				return fail('This one is already decided.', 'rewrite')
+			}
+			await prisma.article.update({
+				where: { id },
+				data: {
+					status: 'changes_requested',
+					reviewNote: `${REWRITE_PREFIX}${note || REWRITE_DEFAULT_NOTE}`,
+					rewriteRequested: true,
+					reviewedAt: now,
+					reviewedBy: who,
+					skippedUntil: null,
+					approvedBodyHash: null,
 				},
-				{ headers: settled.headers },
-			)
+			})
+			await recordReviewEvent(id, 'rewrite_requested', {
+				userId,
+				note: note || null,
+			})
+			return decided('rewrite')
 		}
 		case 'later': {
 			await prisma.article.update({
@@ -294,23 +251,17 @@ export async function action({ params, request }: ActionFunctionArgs) {
 				data: { skippedUntil: new Date(now.getTime() + LATER_MS) },
 			})
 			await recordReviewEvent(id, 'later', { userId })
-			return redirectWithToast('/review', {
-				type: 'message',
-				description: 'Set aside for 3 days.',
-			})
+			return json({ ok: true as const, decided: 'later' as const })
 		}
 		case 'question': {
-			const question = String(form.get('question') ?? '').trim()
+			const question = String(form.get('question') ?? '').trim().slice(0, 2000)
 			if (!question) return fail('Type one thing to ask.', 'ask')
 			await prisma.article.update({
 				where: { id },
 				data: { question, questionAt: now, answer: null, answeredAt: null },
 			})
 			await recordReviewEvent(id, 'question', { userId, note: question })
-			return redirectWithToast('/review', {
-				type: 'success',
-				description: 'Sent to Zane. His answer will show on this article.',
-			})
+			return json({ ok: true as const, asked: true as const, question })
 		}
 		case 'deny': {
 			if (article.status !== 'pending') {
@@ -327,27 +278,17 @@ export async function action({ params, request }: ActionFunctionArgs) {
 				},
 			})
 			await recordReviewEvent(id, 'denied', { userId, note })
-			const settled = await settleSitting(request, article, now, who)
-			return redirectWithToast(
-				afterDecisionUrl(settled),
-				{ type: 'message', description: 'Set aside. It will not go anywhere.' },
-				{ headers: settled.headers },
-			)
+			return decided('denied')
 		}
 		case 'reopen':
 		case 'takedown': {
-			if (article.status === 'pending') return redirect(`/review/${id}`)
-			await reopenArticle(id, {
-				userId,
-				kind: intent === 'takedown' ? 'takedown' : 'reopened',
-			})
-			return redirectWithToast(`/review/${id}`, {
-				type: 'message',
-				description:
-					intent === 'takedown'
-						? 'Taken down. It is off your blog.'
-						: 'Undone. It is back in your list.',
-			})
+			if (article.status !== 'pending') {
+				await reopenArticle(id, {
+					userId,
+					kind: intent === 'takedown' ? 'takedown' : 'reopened',
+				})
+			}
+			return json({ ok: true as const, reopened: true as const })
 		}
 		default:
 			return json({ error: 'Unknown action.' }, { status: 400 })
@@ -355,8 +296,63 @@ export async function action({ params, request }: ActionFunctionArgs) {
 }
 
 /* ------------------------------------------------------------------------ */
-/* The reading beacon                                                       */
+/* Shared bits                                                              */
 /* ------------------------------------------------------------------------ */
+
+type CardView = SerializeFrom<typeof loader>['first']
+
+type Decision =
+	| { kind: 'approved'; doneToday: number; blogPath: string | null }
+	| { kind: 'later' | 'writer' | 'rewrite' | 'denied' }
+
+type ArticleEntry = {
+	type: 'article'
+	view: CardView
+	/** The status as the page knows it: the loaded one, then pending again after a reopen. */
+	status: string
+	/** Her decision in this feed, or null while the card is open. */
+	decision: Decision | null
+	/** One line under the header after a reopen ("Undone. ..."). */
+	notice: string | null
+}
+type PlentyEntry = { type: 'plenty'; key: string; approved: number }
+type Entry = ArticleEntry | PlentyEntry
+type Tail = 'idle' | 'loading' | 'plenty' | 'empty'
+type Current = { kind: 'article'; id: string } | { kind: 'other' }
+
+type DecisionData =
+	| {
+			decided: DecidedKind
+			view: {
+				doneToday: number
+				approvedThisSitting: number
+				showPlenty: boolean
+				blogPath: string | null
+			}
+	  }
+	| { decided: 'later' }
+
+function isArticle(e: Entry): e is ArticleEntry {
+	return e.type === 'article'
+}
+
+function articleEntry(view: CardView): ArticleEntry {
+	return { type: 'article', view, status: view.article.status, decision: null, notice: null }
+}
+
+function toDecision(data: DecisionData): Decision {
+	if (data.decided === 'later') return { kind: 'later' }
+	if (data.decided === 'approved') {
+		return {
+			kind: 'approved',
+			doneToday: data.view.doneToday,
+			blogPath: data.view.blogPath,
+		}
+	}
+	if (data.decided === 'changes_requested') return { kind: 'writer' }
+	if (data.decided === 'rewrite') return { kind: 'rewrite' }
+	return { kind: 'denied' }
+}
 
 type Beacon =
 	| { articleId: string; kind: 'opened' }
@@ -385,63 +381,709 @@ function scrollTo(el: Element | null | undefined) {
 	el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
-function paragraphEl(index: number): Element | null {
-	if (index < 0) return null
-	return document.querySelector(`[data-paragraph="${index}"]`)
+function inViewport(el: Element): boolean {
+	const r = el.getBoundingClientRect()
+	return r.top >= 0 && r.bottom <= window.innerHeight
+}
+
+function cardElementId(id: string): string {
+	return `feed-${id}`
+}
+
+/** Her words from a "Write a different article" note, or '' for the default. */
+function rewriteWords(note: string | null): string {
+	if (!note || !note.startsWith(REWRITE_PREFIX)) return ''
+	const words = note.slice(REWRITE_PREFIX.length).trim()
+	return words === REWRITE_DEFAULT_NOTE ? '' : words
+}
+
+function isRewriteNote(note: string | null): boolean {
+	return Boolean(note && note.startsWith(REWRITE_PREFIX))
 }
 
 /* ------------------------------------------------------------------------ */
-/* Page                                                                     */
+/* The feed                                                                 */
 /* ------------------------------------------------------------------------ */
 
 export default function ReviewArticle() {
-	const data = useLoaderData<typeof loader>()
-	if (data.doneView) {
-		return <ApprovedScreen article={data.article} view={data.doneView} />
-	}
-	return <ArticleScreen key={data.article.id} />
+	const { first, lane, lapsedIntent } = useLoaderData<typeof loader>()
+	return (
+		<Feed
+			key={first.article.id}
+			first={first}
+			lane={lane}
+			lapsedIntent={lapsedIntent}
+		/>
+	)
 }
 
-function ArticleScreen() {
-	const { article, images, aid, links, paragraphs, ranges, lapsedIntent } =
-		useLoaderData<typeof loader>()
-	const actionData = useActionData<typeof action>()
-	const navigation = useNavigation()
-	const navigate = useNavigate()
-	const submit = useSubmit()
-	const busy = navigation.state !== 'idle'
-	const pending = article.status === 'pending'
-	const error = actionData && 'error' in actionData ? actionData.error : null
-	const errorSheet =
-		actionData && 'sheet' in actionData ? actionData.sheet : null
+type CardHandle = { tapApprove: () => void; openMore: () => void }
 
-	const [sheet, setSheet] = useState<SheetKey | 'end' | 'lapsed' | null>(
+function Feed({
+	first,
+	lane,
+	lapsedIntent,
+}: {
+	first: CardView
+	lane: number
+	lapsedIntent: boolean
+}) {
+	const [entries, setEntries] = useState<Entry[]>([articleEntry(first)])
+	const [tail, setTail] = useState<Tail>('idle')
+	const [current, setCurrent] = useState<Current>({
+		kind: 'article',
+		id: first.article.id,
+	})
+	const [busyId, setBusyId] = useState<string | null>(null)
+	const rootRef = useRef<HTMLDivElement>(null)
+	const sentinelRef = useRef<HTMLDivElement>(null)
+	const entriesRef = useRef(entries)
+	entriesRef.current = entries
+	const tailRef = useRef(tail)
+	tailRef.current = tail
+	const currentRef = useRef(current)
+	currentRef.current = current
+	const busyRef = useRef<string | null>(null)
+	busyRef.current = busyId
+	/** Cards that hold the current line still: a sheet open, a request running, text selected. */
+	const locksRef = useRef(new Set<string>())
+	/** The last position the spy saw, kept while a lock holds the current line. */
+	const latestRef = useRef<Current>(current)
+	const openedRef = useRef(new Set<string>())
+	const loadingRef = useRef(false)
+	const sentinelSeenRef = useRef(false)
+	const handles = useRef(new Map<string, CardHandle>())
+
+	/** True when a pending, undecided article sits after `id` in the feed. */
+	function pendingAfter(id: string): ArticleEntry | null {
+		const list = entriesRef.current
+		const at = list.findIndex(e => isArticle(e) && e.view.article.id === id)
+		for (const e of list.slice(at + 1)) {
+			if (isArticle(e) && e.status === 'pending' && !e.decision) return e
+		}
+		return null
+	}
+
+	const loadNext = useCallback(async () => {
+		if (loadingRef.current) return
+		loadingRef.current = true
+		setTail('loading')
+		const exclude = entriesRef.current
+			.filter(isArticle)
+			.map(e => e.view.article.id)
+		try {
+			const params = new URLSearchParams({
+				lane: String(lane),
+				exclude: exclude.join(','),
+			})
+			const response = await fetch(`${NEXT_ENDPOINT}?${params.toString()}`, {
+				headers: { Accept: 'application/json' },
+			})
+			if (!response.ok) throw new Error(String(response.status))
+			const data = (await response.json()) as { card: CardView | null }
+			const card = data.card
+			if (!card || exclude.includes(card.article.id)) {
+				setTail('empty')
+				return
+			}
+			setEntries(prev => [...prev, articleEntry(card)])
+			setTail('idle')
+		} catch {
+			// the sentinel tries again when it next comes into view
+			setTail('idle')
+		} finally {
+			loadingRef.current = false
+		}
+	}, [lane])
+
+	/** Pre-load one article ahead, never more. */
+	const maybeLoad = useCallback(() => {
+		if (!sentinelSeenRef.current) return
+		if (tailRef.current !== 'idle') return
+		if (busyRef.current) return
+		const articles = entriesRef.current.filter(isArticle)
+		const last = articles[articles.length - 1]
+		const cur = currentRef.current
+		if (
+			last &&
+			last.status === 'pending' &&
+			!last.decision &&
+			!(cur.kind === 'article' && cur.id === last.view.article.id)
+		) {
+			return
+		}
+		void loadNext()
+	}, [loadNext])
+
+	// The sentinel one viewport below the last item.
+	useEffect(() => {
+		const el = sentinelRef.current
+		if (!el) return
+		const io = new IntersectionObserver(
+			list => {
+				sentinelSeenRef.current = list.some(e => e.isIntersecting)
+				maybeLoad()
+			},
+			{ rootMargin: '0px 0px 100% 0px' },
+		)
+		io.observe(el)
+		return () => io.disconnect()
+	}, [maybeLoad])
+	useEffect(() => {
+		maybeLoad()
+	}, [current, tail, entries, maybeLoad])
+
+	// The current line at 40 percent of the viewport.
+	useEffect(() => {
+		const root = rootRef.current
+		if (!root) return
+		const spy = new IntersectionObserver(
+			list => {
+				for (const entry of list) {
+					if (!entry.isIntersecting) continue
+					const id = (entry.target as HTMLElement).dataset.feedId
+					latestRef.current = id ? { kind: 'article', id } : { kind: 'other' }
+				}
+				if (locksRef.current.size > 0) return
+				setCurrent(latestRef.current)
+			},
+			{ rootMargin: '-40% 0px -59% 0px' },
+		)
+		root
+			.querySelectorAll<HTMLElement>('[data-feed-spy]')
+			.forEach(el => spy.observe(el))
+		return () => spy.disconnect()
+	}, [entries.length, tail])
+
+	// The first time a card is current: the opened beacon and the address bar.
+	useEffect(() => {
+		if (current.kind !== 'article') return
+		const id = current.id
+		if (!openedRef.current.has(id)) {
+			openedRef.current.add(id)
+			sendBeacon({ articleId: id, kind: 'opened' })
+		}
+		const path = `/review/${id}`
+		if (window.location.pathname !== path) {
+			window.history.replaceState(window.history.state, '', path)
+		}
+	}, [current])
+
+	const onLock = useCallback((id: string, on: boolean) => {
+		if (on) locksRef.current.add(id)
+		else locksRef.current.delete(id)
+		// The spy only reports crossings. When the last lock clears, apply the
+		// position it saw while locked.
+		if (locksRef.current.size === 0) setCurrent(latestRef.current)
+	}, [])
+
+	const onBusy = useCallback((id: string, on: boolean) => {
+		setBusyId(prev => (on ? id : prev === id ? null : prev))
+	}, [])
+
+	const onDecided = useCallback(
+		(id: string, data: DecisionData) => {
+			const decision = toDecision(data)
+			const showPlenty = 'view' in data && data.view.showPlenty
+			setEntries(prev => {
+				const next: Entry[] = prev.map(e =>
+					isArticle(e) && e.view.article.id === id
+						? { ...e, decision, notice: null }
+						: e,
+				)
+				if (showPlenty && 'view' in data) {
+					const at = next.findIndex(
+						e => isArticle(e) && e.view.article.id === id,
+					)
+					next.splice(at + 1, 0, {
+						type: 'plenty',
+						key: `plenty-${id}`,
+						approved: data.view.approvedThisSitting,
+					})
+				}
+				return next
+			})
+			window.requestAnimationFrame(() => {
+				document.getElementById(cardElementId(id))?.scrollIntoView({ block: 'start' })
+			})
+			if (pendingAfter(id)) return
+			if (showPlenty) setTail('plenty')
+			else void loadNext()
+		},
+		[loadNext],
+	)
+
+	const onReopened = useCallback((id: string, notice: string) => {
+		setEntries(prev =>
+			prev.map(e =>
+				isArticle(e) && e.view.article.id === id
+					? { ...e, status: 'pending', decision: null, notice }
+					: e,
+			),
+		)
+	}, [])
+
+	function oneMore(afterKey: string) {
+		const at = entries.findIndex(e => e.type === 'plenty' && e.key === afterKey)
+		const next = entries
+			.slice(at + 1)
+			.find(e => isArticle(e) && e.status === 'pending' && !e.decision)
+		if (next && isArticle(next)) {
+			document
+				.getElementById(cardElementId(next.view.article.id))
+				?.scrollIntoView({ block: 'start' })
+			return
+		}
+		void loadNext()
+	}
+
+	const currentEntry =
+		current.kind === 'article'
+			? entries.find(
+					(e): e is ArticleEntry =>
+						isArticle(e) && e.view.article.id === current.id,
+				)
+			: undefined
+	const barOn =
+		Boolean(currentEntry) &&
+		currentEntry?.status === 'pending' &&
+		!currentEntry.decision
+	const barArticle = currentEntry?.view.article
+	const barBusy = Boolean(barArticle) && busyId === barArticle?.id
+	const approveLabel =
+		barArticle?.kind === 'blog' ? 'Approve and publish on my site' : 'Approve'
+
+	let articleIndex = -1
+	return (
+		<div ref={rootRef} className="pb-28">
+			{entries.map(entry => {
+				if (entry.type === 'plenty') {
+					return (
+						<PlentyCard
+							key={entry.key}
+							approved={entry.approved}
+							onOneMore={() => oneMore(entry.key)}
+						/>
+					)
+				}
+				articleIndex += 1
+				const id = entry.view.article.id
+				return (
+					<div key={id}>
+						{articleIndex > 0 ? <Divider view={entry.view} /> : null}
+						<ArticleCard
+							ref={handle => {
+								if (handle) handles.current.set(id, handle)
+								else handles.current.delete(id)
+							}}
+							entry={entry}
+							first={articleIndex === 0}
+							active={current.kind === 'article' && current.id === id}
+							lapsedIntent={articleIndex === 0 && lapsedIntent}
+							onDecided={onDecided}
+							onReopened={onReopened}
+							onLock={onLock}
+							onBusy={onBusy}
+						/>
+					</div>
+				)
+			})}
+
+			{tail === 'loading' ? (
+				<div
+					data-feed-spy=""
+					role="status"
+					className="mt-10 space-y-3"
+				>
+					<span className="sr-only">Loading the next one</span>
+					<div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+					<div className="h-3 w-full animate-pulse rounded bg-muted" />
+					<div className="h-3 w-5/6 animate-pulse rounded bg-muted" />
+				</div>
+			) : null}
+			{tail === 'empty' ? (
+				<section
+					data-feed-spy=""
+					className="mt-10 rounded-xl border bg-card p-6 text-center shadow-sm"
+				>
+					<p className="text-base">
+						Nothing needs you today. The writers are working.
+					</p>
+					<Link
+						to="/review"
+						className="mt-3 inline-block text-sm font-medium text-primary underline-offset-2 hover:underline"
+					>
+						Back to the start
+					</Link>
+				</section>
+			) : null}
+			<div ref={sentinelRef} aria-hidden="true" className="h-px" />
+
+			<div
+				className={`fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ${
+					barOn ? 'translate-y-0' : 'translate-y-full'
+				}`}
+				aria-hidden={!barOn}
+			>
+				<div className="mx-auto max-w-xl">
+					{barArticle ? (
+						<p
+							key={barArticle.id}
+							className="mb-2 line-clamp-1 text-xs text-muted-foreground animate-in fade-in duration-200"
+						>
+							<span className="sr-only">This article: </span>
+							{barArticle.title}
+						</p>
+					) : null}
+					{/* The blog label is long: it gets its own row on a phone. */}
+					<div className="flex flex-wrap items-center gap-2">
+						{barArticle?.isReference ? (
+							<p className="basis-full text-sm text-muted-foreground">
+								{ARTICLE_CHANGER_COPY.referenceNote}
+							</p>
+						) : (
+							<Button
+								type="button"
+								size="lg"
+								className={`min-w-0 flex-1 px-3 text-base ${
+									barArticle?.kind === 'blog' ? 'basis-full' : ''
+								}`}
+								onClick={() =>
+									barArticle && handles.current.get(barArticle.id)?.tapApprove()
+								}
+								disabled={!barOn || barBusy}
+								tabIndex={barOn ? 0 : -1}
+							>
+								{approveLabel}
+							</Button>
+						)}
+						<Button
+							asChild
+							variant="outline"
+							size="lg"
+							className="min-w-0 flex-1 px-3 text-base"
+						>
+							<Link
+								to={`/review/${barArticle?.id ?? first.article.id}/change`}
+								tabIndex={barOn ? 0 : -1}
+							>
+								Change it
+							</Link>
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							size="lg"
+							className="shrink-0 px-3"
+							onClick={() =>
+								barArticle && handles.current.get(barArticle.id)?.openMore()
+							}
+							aria-label="More"
+							disabled={!barOn || barBusy}
+							tabIndex={barOn ? 0 : -1}
+						>
+							<Icon name="dots-horizontal" className="h-5 w-5" />
+							<span className="sr-only">...</span>
+						</Button>
+					</div>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+function Divider({ view }: { view: CardView }) {
+	return (
+		<div
+			data-feed-spy=""
+			className="flex min-h-[40vh] flex-col items-center justify-center border-t py-8 text-center"
+		>
+			<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				Next one
+			</p>
+			<p className="mt-2 line-clamp-2 text-lg font-semibold leading-snug">
+				{view.article.title}
+			</p>
+			<p className="mt-1 text-sm text-muted-foreground">
+				{view.article.where} · {view.article.about}
+			</p>
+		</div>
+	)
+}
+
+function PlentyCard({
+	approved,
+	onOneMore,
+}: {
+	approved: number
+	onOneMore: () => void
+}) {
+	return (
+		<section
+			data-feed-spy=""
+			className="mt-6 rounded-xl border bg-card p-6 shadow-sm"
+		>
+			<p className="text-lg font-medium">
+				{approved > 0
+					? `That is plenty for now. ${approved} approved.`
+					: 'That is plenty for now.'}
+			</p>
+			<div className="mt-4 flex flex-col gap-2">
+				<Form method="post" action="/review?index">
+					<input type="hidden" name="intent" value="stop" />
+					<Button type="submit" size="lg" className="w-full text-base">
+						Stop here
+					</Button>
+				</Form>
+				<Button
+					type="button"
+					variant="outline"
+					size="lg"
+					className="w-full text-base"
+					onClick={onOneMore}
+				>
+					One more anyway
+				</Button>
+			</div>
+		</section>
+	)
+}
+
+/* ------------------------------------------------------------------------ */
+/* One card                                                                 */
+/* ------------------------------------------------------------------------ */
+
+type CardProps = {
+	entry: ArticleEntry
+	first: boolean
+	active: boolean
+	lapsedIntent: boolean
+	onDecided: (id: string, data: DecisionData) => void
+	onReopened: (id: string, notice: string) => void
+	onLock: (id: string, on: boolean) => void
+	onBusy: (id: string, on: boolean) => void
+}
+
+
+type ChangeLine = { summary: string; prevBody: string; prevHash: string }
+
+type CardSheet = SheetKey | 'end' | 'lapsed'
+
+const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
+	{ entry, first, active, lapsedIntent, onDecided, onReopened, onLock, onBusy },
+	ref,
+) {
+	const { view, status, decision, notice } = entry
+	const { article, images, aid, links } = view
+	const id = article.id
+	const fetcher = useFetcher<typeof action>()
+	const navigate = useNavigate()
+	const busy = fetcher.state !== 'idle'
+	const pending = status === 'pending'
+	const collapsed = decision !== null
+	/** A tapped claim or a selected passage can be changed here. */
+	const fixable = pending && !collapsed && !article.isReference
+
+	const [sheet, setSheet] = useState<CardSheet | null>(
 		lapsedIntent ? 'lapsed' : null,
 	)
+	const [error, setError] = useState<string | null>(null)
+	const [errorSheet, setErrorSheet] = useState<SheetKey | null>(null)
 	const [reachedEnd, setReachedEnd] = useState(article.reachedEnd)
-	const [zoom, setZoom] = useState<string | null>(null)
+	const [zoom, setZoom] = useState<ZoomTarget | null>(null)
+	const [question, setQuestion] = useState(article.question)
+	const [answer, setAnswer] = useState(article.answer)
+	const [body, setBody] = useState(article.body)
+	const [savedHash, setSavedHash] = useState(article.savedHash)
+	const [fixRequest, setFixRequest] = useState<PassageRequest | null>(null)
+	const [changeLine, setChangeLine] = useState<ChangeLine | null>(null)
+	const [changedRange, setChangedRange] = useState<{
+		start: number
+		end: number
+	} | null>(null)
+	const [undoState, setUndoState] = useState<'idle' | 'saving' | 'error'>('idle')
+	const [showRejected, setShowRejected] = useState(false)
+	const [selecting, setSelecting] = useState(false)
+	const [rewriteNote, setRewriteNote] = useState('')
+	const [rewriteInterim, setRewriteInterim] = useState('')
+	const dictation = useDictation({
+		onFinal: text => setRewriteNote(current => appendSpeech(current, text)),
+		onInterim: setRewriteInterim,
+	})
+	const cardRef = useRef<HTMLElement>(null)
 	const proseRef = useRef<HTMLDivElement>(null)
 	const endRef = useRef<HTMLParagraphElement>(null)
 	// The furthest paragraph she reached in this visit. "Take me there" reads it.
 	const maxSeenRef = useRef(-1)
+	const markerDoneRef = useRef(false)
+	const handledRef = useRef<unknown>(null)
+	const lastIntentRef = useRef('')
 
+	/* ---- the text, as it stands in the browser ---- */
+
+	const paragraphs = useMemo(() => splitParagraphs(body), [body])
+	const claimRanges = useMemo(
+		() =>
+			findHighlightRanges(
+				body,
+				aid.claims.map(c => c.quote),
+			),
+		[body, aid.claims],
+	)
+	const claims = useMemo(
+		() =>
+			aid.claims.map((c, index) => {
+				const hit = findHighlightRanges(body, [c.quote])[0]
+				return {
+					quote: c.quote,
+					paragraph: hit ? paragraphIndexAt(paragraphs, hit.start) : -1,
+					gone: !hit,
+					index,
+				}
+			}),
+		[aid.claims, body, paragraphs],
+	)
+	const credentials = useMemo(
+		() =>
+			aid.credentials.map(c => {
+				const hit = findHighlightRanges(body, [c.quote])[0]
+				return {
+					quote: c.quote,
+					paragraph: hit ? paragraphIndexAt(paragraphs, hit.start) : -1,
+					gone: !hit,
+				}
+			}),
+		[aid.credentials, body, paragraphs],
+	)
+	const unchanged = savedHash === article.savedHash
+	const ranges = useMemo(() => {
+		const out: ProseRange[] = claimRanges.map(r => ({
+			start: r.start,
+			end: r.end,
+			index: r.index,
+			kind: 'claim',
+		}))
+		// the writer's changes after her note, while the text is as loaded
+		if (unchanged) {
+			for (const at of view.changedParagraphs) {
+				const p = paragraphs[at]
+				if (p) out.push({ start: p.start, end: p.end, index: -1, kind: 'changed' })
+			}
+		}
+		if (changedRange) out.push({ ...changedRange, index: -1, kind: 'changed' })
+		return out
+	}, [claimRanges, changedRange, paragraphs, unchanged, view.changedParagraphs])
+	const resolveImage = useMemo(() => articleImageResolver(images), [images])
+	const pictureLines = countPictureLines(body)
 	const markerAt =
 		pending && article.readToParagraph > 0 && !article.reachedEnd
 			? article.readToParagraph
 			: null
+	const remarkPlugins = useMemo(
+		() => [reviewProsePlugin({ paragraphs, ranges, markerAt })],
+		[paragraphs, ranges, markerAt],
+	)
 
-	// Record reading: opened once, read_to every five paragraphs and at the
-	// end. Come back to where she was. Nothing here blocks anything.
+	/* ---- what the feed needs to know ---- */
+
 	useEffect(() => {
-		const articleId = article.id
-		const total = paragraphs.length
-		sendBeacon({ articleId, kind: 'opened' })
+		onBusy(id, busy)
+	}, [busy, id, onBusy])
+	useEffect(() => {
+		onLock(id, sheet !== null || busy || selecting)
+		return () => onLock(id, false)
+	}, [busy, id, onLock, selecting, sheet])
 
-		maxSeenRef.current = -1
+	// Dictation ends with the sheet it belongs to.
+	const stopDictation = dictation.stop
+	useEffect(() => {
+		if (sheet !== 'rewrite') stopDictation()
+	}, [sheet, stopDictation])
+
+	// A live selection in the prose holds the current line still.
+	useEffect(() => {
+		if (!active || !fixable) return
+		const onSelection = () => {
+			const sel = document.getSelection()
+			setSelecting(
+				Boolean(
+					sel &&
+						!sel.isCollapsed &&
+						sel.rangeCount > 0 &&
+						proseRef.current?.contains(sel.getRangeAt(0).commonAncestorContainer),
+				),
+			)
+		}
+		document.addEventListener('selectionchange', onSelection)
+		return () => {
+			document.removeEventListener('selectionchange', onSelection)
+			setSelecting(false)
+		}
+	}, [active, fixable])
+
+	// What the server said to the last submission.
+	useEffect(() => {
+		if (fetcher.formData) {
+			lastIntentRef.current = String(fetcher.formData.get('intent') ?? '')
+		}
+	}, [fetcher.formData])
+	useEffect(() => {
+		const data = fetcher.data
+		if (fetcher.state !== 'idle' || !data || data === handledRef.current) return
+		handledRef.current = data
+		if ('error' in data) {
+			setError(data.error)
+			const at = (data as { sheet?: unknown }).sheet
+			setErrorSheet(isSheetKey(at) ? at : null)
+			return
+		}
+		setError(null)
+		setErrorSheet(null)
+		setSheet(null)
+		if ('decided' in data) {
+			onDecided(id, data)
+			return
+		}
+		if ('asked' in data) {
+			setQuestion(data.question)
+			setAnswer(null)
+			return
+		}
+		if ('reopened' in data) {
+			onReopened(
+				id,
+				lastIntentRef.current === 'takedown'
+					? 'Taken down. It is off your blog.'
+					: 'Undone. It is back in your list.',
+			)
+		}
+	}, [fetcher.data, fetcher.state, id, onDecided, onReopened])
+
+	useImperativeHandle(
+		ref,
+		() => ({
+			tapApprove() {
+				if (reachedEnd) approve()
+				else setSheet('end')
+			},
+			openMore() {
+				setSheet('more')
+			},
+		}),
+		// approve() reads state that changes with these
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[reachedEnd, id],
+	)
+
+	/* ---- reading, recorded and never policed ---- */
+
+	useEffect(() => {
+		if (collapsed) return
+		const total = paragraphs.length
 		let lastSent = -1
 		const send = (paragraph: number, end: boolean, unload = false) => {
 			lastSent = paragraph
-			sendBeacon({ articleId, kind: 'read_to', paragraph, end }, unload)
+			sendBeacon({ articleId: id, kind: 'read_to', paragraph, end }, unload)
 		}
 		const blocks = Array.from(
 			proseRef.current?.querySelectorAll<HTMLElement>('[data-paragraph]') ?? [],
@@ -477,31 +1119,50 @@ function ArticleScreen() {
 		document.addEventListener('visibilitychange', onVisibility)
 		window.addEventListener('pagehide', flush)
 
-		const frame = window.requestAnimationFrame(() => {
-			document.getElementById(MARKER_ID)?.scrollIntoView({ block: 'center' })
-		})
+		let frame = 0
+		if (first && !markerDoneRef.current) {
+			markerDoneRef.current = true
+			frame = window.requestAnimationFrame(() => {
+				cardRef.current
+					?.querySelector(`#${MARKER_ID}`)
+					?.scrollIntoView({ block: 'center' })
+			})
+		}
 
 		return () => {
-			window.cancelAnimationFrame(frame)
+			if (frame) window.cancelAnimationFrame(frame)
 			seen.disconnect()
 			atEnd.disconnect()
 			document.removeEventListener('visibilitychange', onVisibility)
 			window.removeEventListener('pagehide', flush)
 			flush()
 		}
-	}, [article.id, paragraphs.length])
+	}, [id, paragraphs.length, collapsed, first])
+
+	// The green mark on a changed passage: scroll to it, then let it fade.
+	useEffect(() => {
+		if (!changedRange) return
+		const frame = window.requestAnimationFrame(() => {
+			const mark = cardRef.current?.querySelector('mark.review-changed')
+			if (mark && !inViewport(mark)) {
+				mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+			}
+		})
+		const timer = window.setTimeout(() => setChangedRange(null), CHANGED_MS)
+		return () => {
+			window.cancelAnimationFrame(frame)
+			window.clearTimeout(timer)
+		}
+	}, [changedRange])
+
+	/* ---- actions ---- */
 
 	function approve() {
 		setSheet(null)
-		submit(
+		fetcher.submit(
 			{ intent: 'approve' },
-			{ method: 'post', action: `/review/${article.id}?intent=approve` },
+			{ method: 'post', action: `/review/${id}?intent=approve` },
 		)
-	}
-
-	function tapApprove() {
-		if (reachedEnd) approve()
-		else setSheet('end')
 	}
 
 	function takeMeThere() {
@@ -509,265 +1170,376 @@ function ArticleScreen() {
 		// The block after the furthest one she reached in this visit (the end
 		// line when that was the last block), then the marker from her last
 		// visit, then the top of the text.
+		const root = cardRef.current
 		const seen = maxSeenRef.current
-		const next = seen < 0 ? null : (paragraphEl(seen + 1) ?? endRef.current)
+		const next =
+			seen < 0
+				? null
+				: (root?.querySelector(`[data-paragraph="${seen + 1}"]`) ?? endRef.current)
 		scrollTo(
 			next ??
-				document.getElementById(MARKER_ID) ??
-				document.getElementById('every-word'),
+				root?.querySelector(`#${MARKER_ID}`) ??
+				root?.querySelector('[data-every-word]'),
 		)
 	}
 
-	function seeInText(claimIndex: number | null, paragraph: number) {
-		const mark =
-			claimIndex === null ? null : document.getElementById(highlightId(claimIndex))
-		scrollTo(mark ?? paragraphEl(paragraph))
+	function openChange(
+		text: string,
+		paragraph: number,
+		source: 'panel' | 'prose',
+		index: number | null = null,
+	) {
+		if (!fixable) return
+		setFixRequest({
+			text,
+			paragraph: paragraph >= 0 ? paragraph : null,
+			index,
+			source,
+			nonce: Date.now(),
+		})
 	}
 
-	/** A tap on a highlight scrolls back to its row in the panel. */
+	/** A tap on a picture zooms it; a tap on a highlight opens the fix sheet. */
 	function onProseClick(event: React.MouseEvent<HTMLDivElement>) {
+		const hit = zoomTarget(event.target)
+		if (hit) {
+			setZoom(hit)
+			return
+		}
 		const target = event.target as Element
 		const mark = target.closest<HTMLElement>('mark[data-claim]')
 		if (!mark) return
 		const index = Number(mark.dataset.claim)
-		if (Number.isNaN(index)) return
-		scrollTo(document.getElementById(claimRowId(index)))
+		const claim = Number.isNaN(index) ? undefined : claims[index]
+		if (!claim) return
+		if (fixable) openChange(plainQuote(claim.quote), claim.paragraph, 'prose', index)
+		else scrollTo(cardRef.current?.querySelector(`#${claimRowId(index)}`))
 	}
 
-	/** The marks are not focusable; Enter on the wrapper does nothing extra. */
-	function onProseKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-		if (event.key !== 'Enter') return
-		const target = event.target as Element
-		const mark = target.closest<HTMLElement>('mark[data-claim]')
-		if (!mark) return
-		const index = Number(mark.dataset.claim)
-		if (!Number.isNaN(index)) scrollTo(document.getElementById(claimRowId(index)))
+	function onApplied(result: PassageApplied) {
+		if (result.summary !== null) {
+			setChangeLine({ summary: result.summary, prevBody: body, prevHash: savedHash })
+		} else {
+			setChangeLine(null)
+		}
+		setBody(result.body)
+		setSavedHash(result.savedHash)
+		setChangedRange(result.changed)
+		setUndoState('idle')
 	}
 
-	const approveLabel =
-		article.kind === 'blog' ? 'Approve and publish on my site' : 'Approve'
-	const zoomed = zoom ? images.find(im => im.id === zoom) : null
+	async function undoThat() {
+		if (!changeLine || undoState === 'saving') return
+		setUndoState('saving')
+		const result = await saveArticleBody({
+			articleId: id,
+			body: changeLine.prevBody,
+			baseHash: savedHash,
+		})
+		if (result.ok) {
+			onApplied({
+				body: changeLine.prevBody,
+				savedHash: result.hash,
+				summary: null,
+				changed: null,
+			})
+			return
+		}
+		if (result.kind === 'changed') {
+			// the writer's text landed meanwhile: keep what the server has
+			onApplied({ body: result.body, savedHash: result.hash, summary: null, changed: null })
+			return
+		}
+		setUndoState('error')
+	}
+
+	/* ---- render ---- */
+
+	const zoomedImage = zoom
+		? images.find(im => articleImageUrl(im.id) === zoom.src)
+		: undefined
+	const rewriteBack = Boolean(article.revisionNote) && isRewriteNote(article.revisionNote)
+	const rewriteSaid = rewriteWords(article.revisionNote)
+	const stateLabel = decision ? collapsedLabel(decision) : null
 
 	return (
-		<div className="pb-28">
+		<article
+			id={cardElementId(id)}
+			ref={cardRef}
+			data-feed-id={id}
+			data-feed-spy=""
+			className="scroll-mt-2"
+			aria-current={active ? 'true' : undefined}
+		>
 			<header>
-				<h1 className="text-2xl font-semibold leading-tight">{article.title}</h1>
-				<p className="mt-2 text-sm text-muted-foreground">
-					{article.where} · {article.byline} · {article.about}
-				</p>
+				<h1
+					className={
+						collapsed
+							? 'line-clamp-2 text-lg font-semibold leading-tight'
+							: 'text-2xl font-semibold leading-tight'
+					}
+				>
+					{article.title}
+				</h1>
+				{collapsed ? (
+					<p className="mt-1 text-sm text-muted-foreground">{stateLabel}</p>
+				) : (
+					<p className="mt-2 text-sm text-muted-foreground">
+						{article.where} · {article.byline} · {article.about}
+					</p>
+				)}
+				{notice && !collapsed ? (
+					<p className="mt-2 text-sm font-medium text-green-800 dark:text-green-200">
+						{notice}
+					</p>
+				) : null}
 			</header>
 
-			{!pending ? <DecidedBanner article={article} busy={busy} /> : null}
+			{decision ? (
+				<DecidedCard
+					article={article}
+					decision={decision}
+					busy={busy}
+					onUndo={() => fetcher.submit({ intent: 'reopen' }, { method: 'post', action: `/review/${id}` })}
+					onTakedown={() => fetcher.submit({ intent: 'takedown' }, { method: 'post', action: `/review/${id}` })}
+				/>
+			) : (
+				<>
+					{!pending ? (
+						<DecidedBanner
+							article={article}
+							status={status}
+							busy={busy}
+							onReopen={intent =>
+								fetcher.submit({ intent }, { method: 'post', action: `/review/${id}` })
+							}
+						/>
+					) : null}
 
-			{article.answer ? (
-				<div className="mt-4 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
-					<p className="font-medium">Zane says:</p>
-					<p className="mt-1 whitespace-pre-wrap">{article.answer}</p>
-				</div>
-			) : article.question ? (
-				<div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-					<p className="font-medium">You asked Zane:</p>
-					<p className="mt-1 whitespace-pre-wrap">{article.question}</p>
-					<p className="mt-1 text-xs">His answer will show here.</p>
-				</div>
-			) : null}
-
-			<section className="mt-5 rounded-xl border bg-card p-4 shadow-sm">
-				<h2 className="text-base font-semibold">Things to check first</h2>
-
-				<PanelSection number={1} title="Medical claims">
-					{aid.claims.length === 0 ? (
-						<p className="text-sm text-muted-foreground">None found.</p>
-					) : (
-						<ul className="space-y-2">
-							{aid.claims.map((c, i) => (
-								<li
-									key={i}
-									id={claimRowId(i)}
-									className="flex items-start gap-2 scroll-mt-4"
+					{rewriteBack ? (
+						<div className="mt-4 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
+							<p className="font-medium">A new article, as you asked.</p>
+							{rewriteSaid ? (
+								<p className="mt-1">You said: “{rewriteSaid}”</p>
+							) : null}
+							{article.revisionBaseBody ? (
+								<button
+									type="button"
+									onClick={() => setShowRejected(v => !v)}
+									aria-expanded={showRejected}
+									className="mt-1 text-sm underline underline-offset-2"
 								>
-									<p className="flex-1 text-sm">“{plainQuote(c.quote)}”</p>
-									<button
-										type="button"
-										onClick={() => seeInText(c.highlighted ? i : null, c.paragraph)}
-										className="shrink-0 rounded-full p-1 text-primary hover:bg-accent"
-										aria-label="See in text"
-										title="See in text"
-									>
-										<Icon name="chevron-right" className="h-5 w-5" />
-									</button>
-								</li>
-							))}
-						</ul>
-					)}
-				</PanelSection>
-
-				<PanelSection number={2} title="Your credentials">
-					{aid.credentials.length === 0 ? (
-						<p className="text-sm text-muted-foreground">
-							This text does not name you or the practice.
-						</p>
-					) : (
-						<ul className="space-y-2">
-							{aid.credentials.map((c, i) => (
-								<li key={i} className="flex items-start gap-2">
-									<p className="flex-1 text-sm">“{plainQuote(c.quote)}”</p>
-									<button
-										type="button"
-										onClick={() => seeInText(null, c.paragraph)}
-										className="shrink-0 rounded-full p-1 text-primary hover:bg-accent"
-										aria-label="See in text"
-										title="See in text"
-									>
-										<Icon name="chevron-right" className="h-5 w-5" />
-									</button>
-								</li>
-							))}
-						</ul>
-					)}
-				</PanelSection>
-
-				<PanelSection number={3} title="Links">
-					{links.length === 0 ? (
-						<p className="text-sm text-muted-foreground">No links were asked for.</p>
-					) : (
-						<ul className="space-y-2">
-							{links.map(l => (
-								<li key={l.url} className="text-sm">
-									{l.missing ? (
-										<p className="font-medium text-red-700 dark:text-red-400">
-											Missing: {l.name}
-										</p>
-									) : (
-										<p className="flex flex-wrap items-center gap-x-1.5">
-											<span className="font-medium">{l.anchor ?? l.name}</span>
-											<Icon name="arrow-right" className="h-4 w-4 text-muted-foreground" />
-											<span>{l.domain}</span>
-											<span className="text-muted-foreground">({l.name})</span>
-										</p>
-									)}
-								</li>
-							))}
-						</ul>
-					)}
-				</PanelSection>
-
-				<PanelSection number={4} title="Pictures">
-					{images.length === 0 ? (
-						<p className="text-sm text-muted-foreground">
-							No pictures yet. They are being made and will show up here on
-							their own.
-						</p>
-					) : (
-						<ul className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
-							{images.map(im => (
-								<li key={im.id} className="w-36 shrink-0">
-									<button
-										type="button"
-										onClick={() => setZoom(im.id)}
-										className="block w-full rounded-lg border bg-background p-1 text-left"
-										aria-label={`Zoom: ${im.altText ?? 'picture'}`}
-									>
-										<img
-											src={`/resources/article-images/${im.id}`}
-											alt={im.altText ?? ''}
-											loading="lazy"
-											className="aspect-[3/2] w-full rounded object-cover"
-										/>
-										<span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">
-											{im.altText ?? im.caption ?? 'No description'}
-										</span>
-									</button>
-								</li>
-							))}
-						</ul>
-					)}
-				</PanelSection>
-
-				{aid.rules.length > 0 ? (
-					<PanelSection number={5} title="The publisher’s rules">
-						<ul className="list-disc space-y-1 pl-5 text-sm">
-							{aid.rules.map((rule, i) => (
-								<li key={i}>{rule}</li>
-							))}
-						</ul>
-					</PanelSection>
-				) : null}
-
-				<p className="mt-4 text-xs text-muted-foreground">{aid.note}</p>
-			</section>
-
-			<section className="mt-6">
-				<h2 id="every-word" className="text-base font-semibold scroll-mt-4">
-					Every word
-				</h2>
-				<div
-					ref={proseRef}
-					role="presentation"
-					onClick={onProseClick}
-					onKeyDown={onProseKeyDown}
-					className="mt-3"
-				>
-					<MarkdownContent
-						content={article.body}
-						className="prose prose-lg max-w-none dark:prose-invert [&_li]:leading-[1.6] [&_p]:leading-[1.6] [&_[data-paragraph]]:scroll-mt-4 [&_mark]:cursor-pointer [&_mark]:rounded-sm [&_mark]:bg-amber-200 [&_mark]:px-0.5 [&_mark]:text-inherit dark:[&_mark]:bg-amber-700 [&_.review-marker]:my-4 [&_.review-marker]:inline-block [&_.review-marker]:rounded-full [&_.review-marker]:bg-primary [&_.review-marker]:px-3 [&_.review-marker]:py-1 [&_.review-marker]:text-xs [&_.review-marker]:font-medium [&_.review-marker]:text-primary-foreground"
-						remarkPlugins={[reviewProsePlugin({ paragraphs, ranges, markerAt })]}
-					/>
-				</div>
-				<p ref={endRef} className="mt-8 text-center text-sm text-muted-foreground">
-					That is all of it.
-				</p>
-			</section>
-
-			{pending ? (
-				<div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
-					{/* The blog label is long: it gets its own row on a phone. */}
-					<div className="mx-auto flex max-w-xl flex-wrap items-center gap-2">
-						{article.isReference ? (
-							<p className="basis-full text-sm text-muted-foreground">
-								{ARTICLE_CHANGER_COPY.referenceNote}
+									See the one you turned down
+								</button>
+							) : null}
+							{showRejected && article.revisionBaseBody ? (
+								<MarkdownContent
+									content={article.revisionBaseBody}
+									className="prose prose-sm mt-3 max-w-none text-muted-foreground dark:prose-invert"
+									resolveImageSrc={resolveImage}
+								/>
+							) : null}
+						</div>
+					) : article.revisionNote ? (
+						<div className="mt-4 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
+							<p>
+								Your note: “{article.revisionNote}”. The writer’s changes are
+								marked.
 							</p>
-						) : (
-							<Button
+						</div>
+					) : null}
+
+					{answer ? (
+						<div className="mt-4 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
+							<p className="font-medium">Zane says:</p>
+							<p className="mt-1 whitespace-pre-wrap">{answer}</p>
+						</div>
+					) : question ? (
+						<div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+							<p className="font-medium">You asked Zane:</p>
+							<p className="mt-1 whitespace-pre-wrap">{question}</p>
+							<p className="mt-1 text-xs">His answer will show here.</p>
+						</div>
+					) : null}
+
+					{changeLine ? (
+						<div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-green-300 bg-green-50 p-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
+							<p className="flex-1">Changed: {changeLine.summary}</p>
+							<button
 								type="button"
-								size="lg"
-								className={`min-w-0 flex-1 px-3 text-base ${
-									article.kind === 'blog' ? 'basis-full' : ''
-								}`}
-								onClick={tapApprove}
-								disabled={busy}
+								onClick={undoThat}
+								disabled={undoState === 'saving'}
+								className="text-sm font-medium underline underline-offset-2 disabled:opacity-50"
 							>
-								{approveLabel}
-							</Button>
-						)}
-						<Button
-							asChild
-							variant="outline"
-							size="lg"
-							className="min-w-0 flex-1 px-3 text-base"
+								{ARTICLE_CHANGER_COPY.undo}
+							</button>
+							<span className="basis-full text-xs text-muted-foreground">
+								{undoState === 'saving'
+									? 'Saving…'
+									: undoState === 'error'
+										? 'Could not save. Trying again…'
+										: 'Saved'}
+							</span>
+						</div>
+					) : null}
+
+					<section className="mt-5 rounded-xl border bg-card p-4 shadow-sm">
+						<h2 className="text-base font-semibold">Things to check first</h2>
+
+						<PanelSection number={1} title="Medical claims">
+							{claims.length === 0 ? (
+								<p className="text-sm text-muted-foreground">None found.</p>
+							) : (
+								<ul className="space-y-1">
+									{claims.map(c => (
+										<li key={c.index} id={claimRowId(c.index)} className="scroll-mt-4">
+											<CheckRow
+												quote={c.quote}
+												gone={c.gone}
+												fixable={fixable}
+												onChange={() =>
+													openChange(plainQuote(c.quote), c.paragraph, 'panel', c.index)
+												}
+											/>
+										</li>
+									))}
+								</ul>
+							)}
+						</PanelSection>
+
+						<PanelSection number={2} title="Your credentials">
+							{credentials.length === 0 ? (
+								<p className="text-sm text-muted-foreground">
+									This text does not name you or the practice.
+								</p>
+							) : (
+								<ul className="space-y-1">
+									{credentials.map((c, i) => (
+										<li key={i}>
+											<CheckRow
+												quote={c.quote}
+												gone={c.gone}
+												fixable={fixable}
+												onChange={() =>
+													openChange(plainQuote(c.quote), c.paragraph, 'panel')
+												}
+											/>
+										</li>
+									))}
+								</ul>
+							)}
+						</PanelSection>
+
+						<PanelSection number={3} title="Links">
+							{links.length === 0 ? (
+								<p className="text-sm text-muted-foreground">No links were asked for.</p>
+							) : (
+								<ul className="space-y-2">
+									{links.map(l => (
+										<li key={l.url} className="text-sm">
+											{l.missing ? (
+												<p className="font-medium text-red-700 dark:text-red-400">
+													Missing: {l.name}
+												</p>
+											) : (
+												<p className="flex flex-wrap items-center gap-x-1.5">
+													<span className="font-medium">{l.anchor ?? l.name}</span>
+													<Icon name="arrow-right" className="h-4 w-4 text-muted-foreground" />
+													<span>{l.domain}</span>
+													<span className="text-muted-foreground">({l.name})</span>
+												</p>
+											)}
+										</li>
+									))}
+								</ul>
+							)}
+						</PanelSection>
+
+						<PanelSection number={4} title="Pictures">
+							<p className="text-sm text-muted-foreground">
+								{picturesNote(pictureLines, images.length)}
+							</p>
+							{pictureLines === 0 && images.length > 0 ? (
+								<ul className="-mx-4 mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
+									{images.map(im => (
+										<li key={im.id} className="w-36 shrink-0">
+											<button
+												type="button"
+												onClick={() =>
+													setZoom({ src: articleImageUrl(im.id), alt: im.altText ?? '' })
+												}
+												className="block w-full rounded-lg border bg-background p-1 text-left"
+												aria-label={`Zoom: ${im.altText ?? 'picture'}`}
+											>
+												<img
+													src={articleImageUrl(im.id)}
+													alt={im.altText ?? ''}
+													loading="lazy"
+													className="aspect-[3/2] w-full rounded object-cover"
+												/>
+												<span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">
+													{im.altText ?? im.caption ?? 'No description'}
+												</span>
+											</button>
+										</li>
+									))}
+								</ul>
+							) : null}
+						</PanelSection>
+
+						{aid.rules.length > 0 ? (
+							<PanelSection number={5} title="The publisher’s rules">
+								<ul className="list-disc space-y-1 pl-5 text-sm">
+									{aid.rules.map((rule, i) => (
+										<li key={i}>{rule}</li>
+									))}
+								</ul>
+							</PanelSection>
+						) : null}
+
+						<p className="mt-4 text-xs text-muted-foreground">{aid.note}</p>
+					</section>
+
+					<section className="mt-6">
+						<h2 data-every-word="" className="text-base font-semibold scroll-mt-4">
+							Every word
+						</h2>
+						<div
+							ref={proseRef}
+							role="presentation"
+							onClick={onProseClick}
+							className="mt-3"
 						>
-							<Link to={`/review/${article.id}/change`}>Change it</Link>
-						</Button>
-						<Button
-							type="button"
-							variant="outline"
-							size="lg"
-							className="shrink-0 px-3"
-							onClick={() => setSheet('more')}
-							aria-label="More"
-							disabled={busy}
-						>
-							<Icon name="dots-horizontal" className="h-5 w-5" />
-							<span className="sr-only">...</span>
-						</Button>
-					</div>
-				</div>
-			) : null}
+							<MarkdownContent
+								content={body}
+								className="prose prose-lg max-w-none dark:prose-invert [&_li]:leading-[1.6] [&_p]:leading-[1.6] [&_[data-paragraph]]:scroll-mt-4 [&_mark]:cursor-pointer [&_mark]:rounded-sm [&_mark]:bg-amber-200 [&_mark]:px-0.5 [&_mark]:text-inherit dark:[&_mark]:bg-amber-700 [&_.review-changed]:cursor-auto [&_.review-changed]:bg-green-200 dark:[&_.review-changed]:bg-green-800 [&_.review-marker]:my-4 [&_.review-marker]:inline-block [&_.review-marker]:rounded-full [&_.review-marker]:bg-primary [&_.review-marker]:px-3 [&_.review-marker]:py-1 [&_.review-marker]:text-xs [&_.review-marker]:font-medium [&_.review-marker]:text-primary-foreground"
+								remarkPlugins={remarkPlugins}
+								resolveImageSrc={resolveImage}
+							/>
+						</div>
+						<p ref={endRef} className="mt-8 text-center text-sm text-muted-foreground">
+							That is all of it.
+						</p>
+					</section>
+
+					<PassageFix
+						articleId={id}
+						body={body}
+						savedHash={savedHash}
+						links={links}
+						containerRef={proseRef}
+						active={active}
+						disabled={!fixable || busy || undoState === 'saving'}
+						request={fixRequest}
+						onApplied={onApplied}
+					/>
+				</>
+			)}
 
 			{sheet === 'more' ? (
 				<Sheet onClose={() => setSheet(null)} title="More">
 					<div className="flex flex-col gap-2">
-						<Form method="post">
+						<fetcher.Form method="post" action={`/review/${id}`}>
 							<input type="hidden" name="intent" value="later" />
 							<Button
 								type="submit"
@@ -778,7 +1550,7 @@ function ArticleScreen() {
 							>
 								Later
 							</Button>
-						</Form>
+						</fetcher.Form>
 						<Button
 							type="button"
 							variant="outline"
@@ -803,6 +1575,15 @@ function ArticleScreen() {
 							type="button"
 							variant="outline"
 							size="lg"
+							className="w-full text-base"
+							onClick={() => setSheet('rewrite')}
+						>
+							Write a different article
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							size="lg"
 							className="w-full text-base text-red-700 dark:text-red-400"
 							onClick={() => setSheet('deny')}
 						>
@@ -815,31 +1596,31 @@ function ArticleScreen() {
 
 			{sheet === 'ask' ? (
 				<Sheet onClose={() => setSheet(null)} title="Ask Zane">
-					<Form method="post" className="space-y-3">
+					<fetcher.Form method="post" action={`/review/${id}`} className="space-y-3">
 						<input type="hidden" name="intent" value="question" />
-						<label htmlFor="review-question" className="text-sm font-medium">
+						<label htmlFor={`review-question-${id}`} className="text-sm font-medium">
 							Ask Zane one thing
 						</label>
 						<Textarea
-							id="review-question"
+							id={`review-question-${id}`}
 							name="question"
 							rows={2}
 							required
 							placeholder="Is this publisher real?"
 							className="text-base"
-							defaultValue={article.question ?? ''}
+							defaultValue={question ?? ''}
 						/>
 						{error && errorSheet === 'ask' ? <SheetError>{error}</SheetError> : null}
 						<Button type="submit" size="lg" className="w-full text-base" disabled={busy}>
 							Send
 						</Button>
-					</Form>
+					</fetcher.Form>
 				</Sheet>
 			) : null}
 
 			{sheet === 'writer' ? (
 				<Sheet onClose={() => setSheet(null)} title="Send a note to the writer">
-					<Form method="post" className="space-y-3">
+					<fetcher.Form method="post" action={`/review/${id}`} className="space-y-3">
 						<input type="hidden" name="intent" value="changes_requested" />
 						<div className="flex flex-wrap gap-2">
 							{ARTICLE_EDIT_CHIPS.map(chip => (
@@ -858,11 +1639,11 @@ function ArticleScreen() {
 								</label>
 							))}
 						</div>
-						<label htmlFor="review-writer-note" className="sr-only">
+						<label htmlFor={`review-writer-note-${id}`} className="sr-only">
 							What to change
 						</label>
 						<Textarea
-							id="review-writer-note"
+							id={`review-writer-note-${id}`}
 							name="note"
 							rows={3}
 							aria-label="What to change"
@@ -873,7 +1654,69 @@ function ArticleScreen() {
 						<Button type="submit" size="lg" className="w-full text-base" disabled={busy}>
 							Send to the writer
 						</Button>
-					</Form>
+					</fetcher.Form>
+				</Sheet>
+			) : null}
+
+			{sheet === 'rewrite' ? (
+				<Sheet onClose={() => setSheet(null)} title="Write a different article">
+					<p className="text-sm text-muted-foreground">
+						The writer starts over with a new topic for{' '}
+						{article.kind === 'blog' ? 'your blog' : (article.publication ?? 'the publisher')}.
+						This one leaves your list until the new one is ready. That usually
+						takes a day or two.
+					</p>
+					{article.publisherWaiting ? (
+						<p className="mt-2 text-sm text-muted-foreground">
+							The publisher agreed to this topic. The writer will offer them the
+							new one.
+						</p>
+					) : null}
+					<fetcher.Form method="post" action={`/review/${id}`} className="mt-3 space-y-3">
+						<input type="hidden" name="intent" value="rewrite" />
+						<label htmlFor={`review-rewrite-note-${id}`} className="text-sm font-medium">
+							Anything to tell the writer? (optional)
+						</label>
+						<Textarea
+							id={`review-rewrite-note-${id}`}
+							name="note"
+							rows={2}
+							value={rewriteNote}
+							onChange={e => setRewriteNote(e.currentTarget.value)}
+							placeholder="For example: not fillers again, something about skin care."
+							className="text-base"
+						/>
+						{rewriteInterim ? (
+							<p aria-live="polite" className="text-sm italic text-muted-foreground">
+								{rewriteInterim}…
+							</p>
+						) : null}
+						{error && errorSheet === 'rewrite' ? <SheetError>{error}</SheetError> : null}
+						<div className="flex flex-wrap items-center gap-2">
+							{dictation.supported ? (
+								<Button
+									type="button"
+									variant={dictation.listening ? 'secondary' : 'outline'}
+									size="lg"
+									aria-pressed={dictation.listening}
+									onClick={dictation.listening ? dictation.stop : dictation.start}
+								>
+									{dictation.listening
+										? ARTICLE_CHANGER_COPY.listening
+										: ARTICLE_CHANGER_COPY.dictate}
+								</Button>
+							) : null}
+							<Button
+								type="submit"
+								size="lg"
+								className="min-w-0 flex-1 text-base"
+								disabled={busy}
+								onClick={dictation.stop}
+							>
+								Write a different one
+							</Button>
+						</div>
+					</fetcher.Form>
 				</Sheet>
 			) : null}
 
@@ -882,13 +1725,13 @@ function ArticleScreen() {
 					<p className="text-sm text-muted-foreground">
 						This drops the placement. Use Change it if you want a fix.
 					</p>
-					<Form method="post" className="mt-3 space-y-3">
+					<fetcher.Form method="post" action={`/review/${id}`} className="mt-3 space-y-3">
 						<input type="hidden" name="intent" value="deny" />
-						<label htmlFor="review-deny-note" className="text-sm font-medium">
+						<label htmlFor={`review-deny-note-${id}`} className="text-sm font-medium">
 							Why not? One line helps the next draft.
 						</label>
 						<Textarea
-							id="review-deny-note"
+							id={`review-deny-note-${id}`}
 							name="note"
 							rows={2}
 							required
@@ -904,7 +1747,7 @@ function ArticleScreen() {
 						>
 							Do not use it
 						</Button>
-					</Form>
+					</fetcher.Form>
 				</Sheet>
 			) : null}
 
@@ -937,7 +1780,7 @@ function ArticleScreen() {
 				<Sheet
 					onClose={() => {
 						setSheet(null)
-						navigate(`/review/${article.id}`, { replace: true })
+						navigate(`/review/${id}`, { replace: true })
 					}}
 					title="You tapped Approve before you signed in. Approve now?"
 				>
@@ -952,7 +1795,7 @@ function ArticleScreen() {
 							className="w-full text-base"
 							onClick={() => {
 								setSheet(null)
-								navigate(`/review/${article.id}`, { replace: true })
+								navigate(`/review/${id}`, { replace: true })
 							}}
 						>
 							Not now
@@ -961,7 +1804,7 @@ function ArticleScreen() {
 				</Sheet>
 			) : null}
 
-			{zoomed ? (
+			{zoom ? (
 				<div className="fixed inset-0 z-50">
 					<button
 						type="button"
@@ -972,17 +1815,17 @@ function ArticleScreen() {
 					<div
 						role="dialog"
 						aria-modal="true"
-						aria-label={zoomed.altText ?? 'Picture'}
+						aria-label={zoom.alt || 'Picture'}
 						className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center p-4"
 					>
 						<img
-							src={`/resources/article-images/${zoomed.id}`}
-							alt={zoomed.altText ?? ''}
+							src={zoom.src}
+							alt={zoom.alt}
 							className="max-h-[80vh] w-full max-w-xl rounded object-contain"
 						/>
-						{zoomed.altText || zoomed.caption ? (
+						{zoom.alt || zoomedImage?.caption ? (
 							<p className="mt-3 max-w-xl text-center text-sm text-white">
-								{zoomed.altText ?? zoomed.caption}
+								{zoom.alt || zoomedImage?.caption}
 							</p>
 						) : null}
 						<button
@@ -995,7 +1838,42 @@ function ArticleScreen() {
 					</div>
 				</div>
 			) : null}
-		</div>
+		</article>
+	)
+})
+
+/** One row of claims or credentials: a button that opens the fix sheet, or plain text. */
+function CheckRow({
+	quote,
+	gone,
+	fixable,
+	onChange,
+}: {
+	quote: string
+	gone: boolean
+	fixable: boolean
+	onChange: () => void
+}) {
+	const text = plainQuote(quote)
+	const shown = gone ? `“${text}” (changed)` : `“${text}”`
+	if (!fixable || gone) {
+		return (
+			<p className={`py-1 text-sm ${gone ? 'text-muted-foreground' : ''}`}>{shown}</p>
+		)
+	}
+	return (
+		<button
+			type="button"
+			onClick={onChange}
+			aria-label={`Change: ${text}`}
+			className="-mx-2 flex min-h-11 w-[calc(100%+1rem)] items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent"
+		>
+			<span className="flex-1 text-sm">{shown}</span>
+			<span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
+				<Icon name="pencil-1" className="h-4 w-4" />
+				Change
+			</span>
+		</button>
 	)
 }
 
@@ -1018,23 +1896,29 @@ function PanelSection({
 	)
 }
 
-type LoaderArticle = ReturnType<typeof useLoaderData<typeof loader>>['article']
+type ViewArticle = CardView['article']
 
+/** A deep-linked article she decided before: the record and a way back. */
 function DecidedBanner({
 	article,
+	status,
 	busy,
+	onReopen,
 }: {
-	article: LoaderArticle
+	article: ViewArticle
+	status: string
 	busy: boolean
+	onReopen: (intent: 'reopen' | 'takedown') => void
 }) {
 	const when = article.reviewedAt ? ` on ${formatDate(article.reviewedAt)}` : ''
-	const isApproved = article.status === 'approved'
+	const isApproved = status === 'approved'
+	const takedown = isApproved && article.kind === 'blog'
 	return (
 		<div
 			className={`mt-4 rounded-md border p-3 text-sm ${
 				isApproved
 					? 'border-green-300 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100'
-					: article.status === 'denied'
+					: status === 'denied'
 						? 'border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100'
 						: 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100'
 			}`}
@@ -1042,9 +1926,11 @@ function DecidedBanner({
 			<p className="font-medium">
 				{isApproved
 					? `Approved${when}.`
-					: article.status === 'denied'
+					: status === 'denied'
 						? `Do not publish${when}.`
-						: `With the writer${when}.`}
+						: article.rewriteRequested
+							? `A new article is on its way${when}.`
+							: `With the writer${when}.`}
 			</p>
 			{article.reviewNote ? <p className="mt-1">{article.reviewNote}</p> : null}
 			{isApproved && article.liveUrl ? (
@@ -1057,140 +1943,129 @@ function DecidedBanner({
 					Live page
 				</a>
 			) : null}
-			<Form method="post" className="mt-2">
-				<input
-					type="hidden"
-					name="intent"
-					value={isApproved && article.kind === 'blog' ? 'takedown' : 'reopen'}
-				/>
-				<Button type="submit" variant="outline" size="sm" disabled={busy}>
-					{isApproved && article.kind === 'blog' ? 'Take it down' : 'Reopen'}
-				</Button>
-			</Form>
+			<Button
+				type="button"
+				variant="outline"
+				size="sm"
+				className="mt-2"
+				disabled={busy}
+				onClick={() => onReopen(takedown ? 'takedown' : 'reopen')}
+			>
+				{takedown ? 'Take it down' : article.rewriteRequested ? 'Keep this one' : 'Reopen'}
+			</Button>
 		</div>
 	)
 }
 
-/* ------------------------------------------------------------------------ */
-/* S7: Approved (with S8 when the sitting is spent)                         */
-/* ------------------------------------------------------------------------ */
+function collapsedLabel(decision: Decision): string {
+	switch (decision.kind) {
+		case 'approved':
+			return 'Approved'
+		case 'later':
+			return 'Set aside for 3 days'
+		case 'writer':
+		case 'rewrite':
+			return 'Sent to the writer'
+		case 'denied':
+			return 'Set aside. It will not go anywhere.'
+	}
+}
 
-type DoneView = NonNullable<
-	ReturnType<typeof useLoaderData<typeof loader>>['doneView']
->
-
-function ApprovedScreen({
+/** S7 as a card: what happens next, and the way back for a few seconds. */
+function DecidedCard({
 	article,
-	view,
+	decision,
+	busy,
+	onUndo,
+	onTakedown,
 }: {
-	article: LoaderArticle
-	view: DoneView
+	article: ViewArticle
+	decision: Decision
+	busy: boolean
+	onUndo: () => void
+	onTakedown: () => void
 }) {
-	const navigation = useNavigation()
-	const busy = navigation.state !== 'idle'
-	const [undoOpen, setUndoOpen] = useState(true)
+	const [undoOpen, setUndoOpen] = useState(decision.kind === 'approved')
 	useEffect(() => {
+		if (decision.kind !== 'approved') return
 		const timer = window.setTimeout(() => setUndoOpen(false), UNDO_MS)
 		return () => window.clearTimeout(timer)
-	}, [])
-	const blogPath = `/blog/${article.slug ?? ''}`
+	}, [decision.kind])
 
-	return (
-		<div className="flex flex-1 flex-col items-center justify-center gap-4 py-8 text-center">
-			<div className="rounded-full bg-green-100 p-4 dark:bg-green-900">
-				<Icon name="check" className="h-10 w-10 text-green-700 dark:text-green-200" />
-			</div>
-			<p className="text-2xl font-semibold">Approved.</p>
-			{article.kind === 'blog' ? (
-				<>
-					<p className="text-base">
-						{`It is live now: hitchcoxaesthetics.com${blogPath}`}
-					</p>
-					<div className="flex gap-2">
-						<Button asChild variant="outline">
-							<a href={blogPath} target="_blank" rel="noreferrer">
-								Open it
-							</a>
-						</Button>
-						<Form method="post">
-							<input type="hidden" name="intent" value="takedown" />
-							<Button type="submit" variant="outline" disabled={busy}>
+	if (decision.kind === 'approved') {
+		const blogPath = decision.blogPath ?? `/blog/${article.slug ?? ''}`
+		return (
+			<section className="mt-4 rounded-xl border border-green-300 bg-green-50 p-5 text-center text-green-900 shadow-sm dark:border-green-800 dark:bg-green-950 dark:text-green-100">
+				<div className="mx-auto w-fit rounded-full bg-green-100 p-3 dark:bg-green-900">
+					<Icon name="check" className="h-8 w-8 text-green-700 dark:text-green-200" />
+				</div>
+				<p className="mt-3 text-xl font-semibold">Approved.</p>
+				{article.kind === 'blog' ? (
+					<>
+						<p className="mt-2 text-base">
+							{`It is live now: hitchcoxaesthetics.com${blogPath}`}
+						</p>
+						<div className="mt-3 flex justify-center gap-2">
+							<Button asChild variant="outline">
+								<a href={blogPath} target="_blank" rel="noreferrer">
+									Open it
+								</a>
+							</Button>
+							<Button type="button" variant="outline" disabled={busy} onClick={onTakedown}>
 								Take it down
 							</Button>
-						</Form>
-					</div>
-				</>
-			) : (
-				<p className="text-base">
-					“{article.title}” is on its way to{' '}
-					{article.publication ?? 'the publisher'}. You will see Sent here, then
-					Live when the publisher posts it, with the link.
-				</p>
-			)}
-			<p className="text-sm text-muted-foreground">{`${view.doneToday} done today.`}</p>
-			{undoOpen ? (
-				<Form method="post">
-					<input type="hidden" name="intent" value="reopen" />
+						</div>
+					</>
+				) : (
+					<p className="mt-2 text-base">
+						“{article.title}” is on its way to{' '}
+						{article.publication ?? 'the publisher'}. You will see Sent here,
+						then Live when the publisher posts it, with the link.
+					</p>
+				)}
+				<p className="mt-3 text-sm text-muted-foreground">{`${decision.doneToday} done today.`}</p>
+				{undoOpen ? (
 					<button
-						type="submit"
+						type="button"
 						disabled={busy}
-						className="text-sm font-medium text-primary underline underline-offset-2"
+						onClick={onUndo}
+						className="mt-2 text-sm font-medium text-primary underline underline-offset-2"
 					>
 						Undo
 					</button>
-				</Form>
-			) : null}
+				) : null}
+			</section>
+		)
+	}
 
-			<div className="mt-4 w-full">
-				{view.showPlenty ? (
-					<section className="rounded-xl border bg-card p-6 shadow-sm">
-						<p className="text-lg font-medium">
-							{view.approvedThisSitting > 0
-								? `That is plenty for now. ${view.approvedThisSitting} approved.`
-								: 'That is plenty for now.'}
-						</p>
-						<div className="mt-4 flex flex-col gap-2">
-							<Form method="post" action="/review?index">
-								<input type="hidden" name="intent" value="stop" />
-								<Button type="submit" size="lg" className="w-full text-base" disabled={busy}>
-									Stop here
-								</Button>
-							</Form>
-							{view.next ? (
-								<Button asChild variant="outline" size="lg" className="w-full text-base">
-									<Link to={`/review/${view.next.id}`}>One more anyway</Link>
-								</Button>
-							) : null}
-						</div>
-					</section>
-				) : (
-					<div className="flex flex-col gap-2">
-						{view.next ? (
-							<Button asChild size="lg" className="w-full text-base">
-								<Link to={`/review/${view.next.id}`}>
-									{`Next one (${view.next.about.toLowerCase()})`}
-								</Link>
-							</Button>
-						) : (
-							<p className="text-base">
-								Nothing needs you today. The writers are working.
-							</p>
-						)}
-						<Form method="post" action="/review?index">
-							<input type="hidden" name="intent" value="stop" />
-							<Button
-								type="submit"
-								variant="outline"
-								size="lg"
-								className="w-full text-base"
-								disabled={busy}
-							>
-								I am done for now
-							</Button>
-						</Form>
-					</div>
-				)}
-			</div>
-		</div>
+	if (decision.kind === 'rewrite') {
+		return (
+			<section className="mt-4 rounded-xl border bg-card p-5 text-center shadow-sm">
+				<p className="text-base">A new article is on its way. It comes back to you here.</p>
+				<p className="mt-3 text-sm text-muted-foreground">
+					Changed your mind?{' '}
+					<button
+						type="button"
+						disabled={busy}
+						onClick={onUndo}
+						className="font-medium text-primary underline underline-offset-2"
+					>
+						Keep this one
+					</button>
+				</p>
+			</section>
+		)
+	}
+
+	return (
+		<section className="mt-4 rounded-xl border bg-card p-5 text-center shadow-sm">
+			<p className="text-base">
+				{decision.kind === 'writer'
+					? 'Sent to the writer. It comes back to you as "Your change is in".'
+					: decision.kind === 'later'
+						? 'Set aside for 3 days.'
+						: 'Set aside. It will not go anywhere.'}
+			</p>
+		</section>
 	)
 }

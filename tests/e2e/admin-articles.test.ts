@@ -78,6 +78,12 @@ test('an admin can read, edit and approve an article', async ({
 			page.getByRole('heading', { name: article.title, level: 2 }),
 		).toBeVisible()
 		await expect(page.getByText('In place: Sarah Hitchcox Aesthetics')).toBeVisible()
+		// this body has no picture line, so the picture shows under the note
+		await expect(
+			page.getByText(
+				'1 picture. The writer has not placed it in the text yet, so it shows here.',
+			),
+		).toBeVisible()
 		await expect(page.getByRole('img', { name: 'a test picture' })).toBeVisible()
 		await page.screenshot({
 			path: process.env.ARTICLE_SHOT ?? 'test-results/admin-article-review.png',
@@ -85,12 +91,16 @@ test('an admin can read, edit and approve an article', async ({
 		})
 
 		// The prompt tab is the default. The plain editor sits behind its tab.
+		// A typed change saves itself; there is no Save button.
+		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(0)
 		await page.getByRole('tab', { name: 'Edit the text myself' }).click()
 		const text = page.getByLabel('Article text')
 		await text.fill(`${BODY}\n\nSarah added this line.`)
 		await expect(page.getByText('Sarah added this line.').last()).toBeVisible()
-		await page.getByRole('button', { name: 'Save edits' }).click()
-		await expect(page.getByText('Saved.')).toBeVisible()
+		await expect(page.getByText('Saved', { exact: true })).toBeVisible()
+		const saved = await prisma.article.findUniqueOrThrow({ where: { id: article.id } })
+		expect(saved.body).toContain('Sarah added this line.')
+		expect(saved.editedBy).toBeTruthy()
 
 		await page.getByRole('button', { name: 'Approve', exact: true }).click()
 		await expect(page).toHaveURL(/\/admin\/articles$/)

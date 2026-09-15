@@ -4,11 +4,13 @@ import ReactMarkdown from 'react-markdown'
 import { describe, expect, test } from 'vitest'
 import { findHighlightRanges, splitParagraphs } from './review-aid.ts'
 import {
+	CHANGED_CLASS,
 	MARKER_ID,
 	MARKER_TEXT,
 	reviewProsePlugin,
 	transformReviewProse,
 	type MdNode,
+	type ProseRange,
 } from './review-prose.ts'
 
 const BODY = `## Botox for TMJ
@@ -20,9 +22,17 @@ Results last 3 to 4 months. See [our site](https://hitchcoxaesthetics.com).
 - One
 - Two`
 
-function render(body: string, quotes: string[], markerAt: number | null = null) {
+function render(
+	body: string,
+	quotes: string[],
+	markerAt: number | null = null,
+	extraRanges: ProseRange[] = [],
+) {
 	const paragraphs = splitParagraphs(body)
-	const ranges = findHighlightRanges(body, quotes)
+	const ranges: ProseRange[] = [
+		...findHighlightRanges(body, quotes),
+		...extraRanges,
+	]
 	return renderToStaticMarkup(
 		createElement(
 			ReactMarkdown,
@@ -117,5 +127,56 @@ describe('reviewProsePlugin', () => {
 		const paragraph = tree.children?.[0]
 		expect(paragraph?.children?.length).toBe(1)
 		expect(paragraph?.children?.[0]?.type).toBe('text')
+	})
+
+	test('a changed range renders a review-changed mark with no id and no claim', () => {
+		const start = BODY.indexOf('Results last')
+		const end = start + 'Results last 3 to 4 months.'.length
+		const html = render(BODY, [], null, [
+			{ start, end, index: 0, kind: 'changed' },
+		])
+		expect(html).toContain(
+			`<mark class="${CHANGED_CLASS}">Results last 3 to 4 months.</mark>`,
+		)
+		expect(html).not.toContain('data-claim')
+		expect(html).not.toContain('id="hl-')
+	})
+
+	test('a changed range wins over a claim it overlaps', () => {
+		const start = BODY.indexOf('3 to 4 months')
+		const end = start + '3 to 4 months'.length
+		const html = render(BODY, ['Results last 3 to 4 months.'], null, [
+			{ start, end, index: 0, kind: 'changed' },
+		])
+		expect(html).toContain(`<mark class="${CHANGED_CLASS}">3 to 4 months</mark>`)
+		expect(html).not.toContain('data-claim')
+	})
+
+	test('a claim elsewhere keeps its id next to a changed range', () => {
+		const start = BODY.indexOf('Results last')
+		const end = start + 'Results last 3 to 4 months.'.length
+		const html = render(
+			BODY,
+			['Sarah Hitchcox, RN, treats jaw pain at her Bearden office.'],
+			null,
+			[{ start, end, index: 5, kind: 'changed' }],
+		)
+		expect(html).toContain('data-claim="0" id="hl-0"')
+		expect(html).toContain(`<mark class="${CHANGED_CLASS}">`)
+	})
+
+	test('a picture line block gets a paragraph index', () => {
+		const body = `Intro paragraph.
+
+![a test picture](images/image-1.png)
+*A caption under it.*
+
+Closing paragraph.`
+		const html = render(body, [])
+		expect(html).toContain('<p data-paragraph="0">Intro paragraph.</p>')
+		expect(html).toMatch(
+			/<p data-paragraph="1"><img src="images\/image-1\.png" alt="a test picture"\/>\s*<em>A caption under it\.<\/em><\/p>/,
+		)
+		expect(html).toContain('<p data-paragraph="2">Closing paragraph.</p>')
 	})
 })

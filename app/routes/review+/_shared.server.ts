@@ -4,9 +4,16 @@
  * Not a route (the `.server.ts` suffix keeps it out of the route tree).
  */
 import { redirect } from '@remix-run/node'
-import { hashBody } from '#app/utils/articles.server.ts'
+import { hashBody, normalizeWhitespace } from '#app/utils/articles.server.ts'
+import { missingLinks, parseLinks } from '#app/utils/articles.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { combineHeaders } from '#app/utils/misc.tsx'
+import {
+	aboutMinutes,
+	loadReviewAid,
+	reviewAidNote,
+	splitParagraphs,
+} from '#app/utils/review-aid.ts'
 import {
 	recordReviewEvent,
 	secondsSinceOpened,
@@ -44,6 +51,7 @@ export const QUEUE_SELECT = {
 	publisherWaiting: true,
 	placementUsd: true,
 	revisionNote: true,
+	rewriteRequested: true,
 	readToParagraph: true,
 	skippedUntil: true,
 	editedAt: true,
@@ -59,6 +67,7 @@ export const QUEUE_SELECT = {
 
 export type QueueRow = QueueArticle & {
 	title: string
+	rewriteRequested: boolean
 	slug: string | null
 	publication: string | null
 	editedBy: string | null
@@ -133,6 +142,143 @@ export async function loadCards(
 export function whereLabel(a: { kind: string; publication: string | null }) {
 	if (a.kind === 'blog') return 'Your blog'
 	return `Goes on ${a.publication ?? 'the publisher’s site'}`
+}
+
+/* ------------------------------------------------------------------------ */
+/* One card of the feed                                                     */
+/* ------------------------------------------------------------------------ */
+
+function hostOf(url: string): string {
+	try {
+		return new URL(url).hostname.replace(/^www\./, '')
+	} catch {
+		return url
+	}
+}
+
+function escapeRegExp(s: string): string {
+	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** The words the link is on in the text, or null when the link is not there. */
+function anchorTextFor(body: string, url: string): string | null {
+	const target = escapeRegExp(url.replace(/\/+$/, ''))
+	const re = new RegExp(`\\[([^\\]]+)\\]\\(\\s*${target}\\/?[^)]*\\)`, 'i')
+	return re.exec(body)?.[1]?.trim() ?? null
+}
+
+/** The byline exactly as it will print. */
+export function bylineText(byline: string | null): string {
+	const text = (byline ?? 'Sarah Hitchcox, RN').trim()
+	return /^by\s/i.test(text) ? text : `By ${text}`
+}
+
+/**
+ * Indexes of the paragraphs in `next` whose text (whitespace folded) is not
+ * in `base`. The feed marks them after a revision came back.
+ */
+export function changedParagraphIndexes(base: string, next: string): number[] {
+	const known = new Set(splitParagraphs(base).map(p => normalizeWhitespace(p.text)))
+	return splitParagraphs(next)
+		.map((p, index) => (known.has(normalizeWhitespace(p.text)) ? -1 : index))
+		.filter(index => index >= 0)
+}
+
+/** The columns one card reads. */
+export const VIEW_INCLUDE = {
+	images: {
+		orderBy: { position: 'asc' },
+		select: {
+			id: true,
+			fileName: true,
+			position: true,
+			altText: true,
+			caption: true,
+			width: true,
+			height: true,
+		},
+	},
+} as const
+
+type ViewRow = NonNullable<
+	Awaited<
+		ReturnType<
+			typeof prisma.article.findUnique<{
+				where: { id: string }
+				include: typeof VIEW_INCLUDE
+			}>
+		>
+	>
+>
+
+/**
+ * The JSON one card of the feed needs. Offsets and paragraph indexes are
+ * not sent: the card computes them from its current body, so a change
+ * re-renders without a round trip.
+ */
+export function buildArticleView(article: ViewRow) {
+	const body = article.body
+	const aid = loadReviewAid(article.reviewAidJson, body)
+	const links = parseLinks(article.linksJson)
+	const missing = missingLinks(body, links)
+	const revisionNote = article.revisionNote
+	return {
+		article: {
+			id: article.id,
+			kind: article.kind,
+			title: article.title,
+			slug: article.slug,
+			publication: article.publication,
+			byline: bylineText(article.byline),
+			status: article.status,
+			reviewedAt: article.reviewedAt,
+			reviewedBy: article.reviewedBy,
+			reviewNote: article.reviewNote,
+			liveUrl: article.liveUrl,
+			readToParagraph: article.readToParagraph ?? 0,
+			reachedEnd: Boolean(article.readReachedEndAt),
+			question: article.question,
+			answer: article.answer,
+			isReference: article.isReference,
+			body,
+			savedHash: hashBody(body),
+			where: whereLabel(article),
+			about: aboutMinutes(cardReadSeconds(article)),
+			revisionNote,
+			rewriteRequested: article.rewriteRequested,
+			revisionBaseBody: revisionNote ? article.revisionBaseBody : null,
+			publisherWaiting: article.publisherWaiting,
+		},
+		images: article.images,
+		aid: {
+			note: reviewAidNote(aid),
+			rules: aid.rules,
+			claims: aid.claims.map(c => ({ quote: c.quote })),
+			credentials: aid.credentials.map(c => ({ quote: c.quote })),
+		},
+		links: links.map(l => ({
+			name: l.name,
+			url: l.url,
+			domain: hostOf(l.url),
+			anchor: anchorTextFor(body, l.url),
+			missing: missing.some(m => m.url === l.url),
+		})),
+		changedParagraphs:
+			revisionNote && article.revisionBaseBody
+				? changedParagraphIndexes(article.revisionBaseBody, body)
+				: [],
+	}
+}
+
+export type ArticleView = ReturnType<typeof buildArticleView>
+
+/** One card by id, or null. */
+export async function loadArticleView(id: string): Promise<ArticleView | null> {
+	const article = await prisma.article.findUnique({
+		where: { id },
+		include: VIEW_INCLUDE,
+	})
+	return article ? buildArticleView(article) : null
 }
 
 /** Midnight today in the practice's time zone, as an instant. */
@@ -239,7 +385,11 @@ export async function approveArticle(
 	})
 }
 
-/** Undo (reopened) and "Take it down" (takedown): back to pending, the approval record cleared. */
+/**
+ * Undo (reopened), "Take it down" (takedown) and "Keep this one" after a
+ * rewrite request: back to pending, the decision record cleared. A note
+ * from a denial or a rewrite request goes with it.
+ */
 export async function reopenArticle(
 	id: string,
 	opts: { userId: string; kind: 'reopened' | 'takedown' },
@@ -250,7 +400,9 @@ export async function reopenArticle(
 			status: 'pending',
 			reviewedAt: null,
 			reviewedBy: null,
+			reviewNote: null,
 			approvedBodyHash: null,
+			rewriteRequested: false,
 		},
 	})
 	await recordReviewEvent(id, opts.kind, { userId: opts.userId })

@@ -12,14 +12,16 @@ import {
 	useLoaderData,
 	useNavigation,
 } from '@remix-run/react'
-import { useState } from 'react'
-import { ArticleChanger } from '#app/components/article-changer.tsx'
+import { useRef, useState } from 'react'
+import {
+	ArticleChanger,
+	useSubmitAfterSave,
+} from '#app/components/article-changer.tsx'
 import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Icon } from '#app/components/ui/icon'
 import { Textarea } from '#app/components/ui/textarea.tsx'
 import { ARTICLE_EDIT_CHIPS } from '#app/utils/article-edit.ts'
-import { reviewerName } from '#app/utils/articles.server.ts'
+import { hashBody, reviewerName } from '#app/utils/articles.server.ts'
 import { parseLinks } from '#app/utils/articles.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
@@ -33,11 +35,13 @@ import {
 } from './_shared.server.ts'
 
 /**
- * S5, "Change it": the ArticleChanger (tell it what to change, or edit the
- * text) with this page's sticky bar. Save edits stores the working copy.
- * Approve stores it and approves it in one action, so what she approved is
- * what goes out. "Send this to the writer instead" is the changes_requested
- * path for when she does not want to check a change herself.
+ * S5, "Change it": the ArticleChanger (tell it what to change, edit the
+ * text, or select a passage) with this page's sticky bar. Every change
+ * saves itself; there is no Save button. Approve waits for a save in
+ * flight, then stores the working copy and approves it in one action, so
+ * what she approved is what goes out. "Send this to the writer instead" is
+ * the changes_requested path for when she does not want to check a change
+ * herself.
  */
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
@@ -58,6 +62,16 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			linksJson: true,
 			reviewAidJson: true,
 			updatedAt: true,
+			images: {
+				orderBy: { position: 'asc' },
+				select: {
+					id: true,
+					fileName: true,
+					position: true,
+					width: true,
+					height: true,
+				},
+			},
 		},
 	})
 	if (!article) throw new Response('Not found', { status: 404 })
@@ -72,9 +86,11 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			kind: article.kind,
 			title: article.title,
 			body: article.body,
+			savedHash: hashBody(article.body),
 			isReference: article.isReference,
 			updatedAt: article.updatedAt,
 		},
+		images: article.images,
 		links: parseLinks(article.linksJson),
 		claims,
 	})
@@ -106,31 +122,16 @@ export async function action({ params, request }: ActionFunctionArgs) {
 		typeof rawBody === 'string' ? rawBody.replace(/\r\n/g, '\n') : null
 	const now = new Date()
 	const who = await reviewerName(userId)
-	const changed = body !== null && body.trim() !== article.body.trim()
 
 	switch (intent) {
-		case 'save': {
-			if (body === null || !body.trim()) {
-				return json({ error: 'The article text cannot be empty.' }, { status: 400 })
-			}
-			if (changed) {
-				await prisma.article.update({
-					where: { id },
-					data: { body, editedAt: now, editedBy: who },
-				})
-				await recordReviewEvent(id, 'saved', { userId })
-			}
-			return json({ ok: 'Saved.' })
-		}
 		case 'approve': {
 			if (body !== null && !body.trim()) {
 				return json({ error: 'The article text cannot be empty.' }, { status: 400 })
 			}
 			await approveArticle(article, { userId, who, body, now })
 			const settled = await settleSitting(request, article, now, who)
-			return redirect(`/review/${id}?done=approved`, {
-				headers: settled.headers,
-			})
+			// The feed shows the decided card and the queue continues below it.
+			return redirect(`/review/${id}`, { headers: settled.headers })
 		}
 		case 'changes_requested': {
 			const chips = form
@@ -172,25 +173,20 @@ export async function action({ params, request }: ActionFunctionArgs) {
 }
 
 export default function ChangeArticle() {
-	const { article, links, claims } = useLoaderData<typeof loader>()
+	const { article, images, links, claims } = useLoaderData<typeof loader>()
 	const actionData = useActionData<typeof action>()
 	const navigation = useNavigation()
 	const busy = navigation.state !== 'idle'
 	const [writerOpen, setWriterOpen] = useState(false)
+	const flushRef = useRef<(() => Promise<void>) | null>(null)
+	const submitAfterSave = useSubmitAfterSave(flushRef)
 	const error = actionData && 'error' in actionData ? actionData.error : null
-	const ok = actionData && 'ok' in actionData ? actionData.ok : null
 	const approveLabel =
 		article.kind === 'blog' ? 'Approve and publish on my site' : 'Approve'
 
 	return (
 		<div className="pb-36">
-			<Link
-				to={`/review/${article.id}`}
-				className="inline-flex items-center text-sm text-muted-foreground hover:text-primary"
-			>
-				<Icon name="arrow-left" className="mr-1 h-4 w-4" /> Back to the article
-			</Link>
-			<h1 className="mt-2 text-xl font-semibold leading-tight">{article.title}</h1>
+			<h1 className="text-xl font-semibold leading-tight">{article.title}</h1>
 
 			{error && !writerOpen ? (
 				<p
@@ -200,37 +196,30 @@ export default function ChangeArticle() {
 					{error}
 				</p>
 			) : null}
-			{ok ? (
-				<p className="mt-3 rounded-md border border-green-300 bg-green-50 p-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
-					{ok}
-				</p>
-			) : null}
-
-			<Form method="post" className="mt-4">
+			<Form method="post" className="mt-4" onSubmit={submitAfterSave}>
 				<ArticleChanger
 					key={String(article.updatedAt)}
 					articleId={article.id}
 					initialBody={article.body}
-					savedBody={article.body}
+					savedHash={article.savedHash}
 					links={links}
 					claims={claims}
 					isReference={article.isReference}
 					kind={article.kind}
+					images={images}
+					flushRef={flushRef}
 				/>
 
 				<div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
 					<div className="mx-auto max-w-xl">
 						<div className="flex items-center gap-2">
 							<Button
-								type="submit"
-								name="intent"
-								value="save"
+								asChild
 								variant="outline"
 								size="lg"
 								className="min-w-0 flex-1 px-3 text-base"
-								disabled={busy}
 							>
-								Save edits
+								<Link to={`/review/${article.id}`}>Back to the article</Link>
 							</Button>
 							<Button
 								type="submit"
@@ -288,9 +277,6 @@ export default function ChangeArticle() {
 							placeholder="Say what to change. The writer sends it back to you."
 							className="text-base"
 						/>
-						<p className="text-xs text-muted-foreground">
-							Edits you did not save stay out of this note.
-						</p>
 						{error ? <SheetError>{error}</SheetError> : null}
 						<Button type="submit" size="lg" className="w-full text-base" disabled={busy}>
 							Send to the writer

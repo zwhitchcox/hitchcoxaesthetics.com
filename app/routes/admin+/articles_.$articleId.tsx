@@ -11,10 +11,18 @@ import {
 	useLoaderData,
 	useNavigation,
 } from '@remix-run/react'
-import { ArticleChanger } from '#app/components/article-changer.tsx'
+import { useRef, useState } from 'react'
+import {
+	ArticleChanger,
+	useDictation,
+	useSubmitAfterSave,
+} from '#app/components/article-changer.tsx'
+import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon'
 import { Textarea } from '#app/components/ui/textarea.tsx'
+import { appendSpeech } from '#app/utils/article-edit.ts'
+import { countPictureLines, picturesNote } from '#app/utils/article-images.ts'
 import { hashBody, reviewerName } from '#app/utils/articles.server.ts'
 import {
 	articleGroup,
@@ -36,6 +44,21 @@ export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
 }
 
+/** The reviewNote prefix for "Write a different article". */
+const NEW_ARTICLE_PREFIX = 'NEW ARTICLE: '
+
+export const REWRITE_COPY = {
+	link: 'Write a different article',
+	body: (where: string) =>
+		`The writer starts over with a new topic for ${where}. This one leaves your list until the new one is ready. That usually takes a day or two.`,
+	publisherWaiting:
+		'The publisher agreed to this topic. The writer will offer them the new one.',
+	noteLabel: 'Anything to tell the writer? (optional)',
+	notePlaceholder: 'For example: not fillers again, something about skin care.',
+	button: 'Write a different one',
+	pill: 'New article coming',
+} as const
+
 export async function loader({ params, request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	const article = await prisma.article.findUnique({
@@ -43,7 +66,15 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 		include: {
 			images: {
 				orderBy: { position: 'asc' },
-				select: { id: true, altText: true, caption: true, fileName: true },
+				select: {
+					id: true,
+					altText: true,
+					caption: true,
+					fileName: true,
+					position: true,
+					width: true,
+					height: true,
+				},
 			},
 		},
 	})
@@ -57,6 +88,8 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	return json({
 		article: {
 			...article,
+			savedHash: hashBody(article.body),
+			pictureLineCount: countPictureLines(article.body),
 			links: parseLinks(article.linksJson),
 			group: articleGroup({
 				kind: article.kind,
@@ -85,7 +118,9 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			title: true,
 			body: true,
 			bodyOriginal: true,
+			status: true,
 			publishedAt: true,
+			rewriteRequested: true,
 		},
 	})
 	if (!article) throw new Response('Not found', { status: 404 })
@@ -93,7 +128,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	const intent = String(form.get('intent') ?? '')
 	const rawBody = form.get('body')
 	const body = typeof rawBody === 'string' ? rawBody.replace(/\r\n/g, '\n') : null
-	const note = String(form.get('note') ?? '').trim()
+	const note = String(form.get('note') ?? '').trim().slice(0, 2000)
 	const who = await reviewerName(userId)
 	const now = new Date()
 	const textChanged = body !== null && body.trim() !== article.body.trim()
@@ -102,14 +137,6 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	const decidedBody = body ?? article.body
 
 	switch (intent) {
-		case 'save': {
-			if (body === null || !body.trim()) {
-				return json({ error: 'The article text cannot be empty.' }, { status: 400 })
-			}
-			await prisma.article.update({ where: { id }, data: textChange })
-			if (textChanged) await recordReviewEvent(id, 'saved', { userId })
-			return json({ ok: 'Saved.' })
-		}
 		case 'approve': {
 			if (body !== null && !body.trim()) {
 				return json({ error: 'The article text cannot be empty.' }, { status: 400 })
@@ -122,6 +149,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 					reviewedAt: now,
 					reviewedBy: who,
 					reviewNote: note || null,
+					rewriteRequested: false,
 					// The record: what she approved is what goes out, byte for byte.
 					approvedBodyHash: hashBody(decidedBody),
 					publishedAt:
@@ -158,6 +186,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 					reviewedAt: now,
 					reviewedBy: who,
 					reviewNote: note,
+					rewriteRequested: false,
 					approvedBodyHash: null,
 				},
 			})
@@ -183,6 +212,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 					reviewedAt: now,
 					reviewedBy: who,
 					reviewNote: note,
+					rewriteRequested: false,
 					approvedBodyHash: null,
 				},
 			})
@@ -191,6 +221,34 @@ export async function action({ params, request }: ActionFunctionArgs) {
 				type: 'success',
 				title: 'Sent to the writer',
 				description: `"${article.title}" comes back as "Your change is in".`,
+			})
+		}
+		case 'rewrite': {
+			// "Write a different article": a clean-room draft from the mini.
+			if (article.status !== 'pending') {
+				return json({ error: 'This one is already decided.' }, { status: 400 })
+			}
+			const words = String(form.get('rewrite_note') ?? '').trim().slice(0, 2000)
+			await prisma.article.update({
+				where: { id },
+				data: {
+					status: 'changes_requested',
+					reviewNote: `${NEW_ARTICLE_PREFIX}${words || 'a different article'}`,
+					rewriteRequested: true,
+					reviewedAt: now,
+					reviewedBy: who,
+					skippedUntil: null,
+					approvedBodyHash: null,
+				},
+			})
+			await recordReviewEvent(id, 'rewrite_requested', {
+				userId,
+				note: words || null,
+			})
+			return redirectWithToast('/admin/articles', {
+				type: 'success',
+				title: 'A new article is on its way',
+				description: `The writer starts over on "${article.title}".`,
 			})
 		}
 		case 'restore': {
@@ -208,6 +266,9 @@ export async function action({ params, request }: ActionFunctionArgs) {
 					reviewedAt: null,
 					reviewedBy: null,
 					approvedBodyHash: null,
+					rewriteRequested: false,
+					// a rewrite request's note is not a note for this text
+					...(article.rewriteRequested ? { reviewNote: null } : {}),
 				},
 			})
 			await recordReviewEvent(id, 'reopened', { userId })
@@ -263,6 +324,8 @@ export default function ArticleReview() {
 		actionData && 'for' in actionData && actionData.for === 'answer',
 	)
 	const decided = article.status !== 'pending'
+	const showThumbnails =
+		article.images.length > 0 && article.pictureLineCount === 0
 
 	return (
 		<div className="space-y-6">
@@ -333,7 +396,7 @@ export default function ArticleReview() {
 					}`}
 				>
 					<p className="font-medium">
-						{statusLabel(article.status)}
+						{article.rewriteRequested ? REWRITE_COPY.pill : statusLabel(article.status)}
 						{article.reviewedBy ? ` by ${article.reviewedBy}` : ''}
 						{article.reviewedAt ? ` on ${formatDate(article.reviewedAt)}` : ''}.
 					</p>
@@ -343,8 +406,9 @@ export default function ArticleReview() {
 								<p className="mt-1">Her note: “{article.reviewNote}”</p>
 							) : null}
 							<p className="mt-1 text-xs opacity-80">
-								The writer gets this note on the next sync. The article comes
-								back to her as “Your change is in”. Reopen it to take it back.
+								{article.rewriteRequested
+									? 'The writer starts over with a new topic on the next sync. The new draft comes back to her as “A new article, as you asked”. Reopen it to keep this one.'
+									: 'The writer gets this note on the next sync. The article comes back to her as “Your change is in”. Reopen it to take it back.'}
 							</p>
 						</>
 					) : article.reviewNote ? (
@@ -436,47 +500,49 @@ export default function ArticleReview() {
 				</div>
 			) : null}
 
-			{article.images.length > 0 ? (
+			{article.kind === 'guest' && article.group === 'sent' && article.images.length === 0 ? null : (
 				<section>
 					<h3 className="text-lg font-semibold">Pictures</h3>
 					<p className="text-sm text-muted-foreground">
-						{article.kind === 'blog'
-							? 'The first picture is shown at the top of the guide.'
-							: 'These go to the publisher with the article. To swap one, send the writer a note.'}
+						{picturesNote(article.pictureLineCount, article.images.length)}
 					</p>
-					<div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-						{article.images.map(im => (
-							<figure key={im.id} className="rounded-lg border bg-card p-2">
-								<img
-									src={`/resources/article-images/${im.id}`}
-									alt={im.altText ?? ''}
-									loading="lazy"
-									className="aspect-[3/2] w-full rounded object-cover"
-								/>
-								{im.caption ? (
-									<figcaption className="mt-2 text-xs text-muted-foreground">
-										{im.caption}
-									</figcaption>
-								) : null}
-							</figure>
-						))}
-					</div>
+					{showThumbnails ? (
+						<div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+							{article.images.map(im => (
+								<figure key={im.id} className="rounded-lg border bg-card p-2">
+									<img
+										src={`/resources/article-images/${im.id}`}
+										alt={im.altText ?? ''}
+										loading="lazy"
+										className="aspect-[3/2] w-full rounded object-cover"
+									/>
+									{im.caption ? (
+										<figcaption className="mt-2 text-xs text-muted-foreground">
+											{im.caption}
+										</figcaption>
+									) : null}
+								</figure>
+							))}
+						</div>
+					) : null}
 				</section>
-			) : article.kind === 'guest' && article.group !== 'sent' ? (
-				<div className="rounded-md border p-3 text-sm text-muted-foreground">
-					No pictures yet. They are being made and will show up here on their
-					own.
-				</div>
-			) : null}
+			)}
 
 			<Editor
 				key={String(article.updatedAt)}
 				articleId={article.id}
 				body={article.body}
+				savedHash={article.savedHash}
 				kind={article.kind}
 				group={article.group}
 				isReference={article.isReference}
+				readOnly={decided}
+				publisherWaiting={article.publisherWaiting}
+				where={
+					article.kind === 'blog' ? 'your blog' : destinationLabel(article)
+				}
 				links={article.links}
+				images={article.images}
 				claims={claims}
 				aidNote={aidNote}
 				busy={busy}
@@ -520,16 +586,22 @@ export default function ArticleReview() {
 
 /**
  * The sticky decision bar and, under it, the changer: "Tell it what to
- * change" by default, or the plain editor. The changer puts the working
- * copy in a hidden field named `body`, so every button here submits it.
+ * change" by default, or the plain editor. The changer saves every change
+ * on its own and puts the working copy in a hidden field named `body`, so
+ * every button here submits it after any save in flight.
  */
 function Editor({
 	articleId,
 	body,
+	savedHash,
 	kind,
 	group,
 	isReference,
+	readOnly,
+	publisherWaiting,
+	where,
 	links,
+	images,
 	claims,
 	aidNote,
 	busy,
@@ -538,16 +610,30 @@ function Editor({
 }: {
 	articleId: string
 	body: string
+	savedHash: string
 	kind: string
 	group: string
 	isReference: boolean
+	readOnly: boolean
+	publisherWaiting: boolean
+	where: string
 	links: Array<{ name: string; url: string }>
+	images: Array<{
+		id: string
+		fileName: string
+		position: number
+		width: number | null
+		height: number | null
+	}>
 	claims: string[]
 	aidNote: string
 	busy: boolean
 	error: string | null
 	ok: string | null
 }) {
+	const flushRef = useRef<(() => Promise<void>) | null>(null)
+	const submitAfterSave = useSubmitAfterSave(flushRef)
+	const [rewriteOpen, setRewriteOpen] = useState(false)
 	const approveLabel =
 		kind === 'blog'
 			? 'Approve and publish'
@@ -558,66 +644,149 @@ function Editor({
 					: 'Approve'
 
 	return (
-		<Form method="post" className="space-y-3">
-			<div className="sticky top-0 z-10 space-y-2 rounded-lg border bg-card p-3 shadow">
-				<div className="flex flex-wrap items-center gap-2">
-					<Button type="submit" name="intent" value="approve" disabled={busy}>
-						<Icon name="check" className="mr-1 h-4 w-4" /> {approveLabel}
-					</Button>
-					<Button
-						type="submit"
-						name="intent"
-						value="deny"
-						variant="destructive"
-						disabled={busy}
-					>
-						<Icon name="cross-1" className="mr-1 h-4 w-4" /> Deny
-					</Button>
-					<Button
-						type="submit"
-						name="intent"
-						value="changes_requested"
-						variant="outline"
-						disabled={busy}
-					>
-						Send to the writer
-					</Button>
-					<Button
-						type="submit"
-						name="intent"
-						value="save"
-						variant="outline"
-						disabled={busy}
-					>
-						Save edits
-					</Button>
-					<input
-						name="note"
-						aria-label="Note for the writer"
-						placeholder="Note for the writer (needed to deny or send back, optional to approve)"
-						className="min-w-[16rem] flex-1 rounded-md border bg-background px-3 py-2 text-sm"
-					/>
+		<>
+			<Form method="post" className="space-y-3" onSubmit={submitAfterSave}>
+				<div className="sticky top-0 z-10 space-y-2 rounded-lg border bg-card p-3 shadow">
+					<div className="flex flex-wrap items-center gap-2">
+						<Button type="submit" name="intent" value="approve" disabled={busy}>
+							<Icon name="check" className="mr-1 h-4 w-4" /> {approveLabel}
+						</Button>
+						<Button
+							type="submit"
+							name="intent"
+							value="deny"
+							variant="destructive"
+							disabled={busy}
+						>
+							<Icon name="cross-1" className="mr-1 h-4 w-4" /> Deny
+						</Button>
+						<Button
+							type="submit"
+							name="intent"
+							value="changes_requested"
+							variant="outline"
+							disabled={busy}
+						>
+							Send to the writer
+						</Button>
+						<input
+							name="note"
+							aria-label="Note for the writer"
+							placeholder="Note for the writer (needed to deny or send back, optional to approve)"
+							className="min-w-[16rem] flex-1 rounded-md border bg-background px-3 py-2 text-sm"
+						/>
+					</div>
+					{!readOnly ? (
+						<button
+							type="button"
+							onClick={() => setRewriteOpen(true)}
+							className="text-sm text-primary underline-offset-2 hover:underline"
+						>
+							{REWRITE_COPY.link}
+						</button>
+					) : null}
+					<Messages error={error} ok={ok} />
 				</div>
-				<Messages error={error} ok={ok} />
-			</div>
 
-			{claims.length > 0 ? (
-				<p className="text-xs text-muted-foreground">
-					Things to check: {claims.length} {claims.length === 1 ? 'quote' : 'quotes'}{' '}
-					from the text are offered as pills under “Tell it what to change”.{' '}
-					{aidNote}
-				</p>
+				{claims.length > 0 ? (
+					<p className="text-xs text-muted-foreground">
+						Things to check: {claims.length} {claims.length === 1 ? 'quote' : 'quotes'}{' '}
+						from the text are offered as pills under “Tell it what to change”.{' '}
+						{aidNote}
+					</p>
+				) : null}
+
+				<ArticleChanger
+					articleId={articleId}
+					initialBody={body}
+					savedHash={savedHash}
+					links={links}
+					claims={claims}
+					isReference={isReference}
+					kind={kind}
+					images={images}
+					readOnly={readOnly}
+					flushRef={flushRef}
+				/>
+			</Form>
+
+			{rewriteOpen ? (
+				<RewriteSheet
+					where={where}
+					publisherWaiting={publisherWaiting}
+					busy={busy}
+					error={error}
+					onClose={() => setRewriteOpen(false)}
+				/>
 			) : null}
+		</>
+	)
+}
 
-			<ArticleChanger
-				articleId={articleId}
-				initialBody={body}
-				savedBody={body}
-				links={links}
-				claims={claims}
-				isReference={isReference}
-				kind={kind}
-			/>
-		</Form>
+/** "Write a different article": one optional line for the writer, then the button. */
+function RewriteSheet({
+	where,
+	publisherWaiting,
+	busy,
+	error,
+	onClose,
+}: {
+	where: string
+	publisherWaiting: boolean
+	busy: boolean
+	error: string | null
+	onClose: () => void
+}) {
+	const [note, setNote] = useState('')
+	const [interim, setInterim] = useState('')
+	const dictation = useDictation({
+		onFinal: text => setNote(current => appendSpeech(current, text)),
+		onInterim: setInterim,
+	})
+	return (
+		<Sheet title={REWRITE_COPY.link} onClose={onClose}>
+			<Form method="post" className="space-y-3">
+				<input type="hidden" name="intent" value="rewrite" />
+				<p className="text-sm text-muted-foreground">{REWRITE_COPY.body(where)}</p>
+				{publisherWaiting ? (
+					<p className="text-sm text-muted-foreground">
+						{REWRITE_COPY.publisherWaiting}
+					</p>
+				) : null}
+				<label htmlFor="rewrite-note" className="text-sm font-medium">
+					{REWRITE_COPY.noteLabel}
+				</label>
+				<Textarea
+					id="rewrite-note"
+					name="rewrite_note"
+					rows={2}
+					value={note}
+					onChange={e => setNote(e.currentTarget.value)}
+					placeholder={REWRITE_COPY.notePlaceholder}
+					className="text-base"
+				/>
+				{interim ? (
+					<p aria-live="polite" className="text-sm italic text-muted-foreground">
+						{interim}…
+					</p>
+				) : null}
+				{error ? <SheetError>{error}</SheetError> : null}
+				<div className="flex flex-wrap items-center gap-2">
+					{dictation.supported ? (
+						<Button
+							type="button"
+							variant={dictation.listening ? 'secondary' : 'outline'}
+							aria-pressed={dictation.listening}
+							onClick={dictation.listening ? dictation.stop : dictation.start}
+						>
+							{dictation.listening ? 'Listening… tap to stop' : 'Dictate'}
+						</Button>
+					) : null}
+					<Button type="submit" size="lg" className="min-w-0 flex-1" disabled={busy}>
+						{REWRITE_COPY.button}
+					</Button>
+				</div>
+			</Form>
+		</Sheet>
 	)
 }

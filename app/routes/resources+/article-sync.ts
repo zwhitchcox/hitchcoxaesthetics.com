@@ -20,9 +20,10 @@ import { prisma } from '#app/utils/db.server.ts'
  *   GET  /resources/article-sync?since=<ISO>            review state changed since then
  *
  * GET returns every row that changed, including status `changes_requested`
- * (her note is `reviewNote`), the approval record (`approvedBodyHash`), and
- * her question for Zane with his answer. The body is returned for approved
- * rows only.
+ * (her note is `reviewNote`; `rewriteRequested` true means she asked for a
+ * different article), the approval record (`approvedBodyHash`), her question
+ * for Zane with his answer, and `incomingAt` when writer text is held after
+ * a decision. The body is returned for approved rows only.
  *
  * Guarded by ARTICLE_SYNC_TOKEN, same trust model as INTERNAL_COMMAND_TOKEN.
  * With the token unset the endpoint refuses everything.
@@ -62,6 +63,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			question: true,
 			questionAt: true,
 			answer: true,
+			rewriteRequested: true,
+			incomingAt: true,
 			updatedAt: true,
 			_count: { select: { images: true } },
 		},
@@ -87,6 +90,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			question: r.question,
 			questionAt: r.questionAt,
 			answer: r.answer,
+			// "Write a different article": the mini queues a clean-room draft
+			rewriteRequested: r.rewriteRequested,
+			// when writer text was last held after a decision (null: none held)
+			incomingAt: r.incomingAt,
 			images: r._count.images,
 			updatedAt: r.updatedAt,
 		})),

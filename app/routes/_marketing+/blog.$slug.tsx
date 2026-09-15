@@ -5,6 +5,10 @@ import {
 } from '@remix-run/node'
 import { Link, useLoaderData } from '@remix-run/react'
 import { MarkdownContent } from '#app/components/markdown-content.tsx'
+import {
+	articleImageResolver,
+	countPictureLines,
+} from '#app/utils/article-images.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
 
@@ -21,12 +25,24 @@ export async function loader({ params }: LoaderFunctionArgs) {
 			updatedAt: true,
 			images: {
 				orderBy: { position: 'asc' },
-				select: { id: true, altText: true, caption: true },
+				select: {
+					id: true,
+					fileName: true,
+					position: true,
+					width: true,
+					height: true,
+					altText: true,
+					caption: true,
+				},
 			},
 		},
 	})
 	if (!post) throw new Response('Not found', { status: 404 })
-	return json({ post })
+	// The writer places pictures in the text as `![alt](images/image-N.png)`
+	// lines. When the body has them, the pictures render in place and the
+	// hero and the strip below stay out, so no picture shows twice. An older
+	// body with no picture line keeps the hero and the strip.
+	return json({ post, picturesInPlace: countPictureLines(post.body) > 0 })
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data, location }) =>
@@ -42,8 +58,9 @@ export const meta: MetaFunction<typeof loader> = ({ data, location }) =>
 	})
 
 export default function BlogPost() {
-	const { post } = useLoaderData<typeof loader>()
-	const hero = post.images[0]
+	const { post, picturesInPlace } = useLoaderData<typeof loader>()
+	const hero = picturesInPlace ? null : post.images[0]
+	const resolveImage = articleImageResolver(post.images)
 	const published = post.publishedAt ?? post.updatedAt
 
 	const jsonLd = {
@@ -51,8 +68,8 @@ export default function BlogPost() {
 		'@type': 'Article',
 		headline: post.title,
 		description: post.dek ?? undefined,
-		image: hero
-			? `https://hitchcoxaesthetics.com/resources/article-images/${hero.id}`
+		image: post.images[0]
+			? `https://hitchcoxaesthetics.com/resources/article-images/${post.images[0].id}`
 			: undefined,
 		datePublished: published,
 		dateModified: post.updatedAt,
@@ -137,11 +154,14 @@ export default function BlogPost() {
 				<div className="mt-8">
 					<MarkdownContent
 						content={post.body}
-						className="prose prose-lg prose-gray max-w-none dark:prose-invert"
+						// no zoom on the public page, so no zoom cursor on the pictures
+						className="prose prose-lg prose-gray max-w-none dark:prose-invert [&_img]:cursor-default"
+						resolveImageSrc={resolveImage}
+						unresolvedPicture="hide"
 					/>
 				</div>
 
-				{post.images.length > 1 ? (
+				{!picturesInPlace && post.images.length > 1 ? (
 					<div className="mt-10 grid gap-6 sm:grid-cols-2">
 						{post.images.slice(1).map(im => (
 							<figure key={im.id}>

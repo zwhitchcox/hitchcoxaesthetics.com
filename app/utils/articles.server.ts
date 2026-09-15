@@ -22,6 +22,9 @@ export const SyncImageSchema = z.object({
 	caption: z.string().max(2000).nullish(),
 	position: z.number().int().min(0).default(0),
 	dataBase64: z.string().min(1),
+	/** Pixel size of the picture, so the page reserves the box. Omitted: unknown. */
+	width: z.number().int().min(1).max(20000).nullish(),
+	height: z.number().int().min(1).max(20000).nullish(),
 })
 
 export const ReviewAidQuoteSchema = z.object({
@@ -266,6 +269,8 @@ async function syncImages(articleId: string, a: SyncArticle): Promise<void> {
 			altText: im.altText ?? null,
 			caption: im.caption ?? null,
 			position: im.position,
+			width: im.width ?? null,
+			height: im.height ?? null,
 			blob,
 		}
 		await prisma.articleImage.upsert({
@@ -288,7 +293,12 @@ async function syncImages(articleId: string, a: SyncArticle): Promise<void> {
  * - `revision`: different text with `revision: true` for a changes_requested
  *   article. Body replaced, her note kept in `revisionNote`, status pending.
  * - `kept`: different text for an approved, denied, or changes_requested
- *   article (no flag). Held in `incomingBody`. The decision stands.
+ *   article (no flag). Held in `incomingBody`. The decision stands. Also for
+ *   a pending article she has edited (auto-save):
+ *   her saved edit stays and the mini sends the text again on a later run.
+ *   Also for `revision: true` on a pending article: she kept this one after
+ *   the writer started a new draft, so the new draft waits as incoming text.
+ *   The pictures in a `kept` push are not written either.
  *
  * The claim list (`reviewAid`) is verified against the text she will see and
  * stored only while the article is pending, so a decided record keeps the
@@ -378,6 +388,9 @@ export async function upsertSyncedArticle(
 		incoming !== null &&
 		(incoming.hash === existing.bodyHash ||
 			incoming.hash === hashBody(existing.body))
+	// She has edited this text: hold the writer's text instead of replacing
+	// hers (Zane sees "New text arrived" on the desktop list).
+	const editingNow = existing.editedAt !== null
 	const when = now.toISOString().slice(0, 10)
 	let changed: UpsertChange
 	let status = existing.status
@@ -388,7 +401,7 @@ export async function upsertSyncedArticle(
 		if (incoming !== null) {
 			data.estimatedReadSeconds = readSecondsFor(a, incoming.body)
 		}
-	} else if (existing.status === 'pending') {
+	} else if (existing.status === 'pending' && !editingNow && a.revision !== true) {
 		changed = 'text'
 		data = {
 			...data,
@@ -423,6 +436,7 @@ export async function upsertSyncedArticle(
 			reviewNote: null,
 			reviewedAt: null,
 			reviewedBy: null,
+			rewriteRequested: false,
 			receivedAt: now,
 			editedAt: null,
 			editedBy: null,
@@ -435,7 +449,9 @@ export async function upsertSyncedArticle(
 			estimatedReadSeconds: readSecondsFor(a, incoming.body),
 		}
 	} else {
-		// approved, denied, or changes_requested without the revision flag
+		// approved, denied, changes_requested without the revision flag,
+		// pending while she is editing it, or a revision for a pending row
+		// (she kept this one after asking for a different article)
 		changed = 'kept'
 		data = {
 			...data,
@@ -472,7 +488,10 @@ export async function upsertSyncedArticle(
 		await recordReviewEvent(existing.id, 'live', { at: now, note: a.liveUrl })
 	}
 
-	await syncImages(existing.id, a)
+	// Held text keeps its pictures too: a v2 draft shares the file names
+	// (image-1.png, ...), so a write here would swap the pictures under the
+	// text she kept or approved.
+	if (changed !== 'kept') await syncImages(existing.id, a)
 	return {
 		sourceKey: a.sourceKey,
 		id: existing.id,
@@ -480,6 +499,71 @@ export async function upsertSyncedArticle(
 		changed,
 		...(aid ? { reviewAidDropped: aid.dropped } : {}),
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Auto-save: the working copy she edits on the phone or the desktop
+
+export type SaveOutcome =
+	/** Written. `hash` is the new base for the next save. */
+	| { kind: 'saved'; hash: string }
+	/** The same text as stored. Nothing written, no event. */
+	| { kind: 'same'; hash: string }
+	/** The stored text moved on (the writer pushed) since `baseHash`. Her copy is not written. */
+	| { kind: 'changed'; body: string; hash: string }
+	/** Approved, denied or changes_requested. Reopen first. */
+	| { kind: 'decided' }
+	| { kind: 'missing' }
+
+export type SaveWorkingCopyInput = {
+	id: string
+	body: string
+	/** hashBody of the text her copy started from. */
+	baseHash: string
+	/** The reviewer's name for `editedBy`. Never the phone number. */
+	who: string
+	userId: string
+	/** What made the change: her typing or an AI edit. Stored on the `saved` event. */
+	source?: 'auto' | 'ai'
+	now?: Date
+}
+
+/**
+ * Save the working copy without a button (spec phase 2, R5). Rules in order:
+ * not pending -> `decided`; `baseHash` is not the stored text -> `changed`
+ * with the stored text; the same text -> `same` (no write); else write the
+ * body (CRLF folded), `editedAt`, `editedBy`, and one `saved` event.
+ */
+export async function saveWorkingCopy(
+	input: SaveWorkingCopyInput,
+): Promise<SaveOutcome> {
+	const now = input.now ?? new Date()
+	const article = await prisma.article.findUnique({
+		where: { id: input.id },
+		select: { status: true, body: true },
+	})
+	if (!article) return { kind: 'missing' }
+	if (article.status !== 'pending') return { kind: 'decided' }
+	const current = hashBody(article.body)
+	if (input.baseHash !== current) {
+		return { kind: 'changed', body: article.body, hash: current }
+	}
+	const body = input.body.replace(/\r\n/g, '\n')
+	const hash = hashBody(body)
+	if (hash === current) return { kind: 'same', hash }
+	// The status is checked again in the write, so a decision that lands
+	// between the read and the write is never overwritten.
+	const written = await prisma.article.updateMany({
+		where: { id: input.id, status: 'pending' },
+		data: { body, editedAt: now, editedBy: input.who },
+	})
+	if (written.count === 0) return { kind: 'decided' }
+	await recordReviewEvent(input.id, 'saved', {
+		userId: input.userId,
+		note: input.source ?? 'auto',
+		at: now,
+	})
+	return { kind: 'saved', hash }
 }
 
 /** The name shown as the reviewer. Never the phone number. */

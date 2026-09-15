@@ -12,14 +12,16 @@ import { recordReviewEvent } from '#app/utils/review-events.server.ts'
 /**
  * "Tell it what to change" for the article review pages.
  *
- *   POST /resources/article-edit  { articleId, prompt, markdown, links }
+ *   POST /resources/article-edit  { articleId, prompt, markdown, links, selection? }
  *   -> { markdown, summary }      the working copy after the change
  *
  * Admin only. The markdown is the reviewer's CURRENT working copy, not the
- * saved body, so one request can build on the last one. Nothing is saved
- * here: the page's Save edits / Approve buttons store the result. Each
- * applied change writes an ArticleReviewEvent of kind ai_edit whose note is
- * the model's summary. Logs carry lengths and the model id, never the text.
+ * saved body, so one request can build on the last one. `selection` is the
+ * passage she selected or the claim she tapped ("Change this"); the model
+ * then changes only that passage. Nothing is saved here: the page posts the
+ * result to /resources/article-save. Each applied change writes an
+ * ArticleReviewEvent of kind ai_edit whose note is the model's summary.
+ * Logs carry lengths and the model id, never the text.
  */
 
 // Per-user sliding window of request timestamps. In-memory per machine,
@@ -57,7 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
 			{ status: 400 },
 		)
 	}
-	const { articleId, prompt, markdown, links } = parsed.data
+	const { articleId, prompt, markdown, links, selection } = parsed.data
 
 	pruneRateWindows()
 	const window = takeRateLimitToken(
@@ -88,10 +90,10 @@ export async function action({ request }: ActionFunctionArgs) {
 		)
 	}
 
-	const result = await editArticle({ prompt, markdown, links, config })
+	const result = await editArticle({ prompt, markdown, links, selection, config })
 	if (!result.ok) {
 		console.error(
-			`Article edit: ${result.error} (model ${result.model}, prompt ${prompt.length} chars, in ${markdown.length} chars)`,
+			`Article edit: ${result.error} (model ${result.model}, prompt ${prompt.length} chars, selection ${selection?.text.length ?? 0} chars, in ${markdown.length} chars)`,
 		)
 		const status = result.error === 'openrouter_timeout' ? 504 : 502
 		return json({ error: ERROR_MESSAGES[result.error] }, { status })

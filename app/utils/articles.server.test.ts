@@ -6,6 +6,7 @@ import {
 	hashBody,
 	hashReviewAid,
 	parseStoredReviewAid,
+	saveWorkingCopy,
 	upsertSyncedArticle,
 	verifyReviewAidQuotes,
 	type SyncArticle,
@@ -195,10 +196,7 @@ describe('upsertSyncedArticle', () => {
 
 	test('new text over pending: text replaced, her edit cleared, note set', async () => {
 		await upsertSyncedArticle(draft('t:pending'))
-		await prisma.article.update({
-			where: { sourceKey: 't:pending' },
-			data: { body: HER_EDIT, editedAt: NOW, editedBy: 'Sarah Hitchcox' },
-		})
+		// no edit of hers on the row, so the writer's text lands
 		const res = await upsertSyncedArticle(
 			draft('t:pending', { body: NEW_TEXT, wordCount: 460 }),
 			{ now: NOW },
@@ -208,7 +206,7 @@ describe('upsertSyncedArticle', () => {
 		expect(a.body).toBe(NEW_TEXT)
 		expect(a.bodyOriginal).toBe(NEW_TEXT)
 		expect(a.bodyHash).toBe(hashBody(NEW_TEXT))
-		expect(a.previousBody).toBe(HER_EDIT)
+		expect(a.previousBody).toBeNull()
 		expect(a.editedAt).toBeNull()
 		expect(a.editedBy).toBeNull()
 		expect(a.reviewedAt).toBeNull()
@@ -302,6 +300,73 @@ describe('upsertSyncedArticle', () => {
 		expect(a.incomingBody).toBe(NEW_TEXT)
 	})
 
+	test('new text over pending she edited: kept, her body untouched', async () => {
+		await upsertSyncedArticle(draft('t:editing'))
+		const editedAt = new Date(NOW.getTime() - 2 * 60 * 1000)
+		await prisma.article.update({
+			where: { sourceKey: 't:editing' },
+			data: { body: HER_EDIT, editedAt, editedBy: 'Sarah Hitchcox' },
+		})
+		const res = await upsertSyncedArticle(
+			draft('t:editing', { body: NEW_TEXT }),
+			{ now: NOW },
+		)
+		expect(res).toMatchObject({ changed: 'kept', status: 'pending' })
+		const a = await row('t:editing')
+		expect(a.status).toBe('pending')
+		expect(a.body).toBe(HER_EDIT)
+		expect(a.bodyOriginal).toBe(BODY)
+		expect(a.bodyHash).toBe(hashBody(BODY))
+		expect(a.editedAt).toEqual(editedAt)
+		expect(a.editedBy).toBe('Sarah Hitchcox')
+		expect(a.reviewNote).toBeNull()
+		expect(a.incomingBody).toBe(NEW_TEXT)
+		expect(a.incomingBodyHash).toBe(hashBody(NEW_TEXT))
+		expect(a.incomingAt).toEqual(NOW)
+	})
+
+
+	test('revision clears rewriteRequested; kept and meta leave it', async () => {
+		await upsertSyncedArticle(draft('t:rewrite'))
+		await decide('t:rewrite', 'changes_requested', {
+			reviewNote: 'NEW ARTICLE: not fillers again',
+		})
+		await prisma.article.update({
+			where: { sourceKey: 't:rewrite' },
+			data: { rewriteRequested: true },
+		})
+		let res = await upsertSyncedArticle(draft('t:rewrite', { body: NEW_TEXT }))
+		expect(res.changed).toBe('kept')
+		expect((await row('t:rewrite')).rewriteRequested).toBe(true)
+		res = await upsertSyncedArticle(draft('t:rewrite', { body: undefined }))
+		expect(res.changed).toBe('meta')
+		expect((await row('t:rewrite')).rewriteRequested).toBe(true)
+
+		res = await upsertSyncedArticle(
+			draft('t:rewrite', { body: NEW_TEXT, revision: true }),
+			{ now: NOW },
+		)
+		expect(res).toMatchObject({ changed: 'revision', status: 'pending' })
+		const a = await row('t:rewrite')
+		expect(a.rewriteRequested).toBe(false)
+		expect(a.revisionNote).toBe('NEW ARTICLE: not fillers again')
+		expect(a.revisionBaseBody).toBe(BODY)
+	})
+
+	test('revision flag over pending (she kept this one): kept, her text stands', async () => {
+		await upsertSyncedArticle(draft('t:rev-pending'))
+		const res = await upsertSyncedArticle(
+			draft('t:rev-pending', { body: NEW_TEXT, revision: true }),
+			{ now: NOW },
+		)
+		expect(res).toMatchObject({ changed: 'kept', status: 'pending' })
+		const a = await row('t:rev-pending')
+		expect(a.body).toBe(BODY)
+		expect(a.revisionNote).toBeNull()
+		expect(a.incomingBody).toBe(NEW_TEXT)
+		expect(a.incomingAt).toEqual(NOW)
+	})
+
 	test('no body for a known article: meta, and the ledger fields land', async () => {
 		await upsertSyncedArticle(draft('t:nobody'))
 		const res = await upsertSyncedArticle(
@@ -368,6 +433,41 @@ describe('pictures', () => {
 		expect((await row('t:img-clear')).images).toHaveLength(0)
 	})
 
+	test('images carry width and height when the mini sends them', async () => {
+		await upsertSyncedArticle(
+			draft('t:img-size', {
+				images: [
+					{ ...picture('image-1.png'), width: 1200, height: 800 },
+					picture('image-2.png'),
+				],
+			}),
+		)
+		const images = await prisma.articleImage.findMany({
+			where: { article: { sourceKey: 't:img-size' } },
+			orderBy: { fileName: 'asc' },
+			select: { fileName: true, width: true, height: true },
+		})
+		expect(images).toEqual([
+			{ fileName: 'image-1.png', width: 1200, height: 800 },
+			{ fileName: 'image-2.png', width: null, height: null },
+		])
+
+		// a later push with the size fills it in
+		await upsertSyncedArticle(
+			draft('t:img-size', {
+				images: [
+					{ ...picture('image-1.png'), width: 1200, height: 800 },
+					{ ...picture('image-2.png'), width: 640, height: 480 },
+				],
+			}),
+		)
+		const second = await prisma.articleImage.findFirstOrThrow({
+			where: { article: { sourceKey: 't:img-size' }, fileName: 'image-2.png' },
+			select: { width: true, height: true },
+		})
+		expect(second).toEqual({ width: 640, height: 480 })
+	})
+
 	test('a new list replaces the set, as before', async () => {
 		await upsertSyncedArticle(
 			draft('t:img-swap', {
@@ -380,6 +480,46 @@ describe('pictures', () => {
 		expect((await row('t:img-swap')).images.map(i => i.fileName)).toEqual([
 			'image-3.png',
 		])
+	})
+
+	test('kept: the pictures in the push are not written', async () => {
+		// A v2 draft names its pictures like the v1 ones (image-1.png), so a
+		// held push must leave the stored pictures alone too.
+		const v2 = {
+			...picture('image-1.png'),
+			altText: 'the v2 picture',
+			dataBase64: Buffer.from('v2 bytes').toString('base64'),
+		}
+		const stored = (sourceKey: string) =>
+			prisma.articleImage.findMany({
+				where: { article: { sourceKey } },
+				orderBy: { fileName: 'asc' },
+				select: { fileName: true, altText: true, blob: true },
+			})
+
+		// pending row, revision flag: she kept this one after asking for a
+		// different article
+		await upsertSyncedArticle(
+			draft('t:img-kept', { images: [picture('image-1.png')] }),
+		)
+		const before = await stored('t:img-kept')
+		const res = await upsertSyncedArticle(
+			draft('t:img-kept', { body: NEW_TEXT, revision: true, images: [v2] }),
+		)
+		expect(res.changed).toBe('kept')
+		expect(await stored('t:img-kept')).toEqual(before)
+
+		// approved row, new text and new pictures
+		await upsertSyncedArticle(
+			draft('t:img-kept-ok', { images: [picture('image-1.png')] }),
+		)
+		await decide('t:img-kept-ok', 'approved')
+		const beforeOk = await stored('t:img-kept-ok')
+		const resOk = await upsertSyncedArticle(
+			draft('t:img-kept-ok', { body: NEW_TEXT, images: [v2] }),
+		)
+		expect(resOk.changed).toBe('kept')
+		expect(await stored('t:img-kept-ok')).toEqual(beforeOk)
 	})
 })
 
@@ -456,6 +596,118 @@ describe('review aid', () => {
 		expect(res.changed).toBe('kept')
 		expect(res.reviewAidDropped).toBeUndefined()
 		expect((await row('t:aid-decided')).reviewAidJson).toBeNull()
+	})
+})
+
+describe('saveWorkingCopy', () => {
+	const who = { who: 'Sarah Hitchcox', userId: 'user_sarah' }
+
+	async function seeded(sourceKey: string) {
+		await upsertSyncedArticle(draft(sourceKey))
+		const a = await row(sourceKey)
+		return { id: a.id, hash: hashBody(a.body) }
+	}
+
+	test('missing: no such article', async () => {
+		const out = await saveWorkingCopy({
+			id: 'nope',
+			body: HER_EDIT,
+			baseHash: hashBody(BODY),
+			...who,
+		})
+		expect(out).toEqual({ kind: 'missing' })
+	})
+
+	test('decided: an approved article is not written', async () => {
+		const { id, hash } = await seeded('t:save-decided')
+		await decide('t:save-decided', 'approved')
+		const out = await saveWorkingCopy({
+			id,
+			body: HER_EDIT,
+			baseHash: hash,
+			...who,
+		})
+		expect(out).toEqual({ kind: 'decided' })
+		const a = await row('t:save-decided')
+		expect(a.body).toBe(BODY)
+		expect(a.editedAt).toBeNull()
+		expect(a.events).toEqual([])
+	})
+
+	test('changed: the stored text moved on since her base', async () => {
+		const { id } = await seeded('t:save-changed')
+		await upsertSyncedArticle(draft('t:save-changed', { body: NEW_TEXT }))
+		const out = await saveWorkingCopy({
+			id,
+			body: HER_EDIT,
+			baseHash: hashBody(BODY),
+			...who,
+		})
+		expect(out).toEqual({
+			kind: 'changed',
+			body: NEW_TEXT,
+			hash: hashBody(NEW_TEXT),
+		})
+		const a = await row('t:save-changed')
+		expect(a.body).toBe(NEW_TEXT)
+		expect(a.editedAt).toBeNull()
+		expect(a.events).toEqual([])
+	})
+
+	test('same: the same text writes nothing and no event', async () => {
+		const { id, hash } = await seeded('t:save-same')
+		const out = await saveWorkingCopy({
+			id,
+			body: BODY.replace(/\n/g, '\r\n'),
+			baseHash: hash,
+			...who,
+		})
+		expect(out).toEqual({ kind: 'same', hash })
+		const a = await row('t:save-same')
+		expect(a.body).toBe(BODY)
+		expect(a.editedAt).toBeNull()
+		expect(a.editedBy).toBeNull()
+		expect(a.events).toEqual([])
+	})
+
+	test('saved: body, editedAt, editedBy, and one saved event with the note', async () => {
+		const { id, hash } = await seeded('t:save-ok')
+		const out = await saveWorkingCopy({
+			id,
+			body: HER_EDIT.replace(/\n/g, '\r\n'),
+			baseHash: hash,
+			source: 'ai',
+			now: NOW,
+			...who,
+		})
+		expect(out).toEqual({ kind: 'saved', hash: hashBody(HER_EDIT) })
+		const a = await row('t:save-ok')
+		expect(a.body).toBe(HER_EDIT)
+		expect(a.bodyOriginal).toBe(BODY)
+		expect(a.bodyHash).toBe(hashBody(BODY))
+		expect(a.editedAt).toEqual(NOW)
+		expect(a.editedBy).toBe('Sarah Hitchcox')
+		expect(a.status).toBe('pending')
+		expect(a.events).toMatchObject([{ kind: 'saved', note: 'ai', at: NOW }])
+		const ev = await prisma.articleReviewEvent.findFirstOrThrow({
+			where: { articleId: id, kind: 'saved' },
+			select: { userId: true },
+		})
+		expect(ev.userId).toBe('user_sarah')
+
+		// the next save chains from the returned hash; source defaults to auto
+		const again = await saveWorkingCopy({
+			id,
+			body: NEW_TEXT,
+			baseHash: out.kind === 'saved' ? out.hash : '',
+			now: new Date(NOW.getTime() + 60 * 1000),
+			...who,
+		})
+		expect(again).toEqual({ kind: 'saved', hash: hashBody(NEW_TEXT) })
+		expect((await row('t:save-ok')).events.map(e => e.note)).toEqual([
+			'ai',
+			'auto',
+		])
 	})
 })
 
@@ -592,6 +844,35 @@ describe('/resources/article-sync', () => {
 		const b = rows.find(r => r.sourceKey === 't:route-b')!
 		expect(b).toMatchObject({ status: 'pending', approvedBodyHash: null })
 		expect(b.body).toBeUndefined()
+	})
+
+	test('GET returns rewriteRequested and incomingAt', async () => {
+		await post({ articles: [draft('t:route-rw'), draft('t:route-held')] })
+		await decide('t:route-rw', 'changes_requested', {
+			reviewNote: 'NEW ARTICLE: a different article',
+		})
+		await prisma.article.update({
+			where: { sourceKey: 't:route-rw' },
+			data: { rewriteRequested: true },
+		})
+		await decide('t:route-held', 'approved')
+		await upsertSyncedArticle(draft('t:route-held', { body: NEW_TEXT }), {
+			now: NOW,
+		})
+		const { articles } = (await (await get()).json()) as {
+			articles: Array<Record<string, unknown>>
+		}
+		expect(articles.find(r => r.sourceKey === 't:route-rw')).toMatchObject({
+			status: 'changes_requested',
+			reviewNote: 'NEW ARTICLE: a different article',
+			rewriteRequested: true,
+			incomingAt: null,
+		})
+		expect(articles.find(r => r.sourceKey === 't:route-held')).toMatchObject({
+			status: 'approved',
+			rewriteRequested: false,
+			incomingAt: NOW.toISOString(),
+		})
 	})
 
 	test('GET lists a changes_requested row with her note', async () => {

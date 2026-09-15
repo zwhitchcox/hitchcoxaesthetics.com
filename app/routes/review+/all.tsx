@@ -90,7 +90,7 @@ function stateOf(
 		case 'questions':
 			return 'Asked Zane'
 		case 'writer':
-			return 'With the writer'
+			return a.rewriteRequested ? 'New article coming' : 'With the writer'
 		case 'own-words':
 			return 'Best at a desk'
 		case 'approved':

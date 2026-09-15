@@ -11,6 +11,7 @@ export const REVIEW_EVENT_KINDS = [
 	'read_to',
 	'approved',
 	'changes_requested',
+	'rewrite_requested',
 	'later',
 	'question',
 	'denied',
