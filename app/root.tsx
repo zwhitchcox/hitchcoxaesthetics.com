@@ -81,11 +81,7 @@ export const links: LinksFunction = () => {
 			href: '/favicons/favicon-32x32.png',
 		},
 		{ rel: 'apple-touch-icon', href: '/favicons/apple-touch-icon.png' },
-		{
-			rel: 'manifest',
-			href: '/site.webmanifest',
-			crossOrigin: 'use-credentials',
-		} as const, // necessary to make typescript happy
+		// The manifest link is in the Document head: it depends on the path.
 		{ rel: 'stylesheet', href: tailwindStyleSheetUrl },
 		{ rel: 'icon', type: 'image/svg+xml', href: '/favicons/logo.svg' },
 	].filter(Boolean)
@@ -267,6 +263,11 @@ function Document({
 			? (data?.requestInfo?.origin ?? 'https://hitchcoxaesthetics.com')
 			: BRANDS[brandId].homeUrl
 	const canonicalUrl = `${origin}${location.pathname}`
+	// Sarah's phone review (/review) has its own manifest, so "Add to Home
+	// Screen" opens the review page and not the marketing site.
+	const manifestHref = isReviewPath(location.pathname)
+		? '/resources/review-manifest'
+		: '/site.webmanifest'
 
 	// JSON-LD: Knoxville-focused med spa. MedicalClinic is included because
 	// medicalSpecialty is only valid on MedicalClinic/MedicalOrganization -
@@ -320,10 +321,18 @@ function Document({
 		>
 			<head>
 				<meta charSet="utf-8" />
-				<meta name="viewport" content="width=device-width,initial-scale=1" />
+				<meta
+					name="viewport"
+					content={
+						isReviewPath(location.pathname)
+							? 'width=device-width,initial-scale=1,viewport-fit=cover'
+							: 'width=device-width,initial-scale=1'
+					}
+				/>
 				<ClientHintCheck nonce={nonce} />
 				<Meta />
 				<link rel="canonical" href={canonicalUrl} />
+				<link rel="manifest" href={manifestHref} crossOrigin="use-credentials" />
 				<Links />
 				{/* SHA's business schema must never render on a microsite-branded
 				    page: the brands are separate businesses with their own GBP
@@ -511,7 +520,13 @@ function App() {
 const noHeaderPages: string[] = []
 
 // Internal, noindex tools that must render without any marketing chrome.
-const INTERNAL_TOOLS = ['/geo-rank']
+// /review is Sarah's phone article review; it draws its own small header.
+const INTERNAL_TOOLS = ['/geo-rank', '/review']
+
+/** /review and its children, but not /review-qr. */
+function isReviewPath(pathname: string): boolean {
+	return pathname === '/review' || pathname.startsWith('/review/')
+}
 
 /** Hide the marketing site header (report hub panes + internal tools). */
 function hidesSiteHeader(pathname: string): boolean {

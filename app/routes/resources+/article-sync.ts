@@ -4,7 +4,9 @@ import {
 	type LoaderFunctionArgs,
 } from '@remix-run/node'
 import {
+	ArticleSyncError,
 	SyncPayloadSchema,
+	assertBodiesForNewArticles,
 	upsertSyncedArticle,
 	type UpsertResult,
 } from '#app/utils/articles.server.ts'
@@ -17,6 +19,11 @@ import { prisma } from '#app/utils/db.server.ts'
  *   POST /resources/article-sync   {articles: [...]}   create or update articles and their pictures
  *   GET  /resources/article-sync?since=<ISO>            review state changed since then
  *
+ * GET returns every row that changed, including status `changes_requested`
+ * (her note is `reviewNote`), the approval record (`approvedBodyHash`), and
+ * her question for Zane with his answer. The body is returned for approved
+ * rows only.
+ *
  * Guarded by ARTICLE_SYNC_TOKEN, same trust model as INTERNAL_COMMAND_TOKEN.
  * With the token unset the endpoint refuses everything.
  */
@@ -27,7 +34,8 @@ function authorized(request: Request) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-	if (!authorized(request)) return json({ error: 'unauthorized' }, { status: 401 })
+	if (!authorized(request))
+		return json({ error: 'unauthorized' }, { status: 401 })
 	const since = new URL(request.url).searchParams.get('since')
 	const sinceDate = since ? new Date(since) : null
 	const where =
@@ -50,6 +58,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			bodyHash: true,
 			body: true,
 			bodyOriginal: true,
+			approvedBodyHash: true,
+			question: true,
+			questionAt: true,
+			answer: true,
 			updatedAt: true,
 			_count: { select: { images: true } },
 		},
@@ -70,6 +82,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			edited: r.body !== r.bodyOriginal,
 			// the approved text is what gets submitted; other states only need the decision
 			body: r.status === 'approved' ? r.body : undefined,
+			// sha256 of the exact text she approved; null until she approves
+			approvedBodyHash: r.approvedBodyHash,
+			question: r.question,
+			questionAt: r.questionAt,
+			answer: r.answer,
 			images: r._count.images,
 			updatedAt: r.updatedAt,
 		})),
@@ -77,7 +94,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-	if (!authorized(request)) return json({ error: 'unauthorized' }, { status: 401 })
+	if (!authorized(request))
+		return json({ error: 'unauthorized' }, { status: 401 })
 	if (request.method !== 'POST')
 		return json({ error: 'POST only' }, { status: 405 })
 	let raw: unknown
@@ -94,8 +112,20 @@ export async function action({ request }: ActionFunctionArgs) {
 		)
 	}
 	const results: UpsertResult[] = []
-	for (const article of parsed.data.articles) {
-		results.push(await upsertSyncedArticle(article))
+	try {
+		// a create needs a body; refuse the batch before any write
+		await assertBodiesForNewArticles(parsed.data.articles)
+		for (const article of parsed.data.articles) {
+			results.push(await upsertSyncedArticle(article))
+		}
+	} catch (error) {
+		if (error instanceof ArticleSyncError) {
+			return json(
+				{ error: error.message, sourceKey: error.sourceKey, results },
+				{ status: error.status },
+			)
+		}
+		throw error
 	}
 	return json({ results })
 }

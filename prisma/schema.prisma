@@ -889,9 +889,69 @@ model Article {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  // Sarah's phone review (/review). All optional, added 2026-09-16.
+  // "Things to check" panel: the verified claim list and its hash.
+  reviewAidJson        String?
+  reviewAidHash        String?
+  // The approval record: sha256 of the exact text she approved.
+  approvedBodyHash     String?
+  // Reading position, recorded and never policed.
+  readToParagraph      Int?
+  readReachedEndAt     DateTime?
+  // Writer text that arrived after her decision. Held here; the decision stands.
+  incomingBody         String?
+  incomingBodyHash     String?
+  incomingAt           DateTime?
+  // "Later": hidden from her queue until this time.
+  skippedUntil         DateTime?
+  // "Ask Zane" and his answer.
+  question             String?
+  questionAt           DateTime?
+  answer               String?
+  answeredAt           DateTime?
+  // A revision that answers her changes_requested note.
+  revisionNote         String?
+  revisionBaseBody     String?
+  // Queue inputs from the outreach ledger.
+  publisherWaiting     Boolean @default(false)
+  placementUsd         Int?
+  estimatedReadSeconds Int?
+
   images ArticleImage[]
+  events ArticleReviewEvent[]
 
   @@index([kind, status])
+}
+
+// One row per thing that happened to an article in review: opened, read_to,
+// approved, changes_requested, later, question, denied, reopened, takedown,
+// ai_edit, saved, keep_approval, sent, live, digest_sent, weekly_sent.
+model ArticleReviewEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  kind      String
+  paragraph Int?
+  seconds   Int?
+  note      String?
+  at        DateTime @default(now())
+
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId String
+
+  @@index([articleId, at])
+  @@index([kind, at])
+}
+
+// Per-reviewer settings for /review. One row per admin who opens it.
+// Email goes to User.email; no address or number lives here.
+model ReviewSetting {
+  userId            String    @id
+  emailDaily        Boolean   @default(true)
+  emailWeekly       Boolean   @default(true)
+  pausedUntil       DateTime?
+  lastOpenAt        DateTime?
+  lastDailyEmailAt  DateTime?
+  lastWeeklyEmailAt DateTime?
 }
 
 model ArticleImage {

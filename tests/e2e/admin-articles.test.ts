@@ -84,7 +84,9 @@ test('an admin can read, edit and approve an article', async ({
 			fullPage: true,
 		})
 
-		const text = page.getByLabel('Text')
+		// The prompt tab is the default. The plain editor sits behind its tab.
+		await page.getByRole('tab', { name: 'Edit the text myself' }).click()
+		const text = page.getByLabel('Article text')
 		await text.fill(`${BODY}\n\nSarah added this line.`)
 		await expect(page.getByText('Sarah added this line.').last()).toBeVisible()
 		await page.getByRole('button', { name: 'Save edits' }).click()

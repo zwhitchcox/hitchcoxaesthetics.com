@@ -1,20 +1,26 @@
 import { Link } from '@remix-run/react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Options } from 'react-markdown'
 
 /**
  * Renders markdown with Remix <Link prefetch="intent"> for internal links.
  * External links get target="_blank" and rel="noopener noreferrer".
+ *
+ * `remarkPlugins` lets a page change the markdown tree before it renders
+ * (the phone review page wraps claims in <mark> this way). Optional.
  */
 export function MarkdownContent({
 	content,
 	className = 'prose prose-lg prose-gray max-w-none',
+	remarkPlugins,
 }: {
 	content: string
 	className?: string
+	remarkPlugins?: Options['remarkPlugins']
 }) {
 	return (
 		<div className={className}>
 			<ReactMarkdown
+				remarkPlugins={remarkPlugins}
 				components={{
 					a: ({ href, children, ...props }) => {
 						if (!href) return <a {...props}>{children}</a>

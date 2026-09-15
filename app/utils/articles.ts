@@ -3,11 +3,18 @@
  * Server-only logic lives in articles.server.ts.
  */
 
-export const ARTICLE_STATUSES = ['pending', 'approved', 'denied'] as const
+export const ARTICLE_STATUSES = [
+	'pending',
+	'approved',
+	'denied',
+	'changes_requested',
+] as const
 export type ArticleStatus = (typeof ARTICLE_STATUSES)[number]
 
 export type ArticleGroupKey =
 	| 'review'
+	| 'questions'
+	| 'writer'
 	| 'images'
 	| 'reference'
 	| 'approved'
@@ -24,6 +31,18 @@ export const ARTICLE_GROUPS: Array<{
 		title: 'Ready for your review',
 		blurb:
 			'Read it, change anything you want, then approve or deny. An approved guest article goes to the publisher. An approved guide goes live on the blog.',
+	},
+	{
+		key: 'questions',
+		title: 'Questions',
+		blurb:
+			'Sarah asked something about these from her phone. Answer on the article page. The answer shows on her card.',
+	},
+	{
+		key: 'writer',
+		title: 'Waiting on the writer',
+		blurb:
+			'Sarah sent these back with a note. The writer makes the change and the article comes back to her as "Your change is in".',
 	},
 	{
 		key: 'images',
@@ -54,9 +73,14 @@ export function articleGroup(a: {
 	imageCount: number
 	outreachStatus: string | null
 	writer: string | null
+	/** "Ask Zane" from the phone. An open question moves the row to Questions. */
+	question?: string | null
+	answer?: string | null
 }): ArticleGroupKey {
 	if (a.status === 'approved') return 'approved'
 	if (a.status === 'denied') return 'denied'
+	if (a.status === 'changes_requested') return 'writer'
+	if (a.question && !a.answer) return 'questions'
 	if (a.kind === 'guest' && ['submitted', 'live'].includes(a.outreachStatus ?? ''))
 		return 'sent'
 	if (a.isReference) return 'reference'
@@ -115,6 +139,7 @@ export function missingLinks(body: string, links: ArticleLink[]): ArticleLink[] 
 export function statusLabel(status: string): string {
 	if (status === 'approved') return 'Approved'
 	if (status === 'denied') return 'Denied'
+	if (status === 'changes_requested') return 'Changes requested'
 	return 'Waiting for review'
 }
 
