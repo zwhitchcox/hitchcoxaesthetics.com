@@ -11,6 +11,8 @@ export type MenuLink =
 			to: string
 			label: string
 			hint?: string
+			/** A page that serves its own full document (the report hub). */
+			reloadDocument?: boolean
 	  }
 	| {
 			label: string
@@ -189,6 +191,7 @@ export function ListWithDot({
 									}`
 								}
 								to={resolvedTo ?? '/'}
+								reloadDocument={link.reloadDocument}
 								prefetch="intent"
 								target={resolvedTo?.startsWith('http') ? '_blank' : undefined}
 								onClick={handleLinkClick}

@@ -442,7 +442,7 @@ export default function ArticleReview() {
 					<p className="text-sm text-muted-foreground">
 						{article.kind === 'blog'
 							? 'The first picture is shown at the top of the guide.'
-							: 'These go to the publisher with the article. Ask Zane to change one.'}
+							: 'These go to the publisher with the article. To swap one, send the writer a note.'}
 					</p>
 					<div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						{article.images.map(im => (

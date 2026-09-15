@@ -25,7 +25,7 @@ import { z } from 'zod'
 
 import { AiChat } from '#/app/components/ai-chat.tsx'
 import { GeneralErrorBoundary } from '#/app/components/error-boundary.tsx'
-import { ListWithDot } from '#/app/components/list-with-dot'
+import { ListWithDot, type MenuLink } from '#/app/components/list-with-dot'
 import Logo from '#/app/components/logo'
 import { EpicProgress } from '#/app/components/progress-bar.tsx'
 import { useToast } from '#/app/components/toaster.tsx'
@@ -56,6 +56,7 @@ import {
 } from '#/app/utils/locations.ts'
 import { BRANDS, DEFAULT_BRAND_ID } from '#/app/config/brands.ts'
 import { getBrandIdFromRequest } from '#/app/utils/brand.server.ts'
+import { adminMenuItems } from '#/app/utils/admin-nav.ts'
 import { menuLinks } from '#/app/utils/menu-links.server.ts'
 import { combineHeaders, getDomainUrl } from '#/app/utils/misc.tsx'
 import { useNonce } from '#/app/utils/nonce-provider.ts'
@@ -150,6 +151,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	// the SHA site chrome, the route supplies its own brand header.
 	const brandId = getBrandIdFromRequest(request)
 
+	// The admin pages in the site menu: only on an /admin page and only for an
+	// admin. Built here on the server, so a non-admin never receives the links.
+	const adminLinks: MenuLink[] =
+		pathname.startsWith('/admin') && user?.roles.some(r => r.name === 'admin')
+			? [
+					{
+						label: 'Admin',
+						subLinks: adminMenuItems.map(item => ({
+							to: item.path,
+							label: item.label,
+							reloadDocument: 'reloadDocument' in item && item.reloadDocument,
+						})),
+					},
+				]
+			: []
 	return json(
 		{
 			user,
@@ -169,7 +185,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			// The SHA nav (SkinMedica shop, about-Sarah hints) must not ship in
 			// the payload of a microsite-branded page; the chrome is hidden
 			// there anyway.
-			menuLinks: brandId === DEFAULT_BRAND_ID ? menuLinks : [],
+			menuLinks: [
+				...(brandId === DEFAULT_BRAND_ID ? menuLinks : []),
+				...adminLinks,
+			],
 		},
 		{
 			headers: combineHeaders(

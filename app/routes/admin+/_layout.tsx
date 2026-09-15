@@ -9,6 +9,7 @@ import {
 } from '@remix-run/react'
 import { Button } from '#app/components/ui/button'
 import { Icon } from '#app/components/ui/icon'
+import { adminMenuItems } from '#app/utils/admin-nav.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 
 // SEO handle to prevent indexing of admin pages
@@ -16,26 +17,6 @@ export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
 }
 
-// Define the admin menu items with valid icon names
-const adminMenuItems = [
-	{ path: '/admin', label: 'Dashboard', icon: 'dashboard' as const },
-	// The report hub serves its own full document, needs a real page load.
-	{
-		path: '/admin/reports',
-		label: 'Reports',
-		icon: 'dashboard' as const,
-		reloadDocument: true,
-	},
-	{ path: '/admin/reviews', label: 'Reviews', icon: 'star' as const },
-	{ path: '/admin/review-links', label: 'Review Links', icon: 'link-2' as const },
-	{ path: '/admin/boulevard', label: 'Boulevard', icon: 'calendar' as const },
-	{ path: '/admin/bg', label: 'Background Jobs', icon: 'clock' as const },
-	{ path: '/admin/google-ads', label: 'Google Ads', icon: 'update' as const },
-	{ path: '/admin/call-tags', label: 'Call Tags', icon: 'phone' as const },
-	{ path: '/admin/follow-ups', label: 'Follow-ups', icon: 'check' as const },
-	{ path: '/admin/articles', label: 'Articles', icon: 'file-text' as const },
-	{ path: '/admin/podcast', label: 'Podcast', icon: 'camera' as const },
-]
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	// Require admin role to access admin routes
@@ -55,7 +36,7 @@ export default function AdminLayout() {
 	return (
 		<div className="mx-auto w-full max-w-[2400px] px-4 py-8 sm:px-6 lg:px-8">
 			<div className="mb-6 flex items-center justify-between">
-				<h1 className="text-3xl font-bold">Admin Dashboard</h1>
+				<h1 className="text-2xl font-bold md:text-3xl">Admin Dashboard</h1>
 				<Link
 					to="/"
 					className="flex items-center rounded-md bg-muted px-3 py-2 text-sm hover:bg-muted/80"
@@ -66,8 +47,9 @@ export default function AdminLayout() {
 			</div>
 
 			<div className="grid grid-cols-1 gap-6 md:grid-cols-[250px_1fr]">
-				{/* Admin navigation sidebar */}
-				<div className="rounded-lg border bg-card p-4 shadow">
+				{/* Admin navigation sidebar. On a phone the same pages sit in the
+				    site menu (root.tsx), so the card is hidden there. */}
+				<div className="hidden rounded-lg border bg-card p-4 shadow md:block">
 					<nav className="space-y-1">
 						{adminMenuItems.map(item => {
 							const isActive =
