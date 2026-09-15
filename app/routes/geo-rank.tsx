@@ -419,9 +419,12 @@ function useLeafletMap(markers: GeoMarker[], ctx: MapCtx) {
 			// iframes lay out late, a 0-height init renders a blank map).
 			if (!L || !el || el.clientHeight < 40) return void setTimeout(init, 60)
 			const map = L.map(el)
-			L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-				attribution: '&copy; OpenStreetMap contributors',
-				maxZoom: 18,
+			// OSM's own tile servers block third-party apps (403 "osm.wiki/Blocked");
+			// CARTO's Voyager basemap serves the same OSM data with attribution.
+			L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+				attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+				subdomains: 'abcd',
+				maxZoom: 20,
 			}).addTo(map)
 			mapInstance.current = map
 			layerRef.current = L.layerGroup().addTo(map)
