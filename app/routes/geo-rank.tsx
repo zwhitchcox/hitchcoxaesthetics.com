@@ -421,12 +421,12 @@ function useLeafletMap(markers: GeoMarker[], ctx: MapCtx) {
 			// iframes lay out late, a 0-height init renders a blank map).
 			if (!L || !el || el.clientHeight < 40) return void setTimeout(init, 60)
 			const map = L.map(el)
-			// OSM's own tile servers block third-party apps (403 "osm.wiki/Blocked");
-			// CARTO's Voyager basemap serves the same OSM data with attribution.
-			L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-				attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-				subdomains: 'abcd',
-				maxZoom: 20,
+			// OSM's own tile servers 403 third-party apps and CARTO's public
+			// tiles now watermark "API KEY REQUIRED". Esri's World Street Map
+			// tiles are free with attribution and need no key. Note {y}/{x}.
+			L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+				attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>',
+				maxZoom: 19,
 			}).addTo(map)
 			mapInstance.current = map
 			layerRef.current = L.layerGroup().addTo(map)
