@@ -80,6 +80,10 @@ function maybeRefreshGeoView() {
 				await reportsQuery(
 					'REFRESH MATERIALIZED VIEW CONCURRENTLY geo_point_week_mv',
 				)
+				// A capture bulk-inserts ~24k rows per keyword; until the table is
+				// re-analyzed the planner thinks a week+keyword slice is 1 row and
+				// picks nested loops (the 16s grid query, 2026-09-15).
+				await reportsQuery('ANALYZE raw_dataforseo_region')
 			}
 		} catch (error) {
 			console.error('[geo-rank] view refresh failed:', error)
@@ -144,27 +148,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		// instead of ours. Chosen by clicking a row in the leaderboard.
 		const competitor = params.get('competitor')?.trim() || null
 
+		// One pass over the week+keyword slice: points, coordinates, and the
+		// best rank in the same GROUP BY. The old two-subquery join fell into a
+		// nested loop that re-ran the aggregate once per grid point (16s with
+		// stale planner stats, measured 2026-09-15); this shape is ~20ms.
 		const gridPromise = client.query(
-			competitor
-				? `SELECT g.grid_lat AS lat, g.grid_lng AS lng, g."gridRow" AS row, g."gridCol" AS col, r.rank
-				 FROM (SELECT DISTINCT "gridRow", "gridCol", "gridLat" AS grid_lat, "gridLng" AS grid_lng
-				       FROM raw_dataforseo_region WHERE week = $1::date AND keyword = $2) g
-				 LEFT JOIN (SELECT "gridRow", "gridCol", min("rankAbsolute") AS rank
-				            FROM raw_dataforseo_region
-				            WHERE week = $1::date AND keyword = $2 AND title = $3
-				            GROUP BY 1, 2) r USING ("gridRow", "gridCol")`
-				: `SELECT g.grid_lat AS lat, g.grid_lng AS lng, g."gridRow" AS row, g."gridCol" AS col, r.rank
-				 FROM (SELECT DISTINCT "gridRow", "gridCol", "gridLat" AS grid_lat, "gridLng" AS grid_lng
-				       FROM raw_dataforseo_region WHERE week = $1::date AND keyword = $2) g
-				 LEFT JOIN (SELECT "gridRow", "gridCol", min("rankAbsolute") AS rank
-				            FROM raw_dataforseo_region r JOIN geo_my_listing m ON m.place_id = r."placeId"
-				            WHERE week = $1::date AND keyword = $2${isAll ? '' : ` AND ${BRAND_CASE} = $3`}
-				            GROUP BY 1, 2) r USING ("gridRow", "gridCol")`,
-			competitor
-				? [week, keyword, competitor]
-				: isAll
-					? [week, keyword]
-					: [week, keyword, brand],
+			`SELECT avg(r."gridLat") AS lat, avg(r."gridLng") AS lng,
+			   r."gridRow" AS row, r."gridCol" AS col,
+			   min(r."rankAbsolute") FILTER (WHERE ${
+					competitor
+						? 'r.title = $3'
+						: isAll
+							? 'm.place_id IS NOT NULL'
+							: `m.place_id IS NOT NULL AND ${BRAND_CASE} = $3`
+				}) AS rank
+			 FROM raw_dataforseo_region r
+			 LEFT JOIN geo_my_listing m ON m.place_id = r."placeId"
+			 WHERE r.week = $1::date AND r.keyword = $2
+			 GROUP BY r."gridRow", r."gridCol"`,
+			competitor ? [week, keyword, competitor] : isAll ? [week, keyword] : [week, keyword, brand],
 		)
 
 		// Competitor reach over time for the selected keyword: share of grid
