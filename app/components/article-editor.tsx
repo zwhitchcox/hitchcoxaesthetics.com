@@ -1298,11 +1298,12 @@ export function ArticleEditor({
 						</p>
 					</div>
 				</div>
+				{/* The dock, the sheet and the popup are fixed, so a drop on them
+				    still bubbles here: a picture can land anywhere on the page. */}
+				{dock}
+				{sheet}
+				{corner}
 			</DropZone>
-
-			{dock}
-			{sheet}
-			{corner}
 
 			{zoom ? (
 				<div className="fixed inset-0 z-50">

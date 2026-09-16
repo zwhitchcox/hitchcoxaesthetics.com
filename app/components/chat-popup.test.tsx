@@ -536,3 +536,36 @@ test('an error that lands while the popup is closed does not mark the launcher a
 		(within(popup()).getByLabelText('Message') as HTMLTextAreaElement).value,
 	).toBe(THE_ASK)
 })
+
+test('a picture dropped on the open popup attaches to the chat', async () => {
+	mockFetch({
+		upload: () =>
+			jsonResponse(200, {
+				image: {
+					id: 'im2',
+					fileName: 'user-im2.png',
+					width: 1,
+					height: 1,
+					url: '/resources/article-images/im2',
+				},
+			}),
+	})
+	renderEditor()
+	await screen.findByRole('textbox', { name: RICH_EDITOR_COPY.label })
+	const user = userEvent.setup()
+	await user.click(launcher())
+	const open = popup()
+	const file = new File([new Uint8Array([137, 80, 78, 71])], 'photo.png', {
+		type: 'image/png',
+	})
+	fireEvent.drop(open, {
+		dataTransfer: { files: [file], types: ['Files'] },
+	})
+
+	await waitFor(() =>
+		expect(open.querySelector('[data-status="ready"]')).toBeTruthy(),
+	)
+	expect(
+		within(open).getByRole('button', { name: 'Remove the picture' }),
+	).toBeTruthy()
+})
