@@ -402,7 +402,6 @@ export function ChatComposer({
 	onSend,
 	enterSends,
 	boxRef,
-	writerLink,
 	trailing,
 	className,
 }: {
@@ -422,8 +421,7 @@ export function ChatComposer({
 	/** Enter sends (a physical keyboard); else Enter is a new line. */
 	enterSends: boolean
 	boxRef: React.RefObject<HTMLTextAreaElement>
-	writerLink?: React.ReactNode
-	/** Rendered after the Send button, inside the row (the phone dock's open/close arrow). */
+	/** Rendered after the Send button, inside the row (the phone dock's save mark). */
 	trailing?: React.ReactNode
 	/** Replaces the whole wrapper class string; the note line then drops its top line too (the dock draws its own). */
 	className?: string
@@ -511,7 +509,13 @@ export function ChatComposer({
 						readOnly={running}
 						aria-busy={running}
 						rows={1}
-						className="min-h-10 resize-none text-base leading-6"
+						className={cn(
+							'min-h-10 resize-none text-base leading-6',
+							// While the ghost words sit over the box, GhostTextarea keeps the placeholder transparent under them.
+							dictation.listening || ghost
+								? ''
+								: 'placeholder:text-muted-foreground/60',
+						)}
 						placeholder={
 							quote
 								? ARTICLE_CHAT_COPY.quotePlaceholder
@@ -545,7 +549,6 @@ export function ChatComposer({
 				{trailing}
 			</div>
 			<DictationNote dictation={dictation} />
-			{writerLink}
 		</div>
 	)
 }

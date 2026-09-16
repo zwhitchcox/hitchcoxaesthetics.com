@@ -1,6 +1,5 @@
 import { forwardRef, useEffect, useRef } from 'react'
 import {
-	ARTICLE_CHAT_COPY,
 	ChatRow,
 	DOCK_TARGET_CLASS,
 	WorkingRow,
@@ -12,8 +11,9 @@ import { cn } from '#app/utils/misc.tsx'
 
 /**
  * The chat's shell: where the chat sits on the page. The phone has a fixed
- * dock at the bottom (the composer, one status line) and a sheet that
- * slides up between the page's top bar and the dock. A wide screen has a
+ * dock at the bottom (the composer, one status line, a tab on its top edge
+ * that opens the chat) and a sheet that slides up between the page's top
+ * bar and the dock. A wide screen has a
  * round launcher bottom-right and a popup above it. Every piece of chat
  * state lives in ArticleEditor; these components only place its children.
  *
@@ -51,7 +51,7 @@ const SAFE_AREA_PADDING_CLASS = 'pb-[max(0.75rem,env(safe-area-inset-bottom))]'
 const noop = () => {}
 
 /* ------------------------------------------------------------------------ */
-/* The phone: the dock, the status line, the arrow, the sheet               */
+/* The phone: the dock and its tab, the status line, the sheet              */
 /* ------------------------------------------------------------------------ */
 
 /**
@@ -59,18 +59,27 @@ const noop = () => {}
  * both chat states, so the composer inside it never remounts. It rises with
  * the keyboard (`keyboardInset`) and sits above the page's bottom bar. The
  * ChatComposer inside it takes `className="space-y-2 px-3 pt-2"` (the dock's
- * own top line is the only one) and `trailing={<ChatToggle … />}`.
+ * own top line is the only one) and `trailing={<SaveState … />}`.
+ *
+ * With `chat`, a small tab protrudes from the dock's top edge on the right
+ * and opens or closes the sheet; the dock is `fixed`, so the tab's
+ * `absolute` offset counts from it. No tab without `chat` (an own-words
+ * row: the dock holds the format row alone).
  */
 export const ChatDock = forwardRef<
 	HTMLDivElement,
-	{ keyboardInset: number; children: React.ReactNode }
->(function ChatDock({ keyboardInset, children }, ref) {
+	{
+		keyboardInset: number
+		chat?: { open: boolean; onOpen: () => void; onClose: () => void }
+		children: React.ReactNode
+	}
+>(function ChatDock({ keyboardInset, chat, children }, ref) {
 	return (
 		<div
 			ref={ref}
 			data-chat-dock=""
 			className={cn(
-				'fixed inset-x-0 z-30 border-t bg-background/95 backdrop-blur',
+				'fixed inset-x-0 z-30 overflow-visible border-t bg-background/95 backdrop-blur',
 				DOCK_BOTTOM_CLASS,
 				keyboardInset ? 'pb-2' : SAFE_AREA_PADDING_CLASS,
 			)}
@@ -78,6 +87,23 @@ export const ChatDock = forwardRef<
 				{ '--keyboard-inset': `${keyboardInset}px` } as React.CSSProperties
 			}
 		>
+			{chat ? (
+				<button
+					type="button"
+					aria-label={
+						chat.open ? CHAT_SHELL_COPY.closeChat : CHAT_SHELL_COPY.openChat
+					}
+					aria-expanded={chat.open}
+					aria-controls={CHAT_SHEET_ID}
+					onClick={chat.open ? chat.onClose : chat.onOpen}
+					className="absolute -top-7 right-3 flex h-7 w-12 items-center justify-center rounded-t-lg border border-b-0 bg-background"
+				>
+					<Icon
+						name={chat.open ? 'chevron-down' : 'chevron-up'}
+						className="h-5 w-5"
+					/>
+				</button>
+			) : null}
 			{children}
 		</div>
 	)
@@ -88,8 +114,6 @@ export type StatusLineProps = {
 	running: boolean
 	/** The newest answer she has not seen (an assistant, change or error row), or null. */
 	entry: ChatEntry | null
-	/** No rows at all: the line invites the first message. */
-	empty: boolean
 	/** The newest change row of this visit: the one with Undo. */
 	undoRowId: string | null
 	undoneIds: ReadonlySet<string>
@@ -101,14 +125,13 @@ export type StatusLineProps = {
 }
 
 /**
- * One line above the composer while the sheet is closed: the working dots,
- * the newest unseen answer, or the invitation to a first message. Absent
- * when there is history and nothing unseen.
+ * One line above the composer while the sheet is closed: the working dots
+ * or the newest unseen answer. Absent otherwise; the sheet's list carries
+ * the invitation to a first message, so nothing sits over the box.
  */
 export function StatusLine({
 	running,
 	entry,
-	empty,
 	undoRowId,
 	undoneIds,
 	undoBusy,
@@ -153,18 +176,13 @@ export function StatusLine({
 				dock
 			/>
 		)
-	} else if (empty) {
-		content = (
-			<button type="button" onClick={onOpen} className="text-left">
-				{ARTICLE_CHAT_COPY.emptyTitle}
-			</button>
-		)
 	} else {
 		return null
 	}
 	return (
 		<div
 			role="status"
+			data-status-line=""
 			aria-live="polite"
 			className="min-h-7 px-3 pt-2 text-sm text-muted-foreground"
 		>
@@ -178,30 +196,6 @@ function cutAnswer(text: string): string {
 	return line.length > STATUS_LINE_CHARS
 		? `${line.slice(0, STATUS_LINE_CHARS).trimEnd()}…`
 		: line
-}
-
-/** The arrow at the end of the dock's composer row: opens and closes the sheet. */
-export function ChatToggle({
-	open,
-	onOpen,
-	onClose,
-}: {
-	open: boolean
-	onOpen: () => void
-	onClose: () => void
-}) {
-	return (
-		<button
-			type="button"
-			aria-label={open ? CHAT_SHELL_COPY.closeChat : CHAT_SHELL_COPY.openChat}
-			aria-expanded={open}
-			aria-controls={CHAT_SHEET_ID}
-			onClick={open ? onClose : onOpen}
-			className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-		>
-			<Icon name={open ? 'chevron-down' : 'chevron-up'} className="h-5 w-5" />
-		</button>
-	)
 }
 
 /**
@@ -221,7 +215,7 @@ export function ChatSheet({
 	keyboardInset: number
 	dockHeight: number
 	onClose: () => void
-	/** The ChatList, with `className="min-h-0 flex-1 overscroll-contain px-4"`. */
+	/** The ChatList, with `className="min-h-0 flex-1 overscroll-contain px-4 pb-7"` (the dock's tab covers the list's bottom-right corner). */
 	children: React.ReactNode
 }) {
 	useEffect(() => {

@@ -205,7 +205,7 @@ function FormatButtons({
 	)
 }
 
-/** The phone row in the dock: the controls, or the link row in their place. Sized to fit a 375 px screen. */
+/** The phone row in the dock: a plain wrapping row of ghost buttons (no band, no border), or the link row in their place. */
 export function FormatRow({
 	selection,
 	onCommand,
@@ -223,7 +223,7 @@ export function FormatRow({
 		<div
 			role="toolbar"
 			aria-label={TOOLBAR_COPY.toolbar}
-			className="flex h-11 items-center gap-1 overflow-x-auto px-1"
+			className="flex flex-wrap items-center gap-1 px-2 pt-1"
 		>
 			<FormatButtons
 				selection={selection}

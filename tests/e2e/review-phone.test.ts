@@ -15,24 +15,30 @@ import { expect, test } from '#tests/playwright-utils.ts'
  * spot for (both too long for 2 min). The walk: pick 2 min, the shortest is
  * served with its picture in the prose and inert claim marks, read to the
  * end, Approve, the approved card and its record, the next one below it,
- * Undo. "Change it" opens the editor page: the article fills the screen in
- * the rich editor, the chat dock sits at the bottom, and there is no tab
- * strip. Opening the editor never saves. A (mocked) chat turn from the dock
- * changes the text in place: the status line reads "Changed: …" with
- * "See it" and "Undo", the green mark shows, the Markdown toggle holds the
- * new text, and "Undo" puts the old text back with a real save. A selected
- * passage in the article becomes a quote through "Comment on this" in the
- * format row. An attached picture (the upload is mocked) shows a thumbnail
- * in the dock, goes out with her words, and lands in the text as a `user-`
- * picture line; the chat sheet shows both bubbles. "Write a different
- * article" on the next card, then "Keep this one". The blog post gets
+ * Undo. "Change it" opens the editor page (phase 4.1 facts R1-R7): the
+ * article fills the screen in the rich editor, the top bar holds Back to
+ * the article, the Markdown toggle and Approve, and one dock sits at the
+ * bottom with the composer, the save mark at the end of its row (a spinner
+ * while a save waits or runs, a check after it; `data-save-state` carries
+ * the state) and a tab on its top edge that opens the chat sheet. There is
+ * no tab strip and no status line before the first turn. Opening the editor
+ * never saves. A (mocked) chat turn from the dock changes the text in
+ * place: the status line reads "Changed: …" with "See it" and "Undo", the
+ * green mark shows, the Markdown toggle holds the new text, and "Undo" puts
+ * the old text back with a real save. A selected passage in the article
+ * becomes a quote through "Comment on this" in the format row. An attached
+ * picture (the upload is mocked) shows a thumbnail in the dock, goes out
+ * with her words, and lands in the text as a `user-` picture line; the chat
+ * sheet shows both bubbles. "Write a different article" on the next card
+ * (no note field; the "…" sheet has no Deny and no note to the writer),
+ * the sync endpoint answers `meta` for the same text and `kept` for
+ * different text while she waits, then "Keep this one". The blog post gets
  * "Approve anyway" on the read-to-the-end sheet; a typed edit in the rich
  * editor and one under the Markdown toggle save themselves and survive a
  * reload; the dock stays inside the screen with the box focused. The guest
  * post gets no "Approve anyway"; a selected passage on the reading page
  * opens the editor with the quote in the dock; Change it opens the editor
- * with no edit, then "Send this to the writer instead". Then the sync
- * endpoint answers `meta` for the same text and `kept` for different text.
+ * with no edit, and Back keeps the stored text byte for byte.
  *
  * The chat turn is mocked at /resources/article-chat (no OpenRouter call):
  * the mock writes the changed text with prisma, as the real resource does,
@@ -222,27 +228,43 @@ function richEditor(page: Page) {
 	return page.getByRole('textbox', { name: 'Article', exact: true })
 }
 
-/** The one-line status above the composer in the dock (a change, an answer, an error, or the empty hint). */
+/** The one-line status above the composer in the dock (a change, an answer or an error). Absent before the first turn. */
 function statusLine(page: Page) {
-	return page.locator(
-		'[data-chat-dock] [role="status"], [data-chat-dock] [role="alert"]',
-	)
+	return page.locator('[data-chat-dock] [data-status-line]')
 }
 
-/** The "Markdown" toggle in the editor's top row; `aria-pressed` carries its state. */
+/** The "Markdown" toggle in the editor's slot in the top bar; `aria-pressed` carries its state. */
 function markdownToggle(page: Page) {
-	return page.getByRole('button', { name: 'Markdown', exact: true })
+	return page
+		.locator('[data-editor-bar-slot]')
+		.getByRole('button', { name: 'Markdown', exact: true })
 }
 
-/** The chevron in the dock opens the chat sheet. */
+/** The save mark at the end of the dock's composer row; `data-save-state` is idle, saving, saved, error or conflict. */
+function saveMark(page: Page) {
+	return page.locator('[data-chat-dock] [data-save-state]')
+}
+
+/** The tab on the dock's top edge: "Open the chat" while the sheet is closed, "Close the chat" while it is open. */
+function chatTab(page: Page) {
+	return page.locator('[data-chat-dock] [aria-controls="article-chat-sheet"]')
+}
+
+/** The tab on the dock opens the chat sheet and flips to "Close the chat", expanded. */
 async function openChat(page: Page) {
-	await page.getByRole('button', { name: 'Open the chat', exact: true }).click()
+	await expect(chatTab(page)).toHaveAttribute('aria-expanded', 'false')
+	await page
+		.locator('[data-chat-dock]')
+		.getByRole('button', { name: 'Open the chat', exact: true })
+		.click()
 	await expect(
 		page.getByRole('dialog', { name: 'Chat', exact: true }),
 	).toBeVisible()
+	await expect(chatTab(page)).toHaveAttribute('aria-label', 'Close the chat')
+	await expect(chatTab(page)).toHaveAttribute('aria-expanded', 'true')
 }
 
-/** The chevron flips to "Close the chat". The sheet's × has the same name, so the dock's button is the one. */
+/** The tab closes the sheet and flips back. The sheet's × has the same name, so the dock's button is the one. */
 async function closeChat(page: Page) {
 	await page
 		.locator('[data-chat-dock]')
@@ -251,6 +273,8 @@ async function closeChat(page: Page) {
 	await expect(
 		page.getByRole('dialog', { name: 'Chat', exact: true }),
 	).toHaveCount(0)
+	await expect(chatTab(page)).toHaveAttribute('aria-label', 'Open the chat')
+	await expect(chatTab(page)).toHaveAttribute('aria-expanded', 'false')
 }
 
 /** Scroll one element to the middle of the screen, clear of the fixed dock and the top bar. */
@@ -321,7 +345,7 @@ async function eventsOfKind(articleId: string, kind: string) {
 	})
 }
 
-test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, a different article, auto-save, the end gate, comment on this, send to the writer, sync', async ({
+test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, a different article, sync, auto-save, the end gate, comment on this, a look with no edit', async ({
 	page,
 	login,
 	request,
@@ -545,27 +569,39 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await page.getByRole('link', { name: 'Change it' }).click()
 		await expect(page).toHaveURL(new RegExp(`/review/${short.id}/change$`))
 		await expect(page.getByRole('tab')).toHaveCount(0)
+		// the top bar: Back to the article, the editor's slot with the Markdown toggle, Approve (R2, R7)
 		await expect(
 			page.getByRole('link', { name: /Back to the article/ }).first(),
+		).toBeVisible()
+		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'false')
+		await expect(
+			page.getByRole('button', { name: 'Approve', exact: true }),
 		).toBeVisible()
 		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(
 			0,
 		)
-		await expect(statusLine(page)).toContainText(
-			'Ask a question or say what to change.',
-		)
+		await expect(
+			page.getByRole('button', { name: 'Send this to the writer instead' }),
+		).toHaveCount(0)
+		// the dock: no status line before the first turn, the box's placeholder
+		// invites her words, the save mark ends the row, the tab is closed (R1, R5)
+		await expect(
+			page.getByText('Ask a question or say what to change.'),
+		).toHaveCount(0)
+		await expect(statusLine(page)).toHaveCount(0)
 		const composer = page.getByPlaceholder('Say or type what to change…')
 		await expect(composer).toBeVisible()
-		await expect(
-			page.getByRole('button', { name: 'Open the chat', exact: true }),
-		).toBeVisible()
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'idle')
+		await expect(chatTab(page)).toHaveAttribute('aria-label', 'Open the chat')
+		await expect(chatTab(page)).toHaveAttribute('aria-expanded', 'false')
 		await expect(article(page)).toContainText(SHORT_CLAIM)
 		await expect(richEditor(page)).toBeVisible()
 		await expectNoSidewaysScroll(page)
 		await page.screenshot({ path: shot('editor'), fullPage: true })
 
-		/* Opening the editor never saves: no `saved` event, the stored text is untouched (D11) */
+		/* Opening the editor never saves: the mark stays idle, no `saved` event, the stored text is untouched (D11) */
 		await page.waitForTimeout(3000)
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'idle')
 		expect(await eventsOfKind(short.id, 'saved')).toHaveLength(0)
 		expect(
 			(
@@ -906,26 +942,42 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		/* R6: "Write a different article" on the second card, then "Keep this one" */
 		const secondCard = card(page, second.id)
 		await page.getByRole('button', { name: 'More' }).click()
-		const moreSheet = page.getByRole('dialog', { name: 'More' })
+		const moreSheet = page.getByRole('dialog', { name: 'More', exact: true })
 		await expect(moreSheet).toBeVisible()
+		// Later, Ask Zane and Write a different article; no "Do not publish this", no note to the writer (R7)
+		await expect(
+			moreSheet.getByRole('button', { name: 'Later', exact: true }),
+		).toBeVisible()
+		await expect(
+			moreSheet.getByRole('button', { name: 'Ask Zane', exact: true }),
+		).toBeVisible()
+		await expect(
+			moreSheet.getByRole('button', { name: 'Do not publish this' }),
+		).toHaveCount(0)
+		await expect(
+			moreSheet.getByRole('button', { name: 'Send a note to the writer' }),
+		).toHaveCount(0)
 		await moreSheet
-			.getByRole('button', { name: 'Write a different article' })
+			.getByRole('button', { name: 'Write a different article', exact: true })
 			.click()
 		const rewriteSheet = page.getByRole('dialog', {
 			name: 'Write a different article',
+			exact: true,
 		})
 		await expect(rewriteSheet).toBeVisible()
 		await expect(
 			rewriteSheet.getByText(
-				`The writer starts over with a new topic for ${PUBLICATION}. This one leaves your list until the new one is ready. That usually takes a day or two.`,
+				'The writer starts over with a new topic and never sees this text. The new article comes back here for you.',
 			),
 		).toBeVisible()
-		await rewriteSheet
-			.getByLabel('Anything to tell the writer? (optional)')
-			.fill('Not fillers again.')
+		// no note field: the writer never sees this text, or her words about it
+		await expect(
+			rewriteSheet.getByLabel('Anything to tell the writer? (optional)'),
+		).toHaveCount(0)
+		await expect(rewriteSheet.getByRole('textbox')).toHaveCount(0)
 		await page.screenshot({ path: shot('rewrite-sheet') })
 		await rewriteSheet
-			.getByRole('button', { name: 'Write a different one' })
+			.getByRole('button', { name: 'Write a different article', exact: true })
 			.click()
 		await expect(rewriteSheet).toBeHidden()
 		await expect(
@@ -947,14 +999,74 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		})
 		expect(rewrite.status).toBe('changes_requested')
 		expect(rewrite.rewriteRequested).toBe(true)
-		expect(rewrite.reviewNote).toBe('NEW ARTICLE: Not fillers again.')
+		// the ledger note is the fixed prefix and default: no words of hers go to the writer
+		expect(rewrite.reviewNote).toBe('NEW ARTICLE: a different article')
 		expect(rewrite.reviewedBy).toBe(user.name)
 		expect(rewrite.reviewedAt).not.toBeNull()
 		expect(rewrite.approvedBodyHash).toBeNull()
 		expect(rewrite.body).toBe(SECOND_BODY)
 		expect(await eventsOfKind(second.id, 'rewrite_requested')).toEqual([
-			expect.objectContaining({ note: 'Not fillers again.', userId: user.id }),
+			expect.objectContaining({ note: null, userId: user.id }),
 		])
+
+		/* The sync endpoint while she waits for a different one: the same text is `meta`, different text is `kept` */
+		const token = process.env.ARTICLE_SYNC_TOKEN
+		expect(token, 'ARTICLE_SYNC_TOKEN is read from .env').toBeTruthy()
+		const push = (body: string) =>
+			request.post('/resources/article-sync', {
+				headers: { Authorization: `Bearer ${token}` },
+				data: {
+					articles: [
+						{
+							sourceKey: second.sourceKey,
+							kind: 'guest',
+							title: second.title,
+							publication: PUBLICATION,
+							publicationUrl: `https://${PUBLICATION}/`,
+							byline: 'Sarah Hitchcox, RN',
+							wordCount: countWords(body),
+							links: LINKS,
+							body,
+						},
+					],
+				},
+			})
+
+		const same = await push(SECOND_BODY)
+		expect(same.status()).toBe(200)
+		expect((await same.json()).results).toEqual([
+			expect.objectContaining({
+				sourceKey: second.sourceKey,
+				id: second.id,
+				status: 'changes_requested',
+				changed: 'meta',
+			}),
+		])
+
+		const later = `${SECOND_BODY}\n\nA line the writer added later.`
+		const different = await push(later)
+		expect(different.status()).toBe(200)
+		expect((await different.json()).results).toEqual([
+			expect.objectContaining({
+				sourceKey: second.sourceKey,
+				id: second.id,
+				status: 'changes_requested',
+				changed: 'kept',
+			}),
+		])
+		const kept = await prisma.article.findUniqueOrThrow({
+			where: { id: second.id },
+		})
+		expect(kept.status).toBe('changes_requested')
+		expect(kept.body).toBe(SECOND_BODY)
+		expect(kept.reviewNote).toBe(rewrite.reviewNote)
+		expect(kept.reviewedAt?.getTime()).toBe(rewrite.reviewedAt?.getTime())
+		expect(kept.incomingBody).toBe(later)
+		expect(kept.incomingBodyHash).toBe(hashBody(later))
+		expect(kept.incomingAt).not.toBeNull()
+		expect(
+			await prisma.articleImage.count({ where: { articleId: second.id } }),
+		).toBe(1)
 
 		await keepThisOne.click()
 		await expect(secondCard.getByText('Every word')).toBeVisible()
@@ -1007,7 +1119,7 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await lastParagraph.click()
 		await caretToEnd(lastParagraph)
 		await page.keyboard.type(' Sarah added this line.')
-		await expect(page.getByText('Saved', { exact: true })).toBeVisible({
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'saved', {
 			timeout: 10_000,
 		})
 		await page.screenshot({ path: shot('autosave'), fullPage: true })
@@ -1025,8 +1137,8 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		const editor = page.getByLabel('Article text')
 		await expect(editor).toHaveValue(BLOG_BODY_TYPED)
 		await editor.fill(BLOG_BODY_EDITED)
-		await expect(page.getByText('Saving…', { exact: true })).toBeVisible()
-		await expect(page.getByText('Saved', { exact: true })).toBeVisible({
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'saving')
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'saved', {
 			timeout: 10_000,
 		})
 		const autoSaved = await prisma.article.findUniqueOrThrow({
@@ -1114,7 +1226,7 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await expect(page).toHaveURL(new RegExp(`/review/${held.id}$`))
 		await expect(cardTitle(page, held.id, held.title)).toBeVisible()
 
-		/* S5: Change it opens the editor with no edit, then "Send this to the writer instead" */
+		/* Change it opens the editor with no edit; Back keeps the stored text: no save, byte for byte (D11) */
 		await page.getByRole('link', { name: 'Change it' }).click()
 		await expect(page).toHaveURL(new RegExp(`/review/${held.id}/change$`))
 		await expect(page.getByRole('tab')).toHaveCount(0)
@@ -1127,113 +1239,35 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(
 			0,
 		)
+		// the writer link and its sheet are gone: the chat took their place (R7)
+		await expect(
+			page.getByRole('button', { name: 'Send this to the writer instead' }),
+		).toHaveCount(0)
+		await expect(
+			page.getByRole('dialog', { name: 'Send this to the writer' }),
+		).toHaveCount(0)
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'idle')
 		await expectNoSidewaysScroll(page)
 		await page.screenshot({ path: shot('change'), fullPage: true })
-		// the writer link renders under the article, inside the editor root, above the fixed dock
-		const writerLink = page
-			.locator('[data-article-editor]')
-			.getByRole('button', { name: 'Send this to the writer instead' })
-		await scrollToCentre(writerLink)
-		await writerLink.click()
-		const writerSheet = page.getByRole('dialog', {
-			name: 'Send this to the writer',
-		})
-		await expect(writerSheet).toBeVisible()
-		await writerSheet.getByText('Wrong fact', { exact: true }).click()
-		await expect(writerSheet.getByLabel('Wrong fact')).toBeChecked()
-		await writerSheet
-			.getByLabel('What to change')
-			.fill('Say 2 to 4 units, not 5.')
-		await page.screenshot({ path: shot('writer-sheet') })
-		await writerSheet
-			.getByRole('button', { name: 'Send to the writer' })
+		await page
+			.getByRole('link', { name: /Back to the article/ })
+			.first()
 			.click()
-		await expect(page).toHaveURL(/\/review(\?plenty=1)?$/)
-		await expect(
-			page.getByText(
-				'Sent to the writer. It comes back to you as "Your change is in".',
-			),
-		).toBeVisible()
-		// the toast slides in; let it settle before the capture
-		await page.screenshot({
-			path: shot('sent'),
-			fullPage: true,
-			animations: 'disabled',
-		})
+		await expect(page).toHaveURL(new RegExp(`/review/${held.id}$`))
+		await expect(cardTitle(page, held.id, held.title)).toBeVisible()
+		await expect(card(page, held.id).getByText('Every word')).toBeVisible()
 
-		// two editor visits with no edit left the stored text byte for byte
-		const requested = await prisma.article.findUniqueOrThrow({
+		// two editor visits with no edit left the stored text byte for byte, still hers to decide
+		const untouched = await prisma.article.findUniqueOrThrow({
 			where: { id: held.id },
 		})
-		expect(requested.status).toBe('changes_requested')
-		expect(requested.rewriteRequested).toBe(false)
-		expect(requested.reviewNote).toBe('Wrong fact: Say 2 to 4 units, not 5.')
-		expect(requested.reviewedBy).toBe(user.name)
-		expect(requested.body).toBe(HELD_BODY)
+		expect(untouched.status).toBe('pending')
+		expect(untouched.body).toBe(HELD_BODY)
+		expect(untouched.editedAt).toBeNull()
+		expect(untouched.editedBy).toBeNull()
+		expect(untouched.reviewNote).toBeNull()
 		expect(await eventsOfKind(held.id, 'saved')).toHaveLength(0)
-		const afterRequest = await eventKinds(held.id)
-		expect(afterRequest.indexOf('changes_requested')).toBeGreaterThan(
-			afterRequest.indexOf('opened'),
-		)
-
-		/* The sync endpoint: the same text is `meta`, different text is `kept` */
-		const token = process.env.ARTICLE_SYNC_TOKEN
-		expect(token, 'ARTICLE_SYNC_TOKEN is read from .env').toBeTruthy()
-		const push = (body: string) =>
-			request.post('/resources/article-sync', {
-				headers: { Authorization: `Bearer ${token}` },
-				data: {
-					articles: [
-						{
-							sourceKey: held.sourceKey,
-							kind: 'guest',
-							title: held.title,
-							publication: PUBLICATION,
-							publicationUrl: `https://${PUBLICATION}/`,
-							byline: 'Sarah Hitchcox, RN',
-							wordCount: countWords(body),
-							links: LINKS,
-							body,
-						},
-					],
-				},
-			})
-
-		const same = await push(HELD_BODY)
-		expect(same.status()).toBe(200)
-		expect((await same.json()).results).toEqual([
-			expect.objectContaining({
-				sourceKey: held.sourceKey,
-				id: held.id,
-				status: 'changes_requested',
-				changed: 'meta',
-			}),
-		])
-
-		const trimmed = `${HELD_BODY}\n\nA line the writer added after her note.`
-		const different = await push(trimmed)
-		expect(different.status()).toBe(200)
-		expect((await different.json()).results).toEqual([
-			expect.objectContaining({
-				sourceKey: held.sourceKey,
-				id: held.id,
-				status: 'changes_requested',
-				changed: 'kept',
-			}),
-		])
-		const kept = await prisma.article.findUniqueOrThrow({
-			where: { id: held.id },
-		})
-		expect(kept.status).toBe('changes_requested')
-		expect(kept.body).toBe(HELD_BODY)
-		expect(kept.reviewNote).toBe(requested.reviewNote)
-		expect(kept.reviewedAt?.getTime()).toBe(requested.reviewedAt?.getTime())
-		expect(kept.incomingBody).toBe(trimmed)
-		expect(kept.incomingBodyHash).toBe(hashBody(trimmed))
-		expect(kept.incomingAt).not.toBeNull()
-		expect(
-			await prisma.articleImage.count({ where: { articleId: held.id } }),
-		).toBe(1)
+		expect(await eventKinds(held.id)).toContain('opened')
 	} finally {
 		await Promise.all(
 			others.map(o =>

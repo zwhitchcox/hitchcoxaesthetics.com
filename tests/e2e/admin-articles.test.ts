@@ -18,14 +18,19 @@ const BODY = [
 ].join('\n')
 
 /*
- * Desktop width (phase 4 plan, section G.9). The article fills the page in
- * the rich editor, centred at 70ch. The chat is a launcher in the bottom
- * right corner; it opens as a popup above the decision bar. A typed edit in
- * the article saves itself and shows in the Markdown toggle; an edit under
- * the toggle lands in the article. A double-click on a word shows the
- * formatting bubble; Bold from it saves `**Second**`. "Comment on this"
- * from the bubble opens the popup with the quote. Approve posts the hidden
- * body from the bar at the bottom.
+ * Desktop width (phase 4 plan, section G.9; phase 4.1 facts R1-R7). The
+ * article fills the page in the rich editor, centred at 70ch, with no bar
+ * of its own. One bar at the bottom holds Approve, "Write a different
+ * article" and the editor's slot: the save mark (a spinner while a save
+ * waits or runs, a check after it; `data-save-state` carries the state) and
+ * the Markdown toggle. No Deny, no "Send to the writer", no note for the
+ * writer. The chat is a launcher in the bottom right corner; it opens as a
+ * popup above the bar. A typed edit in the article saves itself and shows
+ * in the Markdown toggle; an edit under the toggle lands in the article. A
+ * double-click on a word shows the formatting bubble; Bold from it saves
+ * `**Second**`. "Comment on this" from the bubble opens the popup with the
+ * quote. "Write a different article" opens a confirm sheet with no note
+ * field. Approve posts the hidden body from the bar.
  *
  * The caret goes to the end of a paragraph through a DOM selection, not the
  * End key: on macOS Playwright maps End to `scrollToEndOfDocument:`, which
@@ -38,9 +43,26 @@ function richEditor(page: Page) {
 	return page.getByRole('textbox', { name: 'Article', exact: true })
 }
 
-/** The "Markdown" toggle in the editor's top row; `aria-pressed` carries its state. */
+/** The editor's slot in the route's bar: the save mark and the Markdown toggle render into it. */
+function barSlot(page: Page) {
+	return page.locator('[data-editor-bar-slot]')
+}
+
+/** The "Markdown" toggle in the bar slot; `aria-pressed` carries its state. */
 function markdownToggle(page: Page) {
-	return page.getByRole('button', { name: 'Markdown', exact: true })
+	return barSlot(page).getByRole('button', { name: 'Markdown', exact: true })
+}
+
+/** The save mark in the bar slot; `data-save-state` is idle, saving, saved, error or conflict. */
+function saveMark(page: Page) {
+	return barSlot(page).locator('[data-save-state]')
+}
+
+/** The decision bar at the bottom: Approve, "Write a different article" and the editor's slot. */
+function decisionBar(page: Page) {
+	return page.locator('.sticky.bottom-0', {
+		has: page.locator('[data-editor-bar-slot]'),
+	})
 }
 
 /** The chat popup, open. */
@@ -163,6 +185,73 @@ test('an admin can read, edit and approve an article', async ({
 		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(
 			0,
 		)
+		// One bar at the bottom: Approve, "Write a different article" and the editor's
+		// slot with the save mark (idle: nothing changed yet) and the Markdown toggle.
+		// The editor renders no bar of its own (R1-R3).
+		const bar = decisionBar(page)
+		await expect(bar).toBeVisible()
+		await expect(
+			bar.getByRole('button', { name: 'Approve', exact: true }),
+		).toBeVisible()
+		await expect(
+			bar.getByRole('button', {
+				name: 'Write a different article',
+				exact: true,
+			}),
+		).toBeVisible()
+		await expect(markdownToggle(page)).toBeVisible()
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'idle')
+		await expect(
+			page.locator('[data-article-editor] [data-save-state]'),
+		).toHaveCount(0)
+		await expect(
+			page
+				.locator('[data-article-editor]')
+				.getByRole('button', { name: 'Markdown', exact: true }),
+		).toHaveCount(0)
+		// Deny, "Send to the writer" and the note for the writer are gone (R7).
+		await expect(
+			page.getByRole('button', { name: 'Deny', exact: true }),
+		).toHaveCount(0)
+		await expect(
+			page.getByRole('button', { name: 'Send to the writer', exact: true }),
+		).toHaveCount(0)
+		await expect(page.getByLabel('Note for the writer')).toHaveCount(0)
+
+		// "Write a different article" opens the confirm sheet: no note field; Cancel keeps the article.
+		await bar
+			.getByRole('button', { name: 'Write a different article', exact: true })
+			.click()
+		const rewriteSheet = page.getByRole('dialog', {
+			name: 'Write a different article',
+			exact: true,
+		})
+		await expect(rewriteSheet).toBeVisible()
+		await expect(
+			rewriteSheet.getByText(
+				'The writer starts over with a new topic and never sees this text. The new article comes back here for you.',
+			),
+		).toBeVisible()
+		await expect(rewriteSheet.getByRole('textbox')).toHaveCount(0)
+		await expect(
+			rewriteSheet.getByRole('button', {
+				name: 'Write a different article',
+				exact: true,
+			}),
+		).toBeVisible()
+		await rewriteSheet
+			.getByRole('button', { name: 'Cancel', exact: true })
+			.click()
+		await expect(rewriteSheet).toHaveCount(0)
+		expect(
+			(
+				await prisma.article.findUniqueOrThrow({
+					where: { id: article.id },
+					select: { status: true },
+				})
+			).status,
+		).toBe('pending')
+
 		const launcher = page.getByRole('button', { name: 'Open the chat' })
 		await expect(launcher).toBeVisible()
 		await launcher.click()
@@ -191,7 +280,7 @@ test('an admin can read, edit and approve an article', async ({
 		await page.keyboard.press('Enter')
 		await page.keyboard.type('Sarah added this line.')
 		await expect(preview.getByText('Sarah added this line.')).toBeVisible()
-		await expect(page.getByText('Saved', { exact: true })).toBeVisible({
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'saved', {
 			timeout: 10_000,
 		})
 		const saved = await prisma.article.findUniqueOrThrow({
@@ -212,11 +301,11 @@ test('an admin can read, edit and approve an article', async ({
 		const text = page.getByLabel('Article text')
 		await expect(text).toHaveValue(/Sarah added this line\./)
 		await text.fill(`${BODY}\n\nSarah added another line.`)
-		await expect(page.getByText('Saving…', { exact: true })).toBeVisible()
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'saving')
 		await markdownToggle(page).click()
 		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'false')
 		await expect(preview).toContainText('Sarah added another line.')
-		await expect(page.getByText('Saved', { exact: true })).toBeVisible({
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'saved', {
 			timeout: 10_000,
 		})
 
@@ -242,11 +331,11 @@ test('an admin can read, edit and approve an article', async ({
 		const bold = bubble.getByRole('button', { name: 'Bold', exact: true })
 		await bold.click()
 		await expect(bold).toHaveAttribute('aria-pressed', 'true')
-		await expect(page.getByText('Saving…', { exact: true })).toBeVisible()
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'saving')
 		await markdownToggle(page).click()
 		await expect(text).toHaveValue(/\*\*Second\*\*/)
 		await markdownToggle(page).click()
-		await expect(page.getByText('Saved', { exact: true })).toBeVisible({
+		await expect(saveMark(page)).toHaveAttribute('data-save-state', 'saved', {
 			timeout: 10_000,
 		})
 		const bolded = await prisma.article.findUniqueOrThrow({
@@ -272,9 +361,6 @@ test('an admin can read, edit and approve an article', async ({
 			chatPopup(page).getByRole('button', { name: 'Remove the quote' }),
 		).toBeVisible()
 		// the popup sits above the decision bar, not over it
-		const bar = page.locator('.sticky.bottom-0', {
-			has: page.getByLabel('Note for the writer'),
-		})
 		const popupBox = await chatPopup(page).boundingBox()
 		const barBox = await bar.boundingBox()
 		expect(popupBox, 'the popup is on the page').not.toBeNull()

@@ -93,7 +93,7 @@ function renderEditor(overrides: Partial<ArticleEditorProps> = {}) {
 			action: () => null,
 		},
 	])
-	render(<RemixStub initialEntries={['/admin/articles/a1']} />)
+	return render(<RemixStub initialEntries={['/admin/articles/a1']} />)
 }
 
 function hiddenBody() {
@@ -213,7 +213,7 @@ test('a wide screen gets the launcher, no dock, and the article in a 70ch column
 	expect(noPopup()).toBeNull()
 	expect(document.querySelector('[data-chat-dock]')).toBeNull()
 	expect(document.querySelector('[data-chat-list]')).toBeNull()
-	expect(screen.queryByRole('status')).toBeNull()
+	expect(document.querySelector('[data-status-line]')).toBeNull()
 	expect(preview().className).toContain('max-w-[70ch]')
 	// the shell's geometry comes from the editor root
 	const root = document.querySelector('[data-article-editor]')
@@ -429,14 +429,69 @@ test('a 409 keeps the conflict card in flow above the article, and the save mark
 	expect(
 		card.compareDocumentPosition(preview()) & Node.DOCUMENT_POSITION_FOLLOWING,
 	).toBeTruthy()
-	expect(screen.getByText(ARTICLE_EDITOR_COPY.conflictAbove)).toBeTruthy()
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.conflictBelow)).toBeNull()
+	const mark = document.querySelector('[data-save-state]')
+	expect(mark?.getAttribute('data-save-state')).toBe('conflict')
+	expect(mark?.textContent).toBe(ARTICLE_EDITOR_COPY.conflictAbove)
 
 	await user.click(
 		within(card).getByRole('button', { name: ARTICLE_EDITOR_COPY.useTheirs }),
 	)
 	expect(hiddenBody()).toBe('## New from the writer')
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.conflictAbove)).toBeNull()
+	expect(mark?.getAttribute('data-save-state')).toBe('saved')
+})
+
+test('the bar slot holds the save mark then the Markdown toggle, and nothing while it is null', async () => {
+	vi.useFakeTimers({ shouldAdvanceTime: true })
+	mockFetch({
+		save: () => jsonResponse(200, { ok: true, hash: HASH_B, changed: true }),
+	})
+	const { unmount } = renderEditor({ barSlot: null })
+	await screen.findByRole('textbox', { name: RICH_EDITOR_COPY.label })
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.markdown }),
+	).toBeNull()
+	expect(document.querySelector('[data-save-state]')).toBeNull()
+	unmount()
+
+	const slot = document.body.appendChild(document.createElement('div'))
+	try {
+		const viewRef: { current: EditorView | null } = { current: null }
+		renderEditor({ barSlot: slot, editorViewRef: viewRef })
+		await screen.findByRole('textbox', { name: RICH_EDITOR_COPY.label })
+		const mark = slot.querySelector('[data-save-state]')
+		const toggle = within(slot).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.markdown,
+		})
+		if (!(mark instanceof HTMLElement)) throw new Error('no save mark')
+		expect(mark.dataset.saveState).toBe('idle')
+		expect(
+			mark.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy()
+		expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
+
+		// a typed change: the spinner in the slot, then the check
+		act(() => {
+			const view = viewRef.current
+			if (!view) throw new Error('no view')
+			view.dispatch(
+				view.state.tr.insertText(' more', view.state.doc.content.size - 1),
+			)
+		})
+		expect(mark.dataset.saveState).toBe('saving')
+		expect(mark.querySelector('svg')?.getAttribute('class')).toContain(
+			'animate-spin',
+		)
+		expect(
+			within(mark).getByText(ARTICLE_EDITOR_COPY.saving).className,
+		).toContain('sr-only')
+		await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 50)
+		await waitFor(() => expect(mark.dataset.saveState).toBe('saved'))
+		expect(
+			within(mark).getByText(ARTICLE_EDITOR_COPY.saved).className,
+		).toContain('sr-only')
+	} finally {
+		slot.remove()
+	}
 })
 
 test('an error that lands while the popup is closed does not mark the launcher as an answer', async () => {

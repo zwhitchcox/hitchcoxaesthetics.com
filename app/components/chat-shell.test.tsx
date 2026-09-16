@@ -18,7 +18,6 @@ import {
 	ChatLauncher,
 	ChatPopup,
 	ChatSheet,
-	ChatToggle,
 	CHAT_SHELL_COPY,
 	SHEET_SWIPE_PX,
 	STATUS_LINE_CHARS,
@@ -56,7 +55,6 @@ function statusProps(
 	return {
 		running: false,
 		entry: null,
-		empty: false,
 		undoRowId: null,
 		undoneIds: new Set(),
 		undoBusy: false,
@@ -82,25 +80,12 @@ function pointer(el: Element, type: string, clientY: number) {
 /* The status line                                                          */
 /* ------------------------------------------------------------------------ */
 
-test('the status line shows the empty hint with no history and opens the chat on tap', async () => {
-	const user = userEvent.setup()
-	const onOpen = vi.fn()
-	render(<StatusLine {...statusProps({ empty: true, onOpen })} />)
+test('the status line shows Working on it… while running, as a polite live region', () => {
+	render(<StatusLine {...statusProps({ running: true })} />)
 	const line = screen.getByRole('status')
 	expect(line).toHaveAttribute('aria-live', 'polite')
-	await user.click(
-		within(line).getByRole('button', { name: ARTICLE_CHAT_COPY.emptyTitle }),
-	)
-	expect(onOpen).toHaveBeenCalledTimes(1)
-})
-
-test('the status line shows Working on it… while running', () => {
-	render(<StatusLine {...statusProps({ running: true, empty: true })} />)
-	const line = screen.getByRole('status')
 	expect(line).toHaveTextContent(ARTICLE_CHAT_COPY.working)
-	expect(
-		within(line).queryByRole('button', { name: ARTICLE_CHAT_COPY.emptyTitle }),
-	).toBeNull()
+	expect(line).not.toHaveTextContent(ARTICLE_CHAT_COPY.emptyTitle)
 })
 
 test('the status line shows Changed: with See it and Undo for an unseen change, and Undone. after', async () => {
@@ -201,11 +186,10 @@ test('the status line shows an error with Try again as an alert', async () => {
 	expect(onRetry).toHaveBeenCalledWith(RETRY)
 })
 
-test('the status line is absent with old history and nothing unseen', () => {
-	const { rerender } = render(
-		<StatusLine {...statusProps({ entry: null, empty: false })} />,
-	)
+test('the status line is absent with nothing unseen and no turn running: the invitation lives in the list, not over the box', () => {
+	const { rerender } = render(<StatusLine {...statusProps({ entry: null })} />)
 	expect(screen.queryByRole('status')).toBeNull()
+	expect(screen.queryByText(ARTICLE_CHAT_COPY.emptyTitle)).toBeNull()
 	// Her own row is never an answer.
 	rerender(
 		<StatusLine
@@ -216,7 +200,7 @@ test('the status line is absent with old history and nothing unseen', () => {
 })
 
 /* ------------------------------------------------------------------------ */
-/* The dock, the arrow, the sheet                                           */
+/* The dock and its tab, the sheet                                          */
 /* ------------------------------------------------------------------------ */
 
 test('the dock sits at the keyboard inset plus the page bottom bar and drops the safe-area padding with the keyboard up', () => {
@@ -310,28 +294,62 @@ test("the sheet's top is stickyTop and its bottom is the inset plus the dock hei
 	expect(sheet).toHaveTextContent('the list')
 })
 
-test('the arrow reads Open the chat then Close the chat, with aria-expanded and aria-controls, and the icon flips', async () => {
+test('the dock’s tab protrudes from its top edge, reads Open the chat then Close the chat with aria-expanded and aria-controls, and its icon flips; no tab without chat', async () => {
 	const user = userEvent.setup()
 	const onOpen = vi.fn()
 	const onClose = vi.fn()
-	const { rerender } = render(
-		<ChatToggle open={false} onOpen={onOpen} onClose={onClose} />,
+	const { container, rerender } = render(
+		<ChatDock keyboardInset={0} chat={{ open: false, onOpen, onClose }}>
+			<p>the composer</p>
+		</ChatDock>,
 	)
+	const dock = container.querySelector<HTMLElement>('[data-chat-dock]')
+	if (!dock) throw new Error('no dock')
+	expect(dock.className).toContain('overflow-visible')
 	const closed = screen.getByRole('button', { name: CHAT_SHELL_COPY.openChat })
+	expect(dock.contains(closed)).toBe(true)
 	expect(closed).toHaveAttribute('aria-expanded', 'false')
 	expect(closed).toHaveAttribute('aria-controls', 'article-chat-sheet')
+	const classes = closed.className.split(' ')
+	for (const cls of [
+		'absolute',
+		'-top-7',
+		'right-3',
+		'h-7',
+		'w-12',
+		'rounded-t-lg',
+		'border',
+		'border-b-0',
+		'bg-background',
+	]) {
+		expect(classes, cls).toContain(cls)
+	}
 	expect(iconOf(closed)).toBe('chevron-up')
 	await user.click(closed)
 	expect(onOpen).toHaveBeenCalledTimes(1)
 	expect(onClose).not.toHaveBeenCalled()
 
-	rerender(<ChatToggle open={true} onOpen={onOpen} onClose={onClose} />)
+	rerender(
+		<ChatDock keyboardInset={0} chat={{ open: true, onOpen, onClose }}>
+			<p>the composer</p>
+		</ChatDock>,
+	)
 	const open = screen.getByRole('button', { name: CHAT_SHELL_COPY.closeChat })
+	expect(open).toBe(closed)
 	expect(open).toHaveAttribute('aria-expanded', 'true')
 	expect(iconOf(open)).toBe('chevron-down')
 	await user.click(open)
 	expect(onClose).toHaveBeenCalledTimes(1)
 	expect(onOpen).toHaveBeenCalledTimes(1)
+
+	// an own-words row: no chat, so no tab
+	rerender(
+		<ChatDock keyboardInset={0}>
+			<p>the composer</p>
+		</ChatDock>,
+	)
+	expect(screen.queryByRole('button')).toBeNull()
+	expect(dock).toHaveTextContent('the composer')
 })
 
 test('Escape closes the sheet and the popup; a 60 px drag down the sheet header closes it', async () => {

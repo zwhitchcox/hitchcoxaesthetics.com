@@ -9,7 +9,7 @@ import {
 	useState,
 	useSyncExternalStore,
 } from 'react'
-import { flushSync } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import { useHydrated } from 'remix-utils/use-hydrated'
 import {
 	ARTICLE_CHAT_COPY,
@@ -27,7 +27,6 @@ import {
 	ChatLauncher,
 	ChatPopup,
 	ChatSheet,
-	ChatToggle,
 	StatusLine,
 } from '#app/components/chat-shell.tsx'
 import { useDictation } from '#app/components/dictation.tsx'
@@ -90,10 +89,15 @@ import { useKeyboardInset, useMeasuredHeight } from '#app/utils/viewport.ts'
  * `useSubmitAfterSave(flushRef)`.
  *
  * Phone: a fixed dock at the bottom holds the status line, the format row
- * (while the caret is in the article) and the composer; the arrow opens
- * the conversation as a sheet. Desktop (lg): a launcher bottom-right opens
- * it as a popup. Every piece of chat state lives here; the shell
- * components (chat-shell.tsx) only place it.
+ * (while the caret is in the article) and the composer, with the save mark
+ * at the end of its row; a tab on the dock's top edge opens the
+ * conversation as a sheet. Desktop (lg): a launcher bottom-right opens it
+ * as a popup. Every piece of chat state lives here; the shell components
+ * (chat-shell.tsx) only place it.
+ *
+ * The Markdown toggle, and the save mark when no dock holds it, go into the
+ * route's bar through `barSlot` (a portal), so the editor has no bar of its
+ * own.
  */
 export type ArticleEditorProps = {
 	article: {
@@ -121,15 +125,21 @@ export type ArticleEditorProps = {
 	readOnly?: boolean
 	/** The title and the where · byline · about line above the article. */
 	showHeader?: boolean
-	/** px: the page's sticky top bar; the editor's top row and the phone sheet start under it. */
+	/** px: the page's sticky top bar; the phone sheet starts under it, and the See it band and the bubble stay clear of it. */
 	stickyTop?: number
 	/** px: the page's sticky bottom bar; the dock, the launcher and the popup sit above it. */
 	stickyBottom?: number
 	flushRef?: React.MutableRefObject<(() => Promise<void>) | null>
 	/** True while a chat turn runs (Approve disables). */
 	onBusyChange?: (busy: boolean) => void
-	/** Phone: rendered under the article ("Send this to the writer instead"). */
-	writerLink?: React.ReactNode
+	/**
+	 * The route's bar element for the Markdown toggle and, when no dock holds
+	 * it, the save mark: the items render into it through a portal. `null`
+	 * while the route has no element yet (the server render): nothing
+	 * renders. Undefined (no route, the unit tests): a plain right-aligned
+	 * row at the top of the editor holds them.
+	 */
+	barSlot?: HTMLElement | null
 	/** The unit tests type through the rich editor's view. */
 	editorViewRef?: React.MutableRefObject<EditorView | null>
 }
@@ -138,7 +148,7 @@ export const ARTICLE_EDITOR_COPY = {
 	markdown: 'Markdown',
 	saved: 'Saved',
 	saving: 'Saving…',
-	saveFailed: 'Could not save. Trying again…',
+	saveFailed: 'Could not save.',
 	tryNow: 'Try now',
 	conflict: 'The writer sent new text while you were editing.',
 	useTheirs: 'Use the new text',
@@ -158,7 +168,6 @@ export const ARTICLE_EDITOR_COPY = {
 	editorHint:
 		'Plain text with simple marks: a line starting with ## is a heading, *this* is italic, **this** is bold, and [words](https://...) is a link. A line that starts with ![ is a picture, and the italic line under it is its caption. Leave both where they are.',
 	textLabel: 'Article text',
-	markdownBusy: 'Working on it… You can change the text when the chat answers.',
 	linksTitle: 'Links that must stay in the article',
 	inPlace: 'In place: ',
 	missing: 'Missing: ',
@@ -173,8 +182,6 @@ export const ARTICLE_EDITOR_COPY = {
 const CHANGED_MARK_MS = 6000
 /** A chat turn ends here: a little above the server's 60 s limit, so a hung turn frees the article. */
 const CHAT_TIMEOUT_MS = 90_000
-/** The editor's top row (`min-h-8`): the bubble flips below a selection that would put it there. */
-const EDITOR_TOP_ROW_PX = 32
 
 /**
  * The entry the status line shows for the unseen rows: the last turn's
@@ -255,8 +262,23 @@ function useEnterSends() {
 /* The save mark                                                            */
 /* ------------------------------------------------------------------------ */
 
-/** The quiet mark: "Saving…", "Saved", the retry line, or where the conflict's choice is. Never a button. */
-function SaveIndicator({
+export type SaveStateName = 'idle' | 'saving' | 'saved' | 'error' | 'conflict'
+
+/** The save status as the mark shows it: `pending` and `saving` are one spinner, `clean` is nothing. */
+export function saveStateName(status: SaveStatus): SaveStateName {
+	if (status === 'clean') return 'idle'
+	if (status === 'pending') return 'saving'
+	return status
+}
+
+/**
+ * The small save mark: a spinner while a save waits or is in flight, a
+ * check after it (until the next change), the retry line, or where the
+ * conflict's choice is. `data-save-state` carries the state for the tests.
+ * It ends the phone dock's composer row; elsewhere it goes into the route's
+ * bar slot. One live region in every state, so a change in it is read out.
+ */
+function SaveState({
 	status,
 	message,
 	conflictNote,
@@ -268,54 +290,46 @@ function SaveIndicator({
 	conflictNote: string
 	onTryNow: () => void
 }) {
-	if (status === 'saving' || status === 'pending') {
-		return (
-			<span className="text-xs text-muted-foreground" aria-live="polite">
-				{ARTICLE_EDITOR_COPY.saving}
-			</span>
-		)
-	}
-	if (status === 'saved') {
-		return (
-			<span
-				className="inline-flex items-center gap-1 text-xs text-muted-foreground"
-				aria-live="polite"
-			>
-				<Icon name="check" className="h-3.5 w-3.5" />
-				{ARTICLE_EDITOR_COPY.saved}
-			</span>
-		)
-	}
-	if (status === 'error') {
-		return (
-			<span
-				className="inline-flex items-center gap-2 text-xs text-red-700 dark:text-red-400"
-				aria-live="polite"
-			>
-				{message ?? ARTICLE_EDITOR_COPY.saveFailed}
-				{message ? null : (
-					<button
-						type="button"
-						onClick={onTryNow}
-						className="underline underline-offset-2"
-					>
-						{ARTICLE_EDITOR_COPY.tryNow}
-					</button>
-				)}
-			</span>
-		)
-	}
-	if (status === 'conflict') {
-		return (
-			<span
-				className="text-xs text-amber-800 dark:text-amber-200"
-				aria-live="polite"
-			>
-				{conflictNote}
-			</span>
-		)
-	}
-	return null
+	const state = saveStateName(status)
+	return (
+		<span
+			role="status"
+			data-save-state={state}
+			className="inline-flex h-10 min-w-6 shrink-0 items-center justify-center text-xs text-muted-foreground"
+		>
+			{state === 'saving' ? (
+				<>
+					<Icon name="update" size="sm" className="animate-spin" />
+					<span className="sr-only">{ARTICLE_EDITOR_COPY.saving}</span>
+				</>
+			) : state === 'saved' ? (
+				<>
+					<Icon name="check" size="sm" />
+					<span className="sr-only">{ARTICLE_EDITOR_COPY.saved}</span>
+				</>
+			) : state === 'error' ? (
+				<span className="max-w-24 text-right leading-tight text-red-700 dark:text-red-400">
+					{message ?? ARTICLE_EDITOR_COPY.saveFailed}
+					{message ? null : (
+						<>
+							{' '}
+							<button
+								type="button"
+								onClick={onTryNow}
+								className="underline underline-offset-2"
+							>
+								{ARTICLE_EDITOR_COPY.tryNow}
+							</button>
+						</>
+					)}
+				</span>
+			) : state === 'conflict' ? (
+				<span className="text-amber-800 dark:text-amber-200">
+					{conflictNote}
+				</span>
+			) : null}
+		</span>
+	)
 }
 
 /* ------------------------------------------------------------------------ */
@@ -385,7 +399,7 @@ export function ArticleEditor({
 	stickyBottom = 0,
 	flushRef,
 	onBusyChange,
-	writerLink,
+	barSlot,
 	editorViewRef,
 }: ArticleEditorProps) {
 	const articleId = article.id
@@ -420,8 +434,6 @@ export function ArticleEditor({
 	const ownViewRef = useRef<EditorView | null>(null)
 	const viewRef = editorViewRef ?? ownViewRef
 	const proseRef = useRef<HTMLDivElement>(null)
-	/** The editor's top row: the readable band starts under it. */
-	const topRowRef = useRef<HTMLDivElement>(null)
 	const bubbleBoxRef = useRef<HTMLDivElement>(null)
 
 	/* ---- the chat ---- */
@@ -668,10 +680,10 @@ export function ArticleEditor({
 
 	/**
 	 * The mark or the new picture scrolls into the readable band: under the
-	 * sticky bars and the editor's top row, above the dock or the page's
-	 * bottom bar, inside the visual viewport (the software keyboard shrinks
-	 * it). When an answer lands it scrolls only when the mark is outside that
-	 * band; See it always scrolls, to the middle of the band.
+	 * page's sticky top bar, above the dock or the page's bottom bar, inside
+	 * the visual viewport (the software keyboard shrinks it). When an answer
+	 * lands it scrolls only when the mark is outside that band; See it always
+	 * scrolls, to the middle of the band.
 	 */
 	const seeItDoneRef = useRef(seeIt)
 	useEffect(() => {
@@ -694,9 +706,8 @@ export function ArticleEditor({
 			const vv = window.visualViewport
 			const visualTop = vv?.offsetTop ?? 0
 			const visualBottom = vv ? vv.offsetTop + vv.height : window.innerHeight
-			const row = topRowRef.current?.getBoundingClientRect()
 			const dock = dockRef.current?.getBoundingClientRect()
-			const bandTop = Math.max(visualTop, row?.bottom ?? 0)
+			const bandTop = Math.max(visualTop, stickyTop)
 			const bandBottom = dock
 				? Math.min(visualBottom, dock.top)
 				: visualBottom - stickyBottom
@@ -708,7 +719,7 @@ export function ArticleEditor({
 			})
 		})
 		return () => cancelAnimationFrame(frame)
-	}, [changed, seeIt, undo, stickyBottom])
+	}, [changed, seeIt, undo, stickyTop, stickyBottom])
 
 	function onSeeIt() {
 		// The box lets go of the focus first: the keyboard closes and the mark can land mid-screen.
@@ -921,12 +932,17 @@ export function ArticleEditor({
 	const formatRowOn =
 		richOn && !locked && !chatOpen && (editorFocused || linkOpen)
 	const dockOn = !wide && (chatSurface || formatRowOn)
-	/** The conflict card sits in the dock on the phone, so the choice is on screen; in flow above the article elsewhere. */
-	const conflictInDock = !wide && chatSurface
+	/**
+	 * The phone's chat lives in the dock: the composer row with the save mark
+	 * at its end, and the conflict card above them so the choice is on
+	 * screen. Elsewhere the card is in flow above the article and the save
+	 * mark goes into the route's bar.
+	 */
+	const chatInDock = !wide && chatSurface
 	const conflictCard = autoSave.conflict ? (
 		<div
 			role="alert"
-			className={cn(AMBER_CARD, conflictInDock ? 'mx-3 mt-2' : 'mt-2')}
+			className={cn(AMBER_CARD, chatInDock ? 'mx-3 mt-2' : 'mt-2')}
 		>
 			<p className="flex-1">{ARTICLE_EDITOR_COPY.conflict}</p>
 			<Button type="button" size="sm" variant="outline" onClick={useNewText}>
@@ -946,18 +962,46 @@ export function ArticleEditor({
 		setSelection(null)
 	}
 
-	const indicator = readOnly ? null : (
-		<SaveIndicator
+	// The card is above the mark in the dock, and in flow above the desktop's
+	// bottom bar; only a narrow page's top bar (an own-words row) has it below.
+	const saveState = readOnly ? null : (
+		<SaveState
 			status={autoSave.status}
 			message={autoSave.message}
 			conflictNote={
-				conflictInDock
-					? ARTICLE_EDITOR_COPY.conflictBelow
-					: ARTICLE_EDITOR_COPY.conflictAbove
+				chatInDock || wide
+					? ARTICLE_EDITOR_COPY.conflictAbove
+					: ARTICLE_EDITOR_COPY.conflictBelow
 			}
 			onTryNow={autoSave.tryNow}
 		/>
 	)
+	const markdownToggle = (
+		<button
+			type="button"
+			aria-pressed={raw}
+			onClick={toggleRaw}
+			className={cn(
+				'inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground hover:bg-accent',
+				raw ? 'bg-accent text-foreground' : '',
+			)}
+		>
+			<Icon name="file-text" className="h-4 w-4" />
+			{ARTICLE_EDITOR_COPY.markdown}
+		</button>
+	)
+	const barItems = (
+		<>
+			{chatInDock ? null : saveState}
+			{markdownToggle}
+		</>
+	)
+	const bar =
+		barSlot === undefined ? (
+			<div className="flex items-center justify-end gap-2">{barItems}</div>
+		) : barSlot === null ? null : (
+			createPortal(barItems, barSlot)
+		)
 
 	function onCommand(command: EditorCommand) {
 		const view = viewRef.current
@@ -1040,7 +1084,7 @@ export function ArticleEditor({
 				<BubbleMenu
 					{...toolbarProps}
 					wrapper={bubbleBoxRef.current}
-					minTop={stickyTop + EDITOR_TOP_ROW_PX}
+					minTop={stickyTop}
 				/>
 			) : null}
 		</div>
@@ -1072,18 +1116,21 @@ export function ArticleEditor({
 		enterSends,
 		boxRef,
 	}
-	const toggle = (
-		<ChatToggle open={chatOpen} onOpen={openChat} onClose={closeChat} />
-	)
-
 	const dock = dockOn ? (
-		<ChatDock ref={dockRef} keyboardInset={keyboardInset}>
-			{conflictInDock ? conflictCard : null}
+		<ChatDock
+			ref={dockRef}
+			keyboardInset={keyboardInset}
+			chat={
+				chatSurface
+					? { open: chatOpen, onOpen: openChat, onClose: closeChat }
+					: undefined
+			}
+		>
+			{chatInDock ? conflictCard : null}
 			{chatOn && !chatOpen ? (
 				<StatusLine
 					running={running}
 					entry={statusEntry}
-					empty={entries.length === 0 && !formatRowOn}
 					undoRowId={undo?.rowId ?? null}
 					undoneIds={undoneIds}
 					undoBusy={undoBusy}
@@ -1095,18 +1142,18 @@ export function ArticleEditor({
 			) : null}
 			{formatRowOn ? <FormatRow {...toolbarProps} /> : null}
 			{!chatSurface ? null : composerNote ? (
-				// The note takes the composer's place and has no row for the arrow.
+				// The note takes the composer's place; the save mark keeps the row's end.
 				<div className="flex items-center gap-2 pr-3">
 					<div className="min-w-0 flex-1">
 						<ChatComposer {...composerProps} className="space-y-2 px-3 pt-2" />
 					</div>
-					{toggle}
+					{saveState}
 				</div>
 			) : (
 				<ChatComposer
 					{...composerProps}
 					className="space-y-2 px-3 pt-2"
-					trailing={toggle}
+					trailing={saveState}
 				/>
 			)}
 		</ChatDock>
@@ -1122,7 +1169,7 @@ export function ArticleEditor({
 			>
 				<ChatList
 					{...listProps}
-					className="min-h-0 flex-1 overscroll-contain px-4"
+					className="min-h-0 flex-1 overscroll-contain px-4 pb-7"
 				/>
 			</ChatSheet>
 		) : null
@@ -1149,7 +1196,7 @@ export function ArticleEditor({
 				{
 					'--editor-top': `${stickyTop}px`,
 					'--editor-bottom': `${stickyBottom}px`,
-					// The last lines, the links box and the writer link end above the dock.
+					// The last lines and the links box end above the dock.
 					paddingBottom: wide ? undefined : dockHeight + DOCK_GAP_PX,
 				} as React.CSSProperties
 			}
@@ -1163,26 +1210,7 @@ export function ArticleEditor({
 					openChat()
 				}}
 			>
-				<div
-					ref={topRowRef}
-					className="sticky top-[var(--editor-top)] z-20 flex min-h-8 items-center justify-between gap-3 bg-background/95 py-1 backdrop-blur lg:pr-20"
-				>
-					<span className="min-w-0 text-xs text-muted-foreground">
-						{running ? ARTICLE_EDITOR_COPY.markdownBusy : indicator}
-					</span>
-					<button
-						type="button"
-						aria-pressed={raw}
-						onClick={toggleRaw}
-						className={cn(
-							'inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground hover:bg-accent',
-							raw ? 'bg-accent text-foreground' : '',
-						)}
-					>
-						<Icon name="file-text" className="h-4 w-4" />
-						{ARTICLE_EDITOR_COPY.markdown}
-					</button>
-				</div>
+				{bar}
 
 				{isReference ? (
 					<p className={cn(AMBER_NOTE, 'mt-2')}>
@@ -1211,7 +1239,7 @@ export function ArticleEditor({
 					</div>
 				) : null}
 
-				{conflictInDock ? null : conflictCard}
+				{chatInDock ? null : conflictCard}
 
 				<div className={wide && chatOpen ? POPUP_ASIDE_CLASS : undefined}>
 					{showHeader ? (
@@ -1268,7 +1296,6 @@ export function ArticleEditor({
 						<p className="text-xs text-muted-foreground">
 							{ARTICLE_EDITOR_COPY.words(words)}
 						</p>
-						{writerLink}
 					</div>
 				</div>
 			</DropZone>

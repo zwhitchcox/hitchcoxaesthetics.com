@@ -108,7 +108,7 @@ function renderEditor(overrides: Partial<ArticleEditorProps> = {}) {
 		},
 		{ path: '/elsewhere', Component: () => <p>Elsewhere</p> },
 	])
-	render(<RemixStub initialEntries={['/review/a1/change']} />)
+	return render(<RemixStub initialEntries={['/review/a1/change']} />)
 }
 
 function hiddenBody() {
@@ -134,8 +134,50 @@ function composer() {
 	return screen.getByLabelText('Message') as HTMLTextAreaElement
 }
 
+/** The dock's status line. The save mark is a status too, so the role alone is not enough. */
 function statusLine() {
-	return screen.getByRole('status')
+	const el = document.querySelector('[data-status-line]')
+	if (!(el instanceof HTMLElement)) throw new Error('no status line')
+	return el
+}
+
+function noStatusLine() {
+	return document.querySelector('[data-status-line]')
+}
+
+/** The save mark: `data-save-state` carries its state. */
+function saveState() {
+	const el = document.querySelector('[data-save-state]')
+	if (!(el instanceof HTMLElement)) throw new Error('no save mark')
+	return el
+}
+
+/** The icon the save mark draws: the fragment of its `<use href>`. */
+function saveIcon() {
+	const href = saveState().querySelector('use')?.getAttribute('href') ?? ''
+	return href.slice(href.indexOf('#') + 1)
+}
+
+/** The spinner, with the sr-only "Saving…". */
+function expectSaving() {
+	const mark = saveState()
+	expect(mark.dataset.saveState).toBe('saving')
+	expect(saveIcon()).toBe('update')
+	expect(mark.querySelector('svg')?.getAttribute('class')).toContain(
+		'animate-spin',
+	)
+	expect(
+		within(mark).getByText(ARTICLE_EDITOR_COPY.saving).className,
+	).toContain('sr-only')
+}
+
+/** The check, with the sr-only "Saved", once the save has landed. */
+async function expectSaved() {
+	await waitFor(() => expect(saveState().dataset.saveState).toBe('saved'))
+	expect(saveIcon()).toBe('check')
+	expect(
+		within(saveState()).getByText(ARTICLE_EDITOR_COPY.saved).className,
+	).toContain('sr-only')
 }
 
 function markdownToggle() {
@@ -161,7 +203,7 @@ async function openChat(user: ReturnType<typeof userEvent.setup>) {
 	)
 }
 
-/** The dock's arrow, not the sheet's ×: both read "Close the chat". */
+/** The dock's tab, not the sheet's ×: both read "Close the chat". */
 async function closeChat(user: ReturnType<typeof userEvent.setup>) {
 	await user.click(
 		within(dock()).getByRole('button', { name: CHAT_SHELL_COPY.closeChat }),
@@ -313,9 +355,9 @@ test('starts on the article with the working copy in a hidden input, the dock, a
 	expect(hiddenBody()).toBe(BODY)
 	expect(within(preview()).getByText(/Most people need 20 units/)).toBeTruthy()
 	expect(screen.queryAllByRole('tab')).toHaveLength(0)
-	// the dock: the invitation, the composer, the arrow
-	expect(dock().contains(statusLine())).toBe(true)
-	expect(statusLine().textContent).toContain(ARTICLE_CHAT_COPY.emptyTitle)
+	// the dock: the composer and the tab; no status line and no invitation over the box before the first turn
+	expect(noStatusLine()).toBeNull()
+	expect(within(dock()).queryByText(ARTICLE_CHAT_COPY.emptyTitle)).toBeNull()
 	expect(composer().placeholder).toBe('Say or type what to change…')
 	expect(
 		screen
@@ -326,16 +368,28 @@ test('starts on the article with the working copy in a hidden input, the dock, a
 		within(dock()).getByRole('button', { name: CHAT_SHELL_COPY.openChat }),
 	).toBeTruthy()
 	expect(document.querySelector('[data-chat-list]')).toBeNull()
+	// the composer row ends with the save mark, and the tab is not in it
+	const row = screen.getByRole('button', {
+		name: ARTICLE_CHAT_COPY.send,
+	}).parentElement
+	if (!row) throw new Error('no composer row')
+	expect(row.contains(saveState())).toBe(true)
+	expect(
+		within(row).queryByRole('button', { name: CHAT_SHELL_COPY.openChat }),
+	).toBeNull()
 	// jsdom cannot record, so the mic button stays hidden and the keyboard line shows
 	expect(screen.queryByRole('button', { name: 'Dictate' })).toBeNull()
 	expect(
 		screen.getByText('Use the microphone key on your keyboard.'),
 	).toBeTruthy()
-	// the top row: no save mark yet, the Markdown toggle off
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.saved)).toBeNull()
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.saving)).toBeNull()
+	// nothing saved yet: the mark is idle and empty; the Markdown toggle is off
+	expect(saveState().dataset.saveState).toBe('idle')
+	expect(saveState().textContent).toBe('')
+	expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
 	expect(screen.queryByRole('button', { name: 'Save edits' })).toBeNull()
 	expect(markdownToggle().getAttribute('aria-pressed')).toBe('false')
+	// no bar slot: the toggle sits in a plain row at the top of the editor, not a sticky one
+	expect(markdownToggle().parentElement?.className).not.toContain('sticky')
 	expect(screen.getByText(ARTICLE_EDITOR_COPY.endLine)).toBeTruthy()
 })
 
@@ -351,7 +405,7 @@ test('a typed change in the article saves after the debounce and blocks leaving 
 	await richEditor()
 	typeInArticle(' more')
 	expect(hiddenBody()).toBe(`${BODY} more`)
-	expect(screen.getByText(ARTICLE_EDITOR_COPY.saving)).toBeTruthy()
+	expectSaving()
 
 	// still pending: leaving is blocked, and Stay keeps her here
 	await user.click(screen.getByRole('link', { name: 'Leave this page' }))
@@ -394,7 +448,7 @@ test('a typed change under the Markdown toggle saves the same way', async () => 
 	expect(box.value).toBe(BODY)
 	await user.type(box, ' more')
 	expect(hiddenBody()).toBe(`${BODY} more`)
-	expect(screen.getByText(ARTICLE_EDITOR_COPY.saving)).toBeTruthy()
+	expectSaving()
 	await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 50)
 	expect(saveCalls(calls)).toHaveLength(1)
 	expect(calls[0]?.body).toEqual({
@@ -403,7 +457,7 @@ test('a typed change under the Markdown toggle saves the same way', async () => 
 		baseHash: HASH_A,
 		source: 'auto',
 	})
-	expect(await screen.findByText(ARTICLE_EDITOR_COPY.saved)).toBeTruthy()
+	await expectSaved()
 })
 
 test('a 409 shows the conflict card and Keep mine re-posts with the server hash', async () => {
@@ -422,12 +476,13 @@ test('a 409 shows the conflict card and Keep mine re-posts with the server hash'
 
 	const card = await screen.findByRole('alert')
 	expect(card.textContent).toContain(ARTICLE_EDITOR_COPY.conflict)
-	// on the phone the card sits in the dock, so the choice is on screen; the top row points down at it
+	// on the phone the card sits in the dock, so the choice is on screen; the save mark under it points up
 	expect(dock().contains(card)).toBe(true)
-	expect(screen.getByText(ARTICLE_EDITOR_COPY.conflictBelow)).toBeTruthy()
+	expect(saveState().dataset.saveState).toBe('conflict')
+	expect(dock().contains(saveState())).toBe(true)
+	expect(saveState().textContent).toBe(ARTICLE_EDITOR_COPY.conflictAbove)
 	// her copy is still there, and the dock says what to do first
 	expect(hiddenBody()).toBe(`${BODY} more`)
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.saved)).toBeNull()
 	expect(
 		within(dock()).getByText(ARTICLE_CHAT_COPY.conflictComposer),
 	).toBeTruthy()
@@ -436,7 +491,7 @@ test('a 409 shows the conflict card and Keep mine re-posts with the server hash'
 	await user.click(
 		screen.getByRole('button', { name: ARTICLE_EDITOR_COPY.keepMine }),
 	)
-	expect(await screen.findByText(ARTICLE_EDITOR_COPY.saved)).toBeTruthy()
+	await expectSaved()
 	const saves = saveCalls(calls)
 	expect(saves).toHaveLength(2)
 	expect(saves[1]?.body).toEqual({
@@ -446,7 +501,6 @@ test('a 409 shows the conflict card and Keep mine re-posts with the server hash'
 		source: 'auto',
 	})
 	expect(screen.queryByText(ARTICLE_EDITOR_COPY.conflict)).toBeNull()
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.conflictBelow)).toBeNull()
 	expect(composer()).toBeTruthy()
 })
 
@@ -463,7 +517,7 @@ test('Use the new text takes the writer’s text into the article, the Markdown 
 	)
 	expect(hiddenBody()).toBe('## New from the writer')
 	expect((await richEditor()).textContent).toContain('New from the writer')
-	expect(await screen.findByText(ARTICLE_EDITOR_COPY.saved)).toBeTruthy()
+	await expectSaved()
 	expect(saveCalls(calls)).toHaveLength(1)
 	expect((await rawBox(user)).value).toBe('## New from the writer')
 })
@@ -536,11 +590,16 @@ test('an own-words row has no chat but keeps the format row', async () => {
 	expect(
 		screen.queryByRole('button', { name: CHAT_SHELL_COPY.openChat }),
 	).toBeNull()
-	expect(screen.queryByRole('status')).toBeNull()
+	expect(noStatusLine()).toBeNull()
 	expect(document.querySelector('[data-chat-dock]')).toBeNull()
+	// no composer row to hold the save mark: it sits with the Markdown toggle
+	expect(markdownToggle().parentElement?.contains(saveState())).toBe(true)
 
-	// the caret in the article: the dock holds the format row alone
+	// the caret in the article: the dock holds the format row alone, with no tab
 	fireEvent.focus(prose)
+	expect(
+		within(dock()).queryByRole('button', { name: CHAT_SHELL_COPY.openChat }),
+	).toBeNull()
 	const toolbar = within(dock()).getByRole('toolbar', {
 		name: TOOLBAR_COPY.toolbar,
 	})
@@ -573,7 +632,7 @@ test('a decided article in readOnly is not editable, posts nothing, and still op
 	).toBeTruthy()
 	expect(dock().textContent).toContain(ARTICLE_CHAT_COPY.decidedComposer)
 	expect(screen.queryByLabelText('Message')).toBeNull()
-	expect(screen.queryByRole('status')).toBeNull()
+	expect(noStatusLine()).toBeNull()
 	// the article reads through the plain view
 	expect(document.querySelector('.ProseMirror')).toBeNull()
 	expect(within(preview()).getByText(/Most people need 20 units/)).toBeTruthy()
@@ -584,8 +643,8 @@ test('a decided article in readOnly is not editable, posts nothing, and still op
 	await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 50)
 	expect(fetchMock).not.toHaveBeenCalled()
 	expect(hiddenBody()).toBe(BODY)
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.saving)).toBeNull()
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.saved)).toBeNull()
+	// nothing saves: no save mark at all
+	expect(document.querySelector('[data-save-state]')).toBeNull()
 
 	// the history is still there to read
 	await openChat(user)
@@ -622,7 +681,7 @@ test('a quick thought from the closed dock changes the article in place and the 
 		baseHash: HASH_A,
 	})
 	// the server saved it: the mark says so and no save was posted
-	expect(await screen.findByText(ARTICLE_EDITOR_COPY.saved)).toBeTruthy()
+	await expectSaved()
 	expect(saveCalls(calls)).toHaveLength(0)
 
 	// the status line carries the change with See it and Undo; the box is empty
@@ -686,7 +745,7 @@ test('Undo from the status line saves the previous body from the new hash and re
 	expect(
 		screen.queryByRole('button', { name: ARTICLE_CHAT_COPY.undo }),
 	).toBeNull()
-	expect(await screen.findByText(ARTICLE_EDITOR_COPY.saved)).toBeTruthy()
+	await expectSaved()
 	expect((await richEditor()).textContent).toContain('20 units')
 	expect(preview().querySelector('mark.review-changed')).toBeNull()
 })
@@ -808,7 +867,7 @@ test('a quote goes with her words and the sent bubble shows it', async () => {
 	// the quote left the composer
 	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.placeholder)
 	expect(hiddenBody()).toBe(BODY)
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.saved)).toBeNull()
+	expect(saveState().dataset.saveState).toBe('idle')
 
 	// Open shows the bubble with the quote
 	await user.click(
@@ -819,7 +878,7 @@ test('a quote goes with her words and the sent bubble shows it', async () => {
 		within(sheet).getByText(CLAIM, { selector: 'blockquote > button' }),
 	).toBeTruthy()
 	expect(within(sheet).getByText('Yes, 20 units is usual.')).toBeTruthy()
-	expect(screen.queryByRole('status')).toBeNull()
+	expect(noStatusLine()).toBeNull()
 })
 
 test('the error line keeps her words and Try again re-sends', async () => {
@@ -872,7 +931,7 @@ test('the stored history renders oldest first with the day divider in the sheet'
 	})
 	await richEditor()
 	// stored rows are seen: no status line while the sheet is closed
-	expect(screen.queryByRole('status')).toBeNull()
+	expect(noStatusLine()).toBeNull()
 	expect(screen.queryByText('Is 20 units usual?')).toBeNull()
 
 	await openChat(user)
@@ -911,12 +970,11 @@ test('the article is locked while a chat turn runs, and the answer lands on the 
 	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
 	await waitFor(() => expect(chatCalls(calls)).toHaveLength(1))
 
-	// while the turn runs the article takes no input and the top row says why
+	// while the turn runs the article takes no input
 	await waitFor(() =>
 		expect(prose.getAttribute('contenteditable')).toBe('false'),
 	)
 	expect(prose.getAttribute('aria-busy')).toBe('true')
-	expect(screen.getByText(ARTICLE_EDITOR_COPY.markdownBusy)).toBeTruthy()
 	typeInArticle(' more')
 	expect(hiddenBody()).toBe(BODY)
 
@@ -933,10 +991,9 @@ test('the article is locked while a chat turn runs, and the answer lands on the 
 	await waitFor(() => expect(hiddenBody()).toBe(BODY_CHANGED))
 	expect(box.value).toBe(BODY_CHANGED)
 	expect(box.readOnly).toBe(false)
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.markdownBusy)).toBeNull()
 	expect(screen.queryByText(ARTICLE_EDITOR_COPY.conflict)).toBeNull()
 	expect(saveCalls(calls)).toHaveLength(0)
-	expect(await screen.findByText(ARTICLE_EDITOR_COPY.saved)).toBeTruthy()
+	await expectSaved()
 
 	// the article opens again: a typed change goes into the working copy as usual
 	await user.click(markdownToggle())
@@ -988,16 +1045,17 @@ test('the format row shows while the article has focus and hides on blur and whi
 	const toolbar = () =>
 		screen.queryByRole('toolbar', { name: TOOLBAR_COPY.toolbar })
 	expect(toolbar()).toBeNull()
-	expect(statusLine().textContent).toContain(ARTICLE_CHAT_COPY.emptyTitle)
+	// before the first turn there is no status line at all
+	expect(noStatusLine()).toBeNull()
 
-	// with the caret in the article the invitation makes way for the format row
+	// with the caret in the article the format row shows in the dock
 	fireEvent.focus(prose)
 	expect(toolbar()).toBeTruthy()
 	expect(dock().contains(toolbar())).toBe(true)
-	expect(screen.queryByRole('status')).toBeNull()
+	expect(noStatusLine()).toBeNull()
 	fireEvent.blur(prose)
 	expect(toolbar()).toBeNull()
-	expect(statusLine().textContent).toContain(ARTICLE_CHAT_COPY.emptyTitle)
+	expect(noStatusLine()).toBeNull()
 
 	fireEvent.focus(prose)
 	expect(toolbar()).toBeTruthy()
@@ -1025,7 +1083,7 @@ test('Bold from the format row toggles the mark and serialises', async () => {
 	const BOLD_BODY = BODY.replace('20 units', '**20 units**')
 	expect(hiddenBody()).toBe(BOLD_BODY)
 	expect(bold.getAttribute('aria-pressed')).toBe('true')
-	expect(screen.getByText(ARTICLE_EDITOR_COPY.saving)).toBeTruthy()
+	expectSaving()
 
 	fireEvent.pointerDown(bold)
 	expect(hiddenBody()).toBe(BODY)
@@ -1042,39 +1100,32 @@ test('Bold from the format row toggles the mark and serialises', async () => {
 		baseHash: HASH_A,
 		source: 'auto',
 	})
-	expect(await screen.findByText(ARTICLE_EDITOR_COPY.saved)).toBeTruthy()
+	await expectSaved()
 })
 
-test('the sheet opens from the arrow and from the status line, and See it closes it', async () => {
+test('the sheet opens from the tab, and See it from inside it closes it', async () => {
 	const user = userEvent.setup()
 	mockFetch({ chat: chatChanged })
 	renderEditor()
 	await richEditor()
 
-	// the arrow
-	const arrow = within(dock()).getByRole('button', {
+	// the tab on the dock's top edge
+	const tab = within(dock()).getByRole('button', {
 		name: CHAT_SHELL_COPY.openChat,
 	})
-	expect(arrow.getAttribute('aria-expanded')).toBe('false')
-	await user.click(arrow)
+	expect(tab.getAttribute('aria-expanded')).toBe('false')
+	expect(tab.className).toContain('-top-7')
+	await user.click(tab)
 	expect(chatSheet().querySelector('[data-chat-list]')).toBeTruthy()
-	expect(screen.queryByRole('status')).toBeNull()
+	expect(noStatusLine()).toBeNull()
 	const close = within(dock()).getByRole('button', {
 		name: CHAT_SHELL_COPY.closeChat,
 	})
 	expect(close.getAttribute('aria-expanded')).toBe('true')
 	await user.click(close)
 	expect(noChatSheet()).toBeNull()
-
-	// the invitation on the status line
-	await user.click(
-		within(statusLine()).getByRole('button', {
-			name: ARTICLE_CHAT_COPY.emptyTitle,
-		}),
-	)
-	expect(chatSheet()).toBeTruthy()
-	await closeChat(user)
-	expect(noChatSheet()).toBeNull()
+	// nothing to report yet: the dock has no status line
+	expect(noStatusLine()).toBeNull()
 
 	// a change turn, then See it from inside the sheet
 	await user.type(composer(), THE_ASK)
@@ -1105,8 +1156,7 @@ test.each([
 	await vi.advanceTimersByTimeAsync(5000)
 	expect(fetchMock).not.toHaveBeenCalled()
 	expect(hiddenBody()).toBe(body)
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.saving)).toBeNull()
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.saved)).toBeNull()
+	expect(saveState().dataset.saveState).toBe('idle')
 })
 
 test('a picture drop is not offered on the phone', async () => {
@@ -1146,19 +1196,7 @@ test('See it lets go of the box and scrolls the mark to the middle of the readab
 	mockFetch({ chat: chatChanged })
 	const scrollBy = vi.fn()
 	vi.stubGlobal('scrollBy', scrollBy)
-	renderEditor()
-	await richEditor()
-	await user.type(composer(), THE_ASK)
-	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
-	await waitFor(() => expect(hiddenBody()).toBe(BODY_CHANGED))
-	await waitFor(() =>
-		expect(preview().querySelector('mark.review-changed')).not.toBeNull(),
-	)
-	// the mark measures as in view when it lands (jsdom draws nothing): no scroll
-	await new Promise(resolve => requestAnimationFrame(() => resolve(null)))
-	expect(scrollBy).not.toHaveBeenCalled()
-
-	// the phone's geometry: the top row ends at 76 px, the dock starts at 700, the mark is far below
+	// the phone's geometry: the page's top bar ends at 76 px (stickyTop), the dock starts at 700
 	const zero = {
 		top: 0,
 		bottom: 0,
@@ -1172,14 +1210,28 @@ test('See it lets go of the box and scrolls the mark to the middle of the readab
 	} as DOMRect
 	const rectOf = (top: number, height: number) =>
 		({ ...zero, top, y: top, height, bottom: top + height }) as DOMRect
+	let markTop = 300
 	vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
 		function (this: Element) {
-			if (this.matches('mark.review-changed')) return rectOf(1500, 20)
+			if (this.matches('mark.review-changed')) return rectOf(markTop, 20)
 			if (this.matches('[data-chat-dock]')) return rectOf(700, 100)
-			if (this.matches('.sticky.z-20')) return rectOf(44, 32)
 			return zero
 		},
 	)
+	renderEditor({ stickyTop: 76 })
+	await richEditor()
+	await user.type(composer(), THE_ASK)
+	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
+	await waitFor(() => expect(hiddenBody()).toBe(BODY_CHANGED))
+	await waitFor(() =>
+		expect(preview().querySelector('mark.review-changed')).not.toBeNull(),
+	)
+	// the mark lands inside the band (under the bar, above the dock): no scroll
+	await new Promise(resolve => requestAnimationFrame(() => resolve(null)))
+	expect(scrollBy).not.toHaveBeenCalled()
+
+	// the mark is far below the dock: See it scrolls it to the middle of the band
+	markTop = 1500
 	composer().focus()
 	expect(document.activeElement).toBe(composer())
 	fireEvent.click(
@@ -1222,7 +1274,6 @@ test('a turn that never answers ends with the error line, and the article opens 
 	await waitFor(() =>
 		expect(prose.getAttribute('contenteditable')).toBe('true'),
 	)
-	expect(screen.queryByText(ARTICLE_EDITOR_COPY.markdownBusy)).toBeNull()
 	expect(composer().value).toBe(THE_ASK)
 	expect(hiddenBody()).toBe(BODY)
 })
@@ -1235,7 +1286,13 @@ test('leaving after a failed save asks in those words', async () => {
 	await richEditor()
 	typeInArticle(' more')
 	await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 50)
-	expect(await screen.findByText(ARTICLE_EDITOR_COPY.saveFailed)).toBeTruthy()
+	await waitFor(() => expect(saveState().dataset.saveState).toBe('error'))
+	expect(saveState().textContent).toContain(ARTICLE_EDITOR_COPY.saveFailed)
+	expect(
+		within(saveState()).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.tryNow,
+		}),
+	).toBeTruthy()
 
 	await user.click(screen.getByRole('link', { name: 'Leave this page' }))
 	expect(
@@ -1270,7 +1327,7 @@ test('a second failed turn after opening and closing the sheet still shows its e
 	// she looks at the conversation and closes it: everything so far is seen
 	await openChat(user)
 	await closeChat(user)
-	expect(screen.queryByRole('status')).toBeNull()
+	expect(noStatusLine()).toBeNull()
 
 	// the second failure drops the old rows; the new error must still show
 	expect(composer().value).toBe(THE_ASK)
@@ -1307,4 +1364,71 @@ test('Mod-K opens the link row only with a selection or a caret in a link', asyn
 	selectInArticle('20 units')
 	modK()
 	expect(screen.getByLabelText(TOOLBAR_COPY.linkLabel)).toBeTruthy()
+})
+
+test('a failed save shows Could not save. with Try now in the dock, and Try now posts it again', async () => {
+	vi.useFakeTimers({ shouldAdvanceTime: true })
+	const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+	let attempts = 0
+	const { calls } = mockFetch({
+		save: () => {
+			attempts += 1
+			return attempts === 1
+				? jsonResponse(500, { error: 'down' })
+				: jsonResponse(200, { ok: true, hash: HASH_B, changed: true })
+		},
+	})
+	renderEditor()
+	await richEditor()
+	typeInArticle(' more')
+	expectSaving()
+	await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 50)
+
+	await waitFor(() => expect(saveState().dataset.saveState).toBe('error'))
+	expect(dock().contains(saveState())).toBe(true)
+	expect(saveState().textContent).toContain(ARTICLE_EDITOR_COPY.saveFailed)
+	await user.click(
+		within(saveState()).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.tryNow,
+		}),
+	)
+	await expectSaved()
+	const saves = saveCalls(calls)
+	expect(saves).toHaveLength(2)
+	expect(saves[1]?.body).toEqual({
+		articleId: 'a1',
+		body: `${BODY} more`,
+		baseHash: HASH_A,
+		source: 'auto',
+	})
+})
+
+test('the bar slot holds the Markdown toggle alone on the phone, and nothing while it is null; the save mark stays in the dock', async () => {
+	const user = userEvent.setup()
+	const { unmount } = renderEditor({ barSlot: null })
+	await richEditor()
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.markdown }),
+	).toBeNull()
+	expect(dock().contains(saveState())).toBe(true)
+	unmount()
+
+	const slot = document.body.appendChild(document.createElement('div'))
+	slot.setAttribute('data-editor-bar-slot', '')
+	try {
+		renderEditor({ barSlot: slot })
+		await richEditor()
+		const toggle = within(slot).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.markdown,
+		})
+		expect(slot.querySelector('[data-save-state]')).toBeNull()
+		expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
+		expect(dock().contains(saveState())).toBe(true)
+		// the toggle works from the slot
+		await user.click(toggle)
+		expect(toggle.getAttribute('aria-pressed')).toBe('true')
+		expect(screen.getByLabelText(ARTICLE_EDITOR_COPY.textLabel)).toBeTruthy()
+	} finally {
+		slot.remove()
+	}
 })

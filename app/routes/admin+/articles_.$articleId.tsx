@@ -13,12 +13,6 @@ import {
 } from '@remix-run/react'
 import { useRef, useState } from 'react'
 import { ArticleEditor } from '#app/components/article-editor.tsx'
-import {
-	DictateButton,
-	DictationNote,
-	GhostTextarea,
-	useDictation,
-} from '#app/components/dictation.tsx'
 import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon'
@@ -26,7 +20,6 @@ import { Textarea } from '#app/components/ui/textarea.tsx'
 import { bylineText, whereLabel } from '#app/routes/review+/_shared.server.ts'
 import { loadChatHistory } from '#app/utils/article-chat.server.ts'
 import { type ChatMessageJson } from '#app/utils/article-chat.ts'
-import { appendSpeech } from '#app/utils/article-edit.ts'
 import { countPictureLines, picturesNote } from '#app/utils/article-images.ts'
 import { hashBody, reviewerName } from '#app/utils/articles.server.ts'
 import {
@@ -56,22 +49,19 @@ import { useMeasuredHeight } from '#app/utils/viewport.ts'
 
 export const handle: SEOHandle & { stickyToWindow: boolean } = {
 	getSitemapEntries: () => null,
-	/** No scroll box around this page (admin _layout): the decision bar and the editor's top row stick to the window. */
+	/** No scroll box around this page (admin _layout): the decision bar sticks to the window. */
 	stickyToWindow: true,
 }
 
-/** The reviewNote prefix for "Write a different article". */
-const NEW_ARTICLE_PREFIX = 'NEW ARTICLE: '
+/** The reviewNote for "Write a different article". The mini reads the prefix; she adds no words. */
+const NEW_ARTICLE_NOTE = 'NEW ARTICLE: a different article'
 
 export const REWRITE_COPY = {
-	link: 'Write a different article',
-	body: (where: string) =>
-		`The writer starts over with a new topic for ${where}. This one leaves your list until the new one is ready. That usually takes a day or two.`,
+	action: 'Write a different article',
+	body: 'The writer starts over with a new topic and never sees this text. The new article comes back here for you.',
 	publisherWaiting:
 		'The publisher agreed to this topic. The writer will offer them the new one.',
-	noteLabel: 'Anything to tell the writer? (optional)',
-	notePlaceholder: 'For example: not fillers again, something about skin care.',
-	button: 'Write a different one',
+	cancel: 'Cancel',
 	pill: 'New article coming',
 } as const
 
@@ -155,9 +145,6 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	const rawBody = form.get('body')
 	const body =
 		typeof rawBody === 'string' ? rawBody.replace(/\r\n/g, '\n') : null
-	const note = String(form.get('note') ?? '')
-		.trim()
-		.slice(0, 2000)
 	const who = await reviewerName(userId)
 	const now = new Date()
 	const textChanged = body !== null && body.trim() !== article.body.trim()
@@ -180,7 +167,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 					status: 'approved',
 					reviewedAt: now,
 					reviewedBy: who,
-					reviewNote: note || null,
+					reviewNote: null,
 					rewriteRequested: false,
 					// The record: what she approved is what goes out, byte for byte.
 					approvedBodyHash: hashBody(decidedBody),
@@ -203,71 +190,17 @@ export async function action({ params, request }: ActionFunctionArgs) {
 						: `"${article.title}" will be sent to the publisher.`,
 			})
 		}
-		case 'deny': {
-			if (!note) {
-				return json(
-					{ error: 'Add a short reason, so the writer knows what to change.' },
-					{ status: 400 },
-				)
-			}
-			await prisma.article.update({
-				where: { id },
-				data: {
-					...textChange,
-					status: 'denied',
-					reviewedAt: now,
-					reviewedBy: who,
-					reviewNote: note,
-					rewriteRequested: false,
-					approvedBodyHash: null,
-				},
-			})
-			await recordReviewEvent(id, 'denied', { userId, note })
-			return redirectWithToast('/admin/articles', {
-				type: 'message',
-				title: 'Denied',
-				description: `"${article.title}" will not be used.`,
-			})
-		}
-		case 'changes_requested': {
-			if (!note) {
-				return json(
-					{ error: 'Write the change you want. The writer gets this note.' },
-					{ status: 400 },
-				)
-			}
-			await prisma.article.update({
-				where: { id },
-				data: {
-					...textChange,
-					status: 'changes_requested',
-					reviewedAt: now,
-					reviewedBy: who,
-					reviewNote: note,
-					rewriteRequested: false,
-					approvedBodyHash: null,
-				},
-			})
-			await recordReviewEvent(id, 'changes_requested', { userId, note })
-			return redirectWithToast('/admin/articles', {
-				type: 'success',
-				title: 'Sent to the writer',
-				description: `"${article.title}" comes back as "Your change is in".`,
-			})
-		}
 		case 'rewrite': {
-			// "Write a different article": a clean-room draft from the mini.
+			// "Write a different article": a clean-room draft from the mini. No
+			// note goes with it: the writer never sees this text.
 			if (article.status !== 'pending') {
 				return json({ error: 'This one is already decided.' }, { status: 400 })
 			}
-			const words = String(form.get('rewrite_note') ?? '')
-				.trim()
-				.slice(0, 2000)
 			await prisma.article.update({
 				where: { id },
 				data: {
 					status: 'changes_requested',
-					reviewNote: `${NEW_ARTICLE_PREFIX}${words || 'a different article'}`,
+					reviewNote: NEW_ARTICLE_NOTE,
 					rewriteRequested: true,
 					reviewedAt: now,
 					reviewedBy: who,
@@ -275,10 +208,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 					approvedBodyHash: null,
 				},
 			})
-			await recordReviewEvent(id, 'rewrite_requested', {
-				userId,
-				note: words || null,
-			})
+			await recordReviewEvent(id, 'rewrite_requested', { userId })
 			return redirectWithToast('/admin/articles', {
 				type: 'success',
 				title: 'A new article is on its way',
@@ -307,7 +237,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			})
 			await recordReviewEvent(id, 'reopened', { userId })
 			return json({
-				ok: 'Reopened. Approve or deny it again when you are ready.',
+				ok: 'Reopened. Decide again when you are ready.',
 			})
 		}
 		case 'answer': {
@@ -584,9 +514,6 @@ export default function ArticleReview() {
 				}}
 				group={article.group}
 				publisherWaiting={article.publisherWaiting}
-				rewriteWhere={
-					article.kind === 'blog' ? 'your blog' : destinationLabel(article)
-				}
 				claims={claims}
 				aidNote={aidNote}
 				history={history}
@@ -646,7 +573,6 @@ function Editor({
 	article,
 	group,
 	publisherWaiting,
-	rewriteWhere,
 	claims,
 	aidNote,
 	history,
@@ -678,8 +604,6 @@ function Editor({
 	}
 	group: string
 	publisherWaiting: boolean
-	/** "for your blog" or the publication, for the rewrite sheet. */
-	rewriteWhere: string
 	claims: string[]
 	aidNote: string
 	history: ChatMessageJson[]
@@ -691,6 +615,8 @@ function Editor({
 	const submitAfterSave = useSubmitAfterSave(flushRef)
 	const [rewriteOpen, setRewriteOpen] = useState(false)
 	const [chatBusy, setChatBusy] = useState(false)
+	// The editor portals its bar items (the save state, Markdown) in here once the element exists.
+	const [barSlot, setBarSlot] = useState<HTMLElement | null>(null)
 	const barRef = useRef<HTMLDivElement>(null)
 	const barHeight = useMeasuredHeight(barRef)
 	const disabled = busy || chatBusy
@@ -732,6 +658,7 @@ function Editor({
 					stickyBottom={barHeight + BAR_GAP_PX}
 					flushRef={flushRef}
 					onBusyChange={setChatBusy}
+					barSlot={barSlot}
 				/>
 
 				<div
@@ -747,47 +674,27 @@ function Editor({
 						>
 							<Icon name="check" className="mr-1 h-4 w-4" /> {approveLabel}
 						</Button>
-						<Button
-							type="submit"
-							name="intent"
-							value="deny"
-							variant="destructive"
-							disabled={disabled}
-						>
-							<Icon name="cross-1" className="mr-1 h-4 w-4" /> Deny
-						</Button>
-						<Button
-							type="submit"
-							name="intent"
-							value="changes_requested"
-							variant="outline"
-							disabled={disabled}
-						>
-							Send to the writer
-						</Button>
-						<input
-							name="note"
-							aria-label="Note for the writer"
-							placeholder="Note for the writer (needed to deny or send back, optional to approve)"
-							className="min-w-[16rem] flex-1 rounded-md border bg-background px-3 py-2 text-sm"
+						{!article.readOnly ? (
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setRewriteOpen(true)}
+							>
+								{REWRITE_COPY.action}
+							</Button>
+						) : null}
+						<div
+							data-editor-bar-slot=""
+							className="ml-auto flex items-center gap-2"
+							ref={setBarSlot}
 						/>
 					</div>
-					{!article.readOnly ? (
-						<button
-							type="button"
-							onClick={() => setRewriteOpen(true)}
-							className="text-sm text-primary underline-offset-2 hover:underline"
-						>
-							{REWRITE_COPY.link}
-						</button>
-					) : null}
 					<Messages error={error} ok={ok} />
 				</div>
 			</Form>
 
 			{rewriteOpen ? (
 				<RewriteSheet
-					where={rewriteWhere}
 					publisherWaiting={publisherWaiting}
 					busy={busy}
 					error={error}
@@ -798,66 +705,46 @@ function Editor({
 	)
 }
 
-/** "Write a different article": one optional line for the writer (dictate or type), then the button. */
+/** "Write a different article": the confirm sheet. No note: the writer never sees this text. */
 function RewriteSheet({
-	where,
 	publisherWaiting,
 	busy,
 	error,
 	onClose,
 }: {
-	where: string
 	publisherWaiting: boolean
 	busy: boolean
 	error: string | null
 	onClose: () => void
 }) {
-	const [note, setNote] = useState('')
-	const [ghost, setGhost] = useState('')
-	const dictation = useDictation({
-		onInterim: setGhost,
-		onFinal: text => {
-			setGhost('')
-			setNote(current => appendSpeech(current, text))
-		},
-	})
 	return (
-		<Sheet title={REWRITE_COPY.link} onClose={onClose}>
+		<Sheet title={REWRITE_COPY.action} onClose={onClose}>
 			<Form method="post" className="space-y-3">
 				<input type="hidden" name="intent" value="rewrite" />
-				<p className="text-sm text-muted-foreground">
-					{REWRITE_COPY.body(where)}
-				</p>
+				<p className="text-sm text-muted-foreground">{REWRITE_COPY.body}</p>
 				{publisherWaiting ? (
 					<p className="text-sm text-muted-foreground">
 						{REWRITE_COPY.publisherWaiting}
 					</p>
 				) : null}
-				<label htmlFor="rewrite-note" className="text-sm font-medium">
-					{REWRITE_COPY.noteLabel}
-				</label>
-				<GhostTextarea
-					id="rewrite-note"
-					name="rewrite_note"
-					rows={2}
-					value={note}
-					ghost={ghost}
-					listening={dictation.listening}
-					onChange={e => setNote(e.currentTarget.value)}
-					placeholder={REWRITE_COPY.notePlaceholder}
-					className="text-base"
-				/>
-				<DictationNote dictation={dictation} />
 				{error ? <SheetError>{error}</SheetError> : null}
 				<div className="flex flex-wrap items-center gap-2">
-					<DictateButton dictation={dictation} disabled={busy} />
+					<Button
+						type="button"
+						variant="outline"
+						size="lg"
+						onClick={onClose}
+						disabled={busy}
+					>
+						{REWRITE_COPY.cancel}
+					</Button>
 					<Button
 						type="submit"
 						size="lg"
 						className="min-w-0 flex-1"
-						disabled={busy || dictation.listening}
+						disabled={busy}
 					>
-						{REWRITE_COPY.button}
+						{REWRITE_COPY.action}
 					</Button>
 				</div>
 			</Form>

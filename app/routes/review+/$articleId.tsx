@@ -35,8 +35,7 @@ import { MarkdownContent } from '#app/components/markdown-content.tsx'
 import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon'
-import { Textarea } from '#app/components/ui/textarea.tsx'
-import { appendSpeech, ARTICLE_EDIT_CHIPS } from '#app/utils/article-edit.ts'
+import { appendSpeech } from '#app/utils/article-edit.ts'
 import {
 	articleImageResolver,
 	articleImageUrl,
@@ -116,13 +115,13 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	return json({ first, lane: getReviewLane(request), lapsedIntent })
 }
 
-const SHEET_KEYS = ['more', 'ask', 'deny', 'writer', 'rewrite'] as const
+const SHEET_KEYS = ['more', 'ask', 'rewrite'] as const
 type SheetKey = (typeof SHEET_KEYS)[number]
 
 function isSheetKey(value: unknown): value is SheetKey {
 	return (SHEET_KEYS as ReadonlyArray<unknown>).includes(value)
 }
-type DecidedKind = 'approved' | 'changes_requested' | 'denied' | 'rewrite'
+type DecidedKind = 'approved' | 'rewrite'
 
 export async function action({ params, request }: ActionFunctionArgs) {
 	const userId = await requireUserWithRole(request, 'admin')
@@ -145,15 +144,12 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	if (!article) throw new Response('Not found', { status: 404 })
 	const form = await request.formData()
 	const intent = String(form.get('intent') ?? '')
-	const note = String(form.get('note') ?? '')
-		.trim()
-		.slice(0, 2000)
 	const now = new Date()
 	const who = await reviewerName(userId)
 	const fail = (error: string, sheet: SheetKey) =>
 		json({ error, sheet }, { status: 400 })
 	// The publisher takes only her own words: this page never approves the
-	// draft as it is, and never sends it to the writer. Change it is the way.
+	// draft as it is. Change it is the way.
 	const ownWords = `${REFERENCE_NOTE} Use Change it.`
 	const blogPath =
 		article.kind === 'blog' ? `/blog/${article.slug ?? ''}` : null
@@ -200,32 +196,9 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			await approveArticle(article, { userId, who, now })
 			return decided('approved')
 		}
-		case 'changes_requested': {
-			if (article.status !== 'pending') {
-				return fail('This one is already decided.', 'writer')
-			}
-			if (article.isReference) return fail(ownWords, 'writer')
-			const chips = form
-				.getAll('chip')
-				.map(v => String(v).trim())
-				.filter(Boolean)
-			const text = [chips.join(', '), note].filter(Boolean).join(': ')
-			if (!text) {
-				return fail('Say what to change, in a line or two.', 'writer')
-			}
-			await prisma.article.update({
-				where: { id },
-				data: {
-					status: 'changes_requested',
-					reviewNote: text,
-					reviewedAt: now,
-					reviewedBy: who,
-				},
-			})
-			await recordReviewEvent(id, 'changes_requested', { userId, note: text })
-			return decided('changes_requested')
-		}
 		case 'rewrite': {
+			// A clean-room draft from the mini. No note goes with it: the writer
+			// never sees this text.
 			if (article.status !== 'pending') {
 				return fail('This one is already decided.', 'rewrite')
 			}
@@ -233,7 +206,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 				where: { id },
 				data: {
 					status: 'changes_requested',
-					reviewNote: `${REWRITE_PREFIX}${note || REWRITE_DEFAULT_NOTE}`,
+					reviewNote: `${REWRITE_PREFIX}${REWRITE_DEFAULT_NOTE}`,
 					rewriteRequested: true,
 					reviewedAt: now,
 					reviewedBy: who,
@@ -241,10 +214,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 					approvedBodyHash: null,
 				},
 			})
-			await recordReviewEvent(id, 'rewrite_requested', {
-				userId,
-				note: note || null,
-			})
+			await recordReviewEvent(id, 'rewrite_requested', { userId })
 			return decided('rewrite')
 		}
 		case 'later': {
@@ -266,24 +236,6 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			})
 			await recordReviewEvent(id, 'question', { userId, note: question })
 			return json({ ok: true as const, asked: true as const, question })
-		}
-		case 'deny': {
-			if (article.status !== 'pending') {
-				return fail('This one is already decided.', 'deny')
-			}
-			if (!note)
-				return fail('Add one line, so the next draft is better.', 'deny')
-			await prisma.article.update({
-				where: { id },
-				data: {
-					status: 'denied',
-					reviewNote: note,
-					reviewedAt: now,
-					reviewedBy: who,
-				},
-			})
-			await recordReviewEvent(id, 'denied', { userId, note })
-			return decided('denied')
 		}
 		case 'reopen':
 		case 'takedown': {
@@ -308,7 +260,7 @@ type CardView = SerializeFrom<typeof loader>['first']
 
 type Decision =
 	| { kind: 'approved'; doneToday: number; blogPath: string | null }
-	| { kind: 'later' | 'writer' | 'rewrite' | 'denied' }
+	| { kind: 'later' | 'rewrite' }
 
 type ArticleEntry = {
 	type: 'article'
@@ -360,9 +312,7 @@ function toDecision(data: DecisionData): Decision {
 			blogPath: data.view.blogPath,
 		}
 	}
-	if (data.decided === 'changes_requested') return { kind: 'writer' }
-	if (data.decided === 'rewrite') return { kind: 'rewrite' }
-	return { kind: 'denied' }
+	return { kind: 'rewrite' }
 }
 
 type Beacon =
@@ -1479,17 +1429,6 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 						>
 							Ask Zane
 						</Button>
-						{!article.isReference ? (
-							<Button
-								type="button"
-								variant="outline"
-								size="lg"
-								className="w-full text-base"
-								onClick={() => setSheet('writer')}
-							>
-								Send a note to the writer
-							</Button>
-						) : null}
 						<Button
 							type="button"
 							variant="outline"
@@ -1498,15 +1437,6 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 							onClick={() => setSheet('rewrite')}
 						>
 							Write a different article
-						</Button>
-						<Button
-							type="button"
-							variant="outline"
-							size="lg"
-							className="w-full text-base text-red-700 dark:text-red-400"
-							onClick={() => setSheet('deny')}
-						>
-							Do not publish this
 						</Button>
 					</div>
 					{error && errorSheet === 'more' ? (
@@ -1547,63 +1477,11 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 				</Sheet>
 			) : null}
 
-			{sheet === 'writer' ? (
-				<Sheet onClose={() => setSheet(null)} title="Send a note to the writer">
-					<fetcher.Form
-						method="post"
-						action={`/review/${id}`}
-						className="space-y-3"
-					>
-						<input type="hidden" name="intent" value="changes_requested" />
-						<div className="flex flex-wrap gap-2">
-							{ARTICLE_EDIT_CHIPS.map(chip => (
-								<label
-									key={chip}
-									className="cursor-pointer rounded-full border bg-background px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary has-[:checked]:text-primary-foreground"
-								>
-									<input
-										type="checkbox"
-										name="chip"
-										value={chip}
-										aria-label={chip}
-										className="sr-only"
-									/>
-									{chip}
-								</label>
-							))}
-						</div>
-						<DictatedNote
-							id={`review-writer-note-${id}`}
-							name="note"
-							label="What to change"
-							hideLabel
-							rows={3}
-							placeholder="Say what to change. The writer sends it back to you."
-							error={error && errorSheet === 'writer' ? error : null}
-							submit={listening => (
-								<Button
-									type="submit"
-									size="lg"
-									className="min-w-0 flex-1 text-base"
-									disabled={busy || listening}
-								>
-									Send to the writer
-								</Button>
-							)}
-						/>
-					</fetcher.Form>
-				</Sheet>
-			) : null}
-
 			{sheet === 'rewrite' ? (
 				<Sheet onClose={() => setSheet(null)} title="Write a different article">
 					<p className="text-sm text-muted-foreground">
-						The writer starts over with a new topic for{' '}
-						{article.kind === 'blog'
-							? 'your blog'
-							: (article.publication ?? 'the publisher')}
-						. This one leaves your list until the new one is ready. That usually
-						takes a day or two.
+						The writer starts over with a new topic and never sees this text.
+						The new article comes back here for you.
 					</p>
 					{article.publisherWaiting ? (
 						<p className="mt-2 text-sm text-muted-foreground">
@@ -1617,63 +1495,16 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 						className="mt-3 space-y-3"
 					>
 						<input type="hidden" name="intent" value="rewrite" />
-						<DictatedNote
-							id={`review-rewrite-note-${id}`}
-							name="note"
-							label="Anything to tell the writer? (optional)"
-							rows={2}
-							placeholder="For example: not fillers again, something about skin care."
-							error={error && errorSheet === 'rewrite' ? error : null}
-							submit={listening => (
-								<Button
-									type="submit"
-									size="lg"
-									className="min-w-0 flex-1 text-base"
-									disabled={busy || listening}
-								>
-									Write a different one
-								</Button>
-							)}
-						/>
-					</fetcher.Form>
-				</Sheet>
-			) : null}
-
-			{sheet === 'deny' ? (
-				<Sheet onClose={() => setSheet(null)} title="Do not publish this">
-					<p className="text-sm text-muted-foreground">
-						This drops the placement. Use Change it if you want a fix.
-					</p>
-					<fetcher.Form
-						method="post"
-						action={`/review/${id}`}
-						className="mt-3 space-y-3"
-					>
-						<input type="hidden" name="intent" value="deny" />
-						<label
-							htmlFor={`review-deny-note-${id}`}
-							className="text-sm font-medium"
-						>
-							Why not? One line helps the next draft.
-						</label>
-						<Textarea
-							id={`review-deny-note-${id}`}
-							name="note"
-							rows={2}
-							required
-							className="text-base"
-						/>
-						{error && errorSheet === 'deny' ? (
+						{error && errorSheet === 'rewrite' ? (
 							<SheetError>{error}</SheetError>
 						) : null}
 						<Button
 							type="submit"
-							variant="destructive"
 							size="lg"
 							className="w-full text-base"
 							disabled={busy}
 						>
-							Do not use it
+							Write a different article
 						</Button>
 					</fetcher.Form>
 				</Sheet>
@@ -1950,11 +1781,8 @@ function collapsedLabel(decision: Decision): string {
 			return 'Approved'
 		case 'later':
 			return 'Set aside for 3 days'
-		case 'writer':
 		case 'rewrite':
 			return 'Sent to the writer'
-		case 'denied':
-			return 'Set aside. It will not go anywhere.'
 	}
 }
 
@@ -2056,13 +1884,7 @@ function DecidedCard({
 
 	return (
 		<section className="mt-4 rounded-xl border bg-card p-5 text-center shadow-sm">
-			<p className="text-base">
-				{decision.kind === 'writer'
-					? 'Sent to the writer. It comes back to you as "Your change is in".'
-					: decision.kind === 'later'
-						? 'Set aside for 3 days.'
-						: 'Set aside. It will not go anywhere.'}
-			</p>
+			<p className="text-base">Set aside for 3 days.</p>
 		</section>
 	)
 }

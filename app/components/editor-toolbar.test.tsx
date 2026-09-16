@@ -435,11 +435,12 @@ test('the row and the bubble hide while locked', () => {
 	expect(toolbar()).not.toBeNull()
 })
 
-test('the phone row fits a 375 px screen: 40 px buttons, letters for the headings, a short Comment', () => {
+test('the phone row is a plain wrapping row with no band: 44 px buttons, letters for the headings, a short Comment', () => {
 	const editor = mount('row', { comment: vi.fn() })
 	editor.selectText('20 units')
 	const row = toolbar()!
-	expect(row.className).toContain('overflow-x-auto')
+	expect(row.className).toBe('flex flex-wrap items-center gap-1 px-2 pt-1')
+	expect(row.className).not.toMatch(/border|bg-|overflow/)
 	for (const el of within(row).getAllByRole('button')) {
 		expect(el.className, el.getAttribute('aria-label') ?? '').toContain('h-11')
 		expect(el.className, el.getAttribute('aria-label') ?? '').toContain(
