@@ -1,3 +1,4 @@
+import { type Locator, type Page } from '@playwright/test'
 import { prisma } from '#app/utils/db.server.ts'
 import { expect, test } from '#tests/playwright-utils.ts'
 
@@ -17,11 +18,64 @@ const BODY = [
 ].join('\n')
 
 /*
- * Desktop width: the editor shows the chat on the left and the article on
- * the right (phase 3 plan, section 7). The typed edit happens under the
- * Markdown tab, saves itself, and shows in the right column.
+ * Desktop width (phase 4 plan, section G.9). The article fills the page in
+ * the rich editor, centred at 70ch. The chat is a launcher in the bottom
+ * right corner; it opens as a popup above the decision bar. A typed edit in
+ * the article saves itself and shows in the Markdown toggle; an edit under
+ * the toggle lands in the article. A double-click on a word shows the
+ * formatting bubble; Bold from it saves `**Second**`. "Comment on this"
+ * from the bubble opens the popup with the quote. Approve posts the hidden
+ * body from the bar at the bottom.
+ *
+ * The caret goes to the end of a paragraph through a DOM selection, not the
+ * End key: on macOS Playwright maps End to `scrollToEndOfDocument:`, which
+ * scrolls and does not move the caret in a contenteditable.
  */
 test.use({ viewport: { width: 1280, height: 800 } })
+
+/** The rich editor's root: a contenteditable named "Article". */
+function richEditor(page: Page) {
+	return page.getByRole('textbox', { name: 'Article', exact: true })
+}
+
+/** The "Markdown" toggle in the editor's top row; `aria-pressed` carries its state. */
+function markdownToggle(page: Page) {
+	return page.getByRole('button', { name: 'Markdown', exact: true })
+}
+
+/** The chat popup, open. */
+function chatPopup(page: Page) {
+	return page.getByRole('dialog', { name: 'Chat', exact: true })
+}
+
+/** Select the whole text of one block, as a mouse drag would. */
+async function selectText(block: Locator) {
+	await block.scrollIntoViewIfNeeded()
+	await block.evaluate(el => {
+		const range = document.createRange()
+		range.selectNodeContents(el)
+		const selection = window.getSelection()
+		selection?.removeAllRanges()
+		selection?.addRange(range)
+	})
+}
+
+/** Put the caret after the last character of one block, as a click after its last word would. */
+async function caretToEnd(block: Locator) {
+	await block.evaluate(el => {
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+		let last: Node | null = null
+		for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+			last = node
+		}
+		const range = document.createRange()
+		range.selectNodeContents(last ?? el)
+		range.collapse(false)
+		const selection = window.getSelection()
+		selection?.removeAllRanges()
+		selection?.addRange(range)
+	})
+}
 
 test('an admin can read, edit and approve an article', async ({
 	page,
@@ -54,7 +108,10 @@ test('an admin can read, edit and approve an article', async ({
 			writer: 'fable-5.1',
 			wordCount: 20,
 			linksJson: JSON.stringify([
-				{ name: 'Sarah Hitchcox Aesthetics', url: 'https://hitchcoxaesthetics.com' },
+				{
+					name: 'Sarah Hitchcox Aesthetics',
+					url: 'https://hitchcoxaesthetics.com',
+				},
 			]),
 			images: {
 				create: [
@@ -76,7 +133,8 @@ test('an admin can read, edit and approve an article', async ({
 		await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible()
 		await expect(page.getByText('Ready for your review')).toBeVisible()
 		await page.screenshot({
-			path: process.env.ARTICLE_LIST_SHOT ?? 'test-results/admin-articles-list.png',
+			path:
+				process.env.ARTICLE_LIST_SHOT ?? 'test-results/admin-articles-list.png',
 			fullPage: true,
 		})
 		await page.getByRole('link', { name: article.title }).first().click()
@@ -90,36 +148,143 @@ test('an admin can read, edit and approve an article', async ({
 				'1 picture. The writer has not placed it in the text yet, so it shows here.',
 			),
 		).toBeVisible()
-		await expect(page.getByRole('img', { name: 'a test picture' })).toBeVisible()
+		await expect(
+			page.getByRole('img', { name: 'a test picture' }),
+		).toBeVisible()
 		await page.screenshot({
 			path: process.env.ARTICLE_SHOT ?? 'test-results/admin-article-review.png',
 			fullPage: true,
 		})
 
-		// The editor: the chat on the left (open on its empty state), the
-		// article on the right. The old prompt tab is gone. A typed change
-		// under Markdown saves itself; there is no Save button.
-		await expect(page.getByRole('tab', { name: 'Tell it what to change' })).toHaveCount(0)
-		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(0)
-		await expect(page.getByRole('tab', { name: 'Chat' })).toHaveAttribute(
-			'aria-selected',
-			'true',
+		// The editor: the article is the screen, no tab strip, no Save button.
+		// The chat is a launcher in the corner that opens a popup on its empty state.
+		await expect(page.getByRole('tab')).toHaveCount(0)
+		await expect(page.getByText('Tell it what to change')).toHaveCount(0)
+		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(
+			0,
 		)
-		await expect(page.getByText('Ask a question or say what to change.')).toBeVisible()
+		const launcher = page.getByRole('button', { name: 'Open the chat' })
+		await expect(launcher).toBeVisible()
+		await launcher.click()
+		await expect(chatPopup(page)).toBeVisible()
+		await expect(
+			chatPopup(page).getByText('Ask a question or say what to change.'),
+		).toBeVisible()
+		await chatPopup(page)
+			.getByRole('button', { name: 'Close the chat', exact: true })
+			.click()
+		await expect(chatPopup(page)).toHaveCount(0)
+		await expect(launcher).toBeVisible()
 		const preview = page.locator('[data-article-preview]')
 		await expect(preview).toBeVisible()
 		await expect(preview.getByText('Second paragraph.')).toBeVisible()
+		// the article is centred at about 70ch and does not fill the width
+		const previewBox = await preview.boundingBox()
+		expect(previewBox!.width).toBeLessThanOrEqual(720)
 
-		await page.getByRole('tab', { name: 'Markdown' }).click()
-		// the links check sits under the Markdown tab
-		await expect(page.getByText('In place: Sarah Hitchcox Aesthetics')).toBeVisible()
-		const text = page.getByLabel('Article text')
-		await text.fill(`${BODY}\n\nSarah added this line.`)
+		// A typed edit in the article saves itself; the links check sits under the article in both views.
+		const prose = richEditor(page)
+		await expect(prose).toBeVisible()
+		const lastParagraph = prose.locator('p').last()
+		await lastParagraph.click()
+		await caretToEnd(lastParagraph)
+		await page.keyboard.press('Enter')
+		await page.keyboard.type('Sarah added this line.')
 		await expect(preview.getByText('Sarah added this line.')).toBeVisible()
-		await expect(page.getByText('Saved', { exact: true })).toBeVisible()
-		const saved = await prisma.article.findUniqueOrThrow({ where: { id: article.id } })
-		expect(saved.body).toContain('Sarah added this line.')
+		await expect(page.getByText('Saved', { exact: true })).toBeVisible({
+			timeout: 10_000,
+		})
+		const saved = await prisma.article.findUniqueOrThrow({
+			where: { id: article.id },
+		})
+		expect(saved.body).toContain('\n\nSarah added this line.')
 		expect(saved.editedBy).toBeTruthy()
+		await expect(
+			page.getByText('In place: Sarah Hitchcox Aesthetics'),
+		).toBeVisible()
+
+		// The Markdown toggle holds the same working copy; an edit there lands in the article.
+		await markdownToggle(page).click()
+		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'true')
+		await expect(
+			page.getByText('In place: Sarah Hitchcox Aesthetics'),
+		).toBeVisible()
+		const text = page.getByLabel('Article text')
+		await expect(text).toHaveValue(/Sarah added this line\./)
+		await text.fill(`${BODY}\n\nSarah added another line.`)
+		await expect(page.getByText('Saving…', { exact: true })).toBeVisible()
+		await markdownToggle(page).click()
+		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'false')
+		await expect(preview).toContainText('Sarah added another line.')
+		await expect(page.getByText('Saved', { exact: true })).toBeVisible({
+			timeout: 10_000,
+		})
+
+		// The bubble: a double-click on a word shows the formatting controls; Bold saves `**Second**`.
+		const secondParagraph = prose.locator('p', { hasText: 'Second paragraph.' })
+		// the first word: the double-click lands on "Second"
+		await secondParagraph.dblclick({ position: { x: 8, y: 14 } })
+		const bubble = page.getByRole('toolbar', { name: 'Formatting' })
+		await expect(bubble).toBeVisible()
+		for (const name of [
+			'Bold',
+			'Italic',
+			'Heading',
+			'Small heading',
+			'Bullet list',
+			'Link',
+			'Comment on this',
+		]) {
+			await expect(
+				bubble.getByRole('button', { name, exact: true }),
+			).toBeVisible()
+		}
+		const bold = bubble.getByRole('button', { name: 'Bold', exact: true })
+		await bold.click()
+		await expect(bold).toHaveAttribute('aria-pressed', 'true')
+		await expect(page.getByText('Saving…', { exact: true })).toBeVisible()
+		await markdownToggle(page).click()
+		await expect(text).toHaveValue(/\*\*Second\*\*/)
+		await markdownToggle(page).click()
+		await expect(page.getByText('Saved', { exact: true })).toBeVisible({
+			timeout: 10_000,
+		})
+		const bolded = await prisma.article.findUniqueOrThrow({
+			where: { id: article.id },
+		})
+		expect(bolded.body).toContain('**Second**')
+
+		// "Comment on this" from the bubble opens the popup with the quote attached.
+		const firstParagraph = prose.locator('p').first()
+		// the click gives the editor focus, so the bubble shows for the selection
+		await firstParagraph.click()
+		await selectText(firstParagraph)
+		await bubble
+			.getByRole('button', { name: 'Comment on this', exact: true })
+			.click()
+		await expect(chatPopup(page)).toBeVisible()
+		await expect(
+			chatPopup(page).locator('blockquote', {
+				hasText: 'First paragraph with a link to the practice',
+			}),
+		).toBeVisible()
+		await expect(
+			chatPopup(page).getByRole('button', { name: 'Remove the quote' }),
+		).toBeVisible()
+		// the popup sits above the decision bar, not over it
+		const bar = page.locator('.sticky.bottom-0', {
+			has: page.getByLabel('Note for the writer'),
+		})
+		const popupBox = await chatPopup(page).boundingBox()
+		const barBox = await bar.boundingBox()
+		expect(popupBox, 'the popup is on the page').not.toBeNull()
+		expect(barBox, 'the decision bar is on the page').not.toBeNull()
+		expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(barBox!.y)
+		await chatPopup(page)
+			.getByRole('button', { name: 'Close the chat', exact: true })
+			.click()
+		await expect(chatPopup(page)).toHaveCount(0)
+		await expect(launcher).toBeVisible()
 
 		await page.getByRole('button', { name: 'Approve', exact: true }).click()
 		await expect(page).toHaveURL(/\/admin\/articles$/)
@@ -129,7 +294,8 @@ test('an admin can read, edit and approve an article', async ({
 			where: { id: article.id },
 		})
 		expect(updated.status).toBe('approved')
-		expect(updated.body).toContain('Sarah added this line.')
+		expect(updated.body).toContain('Sarah added another line.')
+		expect(updated.body).toContain('**Second**')
 		expect(updated.reviewedBy).toBeTruthy()
 	} finally {
 		await prisma.article.delete({ where: { id: article.id } }).catch(() => {})

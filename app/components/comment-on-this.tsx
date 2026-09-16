@@ -21,8 +21,8 @@ import {
  * it. The candidate clears when the selection collapses or leaves the
  * prose, or 10 s after the last change.
  *
- * `CommentOnThis` renders the button: a pill centred above the bottom
- * edge on a phone, a small button by the selection on a wide screen. It
+ * `CommentOnThis` renders the button: a pill centred above the page's
+ * sticky bar on a phone, a small button by the selection on a wide screen. It
  * reads the cached selection on `pointerdown`, before the tap clears it.
  */
 export const COMMENT_COPY = {
@@ -219,8 +219,8 @@ export function CommentOnThis({
 	narrow: narrowProp,
 }: {
 	candidate: SelectionCandidate | null
-	/** Where the phone pill sits: above the page's sticky bar, or above the bottom edge. */
-	bottom: 'bar' | 'edge'
+	/** The phone pill sits above the page's sticky bar (`[data-review-bar]`). */
+	bottom: 'bar'
 	/** The hook's `pick`. Called on pointerdown. */
 	onPick: () => void
 	/** Force the phone or the wide shape. Defaults to the viewport width. */
@@ -240,7 +240,6 @@ export function CommentOnThis({
 	}
 
 	if (narrow) {
-		const edge = 'calc(env(safe-area-inset-bottom, 0px) + 1rem)'
 		return (
 			<button
 				type="button"
@@ -248,11 +247,9 @@ export function CommentOnThis({
 				className="fixed left-1/2 z-[35] flex h-11 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 text-base font-medium text-primary-foreground shadow-lg"
 				style={{
 					bottom:
-						bottom === 'edge'
-							? edge
-							: barHeight === null
-								? 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)'
-								: `calc(${Math.ceil(barHeight)}px + 0.5rem)`,
+						barHeight === null
+							? 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)'
+							: `calc(${Math.ceil(barHeight)}px + 0.5rem)`,
 				}}
 			>
 				<span className="shrink-0">{COMMENT_COPY.button}</span>

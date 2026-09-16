@@ -29,7 +29,7 @@ export const ARTICLE_CHAT_COPY = {
 	emptyTitle: 'Ask a question or say what to change.',
 	emptyExample:
 		'For example: is 20 units the usual dose? Or: make the second paragraph shorter, and say we offer Dysport too.',
-	placeholder: 'Ask a question, or say what to change.',
+	placeholder: 'Say or type what to change…',
 	quotePlaceholder: 'What should change here? Or ask about it.',
 	send: 'Send',
 	removeQuote: 'Remove the quote',
@@ -64,6 +64,10 @@ export const WORKING_HINT_MS = 6000
 /** The list follows a new entry only when the reader was this close to the bottom. */
 export const NEAR_BOTTOM_PX = 120
 const MAX_ROWS = 6
+/** The text links in a row: See it, Undo, Try again. */
+const ROW_LINK_CLASS = 'text-primary underline-offset-2 hover:underline'
+/** The same links in the phone dock: a 44 px tap target. */
+export const DOCK_TARGET_CLASS = 'inline-flex min-h-11 items-center px-3'
 
 /** What one send carries; kept for Try again. */
 export type ComposerPayload = {
@@ -207,7 +211,7 @@ export function ChatList({
 	)
 }
 
-function ChatRow({
+export function ChatRow({
 	entry,
 	expanded,
 	onToggle,
@@ -218,6 +222,7 @@ function ChatRow({
 	onUndo,
 	onRetry,
 	onZoom,
+	dock = false,
 }: {
 	entry: ChatEntry
 	expanded: boolean
@@ -229,15 +234,28 @@ function ChatRow({
 	onUndo: () => void
 	onRetry: (payload: ComposerPayload) => void
 	onZoom: (src: string, alt: string) => void
+	/** In the phone dock: See it, Undo and Try again are 44 px tap targets. */
+	dock?: boolean
 }) {
 	if (entry.role === 'error') {
 		return (
-			<p role="alert" className="text-sm text-muted-foreground">
-				{entry.text}{' '}
+			<p
+				role="alert"
+				className={cn(
+					'text-sm text-muted-foreground',
+					dock ? 'flex flex-wrap items-center gap-x-2 gap-y-1' : '',
+				)}
+			>
+				{entry.text}
+				{dock ? null : ' '}
 				<button
 					type="button"
 					onClick={() => onRetry(entry.retry)}
-					className="font-medium text-primary underline-offset-2 hover:underline"
+					className={cn(
+						'font-medium',
+						ROW_LINK_CLASS,
+						dock ? DOCK_TARGET_CLASS : '',
+					)}
 				>
 					{ARTICLE_CHAT_COPY.tryAgain}
 				</button>
@@ -323,7 +341,7 @@ function ChatRow({
 			<button
 				type="button"
 				onClick={onSeeIt}
-				className="text-primary underline-offset-2 hover:underline"
+				className={cn(ROW_LINK_CLASS, dock ? DOCK_TARGET_CLASS : '')}
 			>
 				{ARTICLE_CHAT_COPY.seeIt}
 			</button>
@@ -332,7 +350,11 @@ function ChatRow({
 					type="button"
 					disabled={undoBusy}
 					onClick={onUndo}
-					className="text-primary underline-offset-2 hover:underline disabled:opacity-50"
+					className={cn(
+						ROW_LINK_CLASS,
+						'disabled:opacity-50',
+						dock ? DOCK_TARGET_CLASS : '',
+					)}
 				>
 					{ARTICLE_CHAT_COPY.undo}
 				</button>
@@ -341,7 +363,7 @@ function ChatRow({
 	)
 }
 
-function WorkingRow() {
+export function WorkingRow() {
 	const [long, setLong] = useState(false)
 	useEffect(() => {
 		const timer = setTimeout(() => setLong(true), WORKING_HINT_MS)
@@ -381,6 +403,8 @@ export function ChatComposer({
 	enterSends,
 	boxRef,
 	writerLink,
+	trailing,
+	className,
 }: {
 	text: string
 	ghost: string
@@ -399,6 +423,10 @@ export function ChatComposer({
 	enterSends: boolean
 	boxRef: React.RefObject<HTMLTextAreaElement>
 	writerLink?: React.ReactNode
+	/** Rendered after the Send button, inside the row (the phone dock's open/close arrow). */
+	trailing?: React.ReactNode
+	/** Replaces the whole wrapper class string; the note line then drops its top line too (the dock draws its own). */
+	className?: string
 }) {
 	const [expanded, setExpanded] = useState(false)
 
@@ -413,8 +441,14 @@ export function ChatComposer({
 	}, [text, ghost, boxRef])
 
 	if (note) {
+		// Inside the dock the container draws the top line; no second one here.
 		return (
-			<div className="border-t pt-3 text-sm text-muted-foreground">
+			<div
+				className={cn(
+					'pt-3 text-sm text-muted-foreground',
+					className === undefined ? 'border-t' : 'px-3',
+				)}
+			>
 				<p>{note}</p>
 			</div>
 		)
@@ -424,7 +458,7 @@ export function ChatComposer({
 		running || dictation.listening || attachment.status === 'uploading'
 
 	return (
-		<div className="space-y-2 border-t pt-2">
+		<div className={className ?? 'space-y-2 border-t pt-2'}>
 			{quote ? (
 				<div className="flex items-start gap-2">
 					<blockquote className="min-w-0 flex-1 border-l-2 pl-3 text-sm italic text-muted-foreground">
@@ -508,6 +542,7 @@ export function ChatComposer({
 				>
 					<Icon name="arrow-up" className="h-5 w-5" />
 				</button>
+				{trailing}
 			</div>
 			<DictationNote dictation={dictation} />
 			{writerLink}

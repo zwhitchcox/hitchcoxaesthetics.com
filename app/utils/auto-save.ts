@@ -298,9 +298,6 @@ export function useAutoSave({
 		void run()
 	}, [run])
 
-	/** The hash the next save must start from, read from the ref. */
-	const getHash = useCallback(() => hashRef.current, [])
-
 	// Save before the page goes away. The mirror covers a payload too big
 	// for keepalive.
 	useEffect(() => {
@@ -328,8 +325,6 @@ export function useAutoSave({
 		message,
 		/** A save is still owed (or her copy waits on a conflict). */
 		owed,
-		/** The old name of `owed`, kept for callers that read it. */
-		busy: owed,
 		schedule,
 		saveNow,
 		flush,
@@ -338,7 +333,6 @@ export function useAutoSave({
 		keepMine,
 		useTheirs,
 		tryNow,
-		getHash,
 	}
 }
 

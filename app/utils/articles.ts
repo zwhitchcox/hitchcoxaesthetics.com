@@ -154,3 +154,7 @@ export function formatDate(value: string | Date | null | undefined): string {
 		timeZone: 'America/New_York',
 	})
 }
+
+/** The note above the editor for a publisher that takes only her own words. */
+export const REFERENCE_NOTE =
+	'This publisher takes only text you wrote yourself. Change the words below in your own way.'

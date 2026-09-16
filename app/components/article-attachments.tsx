@@ -12,7 +12,6 @@ import {
 	ARTICLE_IMAGE_MAX_BYTES,
 	ARTICLE_IMAGE_UPLOAD_COPY,
 	ARTICLE_IMAGE_UPLOAD_ENDPOINT,
-	articleImageUrl,
 } from '#app/utils/article-images.ts'
 import { cn } from '#app/utils/misc.tsx'
 
@@ -197,27 +196,6 @@ export function useArticleAttachment({
 		if (file) void upload(file, previewRef.current)
 	}, [file, upload])
 
-	/** Keep a stored picture attached (the last message carried it and no change followed). */
-	const keep = useCallback(
-		(imageId: string) => {
-			uploadSeq.current += 1
-			setPreview(null)
-			setFile(null)
-			const url = articleImageUrl(imageId)
-			setAttachment({
-				id: imageId,
-				fileName: '',
-				width: null,
-				height: null,
-				url,
-				previewUrl: url,
-			})
-			setStatus('ready')
-			setError(null)
-		},
-		[setPreview],
-	)
-
 	return {
 		attachment,
 		status,
@@ -226,7 +204,6 @@ export function useArticleAttachment({
 		pickFile,
 		remove,
 		retry,
-		keep,
 	}
 }
 

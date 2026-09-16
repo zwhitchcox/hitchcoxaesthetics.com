@@ -21,7 +21,6 @@ import {
 	useRef,
 	useState,
 } from 'react'
-import { ARTICLE_EDITOR_COPY } from '#app/components/article-editor.tsx'
 import {
 	CommentOnThis,
 	useProseSelection,
@@ -47,7 +46,7 @@ import {
 	type ZoomTarget,
 } from '#app/utils/article-images.ts'
 import { reviewerName } from '#app/utils/articles.server.ts'
-import { formatDate } from '#app/utils/articles.ts'
+import { formatDate, REFERENCE_NOTE } from '#app/utils/articles.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import {
@@ -80,7 +79,7 @@ import {
  * Each card holds S3 (the panel, every word, the sheets), S4 (read to the
  * end), S6 (the "..." menu) and the lapsed-session sheet. This page reads
  * and decides; it never edits. "Change it" and "Comment on this" (a
- * selected passage) open the editor at /review/:id/change on its Chat tab.
+ * selected passage) open the editor at /review/:id/change.
  * After a decision the card collapses to a one-line header and the decided
  * card (S7). "That is plenty" (S8) is a card in the feed.
  */
@@ -155,7 +154,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 		json({ error, sheet }, { status: 400 })
 	// The publisher takes only her own words: this page never approves the
 	// draft as it is, and never sends it to the writer. Change it is the way.
-	const ownWords = `${ARTICLE_EDITOR_COPY.referenceNote} Use Change it.`
+	const ownWords = `${REFERENCE_NOTE} Use Change it.`
 	const blogPath =
 		article.kind === 'blog' ? `/blog/${article.slug ?? ''}` : null
 
@@ -408,10 +407,10 @@ function isRewriteNote(note: string | null): boolean {
 	return Boolean(note && note.startsWith(REWRITE_PREFIX))
 }
 
-/** The editor, open on its chat. With a quote, the chat starts with that passage attached. */
+/** The editor. With a quote, the chat starts with that passage attached. */
 function changeUrl(id: string, quote?: string): string {
-	const base = `/review/${id}/change?tab=chat`
-	return quote ? `${base}&quote=${encodeURIComponent(quote)}` : base
+	const base = `/review/${id}/change`
+	return quote ? `${base}?quote=${encodeURIComponent(quote)}` : base
 }
 
 /** A selected passage, cut so the whole quote fits the editor's limit. */
@@ -757,7 +756,7 @@ function Feed({
 					<div className="flex flex-wrap items-center gap-2">
 						{barArticle?.isReference ? (
 							<p className="basis-full text-sm text-muted-foreground">
-								{ARTICLE_EDITOR_COPY.referenceNote}
+								{REFERENCE_NOTE}
 							</p>
 						) : (
 							<Button

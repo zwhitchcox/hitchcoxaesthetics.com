@@ -11,7 +11,7 @@ import {
 	useLoaderData,
 	useNavigation,
 } from '@remix-run/react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArticleEditor } from '#app/components/article-editor.tsx'
 import {
 	DictateButton,
@@ -52,10 +52,11 @@ import {
 	secondsSinceOpened,
 } from '#app/utils/review-events.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
+import { useMeasuredHeight } from '#app/utils/viewport.ts'
 
 export const handle: SEOHandle & { stickyToWindow: boolean } = {
 	getSitemapEntries: () => null,
-	/** No scroll box around this page (admin _layout): the decision bar and the chat column stick to the window. */
+	/** No scroll box around this page (admin _layout): the decision bar and the editor's top row stick to the window. */
 	stickyToWindow: true,
 }
 
@@ -633,26 +634,9 @@ const SITE_HEADER_PX = 48
 /** The gap between the editor and the decision bar (`space-y-3`). */
 const BAR_GAP_PX = 12
 
-/** The height of an element, kept up to date. 0 until measured. */
-function useMeasuredHeight(ref: React.RefObject<HTMLElement | null>): number {
-	const [height, setHeight] = useState(0)
-	useEffect(() => {
-		const el = ref.current
-		if (!el) return
-		const measure = () =>
-			setHeight(Math.round(el.getBoundingClientRect().height))
-		measure()
-		if (typeof ResizeObserver === 'undefined') return
-		const observer = new ResizeObserver(measure)
-		observer.observe(el)
-		return () => observer.disconnect()
-	}, [ref])
-	return height
-}
-
 /**
- * The editor: the chat (or the raw markdown) on the left, the article on
- * the right; under it the decision bar, stuck to the bottom of the screen
+ * The editor (the article, edited in place; the chat folds into a popup or
+ * a dock) and under it the decision bar, stuck to the bottom of the screen
  * so she reads first and decides last (Zane 2026-09-16). Every change saves
  * itself and the working copy sits in a hidden field named `body`, so every
  * button here submits it after any save in flight. A decided article is
@@ -742,7 +726,6 @@ function Editor({
 					links={article.links}
 					claims={claims}
 					history={history}
-					initialTab="chat"
 					readOnly={article.readOnly}
 					showHeader={false}
 					stickyTop={SITE_HEADER_PX + BAR_GAP_PX}

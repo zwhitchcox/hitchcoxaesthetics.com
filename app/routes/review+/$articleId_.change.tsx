@@ -1,4 +1,3 @@
-import { countPassage } from '#app/utils/article-edit.ts'
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import {
 	json,
@@ -14,10 +13,7 @@ import {
 	useNavigation,
 } from '@remix-run/react'
 import { useRef, useState } from 'react'
-import {
-	ArticleEditor,
-	type EditorTab,
-} from '#app/components/article-editor.tsx'
+import { ArticleEditor } from '#app/components/article-editor.tsx'
 import {
 	DictateButton,
 	DictationNote,
@@ -28,7 +24,11 @@ import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon'
 import { loadChatHistory } from '#app/utils/article-chat.server.ts'
-import { ARTICLE_EDIT_CHIPS, appendSpeech } from '#app/utils/article-edit.ts'
+import {
+	ARTICLE_EDIT_CHIPS,
+	appendSpeech,
+	countPassage,
+} from '#app/utils/article-edit.ts'
 import { reviewerName } from '#app/utils/articles.server.ts'
 import { useSubmitAfterSave } from '#app/utils/auto-save.ts'
 import { prisma } from '#app/utils/db.server.ts'
@@ -36,6 +36,7 @@ import { requireUserWithRole } from '#app/utils/permissions.server'
 import { plainQuote } from '#app/utils/review-aid.ts'
 import { recordReviewEvent } from '#app/utils/review-events.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
+import { useBottomEdge } from '#app/utils/viewport.ts'
 import {
 	afterDecisionUrl,
 	approveArticle,
@@ -44,22 +45,19 @@ import {
 } from './_shared.server.ts'
 
 /**
- * "Change it": the article editor (the article, the chat that edits it,
- * the raw markdown) under a sticky top bar with "Back to the article" and
- * Approve. Every change saves itself. Approve waits for a save in flight,
- * then stores the working copy and approves it in one action, so what she
- * approved is what goes out. "Send this to the writer instead" is the
- * changes_requested path for when she does not want to check a change
+ * "Change it": the article editor under a sticky top bar with "Back to the
+ * article" and Approve. She edits the article in place; the chat folds into
+ * a dock at the bottom. Every change saves itself. Approve waits for a save
+ * in flight, then stores the working copy and approves it in one action, so
+ * what she approved is what goes out. "Send this to the writer instead" is
+ * the changes_requested path for when she does not want to check a change
  * herself.
  *
- * `?tab=article|chat|markdown` picks the tab (default chat). `?quote=` (from
- * "Comment on this" on the reading page) is attached to the chat composer
- * on mount and then dropped from the URL.
+ * `?quote=` (from "Comment on this" on the reading page) is attached to the
+ * chat composer on mount and then dropped from the URL.
  */
-export const handle: SEOHandle & { reviewWide: boolean } = {
+export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
-	/** The review layout widens for the desktop split (see _layout.tsx). */
-	reviewWide: true,
 }
 
 export const CHANGE_COPY = {
@@ -73,7 +71,6 @@ export const CHANGE_COPY = {
 	writerButton: 'Send to the writer',
 } as const
 
-const TABS: ReadonlyArray<EditorTab> = ['article', 'chat', 'markdown']
 /** A quote from the reading page is cut here (the page cuts at 1000 too). */
 const QUOTE_MAX = 1000
 const QUOTE_MIN = 3
@@ -85,12 +82,10 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	if (!view) throw new Response('Not found', { status: 404 })
 	if (view.article.status !== 'pending') return redirect(`/review/${id}`)
 	const url = new URL(request.url)
-	const rawTab = url.searchParams.get('tab') ?? ''
-	const tab: EditorTab = (TABS as ReadonlyArray<string>).includes(rawTab)
-		? (rawTab as EditorTab)
-		: 'chat'
 	// The reading page appends an ellipsis when it cuts a long quote.
-	const rawQuote = (url.searchParams.get('quote') ?? '').trim().replace(/…$/, '')
+	const rawQuote = (url.searchParams.get('quote') ?? '')
+		.trim()
+		.replace(/…$/, '')
 	// Only a passage that is really in the article; a crafted link cannot plant one.
 	const quote =
 		rawQuote.length >= QUOTE_MIN &&
@@ -108,7 +103,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 		),
 	)
 	const history = await loadChatHistory(id)
-	return json({ view, claims, history, tab, quote })
+	return json({ view, claims, history, quote })
 }
 
 export async function action({ params, request }: ActionFunctionArgs) {
@@ -190,8 +185,11 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	}
 }
 
+/** The sticky top bar is this tall (`h-11`); the editor's sheet and top row sit under it. */
+const TOP_BAR_PX = 44
+
 export default function ChangeArticle() {
-	const { view, claims, history, tab, quote } = useLoaderData<typeof loader>()
+	const { view, claims, history, quote } = useLoaderData<typeof loader>()
 	const { article, images, links } = view
 	const actionData = useActionData<typeof action>()
 	const navigation = useNavigation()
@@ -199,16 +197,21 @@ export default function ChangeArticle() {
 	const [chatBusy, setChatBusy] = useState(false)
 	const [writerOpen, setWriterOpen] = useState(false)
 	const flushRef = useRef<(() => Promise<void>) | null>(null)
+	const barRef = useRef<HTMLDivElement>(null)
+	// The bar's bottom edge: 92 px under the layout header, 44 px once that has scrolled away.
+	const barBottom = useBottomEdge(barRef)
 	const submitAfterSave = useSubmitAfterSave(flushRef)
 	const error = actionData && 'error' in actionData ? actionData.error : null
 	const approveLabel =
 		article.kind === 'blog' ? CHANGE_COPY.approveBlog : CHANGE_COPY.approve
 
 	return (
-		// -mb-8 cancels the layout's bottom padding, so the Chat panel ends at the edge.
-		<div className="-mb-8">
+		<>
 			<Form method="post" onSubmit={submitAfterSave}>
-				<div className="sticky top-0 z-30 -mx-4 flex h-11 items-center justify-between bg-background/95 px-4 backdrop-blur">
+				<div
+					ref={barRef}
+					className="sticky top-0 z-30 -mx-4 flex h-11 items-center justify-between bg-background/95 px-4 backdrop-blur"
+				>
 					<Link
 						to={`/review/${article.id}`}
 						className="inline-flex min-w-0 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
@@ -255,9 +258,8 @@ export default function ChangeArticle() {
 						links={links}
 						claims={claims}
 						history={history}
-						initialTab={tab}
 						initialQuote={quote}
-						stickyTop={44}
+						stickyTop={barBottom || TOP_BAR_PX}
 						flushRef={flushRef}
 						onBusyChange={setChatBusy}
 						writerLink={
@@ -282,7 +284,7 @@ export default function ChangeArticle() {
 					onClose={() => setWriterOpen(false)}
 				/>
 			) : null}
-		</div>
+		</>
 	)
 }
 

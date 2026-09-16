@@ -79,6 +79,31 @@
 	}
 }
 
+@layer components {
+	/* The rich editor root (rich-editor.tsx). The stock prosemirror-view/style/prosemirror.css is not imported. */
+	.ProseMirror {
+		position: relative;
+		white-space: pre-wrap;
+		word-wrap: break-word;
+		outline: none;
+	}
+	.ProseMirror[contenteditable='false'] {
+		cursor: default;
+	}
+	.ProseMirror-selectednode {
+		outline: 2px solid hsl(var(--ring));
+		border-radius: 0.5rem;
+	}
+	.ProseMirror [data-soft-break] {
+		white-space: normal;
+	}
+	img.ProseMirror-separator {
+		display: inline !important;
+		border: none !important;
+		margin: 0 !important;
+	}
+}
+
 @keyframes wiggle {
 	0% {
 		transform: rotate(0deg);

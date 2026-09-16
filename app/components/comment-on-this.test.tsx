@@ -52,9 +52,10 @@ function Harness({
 				<p data-paragraph="1">A second paragraph.</p>
 			</div>
 			<p data-testid="outside">Words outside the prose.</p>
+			<div data-review-bar="">Approve · Change it</div>
 			<CommentOnThis
 				candidate={selection.candidate}
-				bottom="edge"
+				bottom="bar"
 				onPick={selection.pick}
 				narrow={false}
 			/>

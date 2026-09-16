@@ -87,7 +87,7 @@ const QUOTE_FOLD: Record<string, string> = {
 	'„': '"',
 }
 
-function normalize(input: string): Normalized {
+export function normalize(input: string): Normalized {
 	const map: number[] = []
 	let text = ''
 	let spaceStart = -1
