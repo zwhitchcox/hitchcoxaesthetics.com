@@ -11,29 +11,42 @@ import {
 	useLoaderData,
 	useNavigation,
 } from '@remix-run/react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { ArticleEditor } from '#app/components/article-editor.tsx'
 import {
-	ArticleChanger,
+	DictateButton,
+	DictationNote,
+	GhostTextarea,
 	useDictation,
-	useSubmitAfterSave,
-} from '#app/components/article-changer.tsx'
+} from '#app/components/dictation.tsx'
 import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon'
 import { Textarea } from '#app/components/ui/textarea.tsx'
+import { bylineText, whereLabel } from '#app/routes/review+/_shared.server.ts'
+import { loadChatHistory } from '#app/utils/article-chat.server.ts'
+import { type ChatMessageJson } from '#app/utils/article-chat.ts'
 import { appendSpeech } from '#app/utils/article-edit.ts'
 import { countPictureLines, picturesNote } from '#app/utils/article-images.ts'
 import { hashBody, reviewerName } from '#app/utils/articles.server.ts'
 import {
 	articleGroup,
+	countWords,
 	destinationLabel,
 	formatDate,
 	parseLinks,
 	statusLabel,
 } from '#app/utils/articles.ts'
+import { useSubmitAfterSave } from '#app/utils/auto-save.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
-import { loadReviewAid, reviewAidNote } from '#app/utils/review-aid.ts'
+import {
+	aboutMinutes,
+	estimateReadSeconds,
+	loadReviewAid,
+	plainQuote,
+	reviewAidNote,
+} from '#app/utils/review-aid.ts'
 import {
 	recordReviewEvent,
 	secondsSinceOpened,
@@ -80,17 +93,26 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	})
 	if (!article) throw new Response('Not found', { status: 404 })
 	// The "things to check" list, verified against the text she will see.
-	// The changer offers each quote as a pill for "Tell it what to change".
+	// The editor highlights each quote in the article as plain reference.
 	const aid = loadReviewAid(article.reviewAidJson, article.body)
 	const claims = Array.from(
-		new Set([...aid.claims, ...aid.credentials].map(item => item.quote)),
+		new Set(
+			[...aid.claims, ...aid.credentials].map(item => plainQuote(item.quote)),
+		),
 	)
+	const history = await loadChatHistory(article.id)
 	return json({
 		article: {
 			...article,
 			savedHash: hashBody(article.body),
 			pictureLineCount: countPictureLines(article.body),
 			links: parseLinks(article.linksJson),
+			where: whereLabel(article),
+			bylineLine: bylineText(article.byline),
+			about: aboutMinutes(
+				article.estimatedReadSeconds ??
+					estimateReadSeconds(article.wordCount ?? countWords(article.body)),
+			),
 			group: articleGroup({
 				kind: article.kind,
 				status: article.status,
@@ -104,6 +126,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 		},
 		claims,
 		aidNote: reviewAidNote(aid),
+		history,
 	})
 }
 
@@ -127,8 +150,11 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	const form = await request.formData()
 	const intent = String(form.get('intent') ?? '')
 	const rawBody = form.get('body')
-	const body = typeof rawBody === 'string' ? rawBody.replace(/\r\n/g, '\n') : null
-	const note = String(form.get('note') ?? '').trim().slice(0, 2000)
+	const body =
+		typeof rawBody === 'string' ? rawBody.replace(/\r\n/g, '\n') : null
+	const note = String(form.get('note') ?? '')
+		.trim()
+		.slice(0, 2000)
 	const who = await reviewerName(userId)
 	const now = new Date()
 	const textChanged = body !== null && body.trim() !== article.body.trim()
@@ -139,7 +165,10 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	switch (intent) {
 		case 'approve': {
 			if (body !== null && !body.trim()) {
-				return json({ error: 'The article text cannot be empty.' }, { status: 400 })
+				return json(
+					{ error: 'The article text cannot be empty.' },
+					{ status: 400 },
+				)
 			}
 			await prisma.article.update({
 				where: { id },
@@ -228,7 +257,9 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			if (article.status !== 'pending') {
 				return json({ error: 'This one is already decided.' }, { status: 400 })
 			}
-			const words = String(form.get('rewrite_note') ?? '').trim().slice(0, 2000)
+			const words = String(form.get('rewrite_note') ?? '')
+				.trim()
+				.slice(0, 2000)
 			await prisma.article.update({
 				where: { id },
 				data: {
@@ -272,7 +303,9 @@ export async function action({ params, request }: ActionFunctionArgs) {
 				},
 			})
 			await recordReviewEvent(id, 'reopened', { userId })
-			return json({ ok: 'Reopened. Approve or deny it again when you are ready.' })
+			return json({
+				ok: 'Reopened. Approve or deny it again when you are ready.',
+			})
 		}
 		case 'answer': {
 			const answer = String(form.get('answer') ?? '').trim()
@@ -314,7 +347,7 @@ function Messages({ error, ok }: { error: string | null; ok: string | null }) {
 }
 
 export default function ArticleReview() {
-	const { article, claims, aidNote } = useLoaderData<typeof loader>()
+	const { article, claims, aidNote, history } = useLoaderData<typeof loader>()
 	const actionData = useActionData<typeof action>()
 	const navigation = useNavigation()
 	const busy = navigation.state !== 'idle'
@@ -345,9 +378,7 @@ export default function ArticleReview() {
 					{article.kind === 'blog' ? (
 						<>
 							For our blog, at{' '}
-							<span className="font-medium">
-								{destinationLabel(article)}
-							</span>
+							<span className="font-medium">{destinationLabel(article)}</span>
 						</>
 					) : (
 						<>
@@ -396,7 +427,9 @@ export default function ArticleReview() {
 					}`}
 				>
 					<p className="font-medium">
-						{article.rewriteRequested ? REWRITE_COPY.pill : statusLabel(article.status)}
+						{article.rewriteRequested
+							? REWRITE_COPY.pill
+							: statusLabel(article.status)}
 						{article.reviewedBy ? ` by ${article.reviewedBy}` : ''}
 						{article.reviewedAt ? ` on ${formatDate(article.reviewedAt)}` : ''}.
 					</p>
@@ -432,8 +465,8 @@ export default function ArticleReview() {
 							New text arrived
 						</span>
 						The writer sent new text
-						{article.incomingAt ? ` on ${formatDate(article.incomingAt)}` : ''}
-						, after this was {statusLabel(article.status).toLowerCase()}.
+						{article.incomingAt ? ` on ${formatDate(article.incomingAt)}` : ''},
+						after this was {statusLabel(article.status).toLowerCase()}.
 					</p>
 					<p className="mt-1">
 						The decision stands and the text below is what goes out. The new
@@ -500,7 +533,9 @@ export default function ArticleReview() {
 				</div>
 			) : null}
 
-			{article.kind === 'guest' && article.group === 'sent' && article.images.length === 0 ? null : (
+			{article.kind === 'guest' &&
+			article.group === 'sent' &&
+			article.images.length === 0 ? null : (
 				<section>
 					<h3 className="text-lg font-semibold">Pictures</h3>
 					<p className="text-sm text-muted-foreground">
@@ -530,21 +565,28 @@ export default function ArticleReview() {
 
 			<Editor
 				key={String(article.updatedAt)}
-				articleId={article.id}
-				body={article.body}
-				savedHash={article.savedHash}
-				kind={article.kind}
+				article={{
+					id: article.id,
+					kind: article.kind,
+					title: article.title,
+					where: article.where,
+					byline: article.bylineLine,
+					about: article.about,
+					body: article.body,
+					savedHash: article.savedHash,
+					isReference: article.isReference,
+					readOnly: decided,
+					links: article.links,
+					images: article.images,
+				}}
 				group={article.group}
-				isReference={article.isReference}
-				readOnly={decided}
 				publisherWaiting={article.publisherWaiting}
-				where={
+				rewriteWhere={
 					article.kind === 'blog' ? 'your blog' : destinationLabel(article)
 				}
-				links={article.links}
-				images={article.images}
 				claims={claims}
 				aidNote={aidNote}
+				history={history}
 				busy={busy}
 				error={forAnswer ? null : error}
 				ok={forAnswer ? null : ok}
@@ -584,49 +626,76 @@ export default function ArticleReview() {
 	)
 }
 
+/** The site header is sticky and this tall (root.tsx, `h-[3rem]`); the bar sits under it. */
+const SITE_HEADER_PX = 48
+/** The gap under the decision bar (`space-y-3`). */
+const BAR_GAP_PX = 12
+
+/** The height of an element, kept up to date. 0 until measured. */
+function useMeasuredHeight(ref: React.RefObject<HTMLElement | null>): number {
+	const [height, setHeight] = useState(0)
+	useEffect(() => {
+		const el = ref.current
+		if (!el) return
+		const measure = () =>
+			setHeight(Math.round(el.getBoundingClientRect().height))
+		measure()
+		if (typeof ResizeObserver === 'undefined') return
+		const observer = new ResizeObserver(measure)
+		observer.observe(el)
+		return () => observer.disconnect()
+	}, [ref])
+	return height
+}
+
 /**
- * The sticky decision bar and, under it, the changer: "Tell it what to
- * change" by default, or the plain editor. The changer saves every change
- * on its own and puts the working copy in a hidden field named `body`, so
- * every button here submits it after any save in flight.
+ * The sticky decision bar and, under it, the editor: the chat (or the raw
+ * markdown) on the left, the article on the right. Every change saves
+ * itself and the working copy sits in a hidden field named `body`, so every
+ * button here submits it after any save in flight. A decided article is
+ * read-only until Reopen.
  */
 function Editor({
-	articleId,
-	body,
-	savedHash,
-	kind,
+	article,
 	group,
-	isReference,
-	readOnly,
 	publisherWaiting,
-	where,
-	links,
-	images,
+	rewriteWhere,
 	claims,
 	aidNote,
+	history,
 	busy,
 	error,
 	ok,
 }: {
-	articleId: string
-	body: string
-	savedHash: string
-	kind: string
-	group: string
-	isReference: boolean
-	readOnly: boolean
-	publisherWaiting: boolean
-	where: string
-	links: Array<{ name: string; url: string }>
-	images: Array<{
+	article: {
 		id: string
-		fileName: string
-		position: number
-		width: number | null
-		height: number | null
-	}>
+		kind: string
+		title: string
+		where: string
+		byline: string
+		about: string
+		body: string
+		savedHash: string
+		isReference: boolean
+		readOnly: boolean
+		links: Array<{ name: string; url: string }>
+		images: Array<{
+			id: string
+			fileName: string
+			position: number
+			altText: string | null
+			caption: string | null
+			width: number | null
+			height: number | null
+		}>
+	}
+	group: string
+	publisherWaiting: boolean
+	/** "for your blog" or the publication, for the rewrite sheet. */
+	rewriteWhere: string
 	claims: string[]
 	aidNote: string
+	history: ChatMessageJson[]
 	busy: boolean
 	error: string | null
 	ok: string | null
@@ -634,8 +703,12 @@ function Editor({
 	const flushRef = useRef<(() => Promise<void>) | null>(null)
 	const submitAfterSave = useSubmitAfterSave(flushRef)
 	const [rewriteOpen, setRewriteOpen] = useState(false)
+	const [chatBusy, setChatBusy] = useState(false)
+	const barRef = useRef<HTMLDivElement>(null)
+	const barHeight = useMeasuredHeight(barRef)
+	const disabled = busy || chatBusy
 	const approveLabel =
-		kind === 'blog'
+		article.kind === 'blog'
 			? 'Approve and publish'
 			: group === 'reference'
 				? 'Approve in my words'
@@ -646,9 +719,17 @@ function Editor({
 	return (
 		<>
 			<Form method="post" className="space-y-3" onSubmit={submitAfterSave}>
-				<div className="sticky top-0 z-10 space-y-2 rounded-lg border bg-card p-3 shadow">
+				<div
+					ref={barRef}
+					className="sticky top-12 z-10 space-y-2 rounded-lg border bg-card p-3 shadow"
+				>
 					<div className="flex flex-wrap items-center gap-2">
-						<Button type="submit" name="intent" value="approve" disabled={busy}>
+						<Button
+							type="submit"
+							name="intent"
+							value="approve"
+							disabled={disabled}
+						>
 							<Icon name="check" className="mr-1 h-4 w-4" /> {approveLabel}
 						</Button>
 						<Button
@@ -656,7 +737,7 @@ function Editor({
 							name="intent"
 							value="deny"
 							variant="destructive"
-							disabled={busy}
+							disabled={disabled}
 						>
 							<Icon name="cross-1" className="mr-1 h-4 w-4" /> Deny
 						</Button>
@@ -665,7 +746,7 @@ function Editor({
 							name="intent"
 							value="changes_requested"
 							variant="outline"
-							disabled={busy}
+							disabled={disabled}
 						>
 							Send to the writer
 						</Button>
@@ -676,7 +757,7 @@ function Editor({
 							className="min-w-[16rem] flex-1 rounded-md border bg-background px-3 py-2 text-sm"
 						/>
 					</div>
-					{!readOnly ? (
+					{!article.readOnly ? (
 						<button
 							type="button"
 							onClick={() => setRewriteOpen(true)}
@@ -688,31 +769,38 @@ function Editor({
 					<Messages error={error} ok={ok} />
 				</div>
 
-				{claims.length > 0 ? (
-					<p className="text-xs text-muted-foreground">
-						Things to check: {claims.length} {claims.length === 1 ? 'quote' : 'quotes'}{' '}
-						from the text are offered as pills under “Tell it what to change”.{' '}
-						{aidNote}
-					</p>
+				{aidNote ? (
+					<p className="text-xs text-muted-foreground">{aidNote}</p>
 				) : null}
 
-				<ArticleChanger
-					articleId={articleId}
-					initialBody={body}
-					savedHash={savedHash}
-					links={links}
+				<ArticleEditor
+					article={{
+						id: article.id,
+						kind: article.kind,
+						title: article.title,
+						where: article.where,
+						byline: article.byline,
+						about: article.about,
+						body: article.body,
+						savedHash: article.savedHash,
+						isReference: article.isReference,
+					}}
+					images={article.images}
+					links={article.links}
 					claims={claims}
-					isReference={isReference}
-					kind={kind}
-					images={images}
-					readOnly={readOnly}
+					history={history}
+					initialTab="chat"
+					readOnly={article.readOnly}
+					showHeader={false}
+					stickyTop={SITE_HEADER_PX + barHeight + BAR_GAP_PX}
 					flushRef={flushRef}
+					onBusyChange={setChatBusy}
 				/>
 			</Form>
 
 			{rewriteOpen ? (
 				<RewriteSheet
-					where={where}
+					where={rewriteWhere}
 					publisherWaiting={publisherWaiting}
 					busy={busy}
 					error={error}
@@ -723,7 +811,7 @@ function Editor({
 	)
 }
 
-/** "Write a different article": one optional line for the writer, then the button. */
+/** "Write a different article": one optional line for the writer (dictate or type), then the button. */
 function RewriteSheet({
 	where,
 	publisherWaiting,
@@ -738,16 +826,21 @@ function RewriteSheet({
 	onClose: () => void
 }) {
 	const [note, setNote] = useState('')
-	const [interim, setInterim] = useState('')
+	const [ghost, setGhost] = useState('')
 	const dictation = useDictation({
-		onFinal: text => setNote(current => appendSpeech(current, text)),
-		onInterim: setInterim,
+		onInterim: setGhost,
+		onFinal: text => {
+			setGhost('')
+			setNote(current => appendSpeech(current, text))
+		},
 	})
 	return (
 		<Sheet title={REWRITE_COPY.link} onClose={onClose}>
 			<Form method="post" className="space-y-3">
 				<input type="hidden" name="intent" value="rewrite" />
-				<p className="text-sm text-muted-foreground">{REWRITE_COPY.body(where)}</p>
+				<p className="text-sm text-muted-foreground">
+					{REWRITE_COPY.body(where)}
+				</p>
 				{publisherWaiting ? (
 					<p className="text-sm text-muted-foreground">
 						{REWRITE_COPY.publisherWaiting}
@@ -756,33 +849,27 @@ function RewriteSheet({
 				<label htmlFor="rewrite-note" className="text-sm font-medium">
 					{REWRITE_COPY.noteLabel}
 				</label>
-				<Textarea
+				<GhostTextarea
 					id="rewrite-note"
 					name="rewrite_note"
 					rows={2}
 					value={note}
+					ghost={ghost}
+					listening={dictation.listening}
 					onChange={e => setNote(e.currentTarget.value)}
 					placeholder={REWRITE_COPY.notePlaceholder}
 					className="text-base"
 				/>
-				{interim ? (
-					<p aria-live="polite" className="text-sm italic text-muted-foreground">
-						{interim}…
-					</p>
-				) : null}
+				<DictationNote dictation={dictation} />
 				{error ? <SheetError>{error}</SheetError> : null}
 				<div className="flex flex-wrap items-center gap-2">
-					{dictation.supported ? (
-						<Button
-							type="button"
-							variant={dictation.listening ? 'secondary' : 'outline'}
-							aria-pressed={dictation.listening}
-							onClick={dictation.listening ? dictation.stop : dictation.start}
-						>
-							{dictation.listening ? 'Listening… tap to stop' : 'Dictate'}
-						</Button>
-					) : null}
-					<Button type="submit" size="lg" className="min-w-0 flex-1" disabled={busy}>
+					<DictateButton dictation={dictation} disabled={busy} />
+					<Button
+						type="submit"
+						size="lg"
+						className="min-w-0 flex-1"
+						disabled={busy || dictation.listening}
+					>
 						{REWRITE_COPY.button}
 					</Button>
 				</div>

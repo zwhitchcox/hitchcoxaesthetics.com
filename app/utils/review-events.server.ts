@@ -19,6 +19,7 @@ export const REVIEW_EVENT_KINDS = [
 	'takedown',
 	'ai_edit',
 	'saved',
+	'picture_uploaded',
 	'keep_approval',
 	'sent',
 	'live',

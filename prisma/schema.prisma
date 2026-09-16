@@ -921,6 +921,7 @@ model Article {
 
   images ArticleImage[]
   events ArticleReviewEvent[]
+  chat   ArticleChatMessage[]
 
   @@index([kind, status])
 }
@@ -942,6 +943,23 @@ model ArticleReviewEvent {
 
   @@index([articleId, at])
   @@index([kind, at])
+}
+
+// The chat that edits the article (phase 3). role: user | assistant | change
+// (an applied tool; text is its summary). One thread per article, no author.
+model ArticleChatMessage {
+  id        String   @id @default(cuid())
+  role      String
+  text      String
+  quote     String?
+  imageId   String?
+  toolName  String?
+  createdAt DateTime @default(now())
+
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId String
+
+  @@index([articleId, createdAt])
 }
 
 // Per-reviewer settings for /review. One row per admin who opens it.

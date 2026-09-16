@@ -1,6 +1,8 @@
+import { firstHeading } from '#app/utils/article-edit.ts'
 import { createHash } from 'node:crypto'
 import { type Prisma } from '@prisma/client'
 import { z } from 'zod'
+import { isUserPictureFileName } from '#app/utils/article-images.ts'
 import { countWords } from '#app/utils/articles.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { recordReviewEvent } from '#app/utils/review-events.server.ts'
@@ -258,11 +260,17 @@ async function syncImages(articleId: string, a: SyncArticle): Promise<void> {
 	if (!a.images) return
 	// An empty list only clears the pictures when the mini says so.
 	if (a.images.length === 0 && a.clearImages !== true) return
-	const keep = a.images.map(i => i.fileName)
+	// Pictures Sarah added in the chat (user-<id>.<ext>) are hers: a writer
+	// push never deletes or overwrites them, and never sends one.
+	const writerImages = a.images.filter(i => !isUserPictureFileName(i.fileName))
+	const keep = writerImages.map(i => i.fileName)
 	await prisma.articleImage.deleteMany({
-		where: { articleId, fileName: { notIn: keep } },
+		where: {
+			articleId,
+			fileName: { notIn: keep, not: { startsWith: 'user-' } },
+		},
 	})
-	for (const im of a.images) {
+	for (const im of writerImages) {
 		const blob = Buffer.from(im.dataBase64, 'base64')
 		const fields = {
 			contentType: im.contentType,
@@ -553,9 +561,16 @@ export async function saveWorkingCopy(
 	if (hash === current) return { kind: 'same', hash }
 	// The status is checked again in the write, so a decision that lands
 	// between the read and the write is never overwritten.
+	// A changed first heading is the new title everywhere (cards, lists, header).
+	const heading = firstHeading(body)
 	const written = await prisma.article.updateMany({
 		where: { id: input.id, status: 'pending' },
-		data: { body, editedAt: now, editedBy: input.who },
+		data: {
+			body,
+			editedAt: now,
+			editedBy: input.who,
+			...(heading ? { title: heading } : {}),
+		},
 	})
 	if (written.count === 0) return { kind: 'decided' }
 	await recordReviewEvent(input.id, 'saved', {

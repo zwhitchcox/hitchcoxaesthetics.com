@@ -5,6 +5,7 @@ import {
 	Link,
 	Outlet,
 	useLocation,
+	useMatches,
 	useRouteError,
 } from '@remix-run/react'
 import { useSyncExternalStore } from 'react'
@@ -126,9 +127,28 @@ function HomeScreenCard({ platform }: { platform: HintPlatform }) {
 /* Shell                                                                    */
 /* ------------------------------------------------------------------------ */
 
-function Shell({ children }: { children: React.ReactNode }) {
+/** A child route that needs the desktop split (the editor) exports `handle.reviewWide`. */
+function useReviewWide(): boolean {
+	const matches = useMatches()
+	return matches.some(
+		match => (match.handle as { reviewWide?: boolean } | undefined)?.reviewWide === true,
+	)
+}
+
+function Shell({
+	children,
+	wide = false,
+}: {
+	children: React.ReactNode
+	/** The editor's two columns need more than one phone column. */
+	wide?: boolean
+}) {
 	return (
-		<div className="mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col px-4 pt-[env(safe-area-inset-top)]">
+		<div
+			className={`mx-auto flex min-h-[100dvh] w-full flex-col px-4 pt-[env(safe-area-inset-top)] ${
+				wide ? 'max-w-xl lg:max-w-6xl' : 'max-w-xl'
+			}`}
+		>
 			<header className="flex items-center justify-between py-3">
 				<Link to="/review" className="text-base font-semibold">
 					Article review
@@ -148,8 +168,9 @@ function Shell({ children }: { children: React.ReactNode }) {
 export default function ReviewLayout() {
 	const { pathname } = useLocation()
 	const hint = useHomeScreenHint()
+	const wide = useReviewWide()
 	return (
-		<Shell>
+		<Shell wide={wide}>
 			{pathname === '/review' && hint ? (
 				<HomeScreenCard platform={hint} />
 			) : null}

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { type Page } from '@playwright/test'
+import { createId } from '@paralleldrive/cuid2'
+import { type Locator, type Page } from '@playwright/test'
 import { countWords } from '#app/utils/articles.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { estimateReadSeconds } from '#app/utils/review-aid.ts'
@@ -7,24 +8,31 @@ import { expect, test } from '#tests/playwright-utils.ts'
 
 /**
  * Sarah's phone review (/review) end to end, at phone width (spec section 9,
- * phase 2 plan section 5).
+ * phase 3 plan section 7).
  *
  * Four articles: two short guest posts (both fit the 2 min lane, so the feed
  * has a next card), a blog post and a guest post a publisher is holding a
  * spot for (both too long for 2 min). The walk: pick 2 min, the shortest is
- * served with its picture in the prose, read to the end, Approve, the
- * approved card and its record, the next one below it, Undo; tap a claim
- * row, the fix sheet opens with that sentence, a (mocked) AI change lands
- * and saves itself, "Undo that" puts the text back; "Write a different
- * article" on the next card, then "Keep this one"; the blog post gets
- * "Approve anyway" on the read-to-the-end sheet and a typed edit on its
- * change page saves itself and survives a reload; the guest post gets no
- * "Approve anyway"; Change it, then "Send this to the writer instead"; then
- * the sync endpoint answers `meta` for the same text and `kept` for
+ * served with its picture in the prose and inert claim marks, read to the
+ * end, Approve, the approved card and its record, the next one below it,
+ * Undo; "Change it" opens the editor on its Chat tab (Article, Chat,
+ * Markdown), a (mocked) chat turn changes the text, "See it" shows the
+ * green mark on the Article tab, the Markdown tab holds the new text,
+ * "Undo" puts the old text back with a real save, a selected passage on the
+ * Article tab becomes a quote in the chat, an attached picture (the upload
+ * is mocked) shows a thumbnail, goes out with her words and lands in the
+ * text as a `user-` picture line; "Write a different article" on
+ * the next card, then "Keep this one"; the blog post gets "Approve anyway"
+ * on the read-to-the-end sheet and a typed edit under Markdown saves itself
+ * and survives a reload; the guest post gets no "Approve anyway", a
+ * selected passage on the reading page opens the editor with the quote,
+ * Change it lands on the Chat tab, then "Send this to the writer instead";
+ * then the sync endpoint answers `meta` for the same text and `kept` for
  * different text.
  *
- * The AI change is mocked at /resources/article-edit (no OpenRouter call).
- * The save that follows it is real.
+ * The chat turn is mocked at /resources/article-chat (no OpenRouter call):
+ * the mock writes the changed text with prisma, as the real resource does,
+ * so the hash it returns is real and the Undo that follows is a real save.
  *
  * The dev server and this test share prisma/data.db. Other pending articles
  * would take the 2 min card, so the test holds them out with the app's own
@@ -90,12 +98,14 @@ const SHORT_BODY = [
 	paragraphs(1),
 ].join('\n')
 
-/** What the mocked AI change returns: the dose becomes a range, nothing else moves. */
+/** What the mocked chat turn writes: the dose becomes a range, nothing else moves. */
 const SHORT_BODY_CHANGED = SHORT_BODY.replace(
 	'20 units on each side',
 	'15 to 25 units on each side',
 )
-const CHANGE_SUMMARY = 'Changed the dose to a range.'
+/** The change row's text. Lowercase first, so the line reads the same whether summaryLine folds it or not. */
+const CHANGE_SUMMARY = 'the dose is now a range.'
+const CHAT_WORDS = 'Say 15 to 25 units, it depends on the person.'
 
 /** A little longer than SHORT_BODY, so it is served second in the 2 min lane. */
 const SECOND_BODY = [
@@ -119,8 +129,17 @@ const BLOG_BODY = [
 	paragraphs(12, 1),
 ].join('\n')
 
-/** Her typed edit on the blog post's change page. */
+/** Her typed edit on the blog post's Markdown tab. */
 const BLOG_BODY_EDITED = `${BLOG_BODY}\n\nSarah added this line.`
+
+/**
+ * The first paragraph of HELD_BODY, as it reads on the page (no link marks).
+ * The link and the final period are part of it on purpose: a re-render of
+ * the prose while she selects would remount the link and cut the selection
+ * there, so the quote must arrive whole.
+ */
+const HELD_FIRST_PARAGRAPH =
+	'Sarah Hitchcox, RN, writes every plan by hand at Sarah Hitchcox Aesthetics.'
 
 /** About 900 words: out of the 2 min lane, in the 5 min lane. */
 const HELD_BODY = [
@@ -158,7 +177,9 @@ const onePicture = {
 	],
 }
 
-const shot = (name: string) => `test-results/phase2-${name}.png`
+/** Screenshot names: `review-phone-*` by default; a run can set REVIEW_SHOT_PREFIX. */
+const SHOT_PREFIX = process.env.REVIEW_SHOT_PREFIX ?? 'review-phone'
+const shot = (name: string) => `test-results/${SHOT_PREFIX}-${name}.png`
 
 /** One card of the feed. Every check on an article is scoped to its card. */
 function card(page: Page, id: string) {
@@ -177,6 +198,28 @@ function divider(page: Page, title: string) {
 	return page
 		.locator('[data-feed-spy]', { hasText: 'Next one' })
 		.filter({ hasText: title })
+}
+
+/** The editor's tab by name (Article, Chat, Markdown). */
+function tab(page: Page, name: string) {
+	return page.getByRole('tab', { name, exact: true })
+}
+
+/** Select the whole text of one block, as a finger drag would. */
+async function selectText(block: Locator) {
+	await block.scrollIntoViewIfNeeded()
+	await block.evaluate(el => {
+		const range = document.createRange()
+		range.selectNodeContents(el)
+		const selection = window.getSelection()
+		selection?.removeAllRanges()
+		selection?.addRange(range)
+	})
+}
+
+/** The "Comment on this" pill or button. Its name starts with the label; the phone pill adds the first words. */
+function commentPill(page: Page) {
+	return page.getByRole('button', { name: /^Comment on this/ })
 }
 
 /** The page body must never scroll sideways at phone width. */
@@ -207,12 +250,12 @@ async function events(articleId: string, kind: string) {
 	})
 }
 
-test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different article, auto-save, the end gate, send to the writer, sync', async ({
+test('Sarah reviews on her phone: lane, approve, undo, the chat editor, a different article, auto-save, the end gate, comment on this, send to the writer, sync', async ({
 	page,
 	login,
 	request,
 }) => {
-	test.setTimeout(180_000)
+	test.setTimeout(240_000)
 
 	for (const name of ['user', 'admin']) {
 		await prisma.role.upsert({
@@ -285,6 +328,12 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 		data: { skippedUntil: holdUntil },
 	})
 
+	// Every address the page lands on, including the ones it replaces at once.
+	const visited: string[] = []
+	page.on('framenavigated', frame => {
+		if (frame === page.mainFrame()) visited.push(frame.url())
+	})
+
 	try {
 		/* S2: home, the lane pick, the short one is served */
 		await page.goto('/review')
@@ -301,7 +350,7 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 		await expectNoSidewaysScroll(page)
 		await page.screenshot({ path: shot('home'), fullPage: true })
 
-		/* S3: the article, with its picture in the prose (R1) */
+		/* S3: the article, with its picture in the prose and inert claim marks */
 		await page.getByRole('link', { name: 'Start' }).click()
 		await expect(page).toHaveURL(new RegExp(`/review/${short.id}$`))
 		const shortCard = card(page, short.id)
@@ -325,6 +374,12 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 				'1 picture, shown in place. Tap it to see it larger.',
 			),
 		).toBeVisible()
+		// the claim is marked in the prose and listed as plain text: no Change button
+		await expect(shortCard.locator('mark[data-claim]').first()).toBeVisible()
+		await expect(shortCard.getByText(`“${SHORT_CLAIM}”`)).toBeVisible()
+		await expect(
+			shortCard.getByRole('button', { name: /^Change: / }),
+		).toHaveCount(0)
 		await expect(shortCard.getByText('That is all of it.')).toBeAttached()
 		await expectNoSidewaysScroll(page)
 
@@ -411,92 +466,109 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 		)
 		await page.screenshot({ path: shot('undone'), fullPage: true })
 
-		/* R3: a tap on a claim row opens the fix sheet with that sentence */
-		const claimRow = shortCard.getByRole('button', {
-			name: `Change: ${SHORT_CLAIM}`,
-		})
-		await claimRow.scrollIntoViewIfNeeded()
-		await expect(claimRow).toBeVisible()
-		// the same sentence is highlighted in the prose
-		await expect(shortCard.locator('mark[data-claim]').first()).toBeVisible()
-		await claimRow.click()
-		// the copy uses a curly apostrophe: What’s wrong with this?
-		const fixSheet = page.getByRole('dialog', {
-			name: /^What.s wrong with this\?$/,
-		})
-		await expect(fixSheet).toBeVisible()
-		await expect(fixSheet.locator('blockquote')).toContainText(SHORT_CLAIM)
+		/* R1: "Change it" opens the editor on its Chat tab */
+		await shortCard.scrollIntoViewIfNeeded()
+		await expect(page.locator('.fixed p', { hasText: short.title })).toBeVisible()
+		await page.getByRole('link', { name: 'Change it' }).click()
+		await expect(page).toHaveURL(
+			new RegExp(`/review/${short.id}/change\\?tab=chat$`),
+		)
+		await expect(tab(page, 'Article')).toBeVisible()
+		await expect(tab(page, 'Chat')).toHaveAttribute('aria-selected', 'true')
+		await expect(tab(page, 'Markdown')).toBeVisible()
 		await expect(
-			fixSheet.getByRole('button', { name: 'Show me where it is' }),
+			page.getByRole('link', { name: /Back to the article/ }).first(),
 		).toBeVisible()
-		const makeChange = fixSheet.getByRole('button', {
-			name: 'Make this change',
-		})
-		await expect(makeChange).toBeDisabled()
+		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(
+			0,
+		)
 		await expect(
-			fixSheet.getByRole('button', { name: 'Wrong fact' }),
+			page.getByText('Ask a question or say what to change.'),
 		).toBeVisible()
 		await expectNoSidewaysScroll(page)
-		await page.screenshot({ path: shot('fix-sheet') })
+		await page.screenshot({ path: shot('chat-empty'), fullPage: true })
 
-		/* R4 + R5: a (mocked) AI change lands in the prose and saves itself */
-		let editRequest: unknown = null
-		await page.route('**/resources/article-edit', async route => {
-			editRequest = route.request().postDataJSON()
+		/* R2: a (mocked) chat turn changes the text; the article updates */
+		let chatRequest: unknown = null
+		await page.route('**/resources/article-chat', async route => {
+			chatRequest = route.request().postDataJSON()
+			// The real resource saves the change before it answers. So does the mock,
+			// so the hash it returns is the server's and the Undo below is a real save.
+			await prisma.article.update({
+				where: { id: short.id },
+				data: { body: SHORT_BODY_CHANGED },
+			})
+			const createdAt = new Date().toISOString()
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
 				body: JSON.stringify({
-					markdown: SHORT_BODY_CHANGED,
-					summary: CHANGE_SUMMARY,
+					messages: [
+						{
+							id: `mock-user-${stamp}`,
+							role: 'user',
+							text: CHAT_WORDS,
+							quote: null,
+							imageId: null,
+							imageUrl: null,
+							toolName: null,
+							createdAt,
+						},
+						{
+							id: `mock-change-${stamp}`,
+							role: 'change',
+							text: CHANGE_SUMMARY,
+							quote: null,
+							imageId: null,
+							imageUrl: null,
+							toolName: 'replace_text',
+							createdAt,
+						},
+					],
+					body: SHORT_BODY_CHANGED,
+					hash: hashBody(SHORT_BODY_CHANGED),
+					changed: true,
 				}),
 			})
 		})
-		await fixSheet
-			.getByLabel('What should change here')
-			.fill('Say 15 to 25 units, it depends on the person.')
-		await expect(makeChange).toBeEnabled()
-		await makeChange.click()
-		await expect(fixSheet).toBeHidden()
-		await page.unroute('**/resources/article-edit')
-		expect(editRequest).toMatchObject({
+		const composer = page.getByPlaceholder('Ask a question, or say what to change.')
+		await composer.fill(CHAT_WORDS)
+		await page.getByRole('button', { name: 'Send', exact: true }).click()
+		await expect(page.getByText(`Changed: ${CHANGE_SUMMARY}`)).toBeVisible()
+		await page.unroute('**/resources/article-chat')
+		expect(chatRequest).toMatchObject({
 			articleId: short.id,
-			prompt: 'Say 15 to 25 units, it depends on the person.',
-			markdown: SHORT_BODY,
-			selection: { text: SHORT_CLAIM },
+			text: CHAT_WORDS,
+			baseHash: hashBody(SHORT_BODY),
 		})
+		await expect(page.getByText(CHAT_WORDS)).toBeVisible()
+		const seeIt = page.getByText('See it', { exact: true })
+		const undoChange = page.getByText('Undo', { exact: true })
+		await expect(seeIt).toBeVisible()
+		await expect(undoChange).toBeVisible()
+		await page.screenshot({ path: shot('chat-changed'), fullPage: true })
+
+		/* "See it": the Article tab, the new text with its green mark, the picture kept */
+		await seeIt.click()
+		await expect(tab(page, 'Article')).toHaveAttribute('aria-selected', 'true')
+		// The Article tab's content is the preview block (on a desktop it is the right column), not a Radix panel.
+		const articlePanel = page.locator('[data-article-preview]')
+		await expect(articlePanel).toBeVisible()
+		await expect(articlePanel).toContainText('15 to 25 units on each side')
+		await expect(articlePanel.locator('mark.review-changed')).toBeVisible()
 		await expect(
-			shortCard.getByText(`Changed: ${CHANGE_SUMMARY}`),
+			articlePanel.locator('img[alt="a test picture"]'),
 		).toBeVisible()
-		await expect(shortCard.getByText('Saved', { exact: true })).toBeVisible()
-		await expect(shortCard.locator('mark.review-changed')).toBeVisible()
-		await expect(
-			shortCard.locator('section:has([data-every-word])'),
-		).toContainText('15 to 25 units on each side')
-		// the picture line was kept, so the picture is still in the prose
-		await expect(picture).toBeVisible()
-		await page.screenshot({ path: shot('changed'), fullPage: true })
+		await page.screenshot({ path: shot('see-it'), fullPage: true })
 
-		const changed = await prisma.article.findUniqueOrThrow({
-			where: { id: short.id },
-		})
-		expect(changed.status).toBe('pending')
-		expect(changed.body).toBe(SHORT_BODY_CHANGED)
-		expect(changed.editedBy).toBe(user.name)
-		expect(changed.editedAt).not.toBeNull()
-		const aiSaves = await events(short.id, 'saved')
-		expect(aiSaves).toEqual([
-			expect.objectContaining({ note: 'ai', userId: user.id }),
-		])
+		/* The Markdown tab is bound to the same working copy */
+		await tab(page, 'Markdown').click()
+		await expect(page.getByLabel('Article text')).toHaveValue(SHORT_BODY_CHANGED)
 
-		/* "Undo that" puts the text back, and that saves too */
-		await shortCard.getByRole('button', { name: 'Undo that' }).click()
-		await expect(shortCard.getByText(`Changed: ${CHANGE_SUMMARY}`)).toHaveCount(
-			0,
-		)
-		await expect(
-			shortCard.locator('section:has([data-every-word])'),
-		).toContainText('20 units on each side')
+		/* "Undo" puts the old text back, with a real save */
+		await tab(page, 'Chat').click()
+		await undoChange.click()
+		await expect(page.getByText('Undone.', { exact: true })).toBeVisible()
 		await expect
 			.poll(
 				async () =>
@@ -506,12 +578,199 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 							select: { body: true },
 						})
 					).body,
-				{ message: 'Undo that saved the previous text' },
+				{ message: 'Undo saved the previous text' },
 			)
 			.toBe(SHORT_BODY)
-		expect((await events(short.id, 'saved')).length).toBe(2)
+		expect(await events(short.id, 'saved')).toEqual([
+			expect.objectContaining({ note: 'ai', userId: user.id }),
+		])
+		const undoneChange = await prisma.article.findUniqueOrThrow({
+			where: { id: short.id },
+		})
+		expect(undoneChange.status).toBe('pending')
+		expect(undoneChange.editedBy).toBe(user.name)
+
+		/* R3: a selected passage on the Article tab becomes a quote in the chat */
+		await tab(page, 'Article').click()
+		const shortParagraph = articlePanel
+			.locator('p[data-paragraph]', { hasText: '20 units on each side' })
+			.first()
+		await selectText(shortParagraph)
+		const pill = commentPill(page)
+		await expect(pill).toBeVisible()
+		await page.screenshot({ path: shot('comment-pill') })
+		await pill.click()
+		await expect(tab(page, 'Chat')).toHaveAttribute('aria-selected', 'true')
+		const removeQuote = page.getByRole('button', { name: 'Remove the quote' })
+		await expect(removeQuote).toBeVisible()
+		await expect(
+			page.locator('blockquote', { hasText: '20 units on each side' }),
+		).toBeVisible()
+		await expect(
+			page.getByPlaceholder('What should change here? Or ask about it.'),
+		).toBeVisible()
+		await page.screenshot({ path: shot('quote-attached'), fullPage: true })
+		await removeQuote.click()
+		await expect(removeQuote).toHaveCount(0)
+		await expect(composer).toBeVisible()
+
+		/* R4: an attached picture shows a thumbnail (the upload is mocked) */
+		// The stored row exists, so the thumbnails and the Article tab load real bytes.
+		const userImageId = createId()
+		const userFileName = `user-${userImageId}.png`
+		const userImageUrl = `/resources/article-images/${userImageId}`
+		await prisma.articleImage.create({
+			data: {
+				id: userImageId,
+				articleId: short.id,
+				fileName: userFileName,
+				contentType: 'image/png',
+				blob: ONE_PIXEL_PNG,
+				width: 1,
+				height: 1,
+				position: 1,
+			},
+		})
+		// Chromium does not hand a blob-backed multipart body to the route, so the
+		// check is the method and the content type; the fields are the server's unit tests.
+		let upload: { method: string; contentType: string } | null = null
+		await page.route('**/resources/article-image-upload', async route => {
+			const req = route.request()
+			upload = {
+				method: req.method(),
+				contentType: req.headers()['content-type'] ?? '',
+			}
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					image: {
+						id: userImageId,
+						fileName: userFileName,
+						width: 1,
+						height: 1,
+						url: userImageUrl,
+					},
+				}),
+			})
+		})
+		const chooser = page.waitForEvent('filechooser')
+		await page.getByRole('button', { name: 'Add a picture' }).click()
+		await (await chooser).setFiles({
+			name: 'test-picture.png',
+			mimeType: 'image/png',
+			buffer: ONE_PIXEL_PNG,
+		})
+		const thumb = page.locator('[data-status="ready"]')
+		await expect(thumb).toBeVisible()
+		await expect(thumb.locator('img')).toBeVisible()
+		await expect(
+			thumb.getByText(
+				'Say where it goes. For example: use this instead of the second picture.',
+			),
+		).toBeVisible()
+		await page.unroute('**/resources/article-image-upload')
+		expect(upload).toMatchObject({
+			method: 'POST',
+			contentType: expect.stringMatching(/^multipart\/form-data; boundary=/),
+		})
+		// the picture alone can be sent: the box is empty and Send is on
+		await expect(composer).toHaveValue('')
+		await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled()
+		await expectNoSidewaysScroll(page)
+		await page.screenshot({ path: shot('picture-attached'), fullPage: true })
+
+		/* The picture goes out with her words; the (mocked) turn swaps the picture line */
+		const SHORT_BODY_PICTURE = SHORT_BODY.replace(
+			'images/image-1.png',
+			`images/${userFileName}`,
+		)
+		const PICTURE_WORDS = 'Use this instead of the picture.'
+		const PICTURE_SUMMARY = 'picture 1 is now the one you sent.'
+		let pictureRequest: unknown = null
+		await page.route('**/resources/article-chat', async route => {
+			pictureRequest = route.request().postDataJSON()
+			await prisma.article.update({
+				where: { id: short.id },
+				data: { body: SHORT_BODY_PICTURE },
+			})
+			const createdAt = new Date().toISOString()
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					messages: [
+						{
+							id: `mock-user-picture-${stamp}`,
+							role: 'user',
+							text: PICTURE_WORDS,
+							quote: null,
+							imageId: userImageId,
+							imageUrl: userImageUrl,
+							toolName: null,
+							createdAt,
+						},
+						{
+							id: `mock-change-picture-${stamp}`,
+							role: 'change',
+							text: PICTURE_SUMMARY,
+							quote: null,
+							imageId: userImageId,
+							imageUrl: userImageUrl,
+							toolName: 'replace_picture',
+							createdAt,
+						},
+					],
+					body: SHORT_BODY_PICTURE,
+					hash: hashBody(SHORT_BODY_PICTURE),
+					changed: true,
+				}),
+			})
+		})
+		await composer.fill(PICTURE_WORDS)
+		await page.getByRole('button', { name: 'Send', exact: true }).click()
+		await expect(page.getByText(`Changed: ${PICTURE_SUMMARY}`)).toBeVisible()
+		await page.unroute('**/resources/article-chat')
+		expect(pictureRequest).toMatchObject({
+			articleId: short.id,
+			text: PICTURE_WORDS,
+			imageId: userImageId,
+			baseHash: hashBody(SHORT_BODY),
+		})
+		// her bubble shows the picture; the change row shows it small
+		const chatList = page.locator('[data-chat-list]')
+		await expect(
+			page.getByRole('button', { name: 'Show the picture larger' }).locator('img'),
+		).toHaveAttribute('src', userImageUrl)
+		await expect(chatList.locator(`img[src="${userImageUrl}"]`)).toHaveCount(2)
+		// the change detached the picture from the composer
+		await expect(page.getByRole('button', { name: 'Remove the picture' })).toHaveCount(0)
+		await page.screenshot({ path: shot('picture-sent'), fullPage: true })
+
+		/* "See it": the Article tab shows the picture she sent, in place */
+		await page.getByText('See it', { exact: true }).last().click()
+		await expect(tab(page, 'Article')).toHaveAttribute('aria-selected', 'true')
+		await expect(
+			articlePanel.locator(`img[src="${userImageUrl}"][alt="a test picture"]`),
+		).toBeVisible()
+		await expect(articlePanel.locator('[data-picture-placeholder]')).toHaveCount(0)
+		await tab(page, 'Markdown').click()
+		await expect(page.getByLabel('Article text')).toHaveValue(SHORT_BODY_PICTURE)
+		await page.screenshot({ path: shot('picture-in-place'), fullPage: true })
+
+		/* Back to the feed */
+		await page
+			.getByRole('link', { name: /Back to the article/ })
+			.first()
+			.click()
+		await expect(page).toHaveURL(new RegExp(`/review/${short.id}$`))
+		await expect(cardTitle(page, short.id, short.title)).toBeVisible()
+		await expect(
+			shortCard.locator('section:has([data-every-word])'),
+		).toContainText('20 units on each side')
 
 		/* The sticky bar follows the article in view */
+		await expect(cardTitle(page, second.id, second.title)).toBeAttached()
 		await page.evaluate(id => {
 			document.getElementById(`feed-${id}`)?.scrollIntoView({ block: 'start' })
 		}, second.id)
@@ -613,15 +872,13 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 				.status,
 		).toBe('pending')
 
-		/* R5 on the change page: a typed edit saves itself and survives a reload */
+		/* R6 on the editor: a typed edit under Markdown saves itself and survives a reload */
 		await page.goto(`/review/${blog.id}/change`)
-		await expect(
-			page.getByRole('tab', { name: 'Tell it what to change' }),
-		).toBeVisible()
+		await expect(tab(page, 'Chat')).toHaveAttribute('aria-selected', 'true')
 		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(
 			0,
 		)
-		await page.getByRole('tab', { name: 'Edit the text myself' }).click()
+		await tab(page, 'Markdown').click()
 		const editor = page.getByLabel('Article text')
 		await expect(editor).toHaveValue(BLOG_BODY)
 		await editor.fill(BLOG_BODY_EDITED)
@@ -640,14 +897,12 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 		])
 
 		await page.reload()
-		await expect(
-			page.getByRole('tab', { name: 'Edit the text myself' }),
-		).toBeVisible()
+		// the tab is in the address, so a reload keeps it
+		await expect(tab(page, 'Markdown')).toHaveAttribute('aria-selected', 'true')
 		// the save landed, so nothing is offered back from the browser mirror
 		await expect(
 			page.getByRole('button', { name: 'Restore your unsaved edit' }),
 		).toHaveCount(0)
-		await page.getByRole('tab', { name: 'Edit the text myself' }).click()
 		await expect(page.getByLabel('Article text')).toHaveValue(BLOG_BODY_EDITED)
 
 		/* S4 on the guest post: no "Approve anyway" */
@@ -668,20 +923,56 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 		await page.keyboard.press('Escape')
 		await expect(endSheet).toBeHidden()
 
-		/* S5: Change it, then "Send this to the writer instead" */
+		/* R3 on the reading page: a selected passage opens the editor with the quote */
+		const heldParagraph = card(page, held.id)
+			.locator('p[data-paragraph]', { hasText: 'writes every plan by hand' })
+			.first()
+		await selectText(heldParagraph)
+		const readingPill = commentPill(page)
+		await expect(readingPill).toBeVisible()
+		// the pill sits above the sticky bar, not under it
+		const pillBox = await readingPill.boundingBox()
+		const barBox = await page.locator('[data-review-bar]').boundingBox()
+		expect(pillBox!.y + pillBox!.height).toBeLessThanOrEqual(barBox!.y + 1)
+		await page.screenshot({ path: shot('reading-pill') })
+		await readingPill.click()
+		await expect(page).toHaveURL(new RegExp(`/review/${held.id}/change\\?tab=chat`))
+		// the hand-off carried the quote in the address, then the editor dropped it
+		await expect
+			.poll(() =>
+				visited.some(url =>
+					new RegExp(`/review/${held.id}/change\\?tab=chat&quote=`).test(url),
+				),
+			)
+			.toBe(true)
+		await expect(tab(page, 'Chat')).toHaveAttribute('aria-selected', 'true')
+		await expect(
+			page.locator('blockquote', { hasText: HELD_FIRST_PARAGRAPH }),
+		).toBeVisible()
+		await expect(
+			page.getByRole('button', { name: 'Remove the quote' }),
+		).toBeVisible()
+		await page.screenshot({ path: shot('reading-quote'), fullPage: true })
+		await page
+			.getByRole('link', { name: /Back to the article/ })
+			.first()
+			.click()
+		await expect(page).toHaveURL(new RegExp(`/review/${held.id}$`))
+		await expect(cardTitle(page, held.id, held.title)).toBeVisible()
+
+		/* S5: Change it lands on the Chat tab, then "Send this to the writer instead" */
 		await page.getByRole('link', { name: 'Change it' }).click()
-		await expect(page).toHaveURL(new RegExp(`/review/${held.id}/change$`))
-		await expect(
-			page.getByRole('tab', { name: 'Tell it what to change' }),
-		).toBeVisible()
-		await expect(
-			page.getByRole('tab', { name: 'Edit the text myself' }),
-		).toBeVisible()
+		await expect(page).toHaveURL(
+			new RegExp(`/review/${held.id}/change\\?tab=chat$`),
+		)
+		await expect(tab(page, 'Article')).toBeVisible()
+		await expect(tab(page, 'Chat')).toHaveAttribute('aria-selected', 'true')
+		await expect(tab(page, 'Markdown')).toBeVisible()
 		await expect(
 			page.getByRole('button', { name: 'Make these changes' }),
-		).toBeDisabled()
+		).toHaveCount(0)
 		await expect(
-			page.getByRole('link', { name: 'Back to the article' }).first(),
+			page.getByRole('link', { name: /Back to the article/ }).first(),
 		).toBeVisible()
 		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(
 			0,
@@ -799,6 +1090,7 @@ test('Sarah reviews on her phone: lane, approve, undo, tap to fix, a different a
 					.catch(() => {}),
 			),
 		)
+		// Chat rows, events and pictures cascade from the article.
 		await prisma.article
 			.deleteMany({ where: { id: { in: mine } } })
 			.catch(() => {})

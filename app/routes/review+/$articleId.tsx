@@ -21,25 +21,23 @@ import {
 	useRef,
 	useState,
 } from 'react'
+import { ARTICLE_EDITOR_COPY } from '#app/components/article-editor.tsx'
 import {
-	ARTICLE_CHANGER_COPY,
+	CommentOnThis,
+	useProseSelection,
+} from '#app/components/comment-on-this.tsx'
+import {
+	DictateButton,
+	DictationNote,
+	GhostTextarea,
 	useDictation,
-} from '#app/components/article-changer.tsx'
+} from '#app/components/dictation.tsx'
 import { MarkdownContent } from '#app/components/markdown-content.tsx'
-import {
-	PassageFix,
-	type PassageApplied,
-	type PassageRequest,
-} from '#app/components/passage-fix.tsx'
 import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon'
 import { Textarea } from '#app/components/ui/textarea.tsx'
-import {
-	appendSpeech,
-	ARTICLE_EDIT_CHIPS,
-	saveArticleBody,
-} from '#app/utils/article-edit.ts'
+import { appendSpeech, ARTICLE_EDIT_CHIPS } from '#app/utils/article-edit.ts'
 import {
 	articleImageResolver,
 	articleImageUrl,
@@ -54,13 +52,11 @@ import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import {
 	findHighlightRanges,
-	paragraphIndexAt,
 	plainQuote,
 	splitParagraphs,
 } from '#app/utils/review-aid.ts'
 import { recordReviewEvent } from '#app/utils/review-events.server.ts'
 import {
-	claimRowId,
 	MARKER_ID,
 	reviewProsePlugin,
 	type ProseRange,
@@ -82,10 +78,11 @@ import {
  * tap and no new page. One sticky bar acts on the article in view.
  *
  * Each card holds S3 (the panel, every word, the sheets), S4 (read to the
- * end), S6 (the "..." menu), the lapsed-session sheet, and the "Change
- * this" flow on a tapped claim or a selected passage. After a decision the
- * card collapses to a one-line header and the decided card (S7). "That is
- * plenty" (S8) is a card in the feed.
+ * end), S6 (the "..." menu) and the lapsed-session sheet. This page reads
+ * and decides; it never edits. "Change it" and "Comment on this" (a
+ * selected passage) open the editor at /review/:id/change on its Chat tab.
+ * After a decision the card collapses to a one-line header and the decided
+ * card (S7). "That is plenty" (S8) is a card in the feed.
  */
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
@@ -97,8 +94,11 @@ const NEXT_ENDPOINT = '/resources/review-next'
 const READ_TO_EVERY = 5
 /** The Undo link on an approved card stays this long. */
 const UNDO_MS = 8000
-/** The green mark on a changed passage stays this long. */
-const CHANGED_MS = 6000
+/** A quote handed to the editor's chat is at most this long, ellipsis included. */
+const QUOTE_MAX_CHARS = 1000
+/** "Every word": 18 px prose, the claim marks, the writer's green marks and the "You were here" marker. */
+const PROSE_CLASS =
+	'prose prose-lg max-w-none dark:prose-invert [&_li]:leading-[1.6] [&_p]:leading-[1.6] [&_[data-paragraph]]:scroll-mt-4 [&_mark]:rounded-sm [&_mark]:bg-amber-200 [&_mark]:px-0.5 [&_mark]:text-inherit dark:[&_mark]:bg-amber-700 [&_.review-changed]:bg-green-200 dark:[&_.review-changed]:bg-green-800 [&_.review-marker]:my-4 [&_.review-marker]:inline-block [&_.review-marker]:rounded-full [&_.review-marker]:bg-primary [&_.review-marker]:px-3 [&_.review-marker]:py-1 [&_.review-marker]:text-xs [&_.review-marker]:font-medium [&_.review-marker]:text-primary-foreground'
 /** Her "Write a different article" note carries this prefix on the ledger. */
 const REWRITE_PREFIX = 'NEW ARTICLE: '
 const REWRITE_DEFAULT_NOTE = 'a different article'
@@ -146,15 +146,18 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	if (!article) throw new Response('Not found', { status: 404 })
 	const form = await request.formData()
 	const intent = String(form.get('intent') ?? '')
-	const note = String(form.get('note') ?? '').trim().slice(0, 2000)
+	const note = String(form.get('note') ?? '')
+		.trim()
+		.slice(0, 2000)
 	const now = new Date()
 	const who = await reviewerName(userId)
 	const fail = (error: string, sheet: SheetKey) =>
 		json({ error, sheet }, { status: 400 })
 	// The publisher takes only her own words: this page never approves the
 	// draft as it is, and never sends it to the writer. Change it is the way.
-	const ownWords = `${ARTICLE_CHANGER_COPY.referenceNote} Use Change it.`
-	const blogPath = article.kind === 'blog' ? `/blog/${article.slug ?? ''}` : null
+	const ownWords = `${ARTICLE_EDITOR_COPY.referenceNote} Use Change it.`
+	const blogPath =
+		article.kind === 'blog' ? `/blog/${article.slug ?? ''}` : null
 
 	/** The JSON after a decision, with the sitting cookie. */
 	const decided = async (kind: DecidedKind) => {
@@ -254,7 +257,9 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			return json({ ok: true as const, decided: 'later' as const })
 		}
 		case 'question': {
-			const question = String(form.get('question') ?? '').trim().slice(0, 2000)
+			const question = String(form.get('question') ?? '')
+				.trim()
+				.slice(0, 2000)
 			if (!question) return fail('Type one thing to ask.', 'ask')
 			await prisma.article.update({
 				where: { id },
@@ -267,7 +272,8 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			if (article.status !== 'pending') {
 				return fail('This one is already decided.', 'deny')
 			}
-			if (!note) return fail('Add one line, so the next draft is better.', 'deny')
+			if (!note)
+				return fail('Add one line, so the next draft is better.', 'deny')
 			await prisma.article.update({
 				where: { id },
 				data: {
@@ -337,7 +343,13 @@ function isArticle(e: Entry): e is ArticleEntry {
 }
 
 function articleEntry(view: CardView): ArticleEntry {
-	return { type: 'article', view, status: view.article.status, decision: null, notice: null }
+	return {
+		type: 'article',
+		view,
+		status: view.article.status,
+		decision: null,
+		notice: null,
+	}
 }
 
 function toDecision(data: DecisionData): Decision {
@@ -381,11 +393,6 @@ function scrollTo(el: Element | null | undefined) {
 	el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
-function inViewport(el: Element): boolean {
-	const r = el.getBoundingClientRect()
-	return r.top >= 0 && r.bottom <= window.innerHeight
-}
-
 function cardElementId(id: string): string {
 	return `feed-${id}`
 }
@@ -399,6 +406,18 @@ function rewriteWords(note: string | null): string {
 
 function isRewriteNote(note: string | null): boolean {
 	return Boolean(note && note.startsWith(REWRITE_PREFIX))
+}
+
+/** The editor, open on its chat. With a quote, the chat starts with that passage attached. */
+function changeUrl(id: string, quote?: string): string {
+	const base = `/review/${id}/change?tab=chat`
+	return quote ? `${base}&quote=${encodeURIComponent(quote)}` : base
+}
+
+/** A selected passage, cut so the whole quote fits the editor's limit. */
+function cutQuote(text: string): string {
+	if (text.length <= QUOTE_MAX_CHARS) return text
+	return `${text.slice(0, QUOTE_MAX_CHARS - 1).trimEnd()}…`
 }
 
 /* ------------------------------------------------------------------------ */
@@ -604,7 +623,9 @@ function Feed({
 				return next
 			})
 			window.requestAnimationFrame(() => {
-				document.getElementById(cardElementId(id))?.scrollIntoView({ block: 'start' })
+				document
+					.getElementById(cardElementId(id))
+					?.scrollIntoView({ block: 'start' })
 			})
 			if (pendingAfter(id)) return
 			if (showPlenty) setTail('plenty')
@@ -690,11 +711,7 @@ function Feed({
 			})}
 
 			{tail === 'loading' ? (
-				<div
-					data-feed-spy=""
-					role="status"
-					className="mt-10 space-y-3"
-				>
+				<div data-feed-spy="" role="status" className="mt-10 space-y-3">
 					<span className="sr-only">Loading the next one</span>
 					<div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
 					<div className="h-3 w-full animate-pulse rounded bg-muted" />
@@ -720,7 +737,8 @@ function Feed({
 			<div ref={sentinelRef} aria-hidden="true" className="h-px" />
 
 			<div
-				className={`fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ${
+				data-review-bar=""
+				className={`fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur transition-transform duration-200 ${
 					barOn ? 'translate-y-0' : 'translate-y-full'
 				}`}
 				aria-hidden={!barOn}
@@ -729,7 +747,7 @@ function Feed({
 					{barArticle ? (
 						<p
 							key={barArticle.id}
-							className="mb-2 line-clamp-1 text-xs text-muted-foreground animate-in fade-in duration-200"
+							className="mb-2 line-clamp-1 text-xs text-muted-foreground duration-200 animate-in fade-in"
 						>
 							<span className="sr-only">This article: </span>
 							{barArticle.title}
@@ -739,7 +757,7 @@ function Feed({
 					<div className="flex flex-wrap items-center gap-2">
 						{barArticle?.isReference ? (
 							<p className="basis-full text-sm text-muted-foreground">
-								{ARTICLE_CHANGER_COPY.referenceNote}
+								{ARTICLE_EDITOR_COPY.referenceNote}
 							</p>
 						) : (
 							<Button
@@ -764,7 +782,7 @@ function Feed({
 							className="min-w-0 flex-1 px-3 text-base"
 						>
 							<Link
-								to={`/review/${barArticle?.id ?? first.article.id}/change`}
+								to={changeUrl(barArticle?.id ?? first.article.id)}
 								tabIndex={barOn ? 0 : -1}
 							>
 								Change it
@@ -864,9 +882,6 @@ type CardProps = {
 	onBusy: (id: string, on: boolean) => void
 }
 
-
-type ChangeLine = { summary: string; prevBody: string; prevHash: string }
-
 type CardSheet = SheetKey | 'end' | 'lapsed'
 
 const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
@@ -876,13 +891,14 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 	const { view, status, decision, notice } = entry
 	const { article, images, aid, links } = view
 	const id = article.id
+	const body = article.body
 	const fetcher = useFetcher<typeof action>()
 	const navigate = useNavigate()
 	const busy = fetcher.state !== 'idle'
 	const pending = status === 'pending'
 	const collapsed = decision !== null
-	/** A tapped claim or a selected passage can be changed here. */
-	const fixable = pending && !collapsed && !article.isReference
+	/** A selected passage can be sent to the editor's chat from here. */
+	const commentable = active && pending && !collapsed && !article.isReference
 
 	const [sheet, setSheet] = useState<CardSheet | null>(
 		lapsedIntent ? 'lapsed' : null,
@@ -893,23 +909,8 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 	const [zoom, setZoom] = useState<ZoomTarget | null>(null)
 	const [question, setQuestion] = useState(article.question)
 	const [answer, setAnswer] = useState(article.answer)
-	const [body, setBody] = useState(article.body)
-	const [savedHash, setSavedHash] = useState(article.savedHash)
-	const [fixRequest, setFixRequest] = useState<PassageRequest | null>(null)
-	const [changeLine, setChangeLine] = useState<ChangeLine | null>(null)
-	const [changedRange, setChangedRange] = useState<{
-		start: number
-		end: number
-	} | null>(null)
-	const [undoState, setUndoState] = useState<'idle' | 'saving' | 'error'>('idle')
 	const [showRejected, setShowRejected] = useState(false)
 	const [selecting, setSelecting] = useState(false)
-	const [rewriteNote, setRewriteNote] = useState('')
-	const [rewriteInterim, setRewriteInterim] = useState('')
-	const dictation = useDictation({
-		onFinal: text => setRewriteNote(current => appendSpeech(current, text)),
-		onInterim: setRewriteInterim,
-	})
 	const cardRef = useRef<HTMLElement>(null)
 	const proseRef = useRef<HTMLDivElement>(null)
 	const endRef = useRef<HTMLParagraphElement>(null)
@@ -919,7 +920,7 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 	const handledRef = useRef<unknown>(null)
 	const lastIntentRef = useRef('')
 
-	/* ---- the text, as it stands in the browser ---- */
+	/* ---- the text and its marks ---- */
 
 	const paragraphs = useMemo(() => splitParagraphs(body), [body])
 	const claimRanges = useMemo(
@@ -930,32 +931,24 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 			),
 		[body, aid.claims],
 	)
+	// A quote the panel lists but the text no longer holds reads " (changed)".
 	const claims = useMemo(
 		() =>
-			aid.claims.map((c, index) => {
-				const hit = findHighlightRanges(body, [c.quote])[0]
-				return {
-					quote: c.quote,
-					paragraph: hit ? paragraphIndexAt(paragraphs, hit.start) : -1,
-					gone: !hit,
-					index,
-				}
-			}),
-		[aid.claims, body, paragraphs],
+			aid.claims.map((c, index) => ({
+				quote: c.quote,
+				gone: findHighlightRanges(body, [c.quote]).length === 0,
+				index,
+			})),
+		[aid.claims, body],
 	)
 	const credentials = useMemo(
 		() =>
-			aid.credentials.map(c => {
-				const hit = findHighlightRanges(body, [c.quote])[0]
-				return {
-					quote: c.quote,
-					paragraph: hit ? paragraphIndexAt(paragraphs, hit.start) : -1,
-					gone: !hit,
-				}
-			}),
-		[aid.credentials, body, paragraphs],
+			aid.credentials.map(c => ({
+				quote: c.quote,
+				gone: findHighlightRanges(body, [c.quote]).length === 0,
+			})),
+		[aid.credentials, body],
 	)
-	const unchanged = savedHash === article.savedHash
 	const ranges = useMemo(() => {
 		const out: ProseRange[] = claimRanges.map(r => ({
 			start: r.start,
@@ -963,16 +956,14 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 			index: r.index,
 			kind: 'claim',
 		}))
-		// the writer's changes after her note, while the text is as loaded
-		if (unchanged) {
-			for (const at of view.changedParagraphs) {
-				const p = paragraphs[at]
-				if (p) out.push({ start: p.start, end: p.end, index: -1, kind: 'changed' })
-			}
+		// the writer's changes after her note
+		for (const at of view.changedParagraphs) {
+			const p = paragraphs[at]
+			if (p)
+				out.push({ start: p.start, end: p.end, index: -1, kind: 'changed' })
 		}
-		if (changedRange) out.push({ ...changedRange, index: -1, kind: 'changed' })
 		return out
-	}, [claimRanges, changedRange, paragraphs, unchanged, view.changedParagraphs])
+	}, [claimRanges, paragraphs, view.changedParagraphs])
 	const resolveImage = useMemo(() => articleImageResolver(images), [images])
 	const pictureLines = countPictureLines(body)
 	const markerAt =
@@ -983,6 +974,34 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 		() => [reviewProsePlugin({ paragraphs, ranges, markerAt })],
 		[paragraphs, ranges, markerAt],
 	)
+	// One element, kept while its inputs stand. The card re-renders on a
+	// selection (the feed's lock) and on every fetcher step; a re-render of
+	// the prose would remount its links and cut a live selection short.
+	const prose = useMemo(
+		() => (
+			<MarkdownContent
+				content={body}
+				className={PROSE_CLASS}
+				remarkPlugins={remarkPlugins}
+				resolveImageSrc={resolveImage}
+			/>
+		),
+		[body, remarkPlugins, resolveImage],
+	)
+
+	/* ---- "Comment on this": a selected passage goes to the editor's chat ---- */
+
+	const commentOn = useCallback(
+		(text: string) => {
+			navigate(changeUrl(id, cutQuote(text)))
+		},
+		[id, navigate],
+	)
+	const selection = useProseSelection({
+		containerRef: proseRef,
+		active: commentable && !busy,
+		onPick: commentOn,
+	})
 
 	/* ---- what the feed needs to know ---- */
 
@@ -994,23 +1013,17 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 		return () => onLock(id, false)
 	}, [busy, id, onLock, selecting, sheet])
 
-	// Dictation ends with the sheet it belongs to.
-	const stopDictation = dictation.stop
-	useEffect(() => {
-		if (sheet !== 'rewrite') stopDictation()
-	}, [sheet, stopDictation])
-
 	// A live selection in the prose holds the current line still.
 	useEffect(() => {
-		if (!active || !fixable) return
+		if (!commentable) return
 		const onSelection = () => {
 			const sel = document.getSelection()
 			setSelecting(
 				Boolean(
 					sel &&
-						!sel.isCollapsed &&
-						sel.rangeCount > 0 &&
-						proseRef.current?.contains(sel.getRangeAt(0).commonAncestorContainer),
+					!sel.isCollapsed &&
+					sel.rangeCount > 0 &&
+					proseRef.current?.contains(sel.getRangeAt(0).commonAncestorContainer),
 				),
 			)
 		}
@@ -1019,7 +1032,7 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 			document.removeEventListener('selectionchange', onSelection)
 			setSelecting(false)
 		}
-	}, [active, fixable])
+	}, [commentable])
 
 	// What the server said to the last submission.
 	useEffect(() => {
@@ -1139,22 +1152,6 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 		}
 	}, [id, paragraphs.length, collapsed, first])
 
-	// The green mark on a changed passage: scroll to it, then let it fade.
-	useEffect(() => {
-		if (!changedRange) return
-		const frame = window.requestAnimationFrame(() => {
-			const mark = cardRef.current?.querySelector('mark.review-changed')
-			if (mark && !inViewport(mark)) {
-				mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
-			}
-		})
-		const timer = window.setTimeout(() => setChangedRange(null), CHANGED_MS)
-		return () => {
-			window.cancelAnimationFrame(frame)
-			window.clearTimeout(timer)
-		}
-	}, [changedRange])
-
 	/* ---- actions ---- */
 
 	function approve() {
@@ -1175,7 +1172,8 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 		const next =
 			seen < 0
 				? null
-				: (root?.querySelector(`[data-paragraph="${seen + 1}"]`) ?? endRef.current)
+				: (root?.querySelector(`[data-paragraph="${seen + 1}"]`) ??
+					endRef.current)
 		scrollTo(
 			next ??
 				root?.querySelector(`#${MARKER_ID}`) ??
@@ -1183,74 +1181,10 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 		)
 	}
 
-	function openChange(
-		text: string,
-		paragraph: number,
-		source: 'panel' | 'prose',
-		index: number | null = null,
-	) {
-		if (!fixable) return
-		setFixRequest({
-			text,
-			paragraph: paragraph >= 0 ? paragraph : null,
-			index,
-			source,
-			nonce: Date.now(),
-		})
-	}
-
-	/** A tap on a picture zooms it; a tap on a highlight opens the fix sheet. */
+	/** A tap on a picture zooms it. The marks are plain text. */
 	function onProseClick(event: React.MouseEvent<HTMLDivElement>) {
 		const hit = zoomTarget(event.target)
-		if (hit) {
-			setZoom(hit)
-			return
-		}
-		const target = event.target as Element
-		const mark = target.closest<HTMLElement>('mark[data-claim]')
-		if (!mark) return
-		const index = Number(mark.dataset.claim)
-		const claim = Number.isNaN(index) ? undefined : claims[index]
-		if (!claim) return
-		if (fixable) openChange(plainQuote(claim.quote), claim.paragraph, 'prose', index)
-		else scrollTo(cardRef.current?.querySelector(`#${claimRowId(index)}`))
-	}
-
-	function onApplied(result: PassageApplied) {
-		if (result.summary !== null) {
-			setChangeLine({ summary: result.summary, prevBody: body, prevHash: savedHash })
-		} else {
-			setChangeLine(null)
-		}
-		setBody(result.body)
-		setSavedHash(result.savedHash)
-		setChangedRange(result.changed)
-		setUndoState('idle')
-	}
-
-	async function undoThat() {
-		if (!changeLine || undoState === 'saving') return
-		setUndoState('saving')
-		const result = await saveArticleBody({
-			articleId: id,
-			body: changeLine.prevBody,
-			baseHash: savedHash,
-		})
-		if (result.ok) {
-			onApplied({
-				body: changeLine.prevBody,
-				savedHash: result.hash,
-				summary: null,
-				changed: null,
-			})
-			return
-		}
-		if (result.kind === 'changed') {
-			// the writer's text landed meanwhile: keep what the server has
-			onApplied({ body: result.body, savedHash: result.hash, summary: null, changed: null })
-			return
-		}
-		setUndoState('error')
+		if (hit) setZoom(hit)
 	}
 
 	/* ---- render ---- */
@@ -1258,7 +1192,8 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 	const zoomedImage = zoom
 		? images.find(im => articleImageUrl(im.id) === zoom.src)
 		: undefined
-	const rewriteBack = Boolean(article.revisionNote) && isRewriteNote(article.revisionNote)
+	const rewriteBack =
+		Boolean(article.revisionNote) && isRewriteNote(article.revisionNote)
 	const rewriteSaid = rewriteWords(article.revisionNote)
 	const stateLabel = decision ? collapsedLabel(decision) : null
 
@@ -1300,8 +1235,18 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 					article={article}
 					decision={decision}
 					busy={busy}
-					onUndo={() => fetcher.submit({ intent: 'reopen' }, { method: 'post', action: `/review/${id}` })}
-					onTakedown={() => fetcher.submit({ intent: 'takedown' }, { method: 'post', action: `/review/${id}` })}
+					onUndo={() =>
+						fetcher.submit(
+							{ intent: 'reopen' },
+							{ method: 'post', action: `/review/${id}` },
+						)
+					}
+					onTakedown={() =>
+						fetcher.submit(
+							{ intent: 'takedown' },
+							{ method: 'post', action: `/review/${id}` },
+						)
+					}
 				/>
 			) : (
 				<>
@@ -1311,7 +1256,10 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 							status={status}
 							busy={busy}
 							onReopen={intent =>
-								fetcher.submit({ intent }, { method: 'post', action: `/review/${id}` })
+								fetcher.submit(
+									{ intent },
+									{ method: 'post', action: `/review/${id}` },
+								)
 							}
 						/>
 					) : null}
@@ -1362,27 +1310,6 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 						</div>
 					) : null}
 
-					{changeLine ? (
-						<div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-green-300 bg-green-50 p-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
-							<p className="flex-1">Changed: {changeLine.summary}</p>
-							<button
-								type="button"
-								onClick={undoThat}
-								disabled={undoState === 'saving'}
-								className="text-sm font-medium underline underline-offset-2 disabled:opacity-50"
-							>
-								{ARTICLE_CHANGER_COPY.undo}
-							</button>
-							<span className="basis-full text-xs text-muted-foreground">
-								{undoState === 'saving'
-									? 'Saving…'
-									: undoState === 'error'
-										? 'Could not save. Trying again…'
-										: 'Saved'}
-							</span>
-						</div>
-					) : null}
-
 					<section className="mt-5 rounded-xl border bg-card p-4 shadow-sm">
 						<h2 className="text-base font-semibold">Things to check first</h2>
 
@@ -1392,15 +1319,8 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 							) : (
 								<ul className="space-y-1">
 									{claims.map(c => (
-										<li key={c.index} id={claimRowId(c.index)} className="scroll-mt-4">
-											<CheckRow
-												quote={c.quote}
-												gone={c.gone}
-												fixable={fixable}
-												onChange={() =>
-													openChange(plainQuote(c.quote), c.paragraph, 'panel', c.index)
-												}
-											/>
+										<li key={c.index}>
+											<CheckRow quote={c.quote} gone={c.gone} />
 										</li>
 									))}
 								</ul>
@@ -1416,14 +1336,7 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 								<ul className="space-y-1">
 									{credentials.map((c, i) => (
 										<li key={i}>
-											<CheckRow
-												quote={c.quote}
-												gone={c.gone}
-												fixable={fixable}
-												onChange={() =>
-													openChange(plainQuote(c.quote), c.paragraph, 'panel')
-												}
-											/>
+											<CheckRow quote={c.quote} gone={c.gone} />
 										</li>
 									))}
 								</ul>
@@ -1432,7 +1345,9 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 
 						<PanelSection number={3} title="Links">
 							{links.length === 0 ? (
-								<p className="text-sm text-muted-foreground">No links were asked for.</p>
+								<p className="text-sm text-muted-foreground">
+									No links were asked for.
+								</p>
 							) : (
 								<ul className="space-y-2">
 									{links.map(l => (
@@ -1443,10 +1358,17 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 												</p>
 											) : (
 												<p className="flex flex-wrap items-center gap-x-1.5">
-													<span className="font-medium">{l.anchor ?? l.name}</span>
-													<Icon name="arrow-right" className="h-4 w-4 text-muted-foreground" />
+													<span className="font-medium">
+														{l.anchor ?? l.name}
+													</span>
+													<Icon
+														name="arrow-right"
+														className="h-4 w-4 text-muted-foreground"
+													/>
 													<span>{l.domain}</span>
-													<span className="text-muted-foreground">({l.name})</span>
+													<span className="text-muted-foreground">
+														({l.name})
+													</span>
 												</p>
 											)}
 										</li>
@@ -1466,7 +1388,10 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 											<button
 												type="button"
 												onClick={() =>
-													setZoom({ src: articleImageUrl(im.id), alt: im.altText ?? '' })
+													setZoom({
+														src: articleImageUrl(im.id),
+														alt: im.altText ?? '',
+													})
 												}
 												className="block w-full rounded-lg border bg-background p-1 text-left"
 												aria-label={`Zoom: ${im.altText ?? 'picture'}`}
@@ -1501,7 +1426,10 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 					</section>
 
 					<section className="mt-6">
-						<h2 data-every-word="" className="text-base font-semibold scroll-mt-4">
+						<h2
+							data-every-word=""
+							className="scroll-mt-4 text-base font-semibold"
+						>
 							Every word
 						</h2>
 						<div
@@ -1510,28 +1438,20 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 							onClick={onProseClick}
 							className="mt-3"
 						>
-							<MarkdownContent
-								content={body}
-								className="prose prose-lg max-w-none dark:prose-invert [&_li]:leading-[1.6] [&_p]:leading-[1.6] [&_[data-paragraph]]:scroll-mt-4 [&_mark]:cursor-pointer [&_mark]:rounded-sm [&_mark]:bg-amber-200 [&_mark]:px-0.5 [&_mark]:text-inherit dark:[&_mark]:bg-amber-700 [&_.review-changed]:cursor-auto [&_.review-changed]:bg-green-200 dark:[&_.review-changed]:bg-green-800 [&_.review-marker]:my-4 [&_.review-marker]:inline-block [&_.review-marker]:rounded-full [&_.review-marker]:bg-primary [&_.review-marker]:px-3 [&_.review-marker]:py-1 [&_.review-marker]:text-xs [&_.review-marker]:font-medium [&_.review-marker]:text-primary-foreground"
-								remarkPlugins={remarkPlugins}
-								resolveImageSrc={resolveImage}
-							/>
+							{prose}
 						</div>
-						<p ref={endRef} className="mt-8 text-center text-sm text-muted-foreground">
+						<p
+							ref={endRef}
+							className="mt-8 text-center text-sm text-muted-foreground"
+						>
 							That is all of it.
 						</p>
 					</section>
 
-					<PassageFix
-						articleId={id}
-						body={body}
-						savedHash={savedHash}
-						links={links}
-						containerRef={proseRef}
-						active={active}
-						disabled={!fixable || busy || undoState === 'saving'}
-						request={fixRequest}
-						onApplied={onApplied}
+					<CommentOnThis
+						candidate={selection.candidate}
+						bottom="bar"
+						onPick={selection.pick}
 					/>
 				</>
 			)}
@@ -1590,37 +1510,51 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 							Do not publish this
 						</Button>
 					</div>
-					{error && errorSheet === 'more' ? <SheetError>{error}</SheetError> : null}
+					{error && errorSheet === 'more' ? (
+						<SheetError>{error}</SheetError>
+					) : null}
 				</Sheet>
 			) : null}
 
 			{sheet === 'ask' ? (
 				<Sheet onClose={() => setSheet(null)} title="Ask Zane">
-					<fetcher.Form method="post" action={`/review/${id}`} className="space-y-3">
+					<fetcher.Form
+						method="post"
+						action={`/review/${id}`}
+						className="space-y-3"
+					>
 						<input type="hidden" name="intent" value="question" />
-						<label htmlFor={`review-question-${id}`} className="text-sm font-medium">
-							Ask Zane one thing
-						</label>
-						<Textarea
+						<DictatedNote
 							id={`review-question-${id}`}
 							name="question"
+							label="Ask Zane one thing"
 							rows={2}
 							required
 							placeholder="Is this publisher real?"
-							className="text-base"
-							defaultValue={question ?? ''}
+							initial={question ?? ''}
+							error={error && errorSheet === 'ask' ? error : null}
+							submit={listening => (
+								<Button
+									type="submit"
+									size="lg"
+									className="min-w-0 flex-1 text-base"
+									disabled={busy || listening}
+								>
+									Send
+								</Button>
+							)}
 						/>
-						{error && errorSheet === 'ask' ? <SheetError>{error}</SheetError> : null}
-						<Button type="submit" size="lg" className="w-full text-base" disabled={busy}>
-							Send
-						</Button>
 					</fetcher.Form>
 				</Sheet>
 			) : null}
 
 			{sheet === 'writer' ? (
 				<Sheet onClose={() => setSheet(null)} title="Send a note to the writer">
-					<fetcher.Form method="post" action={`/review/${id}`} className="space-y-3">
+					<fetcher.Form
+						method="post"
+						action={`/review/${id}`}
+						className="space-y-3"
+					>
 						<input type="hidden" name="intent" value="changes_requested" />
 						<div className="flex flex-wrap gap-2">
 							{ARTICLE_EDIT_CHIPS.map(chip => (
@@ -1639,21 +1573,25 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 								</label>
 							))}
 						</div>
-						<label htmlFor={`review-writer-note-${id}`} className="sr-only">
-							What to change
-						</label>
-						<Textarea
+						<DictatedNote
 							id={`review-writer-note-${id}`}
 							name="note"
+							label="What to change"
+							hideLabel
 							rows={3}
-							aria-label="What to change"
 							placeholder="Say what to change. The writer sends it back to you."
-							className="text-base"
+							error={error && errorSheet === 'writer' ? error : null}
+							submit={listening => (
+								<Button
+									type="submit"
+									size="lg"
+									className="min-w-0 flex-1 text-base"
+									disabled={busy || listening}
+								>
+									Send to the writer
+								</Button>
+							)}
 						/>
-						{error && errorSheet === 'writer' ? <SheetError>{error}</SheetError> : null}
-						<Button type="submit" size="lg" className="w-full text-base" disabled={busy}>
-							Send to the writer
-						</Button>
 					</fetcher.Form>
 				</Sheet>
 			) : null}
@@ -1662,8 +1600,10 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 				<Sheet onClose={() => setSheet(null)} title="Write a different article">
 					<p className="text-sm text-muted-foreground">
 						The writer starts over with a new topic for{' '}
-						{article.kind === 'blog' ? 'your blog' : (article.publication ?? 'the publisher')}.
-						This one leaves your list until the new one is ready. That usually
+						{article.kind === 'blog'
+							? 'your blog'
+							: (article.publication ?? 'the publisher')}
+						. This one leaves your list until the new one is ready. That usually
 						takes a day or two.
 					</p>
 					{article.publisherWaiting ? (
@@ -1672,50 +1612,30 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 							new one.
 						</p>
 					) : null}
-					<fetcher.Form method="post" action={`/review/${id}`} className="mt-3 space-y-3">
+					<fetcher.Form
+						method="post"
+						action={`/review/${id}`}
+						className="mt-3 space-y-3"
+					>
 						<input type="hidden" name="intent" value="rewrite" />
-						<label htmlFor={`review-rewrite-note-${id}`} className="text-sm font-medium">
-							Anything to tell the writer? (optional)
-						</label>
-						<Textarea
+						<DictatedNote
 							id={`review-rewrite-note-${id}`}
 							name="note"
+							label="Anything to tell the writer? (optional)"
 							rows={2}
-							value={rewriteNote}
-							onChange={e => setRewriteNote(e.currentTarget.value)}
 							placeholder="For example: not fillers again, something about skin care."
-							className="text-base"
-						/>
-						{rewriteInterim ? (
-							<p aria-live="polite" className="text-sm italic text-muted-foreground">
-								{rewriteInterim}…
-							</p>
-						) : null}
-						{error && errorSheet === 'rewrite' ? <SheetError>{error}</SheetError> : null}
-						<div className="flex flex-wrap items-center gap-2">
-							{dictation.supported ? (
+							error={error && errorSheet === 'rewrite' ? error : null}
+							submit={listening => (
 								<Button
-									type="button"
-									variant={dictation.listening ? 'secondary' : 'outline'}
+									type="submit"
 									size="lg"
-									aria-pressed={dictation.listening}
-									onClick={dictation.listening ? dictation.stop : dictation.start}
+									className="min-w-0 flex-1 text-base"
+									disabled={busy || listening}
 								>
-									{dictation.listening
-										? ARTICLE_CHANGER_COPY.listening
-										: ARTICLE_CHANGER_COPY.dictate}
+									Write a different one
 								</Button>
-							) : null}
-							<Button
-								type="submit"
-								size="lg"
-								className="min-w-0 flex-1 text-base"
-								disabled={busy}
-								onClick={dictation.stop}
-							>
-								Write a different one
-							</Button>
-						</div>
+							)}
+						/>
 					</fetcher.Form>
 				</Sheet>
 			) : null}
@@ -1725,9 +1645,16 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 					<p className="text-sm text-muted-foreground">
 						This drops the placement. Use Change it if you want a fix.
 					</p>
-					<fetcher.Form method="post" action={`/review/${id}`} className="mt-3 space-y-3">
+					<fetcher.Form
+						method="post"
+						action={`/review/${id}`}
+						className="mt-3 space-y-3"
+					>
 						<input type="hidden" name="intent" value="deny" />
-						<label htmlFor={`review-deny-note-${id}`} className="text-sm font-medium">
+						<label
+							htmlFor={`review-deny-note-${id}`}
+							className="text-sm font-medium"
+						>
 							Why not? One line helps the next draft.
 						</label>
 						<Textarea
@@ -1737,7 +1664,9 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 							required
 							className="text-base"
 						/>
-						{error && errorSheet === 'deny' ? <SheetError>{error}</SheetError> : null}
+						{error && errorSheet === 'deny' ? (
+							<SheetError>{error}</SheetError>
+						) : null}
 						<Button
 							type="submit"
 							variant="destructive"
@@ -1757,7 +1686,12 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 					title="You have not reached the end yet. Read the rest?"
 				>
 					<div className="flex flex-col gap-2">
-						<Button type="button" size="lg" className="w-full text-base" onClick={takeMeThere}>
+						<Button
+							type="button"
+							size="lg"
+							className="w-full text-base"
+							onClick={takeMeThere}
+						>
 							Take me there
 						</Button>
 						{article.kind === 'blog' ? (
@@ -1785,7 +1719,13 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 					title="You tapped Approve before you signed in. Approve now?"
 				>
 					<div className="flex flex-col gap-2">
-						<Button type="button" size="lg" className="w-full text-base" onClick={approve} disabled={busy}>
+						<Button
+							type="button"
+							size="lg"
+							className="w-full text-base"
+							onClick={approve}
+							disabled={busy}
+						>
 							Approve now
 						</Button>
 						<Button
@@ -1842,38 +1782,82 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 	)
 })
 
-/** One row of claims or credentials: a button that opens the fix sheet, or plain text. */
-function CheckRow({
-	quote,
-	gone,
-	fixable,
-	onChange,
+/**
+ * A note box in a sheet, with dictation: the box (the form field keeps its
+ * `name`), the microphone, the status line, then the sheet's own submit
+ * button, which the sheet disables while a dictation runs. Spoken words
+ * show as grey ghost text and join the typed words when she stops.
+ */
+function DictatedNote({
+	id,
+	name,
+	label,
+	hideLabel = false,
+	rows = 3,
+	required = false,
+	placeholder,
+	initial = '',
+	error,
+	submit,
 }: {
-	quote: string
-	gone: boolean
-	fixable: boolean
-	onChange: () => void
+	id: string
+	name: string
+	label: string
+	hideLabel?: boolean
+	rows?: number
+	required?: boolean
+	placeholder?: string
+	initial?: string
+	error: string | null
+	submit: (listening: boolean) => React.ReactNode
 }) {
-	const text = plainQuote(quote)
-	const shown = gone ? `“${text}” (changed)` : `“${text}”`
-	if (!fixable || gone) {
-		return (
-			<p className={`py-1 text-sm ${gone ? 'text-muted-foreground' : ''}`}>{shown}</p>
-		)
-	}
+	const [value, setValue] = useState(initial)
+	const [ghost, setGhost] = useState('')
+	const dictation = useDictation({
+		onInterim: setGhost,
+		onFinal: text => {
+			setValue(current => appendSpeech(current, text))
+			setGhost('')
+		},
+	})
 	return (
-		<button
-			type="button"
-			onClick={onChange}
-			aria-label={`Change: ${text}`}
-			className="-mx-2 flex min-h-11 w-[calc(100%+1rem)] items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent"
-		>
-			<span className="flex-1 text-sm">{shown}</span>
-			<span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
-				<Icon name="pencil-1" className="h-4 w-4" />
-				Change
-			</span>
-		</button>
+		<>
+			<label
+				htmlFor={id}
+				className={hideLabel ? 'sr-only' : 'text-sm font-medium'}
+			>
+				{label}
+			</label>
+			<GhostTextarea
+				id={id}
+				name={name}
+				value={value}
+				ghost={ghost}
+				listening={dictation.listening}
+				onChange={e => setValue(e.currentTarget.value)}
+				rows={rows}
+				required={required}
+				placeholder={placeholder}
+				aria-label={hideLabel ? label : undefined}
+				className="text-base"
+			/>
+			<DictationNote dictation={dictation} />
+			{error ? <SheetError>{error}</SheetError> : null}
+			<div className="flex flex-wrap items-center gap-2">
+				<DictateButton dictation={dictation} disabled={false} />
+				{submit(dictation.listening)}
+			</div>
+		</>
+	)
+}
+
+/** One row of claims or credentials: the quote as plain text. */
+function CheckRow({ quote, gone }: { quote: string; gone: boolean }) {
+	const text = plainQuote(quote)
+	return (
+		<p className={`py-1 text-sm ${gone ? 'text-muted-foreground' : ''}`}>
+			{gone ? `“${text}” (changed)` : `“${text}”`}
+		</p>
 	)
 }
 
@@ -1951,7 +1935,11 @@ function DecidedBanner({
 				disabled={busy}
 				onClick={() => onReopen(takedown ? 'takedown' : 'reopen')}
 			>
-				{takedown ? 'Take it down' : article.rewriteRequested ? 'Keep this one' : 'Reopen'}
+				{takedown
+					? 'Take it down'
+					: article.rewriteRequested
+						? 'Keep this one'
+						: 'Reopen'}
 			</Button>
 		</div>
 	)
@@ -1997,7 +1985,10 @@ function DecidedCard({
 		return (
 			<section className="mt-4 rounded-xl border border-green-300 bg-green-50 p-5 text-center text-green-900 shadow-sm dark:border-green-800 dark:bg-green-950 dark:text-green-100">
 				<div className="mx-auto w-fit rounded-full bg-green-100 p-3 dark:bg-green-900">
-					<Icon name="check" className="h-8 w-8 text-green-700 dark:text-green-200" />
+					<Icon
+						name="check"
+						className="h-8 w-8 text-green-700 dark:text-green-200"
+					/>
 				</div>
 				<p className="mt-3 text-xl font-semibold">Approved.</p>
 				{article.kind === 'blog' ? (
@@ -2011,7 +2002,12 @@ function DecidedCard({
 									Open it
 								</a>
 							</Button>
-							<Button type="button" variant="outline" disabled={busy} onClick={onTakedown}>
+							<Button
+								type="button"
+								variant="outline"
+								disabled={busy}
+								onClick={onTakedown}
+							>
 								Take it down
 							</Button>
 						</div>
@@ -2041,7 +2037,9 @@ function DecidedCard({
 	if (decision.kind === 'rewrite') {
 		return (
 			<section className="mt-4 rounded-xl border bg-card p-5 text-center shadow-sm">
-				<p className="text-base">A new article is on its way. It comes back to you here.</p>
+				<p className="text-base">
+					A new article is on its way. It comes back to you here.
+				</p>
 				<p className="mt-3 text-sm text-muted-foreground">
 					Changed your mind?{' '}
 					<button

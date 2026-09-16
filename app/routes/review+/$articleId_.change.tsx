@@ -1,3 +1,4 @@
+import { countPassage } from '#app/utils/article-edit.ts'
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import {
 	json,
@@ -14,86 +15,100 @@ import {
 } from '@remix-run/react'
 import { useRef, useState } from 'react'
 import {
-	ArticleChanger,
-	useSubmitAfterSave,
-} from '#app/components/article-changer.tsx'
+	ArticleEditor,
+	type EditorTab,
+} from '#app/components/article-editor.tsx'
+import {
+	DictateButton,
+	DictationNote,
+	GhostTextarea,
+	useDictation,
+} from '#app/components/dictation.tsx'
 import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
-import { Textarea } from '#app/components/ui/textarea.tsx'
-import { ARTICLE_EDIT_CHIPS } from '#app/utils/article-edit.ts'
-import { hashBody, reviewerName } from '#app/utils/articles.server.ts'
-import { parseLinks } from '#app/utils/articles.ts'
+import { Icon } from '#app/components/ui/icon'
+import { loadChatHistory } from '#app/utils/article-chat.server.ts'
+import { ARTICLE_EDIT_CHIPS, appendSpeech } from '#app/utils/article-edit.ts'
+import { reviewerName } from '#app/utils/articles.server.ts'
+import { useSubmitAfterSave } from '#app/utils/auto-save.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
-import { loadReviewAid, plainQuote } from '#app/utils/review-aid.ts'
+import { plainQuote } from '#app/utils/review-aid.ts'
 import { recordReviewEvent } from '#app/utils/review-events.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 import {
 	afterDecisionUrl,
 	approveArticle,
+	loadArticleView,
 	settleSitting,
 } from './_shared.server.ts'
 
 /**
- * S5, "Change it": the ArticleChanger (tell it what to change, edit the
- * text, or select a passage) with this page's sticky bar. Every change
- * saves itself; there is no Save button. Approve waits for a save in
- * flight, then stores the working copy and approves it in one action, so
- * what she approved is what goes out. "Send this to the writer instead" is
- * the changes_requested path for when she does not want to check a change
+ * "Change it": the article editor (the article, the chat that edits it,
+ * the raw markdown) under a sticky top bar with "Back to the article" and
+ * Approve. Every change saves itself. Approve waits for a save in flight,
+ * then stores the working copy and approves it in one action, so what she
+ * approved is what goes out. "Send this to the writer instead" is the
+ * changes_requested path for when she does not want to check a change
  * herself.
+ *
+ * `?tab=article|chat|markdown` picks the tab (default chat). `?quote=` (from
+ * "Comment on this" on the reading page) is attached to the chat composer
+ * on mount and then dropped from the URL.
  */
-export const handle: SEOHandle = {
+export const handle: SEOHandle & { reviewWide: boolean } = {
 	getSitemapEntries: () => null,
+	/** The review layout widens for the desktop split (see _layout.tsx). */
+	reviewWide: true,
 }
+
+export const CHANGE_COPY = {
+	back: 'Back to the article',
+	approve: 'Approve',
+	approveBlog: 'Approve and publish',
+	writerLink: 'Send this to the writer instead',
+	writerTitle: 'Send this to the writer',
+	writerLabel: 'What to change',
+	writerPlaceholder: 'Say what to change. The writer sends it back to you.',
+	writerButton: 'Send to the writer',
+} as const
+
+const TABS: ReadonlyArray<EditorTab> = ['article', 'chat', 'markdown']
+/** A quote from the reading page is cut here (the page cuts at 1000 too). */
+const QUOTE_MAX = 1000
+const QUOTE_MIN = 3
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	const id = params.articleId ?? ''
-	const article = await prisma.article.findUnique({
-		where: { id },
-		select: {
-			id: true,
-			kind: true,
-			title: true,
-			body: true,
-			status: true,
-			isReference: true,
-			linksJson: true,
-			reviewAidJson: true,
-			updatedAt: true,
-			images: {
-				orderBy: { position: 'asc' },
-				select: {
-					id: true,
-					fileName: true,
-					position: true,
-					width: true,
-					height: true,
-				},
-			},
-		},
-	})
-	if (!article) throw new Response('Not found', { status: 404 })
-	if (article.status !== 'pending') return redirect(`/review/${id}`)
-	const aid = loadReviewAid(article.reviewAidJson, article.body)
+	const view = await loadArticleView(id)
+	if (!view) throw new Response('Not found', { status: 404 })
+	if (view.article.status !== 'pending') return redirect(`/review/${id}`)
+	const url = new URL(request.url)
+	const rawTab = url.searchParams.get('tab') ?? ''
+	const tab: EditorTab = (TABS as ReadonlyArray<string>).includes(rawTab)
+		? (rawTab as EditorTab)
+		: 'chat'
+	// The reading page appends an ellipsis when it cuts a long quote.
+	const rawQuote = (url.searchParams.get('quote') ?? '').trim().replace(/…$/, '')
+	// Only a passage that is really in the article; a crafted link cannot plant one.
+	const quote =
+		rawQuote.length >= QUOTE_MIN &&
+		rawQuote.length <= QUOTE_MAX &&
+		(countPassage(view.article.body, rawQuote) > 0 ||
+			// the reading page quotes rendered text: links and marks folded
+			countPassage(plainQuote(view.article.body), rawQuote) > 0)
+			? rawQuote
+			: null
 	const claims = Array.from(
-		new Set([...aid.claims, ...aid.credentials].map(c => plainQuote(c.quote))),
+		new Set(
+			[...view.aid.claims, ...view.aid.credentials].map(c =>
+				plainQuote(c.quote),
+			),
+		),
 	)
-	return json({
-		article: {
-			id: article.id,
-			kind: article.kind,
-			title: article.title,
-			body: article.body,
-			savedHash: hashBody(article.body),
-			isReference: article.isReference,
-			updatedAt: article.updatedAt,
-		},
-		images: article.images,
-		links: parseLinks(article.linksJson),
-		claims,
-	})
+	const history = await loadChatHistory(id)
+	return json({ view, claims, history, tab, quote })
 }
 
 export async function action({ params, request }: ActionFunctionArgs) {
@@ -126,7 +141,10 @@ export async function action({ params, request }: ActionFunctionArgs) {
 	switch (intent) {
 		case 'approve': {
 			if (body !== null && !body.trim()) {
-				return json({ error: 'The article text cannot be empty.' }, { status: 400 })
+				return json(
+					{ error: 'The article text cannot be empty.' },
+					{ status: 400 },
+				)
 			}
 			await approveArticle(article, { userId, who, body, now })
 			const settled = await settleSitting(request, article, now, who)
@@ -173,117 +191,169 @@ export async function action({ params, request }: ActionFunctionArgs) {
 }
 
 export default function ChangeArticle() {
-	const { article, images, links, claims } = useLoaderData<typeof loader>()
+	const { view, claims, history, tab, quote } = useLoaderData<typeof loader>()
+	const { article, images, links } = view
 	const actionData = useActionData<typeof action>()
 	const navigation = useNavigation()
-	const busy = navigation.state !== 'idle'
+	const submitting = navigation.state !== 'idle'
+	const [chatBusy, setChatBusy] = useState(false)
 	const [writerOpen, setWriterOpen] = useState(false)
 	const flushRef = useRef<(() => Promise<void>) | null>(null)
 	const submitAfterSave = useSubmitAfterSave(flushRef)
 	const error = actionData && 'error' in actionData ? actionData.error : null
 	const approveLabel =
-		article.kind === 'blog' ? 'Approve and publish on my site' : 'Approve'
+		article.kind === 'blog' ? CHANGE_COPY.approveBlog : CHANGE_COPY.approve
 
 	return (
-		<div className="pb-36">
-			<h1 className="text-xl font-semibold leading-tight">{article.title}</h1>
+		// -mb-8 cancels the layout's bottom padding, so the Chat panel ends at the edge.
+		<div className="-mb-8">
+			<Form method="post" onSubmit={submitAfterSave}>
+				<div className="sticky top-0 z-30 -mx-4 flex h-11 items-center justify-between bg-background/95 px-4 backdrop-blur">
+					<Link
+						to={`/review/${article.id}`}
+						className="inline-flex min-w-0 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
+					>
+						<Icon name="chevron-left" className="h-4 w-4 shrink-0" />
+						<span className="truncate">{CHANGE_COPY.back}</span>
+					</Link>
+					<Button
+						type="submit"
+						name="intent"
+						value="approve"
+						size="sm"
+						className="shrink-0"
+						disabled={submitting || chatBusy}
+					>
+						{approveLabel}
+					</Button>
+				</div>
 
-			{error && !writerOpen ? (
-				<p
-					role="alert"
-					className="mt-3 rounded-md border border-red-300 bg-red-50 p-2 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
-				>
-					{error}
-				</p>
-			) : null}
-			<Form method="post" className="mt-4" onSubmit={submitAfterSave}>
-				<ArticleChanger
-					key={String(article.updatedAt)}
-					articleId={article.id}
-					initialBody={article.body}
-					savedHash={article.savedHash}
-					links={links}
-					claims={claims}
-					isReference={article.isReference}
-					kind={article.kind}
-					images={images}
-					flushRef={flushRef}
-				/>
+				{error && !writerOpen ? (
+					<p
+						role="alert"
+						className="mt-3 rounded-md border border-red-300 bg-red-50 p-2 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
+					>
+						{error}
+					</p>
+				) : null}
 
-				<div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
-					<div className="mx-auto max-w-xl">
-						<div className="flex items-center gap-2">
-							<Button
-								asChild
-								variant="outline"
-								size="lg"
-								className="min-w-0 flex-1 px-3 text-base"
-							>
-								<Link to={`/review/${article.id}`}>Back to the article</Link>
-							</Button>
-							<Button
-								type="submit"
-								name="intent"
-								value="approve"
-								size="lg"
-								className="min-w-0 flex-1 px-3 text-base"
-								disabled={busy}
-							>
-								{approveLabel}
-							</Button>
-						</div>
-						{!article.isReference ? (
-							<button
-								type="button"
-								onClick={() => setWriterOpen(true)}
-								className="mt-2 w-full text-center text-sm text-primary underline-offset-2 hover:underline"
-							>
-								Send this to the writer instead
-							</button>
-						) : null}
-					</div>
+				<div className="mt-2">
+					<ArticleEditor
+						key={article.savedHash}
+						article={{
+							id: article.id,
+							kind: article.kind,
+							title: article.title,
+							where: article.where,
+							byline: article.byline,
+							about: article.about,
+							body: article.body,
+							savedHash: article.savedHash,
+							isReference: article.isReference,
+						}}
+						images={images}
+						links={links}
+						claims={claims}
+						history={history}
+						initialTab={tab}
+						initialQuote={quote}
+						stickyTop={44}
+						flushRef={flushRef}
+						onBusyChange={setChatBusy}
+						writerLink={
+							!article.isReference ? (
+								<button
+									type="button"
+									onClick={() => setWriterOpen(true)}
+									className="w-full text-center text-sm text-muted-foreground underline-offset-2 hover:underline"
+								>
+									{CHANGE_COPY.writerLink}
+								</button>
+							) : null
+						}
+					/>
 				</div>
 			</Form>
 
 			{writerOpen ? (
-				<Sheet onClose={() => setWriterOpen(false)} title="Send this to the writer">
-					<Form method="post" className="space-y-3">
-						<input type="hidden" name="intent" value="changes_requested" />
-						<div className="flex flex-wrap gap-2">
-							{ARTICLE_EDIT_CHIPS.map(chip => (
-								<label
-									key={chip}
-									className="cursor-pointer rounded-full border bg-background px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary has-[:checked]:text-primary-foreground"
-								>
-									<input
-										type="checkbox"
-										name="chip"
-										value={chip}
-										aria-label={chip}
-										className="sr-only"
-									/>
-									{chip}
-								</label>
-							))}
-						</div>
-						<label htmlFor="review-writer-note" className="sr-only">
-							What to change
-						</label>
-						<Textarea
-							id="review-writer-note"
-							name="note"
-							rows={3}
-							aria-label="What to change"
-							placeholder="Say what to change. The writer sends it back to you."
-							className="text-base"
-						/>
-						{error ? <SheetError>{error}</SheetError> : null}
-						<Button type="submit" size="lg" className="w-full text-base" disabled={busy}>
-							Send to the writer
-						</Button>
-					</Form>
-				</Sheet>
+				<WriterSheet
+					busy={submitting}
+					error={error}
+					onClose={() => setWriterOpen(false)}
+				/>
 			) : null}
 		</div>
+	)
+}
+
+/** "Send this to the writer": chips, a note (dictate or type), one button. */
+function WriterSheet({
+	busy,
+	error,
+	onClose,
+}: {
+	busy: boolean
+	error: string | null
+	onClose: () => void
+}) {
+	const [note, setNote] = useState('')
+	const [ghost, setGhost] = useState('')
+	const dictation = useDictation({
+		onInterim: setGhost,
+		onFinal: text => {
+			setGhost('')
+			setNote(current => appendSpeech(current, text))
+		},
+	})
+	return (
+		<Sheet onClose={onClose} title={CHANGE_COPY.writerTitle}>
+			<Form method="post" className="space-y-3">
+				<input type="hidden" name="intent" value="changes_requested" />
+				<div className="flex flex-wrap gap-2">
+					{ARTICLE_EDIT_CHIPS.map(chip => (
+						<label
+							key={chip}
+							className="cursor-pointer rounded-full border bg-background px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary has-[:checked]:text-primary-foreground"
+						>
+							<input
+								type="checkbox"
+								name="chip"
+								value={chip}
+								aria-label={chip}
+								className="sr-only"
+							/>
+							{chip}
+						</label>
+					))}
+				</div>
+				<label htmlFor="review-writer-note" className="sr-only">
+					{CHANGE_COPY.writerLabel}
+				</label>
+				<GhostTextarea
+					id="review-writer-note"
+					name="note"
+					rows={3}
+					value={note}
+					ghost={ghost}
+					listening={dictation.listening}
+					aria-label={CHANGE_COPY.writerLabel}
+					placeholder={CHANGE_COPY.writerPlaceholder}
+					onChange={e => setNote(e.currentTarget.value)}
+				/>
+				<DictationNote dictation={dictation} />
+				{error ? <SheetError>{error}</SheetError> : null}
+				<div className="flex items-center gap-2">
+					<DictateButton dictation={dictation} disabled={busy} />
+					<Button
+						type="submit"
+						size="lg"
+						className="min-w-0 flex-1 text-base"
+						disabled={busy || dictation.listening}
+					>
+						{CHANGE_COPY.writerButton}
+					</Button>
+				</div>
+			</Form>
+		</Sheet>
 	)
 }

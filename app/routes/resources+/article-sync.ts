@@ -18,6 +18,9 @@ import { prisma } from '#app/utils/db.server.ts'
  *
  *   POST /resources/article-sync   {articles: [...]}   create or update articles and their pictures
  *   GET  /resources/article-sync?since=<ISO>            review state changed since then
+ *   GET  /resources/article-sync?image=<id>             the bytes of one stored picture (a picture Sarah
+ *                                                       added in the chat, named images/user-<id>.<ext>
+ *                                                       in approved.md; the mini's pull downloads it)
  *
  * GET returns every row that changed, including status `changes_requested`
  * (her note is `reviewNote`; `rewriteRequested` true means she asked for a
@@ -37,7 +40,10 @@ function authorized(request: Request) {
 export async function loader({ request }: LoaderFunctionArgs) {
 	if (!authorized(request))
 		return json({ error: 'unauthorized' }, { status: 401 })
-	const since = new URL(request.url).searchParams.get('since')
+	const params = new URL(request.url).searchParams
+	const imageId = params.get('image')
+	if (imageId) return imageResponse(imageId)
+	const since = params.get('since')
 	const sinceDate = since ? new Date(since) : null
 	const where =
 		sinceDate && !Number.isNaN(sinceDate.getTime())
@@ -97,6 +103,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			images: r._count.images,
 			updatedAt: r.updatedAt,
 		})),
+	})
+}
+
+/** One stored picture as a download. The token was checked by the caller. */
+async function imageResponse(imageId: string) {
+	const image = await prisma.articleImage.findUnique({
+		where: { id: imageId },
+		select: { fileName: true, contentType: true, blob: true },
+	})
+	if (!image) return json({ error: 'not found' }, { status: 404 })
+	const fileName = image.fileName.replace(/["\\\r\n]/g, '')
+	return new Response(image.blob, {
+		headers: {
+			'Content-Type': image.contentType,
+			'Content-Length': image.blob.byteLength.toString(),
+			'Content-Disposition': `attachment; filename="${fileName}"`,
+			'Cache-Control': 'private, no-store',
+		},
 	})
 }
 

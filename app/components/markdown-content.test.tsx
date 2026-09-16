@@ -37,11 +37,11 @@ describe('MarkdownContent pictures', () => {
 	test('renders a resolved picture in place with zoom hooks and its size', () => {
 		const html = render(articleImageResolver(IMAGES))
 		expect(html).toMatch(
-			/<p><img loading="lazy" decoding="async" class="rounded-lg shadow-md mx-auto cursor-zoom-in" src="\/resources\/article-images\/img-a" alt="a test picture" data-zoom-src="\/resources\/article-images\/img-a" width="1600" height="1067"\/>\s*<em>A caption\.<\/em><\/p>/,
+			/<p><img loading="lazy" decoding="async" class="mx-auto rounded-lg shadow-md cursor-zoom-in" src="\/resources\/article-images\/img-a" alt="a test picture" data-zoom-src="\/resources\/article-images\/img-a" width="1600" height="1067"\/>\s*<em>A caption\.<\/em><\/p>/,
 		)
 		// no size stored: no width or height attributes
 		expect(html).toContain(
-			'<img loading="lazy" decoding="async" class="rounded-lg shadow-md mx-auto cursor-zoom-in" src="/resources/article-images/img-b" alt="second" data-zoom-src="/resources/article-images/img-b"/>',
+			'<img loading="lazy" decoding="async" class="mx-auto rounded-lg shadow-md cursor-zoom-in" src="/resources/article-images/img-b" alt="second" data-zoom-src="/resources/article-images/img-b"/>',
 		)
 	})
 

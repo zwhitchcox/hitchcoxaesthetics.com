@@ -482,6 +482,51 @@ describe('pictures', () => {
 		])
 	})
 
+	test('a writer push never touches the pictures she added (user- rows)', async () => {
+		await upsertSyncedArticle(
+			draft('t:img-user', { images: [picture('image-1.png')] }),
+		)
+		const article = await row('t:img-user')
+		await prisma.articleImage.create({
+			data: {
+				articleId: article.id,
+				fileName: 'user-ck9z1abc.jpg',
+				contentType: 'image/jpeg',
+				blob: Buffer.from('her bytes'),
+				position: 5,
+			},
+		})
+		const names = async () =>
+			(await row('t:img-user')).images.map(i => i.fileName).sort()
+
+		// an empty list with clearImages drops the writer's pictures, not hers
+		await upsertSyncedArticle(
+			draft('t:img-user', { images: [], clearImages: true }),
+		)
+		expect(await names()).toEqual(['user-ck9z1abc.jpg'])
+
+		// a new writer list sits next to hers
+		await upsertSyncedArticle(
+			draft('t:img-user', { images: [picture('image-2.png')] }),
+		)
+		expect(await names()).toEqual(['image-2.png', 'user-ck9z1abc.jpg'])
+
+		// a pushed user- name is ignored: her bytes stand
+		await upsertSyncedArticle(
+			draft('t:img-user', {
+				images: [picture('image-2.png'), picture('user-ck9z1abc.jpg')],
+			}),
+		)
+		const hers = await prisma.articleImage.findFirstOrThrow({
+			where: { article: { sourceKey: 't:img-user' }, fileName: 'user-ck9z1abc.jpg' },
+			select: { blob: true, contentType: true, altText: true },
+		})
+		expect(hers.blob.toString()).toBe('her bytes')
+		expect(hers.contentType).toBe('image/jpeg')
+		expect(hers.altText).toBeNull()
+		expect(await names()).toEqual(['image-2.png', 'user-ck9z1abc.jpg'])
+	})
+
 	test('kept: the pictures in the push are not written', async () => {
 		// A v2 draft names its pictures like the v1 ones (image-1.png), so a
 		// held push must leave the stored pictures alone too.
