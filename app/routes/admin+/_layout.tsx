@@ -1,11 +1,12 @@
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import {
+	isRouteErrorResponse,
 	Link,
 	Outlet,
 	useLocation,
+	useMatches,
 	useRouteError,
-	isRouteErrorResponse,
 } from '@remix-run/react'
 import { Button } from '#app/components/ui/button'
 import { Icon } from '#app/components/ui/icon'
@@ -17,7 +18,6 @@ export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
 }
 
-
 export async function loader({ request }: LoaderFunctionArgs) {
 	// Require admin role to access admin routes
 	await requireUserWithRole(request, 'admin')
@@ -26,6 +26,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function AdminLayout() {
+	const stickyToWindow = useMatches().some(
+		match =>
+			(match.handle as { stickyToWindow?: boolean } | null)?.stickyToWindow,
+	)
 	const location = useLocation()
 
 	// Report pages render inside hub panes (iframes), no admin chrome there.
@@ -61,7 +65,9 @@ export default function AdminLayout() {
 								<Link
 									key={item.path}
 									to={item.path}
-									reloadDocument={'reloadDocument' in item && item.reloadDocument}
+									reloadDocument={
+										'reloadDocument' in item && item.reloadDocument
+									}
 									className={`flex items-center rounded-md px-3 py-2 transition-colors ${
 										isActive
 											? 'bg-primary text-primary-foreground'
@@ -80,8 +86,11 @@ export default function AdminLayout() {
 				</div>
 
 				{/* Content area, min-w-0 so wide tables scroll inside instead of
-				    stretching the page past the viewport */}
-				<div className="min-w-0 overflow-x-auto">
+				    stretching the page past the viewport. A page that exports
+				    `handle.stickyToWindow` gets no scroll box: an overflow box
+				    captures `position: sticky`, and that page's bars must stick
+				    to the window. */}
+				<div className={stickyToWindow ? 'min-w-0' : 'min-w-0 overflow-x-auto'}>
 					<Outlet />
 				</div>
 			</div>

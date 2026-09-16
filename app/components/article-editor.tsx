@@ -110,8 +110,10 @@ export type ArticleEditorProps = {
 	readOnly?: boolean
 	/** The title and the where · byline · about line above the article. */
 	showHeader?: boolean
-	/** px: the height of the page's sticky bar, for the desktop left column. */
+	/** px: what sits above the editor on the desktop left column (the site header). */
 	stickyTop?: number
+	/** px: the page's sticky bottom bar; the left column and the phone chat stop above it. */
+	stickyBottom?: number
 	flushRef?: React.MutableRefObject<(() => Promise<void>) | null>
 	/** True while a chat turn runs (Approve disables). */
 	onBusyChange?: (busy: boolean) => void
@@ -246,7 +248,11 @@ function replaceTabInUrl(tab: EditorTab) {
  * page would never stop growing. So there is no window scroll listener;
  * the visual viewport events cover the keyboard.
  */
-function useFillHeight(node: HTMLElement | null, enabled: boolean) {
+function useFillHeight(
+	node: HTMLElement | null,
+	enabled: boolean,
+	bottomInset = 0,
+) {
 	const [height, setHeight] = useState<number | null>(null)
 	useEffect(() => {
 		if (!enabled || !node || typeof window === 'undefined') {
@@ -258,7 +264,8 @@ function useFillHeight(node: HTMLElement | null, enabled: boolean) {
 		const measure = () => {
 			frame = 0
 			const top = node.getBoundingClientRect().top + window.scrollY
-			const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight
+			const bottom =
+				(vv ? vv.offsetTop + vv.height : window.innerHeight) - bottomInset
 			setHeight(Math.max(240, Math.round(bottom - top)))
 		}
 		const queue = () => {
@@ -284,7 +291,7 @@ function useFillHeight(node: HTMLElement | null, enabled: boolean) {
 			vv?.removeEventListener('resize', queue)
 			vv?.removeEventListener('scroll', queue)
 		}
-	}, [node, enabled])
+	}, [node, enabled, bottomInset])
 	return height
 }
 
@@ -434,6 +441,7 @@ export function ArticleEditor({
 	readOnly = false,
 	showHeader = true,
 	stickyTop = 0,
+	stickyBottom = 0,
 	flushRef,
 	onBusyChange,
 	onSaved,
@@ -924,7 +932,11 @@ export function ArticleEditor({
 		(composerText.trim().length > 0 ||
 			attachment.status === 'ready' ||
 			quote !== null)
-	const chatFill = useFillHeight(chatPanelNode, !wide && tabValue === 'chat')
+	const chatFill = useFillHeight(
+		chatPanelNode,
+		!wide && tabValue === 'chat',
+		stickyBottom,
+	)
 
 	const indicator = readOnly ? null : (
 		<SaveIndicator
@@ -1055,14 +1067,19 @@ export function ArticleEditor({
 				switchTab(normalizeTab(value, { isReference, wide }))
 			}
 			className="lg:grid lg:grid-cols-[minmax(22rem,2fr)_3fr] lg:gap-6"
-			style={{ '--editor-top': `${stickyTop}px` } as React.CSSProperties}
+			style={
+				{
+					'--editor-top': `${stickyTop}px`,
+					'--editor-bottom': `${stickyBottom}px`,
+				} as React.CSSProperties
+			}
 		>
 			<input type="hidden" name="body" value={body} />
 
 			<DropZone
 				enabled={wide && chatOn}
 				onPick={attachment.pickFile}
-				className="flex min-w-0 flex-col lg:sticky lg:top-[var(--editor-top)] lg:h-[calc(100vh-var(--editor-top))] lg:self-start"
+				className="flex min-w-0 flex-col lg:sticky lg:top-[var(--editor-top)] lg:h-[calc(100vh-var(--editor-top)-var(--editor-bottom))] lg:self-start"
 			>
 				<div className="flex items-center gap-2">
 					<TabsList className="flex h-auto min-w-0 flex-1 rounded-md bg-muted p-1 lg:flex-none">

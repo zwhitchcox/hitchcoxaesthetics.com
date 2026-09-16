@@ -53,8 +53,10 @@ import {
 } from '#app/utils/review-events.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 
-export const handle: SEOHandle = {
+export const handle: SEOHandle & { stickyToWindow: boolean } = {
 	getSitemapEntries: () => null,
+	/** No scroll box around this page (admin _layout): the decision bar and the chat column stick to the window. */
+	stickyToWindow: true,
 }
 
 /** The reviewNote prefix for "Write a different article". */
@@ -626,9 +628,9 @@ export default function ArticleReview() {
 	)
 }
 
-/** The site header is sticky and this tall (root.tsx, `h-[3rem]`); the bar sits under it. */
+/** The site header is sticky and this tall (root.tsx, `h-[3rem]`); the editor sits under it. */
 const SITE_HEADER_PX = 48
-/** The gap under the decision bar (`space-y-3`). */
+/** The gap between the editor and the decision bar (`space-y-3`). */
 const BAR_GAP_PX = 12
 
 /** The height of an element, kept up to date. 0 until measured. */
@@ -649,8 +651,9 @@ function useMeasuredHeight(ref: React.RefObject<HTMLElement | null>): number {
 }
 
 /**
- * The sticky decision bar and, under it, the editor: the chat (or the raw
- * markdown) on the left, the article on the right. Every change saves
+ * The editor: the chat (or the raw markdown) on the left, the article on
+ * the right; under it the decision bar, stuck to the bottom of the screen
+ * so she reads first and decides last (Zane 2026-09-16). Every change saves
  * itself and the working copy sits in a hidden field named `body`, so every
  * button here submits it after any save in flight. A decided article is
  * read-only until Reopen.
@@ -719,9 +722,38 @@ function Editor({
 	return (
 		<>
 			<Form method="post" className="space-y-3" onSubmit={submitAfterSave}>
+				{aidNote ? (
+					<p className="text-xs text-muted-foreground">{aidNote}</p>
+				) : null}
+
+				<ArticleEditor
+					article={{
+						id: article.id,
+						kind: article.kind,
+						title: article.title,
+						where: article.where,
+						byline: article.byline,
+						about: article.about,
+						body: article.body,
+						savedHash: article.savedHash,
+						isReference: article.isReference,
+					}}
+					images={article.images}
+					links={article.links}
+					claims={claims}
+					history={history}
+					initialTab="chat"
+					readOnly={article.readOnly}
+					showHeader={false}
+					stickyTop={SITE_HEADER_PX + BAR_GAP_PX}
+					stickyBottom={barHeight + BAR_GAP_PX}
+					flushRef={flushRef}
+					onBusyChange={setChatBusy}
+				/>
+
 				<div
 					ref={barRef}
-					className="sticky top-12 z-10 space-y-2 rounded-lg border bg-card p-3 shadow"
+					className="sticky bottom-0 z-10 space-y-2 rounded-lg border bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow"
 				>
 					<div className="flex flex-wrap items-center gap-2">
 						<Button
@@ -768,34 +800,6 @@ function Editor({
 					) : null}
 					<Messages error={error} ok={ok} />
 				</div>
-
-				{aidNote ? (
-					<p className="text-xs text-muted-foreground">{aidNote}</p>
-				) : null}
-
-				<ArticleEditor
-					article={{
-						id: article.id,
-						kind: article.kind,
-						title: article.title,
-						where: article.where,
-						byline: article.byline,
-						about: article.about,
-						body: article.body,
-						savedHash: article.savedHash,
-						isReference: article.isReference,
-					}}
-					images={article.images}
-					links={article.links}
-					claims={claims}
-					history={history}
-					initialTab="chat"
-					readOnly={article.readOnly}
-					showHeader={false}
-					stickyTop={SITE_HEADER_PX + barHeight + BAR_GAP_PX}
-					flushRef={flushRef}
-					onBusyChange={setChatBusy}
-				/>
 			</Form>
 
 			{rewriteOpen ? (
