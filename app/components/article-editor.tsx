@@ -15,6 +15,8 @@ import {
 	ARTICLE_CHAT_COPY,
 	ChatComposer,
 	ChatList,
+	grillActiveIn,
+	isGrillQuestion,
 	type ChatEntry,
 	type ComposerPayload,
 } from '#app/components/article-chat.tsx'
@@ -46,6 +48,7 @@ import { Icon } from '#app/components/ui/icon'
 import { Textarea } from '#app/components/ui/textarea.tsx'
 import {
 	ARTICLE_CHAT_ENDPOINT,
+	CHAT_COPY,
 	type ChatMessageJson,
 } from '#app/utils/article-chat.ts'
 import { appendSpeech } from '#app/utils/article-edit.ts'
@@ -95,9 +98,14 @@ import { useKeyboardInset, useMeasuredHeight } from '#app/utils/viewport.ts'
  * as a popup. Every piece of chat state lives here; the shell components
  * (chat-shell.tsx) only place it.
  *
- * The Markdown toggle, and the save mark when no dock holds it, go into the
- * route's bar through `barSlot` (a portal), so the editor has no bar of its
- * own.
+ * Grill me starts a grill: the server asks what only she knows, one
+ * question at a time (assistant rows with toolName `grill_question`), and
+ * her answers go through the same send path as any message. A
+ * `grill_done` row, or Stop grilling, ends it.
+ *
+ * The Grill me button, the Markdown toggle, and the save mark when no dock
+ * holds it, go into the route's bar through `barSlot` (a portal), so the
+ * editor has no bar of its own.
  */
 export type ArticleEditorProps = {
 	article: {
@@ -146,6 +154,8 @@ export type ArticleEditorProps = {
 
 export const ARTICLE_EDITOR_COPY = {
 	markdown: 'Markdown',
+	grillMe: CHAT_COPY.grillButton,
+	stopGrilling: CHAT_COPY.grillStopButton,
 	saved: 'Saved',
 	saving: 'Saving…',
 	saveFailed: 'Could not save.',
@@ -182,12 +192,15 @@ export const ARTICLE_EDITOR_COPY = {
 const CHANGED_MARK_MS = 6000
 /** A chat turn ends here: a little above the server's 60 s limit, so a hung turn frees the article. */
 const CHAT_TIMEOUT_MS = 90_000
+/** Reading the stored thread back (after a 409 grill_active) ends here. */
+const HISTORY_TIMEOUT_MS = 15_000
 
 /**
- * The entry the status line shows for the unseen rows: the last turn's
- * change (with See it and Undo) or its error before a trailing note such
- * as "Done."; an answer when the turn changed nothing. A turn = the rows
- * after the last user row.
+ * The entry the status line shows for the unseen rows: a grill question
+ * that waits for her answer; else the last turn's change (with See it and
+ * Undo) or its error before a trailing note such as "Done."; an answer
+ * when the turn changed nothing. A turn = the rows after the last user
+ * row.
  */
 function lastTurnStatus(unseen: ReadonlyArray<ChatEntry>): ChatEntry | null {
 	let start = 0
@@ -198,11 +211,13 @@ function lastTurnStatus(unseen: ReadonlyArray<ChatEntry>): ChatEntry | null {
 		}
 	}
 	const turn = unseen.slice(start).filter(e => e.role !== 'user')
+	const last = turn.at(-1) ?? null
+	if (last && isGrillQuestion(last)) return last
 	for (let i = turn.length - 1; i >= 0; i--) {
 		const e = turn[i]
 		if (e && (e.role === 'change' || e.role === 'error')) return e
 	}
-	return turn.at(-1) ?? null
+	return last
 }
 /** The space between the last line of the page and the phone dock. */
 const DOCK_GAP_PX = 16
@@ -447,6 +462,8 @@ export function ArticleEditor({
 	const [running, setRunning] = useState(false)
 	const runningRef = useRef(false)
 	const [decidedNow, setDecidedNow] = useState(false)
+	/** The last response's word on the grill: true active, false done; null before the first, then the rows decide. */
+	const [grillNote, setGrillNote] = useState<boolean | null>(null)
 	const [undo, setUndo] = useState<Undo | null>(null)
 	const [undoneIds, setUndoneIds] = useState<Set<string>>(() => new Set())
 	const [undoBusy, setUndoBusy] = useState(false)
@@ -467,6 +484,8 @@ export function ArticleEditor({
 
 	/** Sending is possible. */
 	const chatOn = !readOnly && !isReference && !decidedNow
+	/** A grill question waits for her answer: the box asks for it and the bar button reads Stop grilling. */
+	const grillActive = chatOn && (grillNote ?? grillActiveIn(entries))
 	/** The dock, the sheet, the launcher and the popup render at all. */
 	const chatSurface = !isReference
 	// The desktop opens on a quote hand-off; the phone shows the quote in the dock.
@@ -745,21 +764,50 @@ export function ArticleEditor({
 	function dropEntry(id: string) {
 		setEntries(list => list.filter(e => e.id !== id))
 	}
+	/** The stored thread as the server has it now; null when it cannot be read. */
+	async function fetchHistory(): Promise<ChatMessageJson[] | null> {
+		try {
+			const response = await fetch(
+				`${ARTICLE_CHAT_ENDPOINT}?articleId=${encodeURIComponent(articleId)}`,
+				{
+					headers: { Accept: 'application/json' },
+					signal: AbortSignal.timeout(HISTORY_TIMEOUT_MS),
+				},
+			)
+			if (!response.ok) return null
+			const data = (await response.json()) as { messages?: unknown }
+			return Array.isArray(data.messages)
+				? (data.messages as ChatMessageJson[])
+				: null
+		} catch {
+			return null
+		}
+	}
 
+	/**
+	 * One chat request: her message, or a grill start or stop (`payload.mode`:
+	 * no text, no user row). The lock, the flush, the timeout, the 409 rules
+	 * and the error row with Try again are the same for both.
+	 */
 	async function send(payload?: ComposerPayload) {
 		if (runningRef.current || !chatOn) return
-		const text = (payload?.text ?? composerText).trim()
-		const quoteToSend = payload ? payload.quote : quote
-		const imageId = payload
-			? payload.imageId
-			: attachment.status === 'ready'
-				? (attachment.attachment?.id ?? null)
-				: null
-		if (!text && !imageId && !quoteToSend) return
+		const mode = payload?.mode ?? null
+		const text = mode ? '' : (payload?.text ?? composerText).trim()
+		const quoteToSend = mode ? null : payload ? payload.quote : quote
+		const imageId = mode
+			? null
+			: payload
+				? payload.imageId
+				: attachment.status === 'ready'
+					? (attachment.attachment?.id ?? null)
+					: null
+		if (!mode && !text && !imageId && !quoteToSend) return
 		dictation.stop()
 		runningRef.current = true
 		setRunning(true)
-		const sent: ComposerPayload = { text, quote: quoteToSend, imageId }
+		const sent: ComposerPayload = mode
+			? { text, quote: null, imageId: null, mode }
+			: { text, quote: quoteToSend, imageId }
 		setEntries(list => list.filter(e => e.role !== 'error'))
 		try {
 			const { owed: stillOwed, hash } = await autoSave.flush()
@@ -768,17 +816,19 @@ export function ArticleEditor({
 				return
 			}
 			const localId = `local-${++localIdRef.current}`
-			pushEntry({
-				id: localId,
-				role: 'user',
-				text,
-				quote: quoteToSend,
-				imageId,
-				imageUrl: imageId ? articleImageUrl(imageId) : null,
-				toolName: null,
-				createdAt: new Date().toISOString(),
-				pending: true,
-			})
+			if (!mode) {
+				pushEntry({
+					id: localId,
+					role: 'user',
+					text,
+					quote: quoteToSend,
+					imageId,
+					imageUrl: imageId ? articleImageUrl(imageId) : null,
+					toolName: null,
+					createdAt: new Date().toISOString(),
+					pending: true,
+				})
+			}
 			let response: Response
 			try {
 				response = await fetch(ARTICLE_CHAT_ENDPOINT, {
@@ -787,13 +837,17 @@ export function ArticleEditor({
 						'Content-Type': 'application/json',
 						Accept: 'application/json',
 					},
-					body: JSON.stringify({
-						articleId,
-						text,
-						...(quoteToSend ? { quote: quoteToSend } : {}),
-						...(imageId ? { imageId } : {}),
-						baseHash: hash,
-					}),
+					body: JSON.stringify(
+						mode
+							? { articleId, mode, baseHash: hash }
+							: {
+									articleId,
+									text,
+									...(quoteToSend ? { quote: quoteToSend } : {}),
+									...(imageId ? { imageId } : {}),
+									baseHash: hash,
+								},
+					),
 					// A hung turn ends here: the error row shows and the article opens again.
 					signal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
 				})
@@ -807,7 +861,9 @@ export function ArticleEditor({
 				body?: unknown
 				hash?: unknown
 				changed?: unknown
+				grill?: unknown
 				error?: unknown
+				message?: unknown
 			} | null
 			if (
 				response.ok &&
@@ -818,6 +874,10 @@ export function ArticleEditor({
 			) {
 				const rows = data.messages as ChatMessageJson[]
 				setEntries(list => [...list.filter(e => e.id !== localId), ...rows])
+				// The server's word on the grill; without one, the rows decide.
+				setGrillNote(
+					data.grill === 'active' ? true : data.grill === 'done' ? false : null,
+				)
 				const changeRows = rows.filter(r => r.role === 'change')
 				if (data.changed === true) {
 					const prevBody = bodyRef.current
@@ -835,11 +895,18 @@ export function ArticleEditor({
 					// A picture change has no text to mark: See it scrolls to the picture.
 					setChanged(pictureRow ? null : { from: prevBody })
 				}
-				setComposerText('')
-				setGhost('')
-				setQuote(null)
-				// A picture with no change yet stays attached: her next message answers the question.
-				if (!(imageId && changeRows.length === 0)) attachment.remove()
+				if (mode === 'grill') {
+					// The first question is in the thread: show it and ask for the answer.
+					openChat()
+					boxRef.current?.focus()
+				}
+				if (!mode) {
+					setComposerText('')
+					setGhost('')
+					setQuote(null)
+					// A picture with no change yet stays attached: her next message answers the question.
+					if (!(imageId && changeRows.length === 0)) attachment.remove()
+				}
 				return
 			}
 			dropEntry(localId)
@@ -870,6 +937,33 @@ export function ArticleEditor({
 				pushError(ARTICLE_CHAT_COPY.decided, sent)
 				return
 			}
+			if (response.status === 409 && data?.error === 'grill_active') {
+				// A grill already runs on the server (its start was lost, or it began
+				// elsewhere): take the thread as the server has it, so the waiting
+				// question shows; else its line. Either way the composer asks for the answer.
+				const fresh = await fetchHistory()
+				if (fresh) {
+					setEntries(fresh)
+				} else {
+					pushEntry({
+						id: `local-${++localIdRef.current}`,
+						role: 'assistant',
+						text:
+							typeof data.message === 'string'
+								? data.message
+								: CHAT_COPY.grillActive,
+						quote: null,
+						imageId: null,
+						imageUrl: null,
+						toolName: null,
+						createdAt: new Date().toISOString(),
+					})
+				}
+				setGrillNote(true)
+				openChat()
+				boxRef.current?.focus()
+				return
+			}
 			const copy =
 				response.status === 429
 					? ARTICLE_CHAT_COPY.tooMany
@@ -887,6 +981,15 @@ export function ArticleEditor({
 			runningRef.current = false
 			setRunning(false)
 		}
+	}
+
+	/** Grill me: the server asks the first question; her answers go through send(). */
+	function startGrill() {
+		void send({ text: '', quote: null, imageId: null, mode: 'grill' })
+	}
+	/** Stop grilling: the server ends the grill with a grill_done row. */
+	function stopGrill() {
+		void send({ text: '', quote: null, imageId: null, mode: 'grill_stop' })
 	}
 
 	async function undoChange() {
@@ -987,11 +1090,36 @@ export function ArticleEditor({
 			)}
 		>
 			<Icon name="file-text" className="h-4 w-4" />
-			{ARTICLE_EDITOR_COPY.markdown}
+			{/* The phone's top bar is tight: the icon alone below sm, the word from sm up. */}
+			<span className="sr-only sm:not-sr-only">
+				{ARTICLE_EDITOR_COPY.markdown}
+			</span>
 		</button>
 	)
+	// Grill me: the server asks what only she knows, one question at a time.
+	const grillButton = chatOn ? (
+		<button
+			type="button"
+			aria-label={
+				grillActive
+					? ARTICLE_EDITOR_COPY.stopGrilling
+					: ARTICLE_EDITOR_COPY.grillMe
+			}
+			disabled={running || Boolean(autoSave.conflict)}
+			onClick={grillActive ? stopGrill : startGrill}
+			className={cn(
+				'inline-flex h-8 shrink-0 items-center rounded-md px-2 text-sm hover:bg-accent disabled:opacity-50',
+				grillActive ? 'bg-accent text-foreground' : 'text-muted-foreground',
+			)}
+		>
+			{grillActive
+				? ARTICLE_EDITOR_COPY.stopGrilling
+				: ARTICLE_EDITOR_COPY.grillMe}
+		</button>
+	) : null
 	const barItems = (
 		<>
+			{grillButton}
 			{chatInDock ? null : saveState}
 			{markdownToggle}
 		</>
@@ -1114,6 +1242,7 @@ export function ArticleEditor({
 		canSend,
 		onSend: () => void send(),
 		enterSends,
+		grill: grillActive,
 		boxRef,
 	}
 	const dock = dockOn ? (

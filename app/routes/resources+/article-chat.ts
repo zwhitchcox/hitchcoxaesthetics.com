@@ -7,6 +7,7 @@ import { takeRateLimitToken } from '#app/utils/ai-chat.ts'
 import {
 	getArticleChatConfig,
 	loadChatHistory,
+	loadGrillState,
 	runArticleChatTurn,
 } from '#app/utils/article-chat.server.ts'
 import {
@@ -18,19 +19,28 @@ import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 
 /**
- * The chat that edits the article (spec phase 3, section 2).
+ * The chat that edits the article (spec phase 3, section 2; phase 5 adds
+ * the grill).
  *
- *   POST /resources/article-chat  { articleId, text, quote?, imageId?, baseHash }
- *   -> 200 { messages, body, hash, changed }   the new rows, the working copy after the turn
+ *   POST /resources/article-chat  { articleId, text, quote?, imageId?, baseHash, mode? }
+ *   -> 200 { messages, body, hash, changed, grill }
+ *                                               the new rows, the working copy after the turn,
+ *                                               grill: 'active' | 'done' | null
  *   -> 400 { error }                            bad request, or a picture that is not on this article
  *   -> 404 { error }
  *   -> 409 { error: 'decided', message }        the article is not pending
  *   -> 409 { error: 'changed', message, body, hash }
  *                                               the stored text moved on since baseHash
+ *   -> 409 { error: 'grill_active', message }   mode 'grill' while a grill runs
  *   -> 429 | 502 | 503 | 504 { error }
  *
+ *   mode 'grill' (no text): the first question lands as an assistant row
+ *   with toolName 'grill_question'. mode 'grill_stop' (no text): a
+ *   grill_done row 'Stopped.'. A plain turn while a grill runs is her
+ *   answer; the turn ends with a grill_question or a grill_done row.
+ *
  *   GET /resources/article-chat?articleId=<id>
- *   -> 200 { messages }                         the last 200 rows, oldest first
+ *   -> 200 { messages, grill }                  the last 200 rows, oldest first; grill: 'active' | null
  *
  * Admin only, JSON only. The turn itself lives in article-chat.server.ts.
  * Logs carry lengths, counts and the model id, never the text.
@@ -50,8 +60,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		select: { id: true },
 	})
 	if (!article) return json({ error: CHAT_COPY.notFound }, { status: 404 })
+	const [messages, grill] = await Promise.all([
+		loadChatHistory(articleId),
+		loadGrillState(articleId),
+	])
 	return json(
-		{ messages: await loadChatHistory(articleId) },
+		{ messages, grill: grill.active ? ('active' as const) : null },
 		{ headers: { 'Cache-Control': 'no-store' } },
 	)
 }
@@ -67,7 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
 	if (!parsed.success) {
 		return json({ error: CHAT_COPY.badRequest }, { status: 400 })
 	}
-	const { articleId, text, quote, imageId, baseHash } = parsed.data
+	const { articleId, text, quote, imageId, baseHash, mode } = parsed.data
 
 	pruneRateWindows()
 	const window = takeRateLimitToken(
@@ -90,6 +104,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		quote,
 		imageId,
 		baseHash,
+		mode,
 		config,
 	})
 	if (result.ok) {
@@ -102,6 +117,11 @@ export async function action({ request }: ActionFunctionArgs) {
 		case 'decided':
 			return json(
 				{ error: 'decided', message: CHAT_COPY.decided },
+				{ status: 409 },
+			)
+		case 'grill_active':
+			return json(
+				{ error: 'grill_active', message: CHAT_COPY.grillActive },
 				{ status: 409 },
 			)
 		case 'changed':

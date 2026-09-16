@@ -160,6 +160,53 @@ const chatChanged = (body: Record<string, unknown>) =>
 		changed: true,
 	})
 
+/* The grill: one question at a time as assistant rows with toolName grill_question. */
+const Q1 = 'Q1. How long do you tell patients Botox lasts? A range is fine.'
+const Q2 = 'Q2. What do you charge per unit at the moment?'
+const ANSWER_1 = 'Three to four months for most people.'
+
+const grillStart = () =>
+	jsonResponse(200, {
+		messages: [
+			row({
+				id: 'q1',
+				role: 'assistant',
+				text: Q1,
+				toolName: 'grill_question',
+			}),
+		],
+		body: BODY,
+		hash: HASH_A,
+		changed: false,
+		grill: 'active',
+	})
+
+const grillNext = (body: Record<string, unknown>) =>
+	jsonResponse(200, {
+		messages: [
+			row({ id: 'u1', role: 'user', text: String(body.text) }),
+			row({
+				id: 'c1',
+				role: 'change',
+				text: 'Said 15 to 25 units.',
+				toolName: 'replace_text',
+			}),
+			row({
+				id: 'q2',
+				role: 'assistant',
+				text: Q2,
+				toolName: 'grill_question',
+			}),
+		],
+		body: BODY_CHANGED,
+		hash: HASH_B,
+		changed: true,
+		grill: 'active',
+	})
+
+const chatCalls = (calls: Call[]) =>
+	calls.filter(c => c.url === '/resources/article-chat')
+
 function launcher() {
 	return screen.getByRole('button', { name: CHAT_SHELL_COPY.openChat })
 }
@@ -568,4 +615,128 @@ test('a picture dropped on the open popup attaches to the chat', async () => {
 	expect(
 		within(open).getByRole('button', { name: 'Remove the picture' }),
 	).toBeTruthy()
+})
+
+test('Grill me in the bar slot posts mode grill with the hash and opens the popup on the question with the box focused; Stop grilling ends it on the server’s word alone', async () => {
+	const user = userEvent.setup()
+	let finishChat: (response: Response) => void = () => {}
+	const chatLands = new Promise<Response>(resolve => {
+		finishChat = resolve
+	})
+	const { calls } = mockFetch({
+		chat: body =>
+			body.mode === 'grill'
+				? chatLands
+				: body.mode === 'grill_stop'
+					? jsonResponse(200, {
+							messages: [],
+							body: BODY,
+							hash: HASH_A,
+							changed: false,
+							grill: 'done',
+						})
+					: jsonResponse(500, { error: 'unexpected' }),
+	})
+	const slot = document.body.appendChild(document.createElement('div'))
+	try {
+		renderEditor({ barSlot: slot })
+		await screen.findByRole('textbox', { name: RICH_EDITOR_COPY.label })
+		// the slot: [Grill me][save mark][Markdown]
+		const grill = within(slot).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.grillMe,
+		})
+		const mark = slot.querySelector('[data-save-state]')
+		if (!(mark instanceof HTMLElement)) throw new Error('no save mark')
+		expect(
+			grill.compareDocumentPosition(mark) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy()
+		expect(grill.getAttribute('aria-label')).toBe('Grill me')
+
+		await user.click(grill)
+		await waitFor(() => expect(chatCalls(calls)).toHaveLength(1))
+		expect(calls[0]?.body).toEqual({
+			articleId: 'a1',
+			mode: 'grill',
+			baseHash: HASH_A,
+		})
+		// while it runs the button is off and the popup stays closed
+		expect(grill.hasAttribute('disabled')).toBe(true)
+		expect(noPopup()).toBeNull()
+
+		finishChat(grillStart())
+		const open = await screen.findByRole('dialog', {
+			name: CHAT_SHELL_COPY.chatTitle,
+		})
+		expect(within(open).getByText(Q1)).toBeTruthy()
+		expect(within(open).getByText(ARTICLE_CHAT_COPY.question)).toBeTruthy()
+		expect(open.querySelectorAll('[data-grill-question]')).toHaveLength(1)
+		// no user bubble for the start
+		expect(open.querySelector('[aria-busy="true"]')).toBeNull()
+		const box = within(open).getByLabelText('Message') as HTMLTextAreaElement
+		expect(box.placeholder).toBe(ARTICLE_CHAT_COPY.grillPlaceholder)
+		await waitFor(() => expect(document.activeElement).toBe(box))
+		expect(
+			screen.queryByRole('button', { name: CHAT_SHELL_COPY.openChat }),
+		).toBeNull()
+		const stop = within(slot).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.stopGrilling,
+		})
+		expect(
+			within(slot).queryByRole('button', { name: ARTICLE_EDITOR_COPY.grillMe }),
+		).toBeNull()
+
+		// Stop grilling: the response carries no row, only grill: 'done'
+		await user.click(stop)
+		await waitFor(() => expect(chatCalls(calls)).toHaveLength(2))
+		expect(calls[1]?.body).toEqual({
+			articleId: 'a1',
+			mode: 'grill_stop',
+			baseHash: HASH_A,
+		})
+		await waitFor(() =>
+			expect(box.placeholder).toBe(ARTICLE_CHAT_COPY.placeholder),
+		)
+		expect(
+			within(slot).getByRole('button', { name: ARTICLE_EDITOR_COPY.grillMe }),
+		).toBeTruthy()
+		expect(popup()).toBeTruthy()
+	} finally {
+		slot.remove()
+	}
+})
+
+test('an answer typed in the popup during a grill posts as a normal turn and the next question replaces the first', async () => {
+	const user = userEvent.setup()
+	const { calls } = mockFetch({
+		chat: body => (body.mode === 'grill' ? grillStart() : grillNext(body)),
+	})
+	renderEditor()
+	await screen.findByRole('textbox', { name: RICH_EDITOR_COPY.label })
+	await user.click(
+		screen.getByRole('button', { name: ARTICLE_EDITOR_COPY.grillMe }),
+	)
+	const open = await screen.findByRole('dialog', {
+		name: CHAT_SHELL_COPY.chatTitle,
+	})
+	const box = within(open).getByLabelText('Message') as HTMLTextAreaElement
+	await user.type(box, ANSWER_1)
+	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
+	await waitFor(() => expect(hiddenBody()).toBe(BODY_CHANGED))
+	expect(calls[1]?.body).toEqual({
+		articleId: 'a1',
+		text: ANSWER_1,
+		baseHash: HASH_A,
+	})
+	expect(within(open).getByText(ANSWER_1)).toBeTruthy()
+	expect(within(open).getByText('Changed: said 15 to 25 units.')).toBeTruthy()
+	expect(within(open).getByText(Q2)).toBeTruthy()
+	expect(open.querySelectorAll('[data-grill-question]')).toHaveLength(2)
+	expect(box.value).toBe('')
+	expect(box.placeholder).toBe(ARTICLE_CHAT_COPY.grillPlaceholder)
+	expect(
+		screen.getByRole('button', { name: ARTICLE_EDITOR_COPY.stopGrilling }),
+	).toBeTruthy()
+	expect(preview().querySelector('mark.review-changed')?.textContent).toBe(
+		'15 to 25',
+	)
 })

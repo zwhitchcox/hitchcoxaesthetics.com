@@ -11,13 +11,28 @@ import {
 	type UpsertResult,
 } from '#app/utils/articles.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
+import {
+	listFactsForSync,
+	upsertDocFacts,
+} from '#app/utils/review-facts.server.ts'
+import {
+	SyncFactsPayloadSchema,
+	isFactsPayload,
+} from '#app/utils/review-facts.ts'
 
 /**
  * Sync endpoint for the outreach system on the Mac mini
  * (tools/article-writer/review_sync.py in the pbn repo).
  *
  *   POST /resources/article-sync   {articles: [...]}   create or update articles and their pictures
+ *   POST /resources/article-sync   {facts: [...]}      mirror the docs rows of the fact bank (phase 5, R8):
+ *                                                       [{ key, fact, tags, question?, answer? }], at most 500,
+ *                                                       upserted by key with source 'docs'; a key that is not
+ *                                                       sent is left alone. -> { upserted, unchanged }
  *   GET  /resources/article-sync?since=<ISO>            review state changed since then
+ *   GET  /resources/article-sync?facts=1                the non-retired fact rows: { now, facts: [{ id, key,
+ *                                                       source, fact, tags, question, answer, updatedAt }] };
+ *                                                       add &since=<ISO> for rows updated after that time
  *   GET  /resources/article-sync?image=<id>             the bytes of one stored picture (a picture Sarah
  *                                                       added in the chat, named images/user-<id>.<ext>
  *                                                       in approved.md; the mini's pull downloads it)
@@ -44,6 +59,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const imageId = params.get('image')
 	if (imageId) return imageResponse(imageId)
 	const since = params.get('since')
+	if (params.get('facts')) return factsResponse(since)
 	const sinceDate = since ? new Date(since) : null
 	const where =
 		sinceDate && !Number.isNaN(sinceDate.getTime())
@@ -106,6 +122,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	})
 }
 
+/** The fact bank for the mini (R8). The token was checked by the caller. */
+async function factsResponse(since: string | null) {
+	const sinceDate = since ? new Date(since) : null
+	const facts = await listFactsForSync(
+		sinceDate && !Number.isNaN(sinceDate.getTime()) ? sinceDate : null,
+	)
+	return json({ now: new Date().toISOString(), facts })
+}
+
 /** One stored picture as a download. The token was checked by the caller. */
 async function imageResponse(imageId: string) {
 	const image = await prisma.articleImage.findUnique({
@@ -134,6 +159,16 @@ export async function action({ request }: ActionFunctionArgs) {
 		raw = await request.json()
 	} catch {
 		return json({ error: 'body must be JSON' }, { status: 400 })
+	}
+	if (isFactsPayload(raw)) {
+		const facts = SyncFactsPayloadSchema.safeParse(raw)
+		if (!facts.success) {
+			return json(
+				{ error: 'invalid payload', issues: facts.error.issues.slice(0, 10) },
+				{ status: 400 },
+			)
+		}
+		return json(await upsertDocFacts(facts.data.facts))
 	}
 	const parsed = SyncPayloadSchema.safeParse(raw)
 	if (!parsed.success) {

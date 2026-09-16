@@ -47,6 +47,7 @@ export const handle: SEOHandle = {
 
 export const CHANGE_COPY = {
 	back: 'Back to the article',
+	backShort: 'Back',
 	approve: 'Approve',
 	approveBlog: 'Approve and publish',
 } as const
@@ -160,10 +161,13 @@ export default function ChangeArticle() {
 			>
 				<Link
 					to={`/review/${article.id}`}
-					className="inline-flex min-w-0 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
+					aria-label={CHANGE_COPY.back}
+					className="inline-flex min-w-0 shrink-0 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
 				>
 					<Icon name="chevron-left" className="h-4 w-4 shrink-0" />
-					<span className="truncate">{CHANGE_COPY.back}</span>
+					{/* A small screen shows "Back": the bar also holds Grill me, Markdown and Approve. */}
+					<span className="sm:hidden">{CHANGE_COPY.backShort}</span>
+					<span className="hidden truncate sm:inline">{CHANGE_COPY.back}</span>
 				</Link>
 				<div
 					data-editor-bar-slot=""

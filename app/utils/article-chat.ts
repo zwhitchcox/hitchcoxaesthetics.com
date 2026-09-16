@@ -23,6 +23,15 @@ import {
 } from '#app/utils/article-edit.ts'
 import { type PictureListItem } from '#app/utils/article-images.ts'
 import { missingLinks, type ArticleLink } from '#app/utils/articles.ts'
+import {
+	FACT_ANSWER_MAX_CHARS,
+	FACT_MAX_CHARS,
+	FACT_QUESTION_MAX_CHARS,
+	FACT_TAGS_MAX_CHARS,
+	factBankBlock,
+	normaliseTags,
+	type FactBankRow,
+} from '#app/utils/review-facts.ts'
 
 export const ARTICLE_CHAT_DEFAULT_MODEL = 'anthropic/claude-sonnet-5'
 export const ARTICLE_CHAT_ENDPOINT = '/resources/article-chat'
@@ -33,6 +42,10 @@ export const ARTICLE_CHAT_RATE_LIMIT = { max: 10, windowMs: 60_000 }
 export const ARTICLE_CHAT_TIMEOUT_MS = 60_000
 /** Tool calls in one turn. The loop stops here without another model call. */
 export const ARTICLE_CHAT_MAX_TOOL_CALLS = 4
+/** A grill turn may call this many more: save_fact and one edit must both fit. */
+export const ARTICLE_CHAT_GRILL_EXTRA_TOOL_CALLS = 2
+/** Questions in one grill. The prompt says it; the server holds it. */
+export const ARTICLE_CHAT_GRILL_MAX_QUESTIONS = 6
 /** The stored rows the model sees, newest last. */
 export const ARTICLE_CHAT_HISTORY_ROWS = 30
 /** The oldest rows drop while the joined history passes this many characters. */
@@ -50,10 +63,14 @@ const SUMMARY_MAX_CHARS = 300
 /* The request and the rows                                                 */
 /* ------------------------------------------------------------------------ */
 
+/** `grill` starts a grill (R2), `grill_stop` ends one (R5). No text with either. */
+export const CHAT_MODES = ['grill', 'grill_stop'] as const
+export type ChatMode = (typeof CHAT_MODES)[number]
+
 /**
  * POST /resources/article-chat. `text` may be empty only with a quote or a
- * picture attached (then the model asks what she wants). `quote` is the
- * passage she selected, as it reads on the page.
+ * picture attached (then the model asks what she wants), or with a `mode`.
+ * `quote` is the passage she selected, as it reads on the page.
  */
 export const ArticleChatRequestSchema = z
 	.object({
@@ -67,11 +84,19 @@ export const ArticleChatRequestSchema = z
 			.nullish(),
 		imageId: z.string().trim().min(1).max(64).nullish(),
 		baseHash: z.string().regex(/^[0-9a-f]{64}$/),
+		mode: z.enum(CHAT_MODES).optional(),
 	})
-	.refine(v => v.text.length > 0 || Boolean(v.imageId) || Boolean(v.quote), {
-		message: 'Say something, or attach a quote or a picture.',
-		path: ['text'],
-	})
+	.refine(
+		v =>
+			v.text.length > 0 ||
+			Boolean(v.imageId) ||
+			Boolean(v.quote) ||
+			Boolean(v.mode),
+		{
+			message: 'Say something, or attach a quote or a picture.',
+			path: ['text'],
+		},
+	)
 
 export type ArticleChatRequest = z.infer<typeof ArticleChatRequestSchema>
 
@@ -91,6 +116,18 @@ export type ChatMessageJson = {
 	toolName: string | null
 	createdAt: string
 }
+
+/**
+ * The assistant rows a grill writes carry a marker in `toolName`: the
+ * question she is to answer, and the row that ends the grill.
+ */
+export const GRILL_ROW_MARKERS = {
+	question: 'grill_question',
+	done: 'grill_done',
+} as const
+
+/** What a turn's response says about the grill: active, ended by this turn, or none. */
+export type GrillState = 'active' | 'done' | null
 
 /** The copy the server and the chat UI share. Exact strings from the plan. */
 export const CHAT_COPY = {
@@ -113,6 +150,20 @@ export const CHAT_COPY = {
 	notSaved: 'Your typed change has not saved yet. Wait for Saved, then send.',
 	/** The change row for replace_picture. `summaryLine` adds "Changed: ". */
 	pictureChanged: (n: number) => `picture ${n} is now the one you sent.`,
+	/** The grill (phase 5). The buttons and the placeholder are the client's. */
+	grillButton: 'Grill me',
+	grillStopButton: 'Stop grilling',
+	grillPlaceholder: 'Answer here, or say skip',
+	/** The synthetic user turn the model sees before the first question. */
+	grillStart: 'Grill me.',
+	/** The grill_done row after Stop grilling or a bare "stop". */
+	grillStopped: 'Stopped.',
+	/** The grill_done row after the last answer. */
+	grillDone: (summary: string) => `Done. Here is what changed: ${summary}`,
+	grillNothingChanged: 'Nothing changed.',
+	/** 409 when Grill me is pressed while a grill runs. */
+	grillActive:
+		'A grill is already running. Answer in the chat, or stop it first.',
 } as const
 
 /** `Changed: <summary>` with the first letter lowered when the word allows it. */
@@ -156,9 +207,26 @@ export const ReplacePictureArgsSchema = z.object({
 	summary: summaryField,
 })
 
+export const SaveFactArgsSchema = z.object({
+	question: z.string().trim().min(1).max(FACT_QUESTION_MAX_CHARS),
+	answer: z.string().trim().min(1).max(FACT_ANSWER_MAX_CHARS),
+	fact: z.string().trim().min(1).max(FACT_MAX_CHARS),
+	tags: z
+		.union([z.string(), z.array(z.string())])
+		.optional()
+		.transform(normaliseTags)
+		.transform(s => s.slice(0, FACT_TAGS_MAX_CHARS)),
+})
+
+export const EndGrillArgsSchema = z.object({
+	summary: summaryField,
+})
+
 export type ReplaceTextArgs = z.infer<typeof ReplaceTextArgsSchema>
 export type RewriteArticleArgs = z.infer<typeof RewriteArticleArgsSchema>
 export type ReplacePictureArgs = z.infer<typeof ReplacePictureArgsSchema>
+export type SaveFactArgs = z.infer<typeof SaveFactArgsSchema>
+export type EndGrillArgs = z.infer<typeof EndGrillArgsSchema>
 
 export const CHAT_TOOL_NAMES = [
 	'replace_text',
@@ -166,6 +234,9 @@ export const CHAT_TOOL_NAMES = [
 	'replace_picture',
 ] as const
 export type ChatToolName = (typeof CHAT_TOOL_NAMES)[number]
+/** The two tools a grill turn adds. */
+export const GRILL_TOOL_NAMES = ['save_fact', 'end_grill'] as const
+export type GrillToolName = (typeof GRILL_TOOL_NAMES)[number]
 
 /** The tools, as sent to OpenRouter. */
 export const CHAT_TOOLS = [
@@ -247,6 +318,63 @@ export const CHAT_TOOLS = [
 	},
 ] as const
 
+/** The tools a grill turn gets: the three above, then these two. */
+export const GRILL_TOOLS = [
+	...CHAT_TOOLS,
+	{
+		type: 'function',
+		function: {
+			name: 'save_fact',
+			description:
+				'Remember what Sarah answered, so nobody asks it again. Call it once per answered question, after the edit. Never for "skip" or "I do not know", and never for an instruction about the text.',
+			parameters: {
+				type: 'object',
+				additionalProperties: false,
+				properties: {
+					question: {
+						type: 'string',
+						description: 'The question she answered, as asked.',
+					},
+					answer: {
+						type: 'string',
+						description: 'Her answer, in her words.',
+					},
+					fact: {
+						type: 'string',
+						description:
+							'One plain sentence a writer can use, for example "Sarah charges $12 per unit of Botox."',
+					},
+					tags: {
+						type: 'string',
+						description:
+							'Lowercase topics, comma-separated, for example "botox, pricing". Use botox, filler, weight-loss, skin, laser, farragut, bearden, pricing, hours, staff, voice, patients where they fit.',
+					},
+				},
+				required: ['question', 'answer', 'fact'],
+			},
+		},
+	},
+	{
+		type: 'function',
+		function: {
+			name: 'end_grill',
+			description:
+				'End the grill: nothing more is worth asking, she asked to stop, or the cap is reached. summary is one or two sentences that say what changed in the article across this grill, or "Nothing changed."',
+			parameters: {
+				type: 'object',
+				additionalProperties: false,
+				properties: {
+					summary: {
+						type: 'string',
+						description: 'What changed in the article, or "Nothing changed."',
+					},
+				},
+				required: ['summary'],
+			},
+		},
+	},
+] as const
+
 /* ------------------------------------------------------------------------ */
 /* Prompts                                                                  */
 /* ------------------------------------------------------------------------ */
@@ -266,19 +394,69 @@ export const CHAT_SYSTEM_RULES = [
 	'When a tool answers not_found or ambiguous, try once more with a longer or shorter find, then tell her in one sentence what you could not find.',
 	'Plain words. No headings and no long lists in answers.',
 	'If she sends a picture with no words, do not change anything; ask which picture it should replace, for example "the second one", or whether to add it.',
+	'WHAT SARAH HAS ALREADY TOLD US lists facts from Sarah. Use them in the article without asking. Never ask a question the list answers. When a fact there conflicts with the article, apply the fact. When she asks a question the list answers, answer from it.',
 ].join(' ')
+
+/**
+ * The GRILL rules (R3), added to the system prompt of every grill turn.
+ * The count line and the turn line are appended by `grillRulesBlock`.
+ */
+export const GRILL_RULES = [
+	'GRILL MODE. Sarah pressed "Grill me". Your goal: make this article hers with facts only she knows. Interview her one question at a time until nothing important is still assumed, then end.',
+	'Ask only what she alone knows: her experience, what she tells patients, numbers and specifics at her practice, her opinion on a claim, her own wording.',
+	'Never ask: anything WHAT SARAH HAS ALREADY TOLD US answers; anything a writer can look up; anything the article already states from a cited source.',
+	'Form: one question per turn, at most two sentences, concrete, with a suggested answer or options when that speeds her up. Number it "Q1", "Q2" and so on. She dictates on a phone: short is good.',
+	'Each answer turn: first apply her answer to the article with replace_text (or rewrite_article when many paragraphs must change), her words where they fit, in her voice. Then call save_fact with the question, her answer, one plain sentence a writer can use, and tags. Then ask the next question, or end.',
+	'"skip", "I don\'t know", "not sure": no edit, no fact; ask the next question. "stop", "enough", "that\'s all": end now.',
+	`The cap is ${ARTICLE_CHAT_GRILL_MAX_QUESTIONS} questions per grill. End earlier when nothing is worth asking. To end, call end_grill with one or two sentences that say what changed in the article across this grill (or "Nothing changed."). Do not write the ending yourself.`,
+].join('\n')
+
+/** What the grill block needs to know about this turn. */
+export type GrillPromptInput = {
+	/** Questions already asked in this grill. */
+	asked: number
+	/** True on the turn that starts the grill: ask Q1, no answer to apply. */
+	start: boolean
+}
+
+/** The GRILL rules with the count line and the line for this turn. */
+export function grillRulesBlock({ asked, start }: GrillPromptInput): string {
+	const lines = [
+		GRILL_RULES,
+		`Asked so far: ${asked} of ${ARTICLE_CHAT_GRILL_MAX_QUESTIONS}.`,
+	]
+	if (start) {
+		lines.push(
+			'This is the start: ask Q1 now, or call end_grill when the list already covers what matters.',
+		)
+	} else if (asked >= ARTICLE_CHAT_GRILL_MAX_QUESTIONS) {
+		lines.push(
+			'That was the last answer: apply it, save the fact, then call end_grill. Do not ask another question.',
+		)
+	}
+	return lines.join('\n')
+}
 
 /** One picture line of the article, numbered from the top (article-images.ts). */
 export type ChatPicture = PictureListItem
 
+/**
+ * The system prompt: the rules, the GRILL rules on a grill turn, the
+ * links, the pictures, the fact bank, and the artifact last.
+ */
 export function buildChatSystemPrompt({
 	links,
 	pictures,
 	markdown,
+	facts = [],
+	grill = null,
 }: {
 	links: ArticleLink[]
 	pictures: ChatPicture[]
 	markdown: string
+	/** The live bank (review-facts.server.ts loadFactBank). */
+	facts?: FactBankRow[]
+	grill?: GrillPromptInput | null
 }): string {
 	const linkLines = links.length
 		? links.map(l => `${l.name}: ${l.url}`).join('\n')
@@ -293,12 +471,16 @@ export function buildChatSystemPrompt({
 		: '(none)'
 	return [
 		CHAT_SYSTEM_RULES,
+		...(grill ? ['', grillRulesBlock(grill)] : []),
 		'',
 		'LINKS THAT MUST STAY:',
 		linkLines,
 		'',
 		'PICTURES IN THE ARTICLE:',
 		pictureLinesText,
+		'',
+		'WHAT SARAH HAS ALREADY TOLD US:',
+		factBankBlock(facts).text,
 		'',
 		'ARTIFACT (markdown):',
 		markdown,
@@ -359,6 +541,7 @@ export type ChatHistoryRow = {
 	text: string
 	quote?: string | null
 	imageId?: string | null
+	toolName?: string | null
 }
 
 export type ChatHistoryMessage = { role: 'user' | 'assistant'; content: string }
@@ -367,28 +550,97 @@ export type ChatHistoryMessage = { role: 'user' | 'assistant'; content: string }
  * The stored rows as model messages: the last ARTICLE_CHAT_HISTORY_ROWS,
  * user rows with their quote block first, change rows as
  * `Changed: <summary>`, the oldest dropped while the joined length passes
- * ARTICLE_CHAT_HISTORY_CHARS.
+ * ARTICLE_CHAT_HISTORY_CHARS. A window opens with her turn, or with a
+ * grill question (then the "Grill me." turn that asked for it is put
+ * back in front, so the model sees a user turn first).
  */
 export function historyToMessages(
 	rows: ChatHistoryRow[],
 ): ChatHistoryMessage[] {
-	const out: ChatHistoryMessage[] = rows
-		.slice(-ARTICLE_CHAT_HISTORY_ROWS)
-		.map(row => {
-			if (row.role === 'user')
-				return { role: 'user', content: userRowText(row) }
-			if (row.role === 'change') {
-				return { role: 'assistant', content: summaryLine(row.text) }
+	const out = rows.slice(-ARTICLE_CHAT_HISTORY_ROWS).map(row => {
+		const opens =
+			row.role === 'user' || row.toolName === GRILL_ROW_MARKERS.question
+		if (row.role === 'user') {
+			return { role: 'user' as const, content: userRowText(row), opens }
+		}
+		if (row.role === 'change') {
+			return {
+				role: 'assistant' as const,
+				content: summaryLine(row.text),
+				opens,
 			}
-			return { role: 'assistant', content: row.text }
-		})
+		}
+		return { role: 'assistant' as const, content: row.text, opens }
+	})
 	let total = out.reduce((n, m) => n + m.content.length, 0)
 	while (out.length > 0 && total > ARTICLE_CHAT_HISTORY_CHARS) {
 		total -= (out.shift() as ChatHistoryMessage).content.length
 	}
 	// A window must open with her turn, never with an answer to a lost turn.
-	while (out.length > 0 && out[0]?.role !== 'user') out.shift()
-	return out
+	while (out.length > 0 && !out[0]?.opens) out.shift()
+	const messages: ChatHistoryMessage[] = out.map(({ role, content }) => ({
+		role,
+		content,
+	}))
+	if (messages[0]?.role === 'assistant') {
+		messages.unshift({ role: 'user', content: CHAT_COPY.grillStart })
+	}
+	return messages
+}
+
+/* ------------------------------------------------------------------------ */
+/* The grill (phase 5)                                                      */
+/* ------------------------------------------------------------------------ */
+
+/** What the grill helpers need from a stored row. */
+export type GrillRow = { toolName?: string | null }
+
+/**
+ * The grill state a thread is in: active while the last marker row is a
+ * question (R4), done when it is a grill_done row, null with no grill yet.
+ */
+export function grillStateOf(rows: GrillRow[]): GrillState {
+	for (let i = rows.length - 1; i >= 0; i--) {
+		const marker = rows[i]?.toolName
+		if (marker === GRILL_ROW_MARKERS.question) return 'active'
+		if (marker === GRILL_ROW_MARKERS.done) return 'done'
+	}
+	return null
+}
+
+/** Questions asked in the current grill: the question rows after the last grill_done. */
+export function grillQuestionsAsked(rows: GrillRow[]): number {
+	let asked = 0
+	for (let i = rows.length - 1; i >= 0; i--) {
+		const marker = rows[i]?.toolName
+		if (marker === GRILL_ROW_MARKERS.done) break
+		if (marker === GRILL_ROW_MARKERS.question) asked++
+	}
+	return asked
+}
+
+/** Her bare words that end a grill without a model call (R4). */
+export const GRILL_STOP_RE =
+	/^(stop|stop grilling|stop the grill|enough|that'?s all|that is all|that'?s it|that is it|no more|no more questions)[\s.!]*$/i
+
+export function isGrillStop(text: string): boolean {
+	return GRILL_STOP_RE.test(text.trim().replace(/[\u2018\u2019]/g, "'"))
+}
+
+/** True when the model's final text asks something: a "Q<n>" label or a closing question mark. */
+export function looksLikeQuestion(text: string): boolean {
+	const trimmed = text.trim()
+	return /\bQ\d+\b/.test(trimmed) || trimmed.endsWith('?')
+}
+
+/** True when the model's final text says the grill is over without end_grill. */
+export function saysGrillDone(text: string): boolean {
+	const trimmed = text.trim()
+	return (
+		/^done\b/i.test(trimmed) ||
+		/\bnothing (more|else) to ask\b/i.test(trimmed) ||
+		/\bthat'?s all (I|i) need\b/.test(trimmed)
+	)
 }
 
 function userRowText(row: ChatHistoryRow): string {

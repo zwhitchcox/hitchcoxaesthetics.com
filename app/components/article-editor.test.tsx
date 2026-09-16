@@ -264,9 +264,10 @@ function jsonResponse(status: number, data: unknown) {
 
 type Call = { url: string; body: Record<string, unknown> }
 
-/** A fetch mock that answers article-chat and article-save and records every call. */
+/** A fetch mock that answers article-chat (the POST, and the GET of the thread), article-save, and records every call. */
 function mockFetch(handlers: {
 	chat?: (body: Record<string, unknown>) => Response | Promise<Response>
+	history?: () => Response | Promise<Response>
 	save?: (body: Record<string, unknown>) => Response | Promise<Response>
 }) {
 	const calls: Call[] = []
@@ -278,6 +279,8 @@ function mockFetch(handlers: {
 		calls.push({ url, body })
 		if (url === '/resources/article-chat' && handlers.chat)
 			return handlers.chat(body)
+		if (url.startsWith('/resources/article-chat?') && handlers.history)
+			return handlers.history()
 		if (url === '/resources/article-save' && handlers.save)
 			return handlers.save(body)
 		return jsonResponse(500, { error: 'unexpected' })
@@ -331,6 +334,108 @@ const chatChangedThenNote = (body: Record<string, unknown>) =>
 		hash: HASH_B,
 		changed: true,
 	})
+
+/* The grill: the server asks one question at a time (assistant rows with
+ * toolName grill_question); a grill_done row ends it. */
+const Q1 = 'Q1. How long do you tell patients Botox lasts? A range is fine.'
+const Q2 = 'Q2. What do you charge per unit at the moment?'
+const GRILL_DONE =
+	'Done. Here is what changed: the article now gives your range.'
+const ANSWER_1 = 'Three to four months for most people.'
+
+/** A grill start: the first question and no user row. */
+const grillStart = () =>
+	jsonResponse(200, {
+		messages: [
+			row({
+				id: 'q1',
+				role: 'assistant',
+				text: Q1,
+				toolName: 'grill_question',
+			}),
+		],
+		body: BODY,
+		hash: HASH_A,
+		changed: false,
+		grill: 'active',
+	})
+
+/** Her answer applied to the article, then the next question. */
+const grillNext = (body: Record<string, unknown>) =>
+	jsonResponse(200, {
+		messages: [
+			row({ id: 'u1', role: 'user', text: String(body.text) }),
+			row({
+				id: 'c1',
+				role: 'change',
+				text: 'Said 15 to 25 units.',
+				toolName: 'replace_text',
+			}),
+			row({
+				id: 'q2',
+				role: 'assistant',
+				text: Q2,
+				toolName: 'grill_question',
+			}),
+		],
+		body: BODY_CHANGED,
+		hash: HASH_B,
+		changed: true,
+		grill: 'active',
+	})
+
+/** The last answer: the grill ends with the Done row. */
+const grillEnd = (body: Record<string, unknown>) =>
+	jsonResponse(200, {
+		messages: [
+			row({ id: 'u2', role: 'user', text: String(body.text) }),
+			row({
+				id: 'd1',
+				role: 'assistant',
+				text: GRILL_DONE,
+				toolName: 'grill_done',
+			}),
+		],
+		body: BODY_CHANGED,
+		hash: HASH_B,
+		changed: false,
+		grill: 'done',
+	})
+
+/** Stop grilling: the server's Stopped. row. */
+const grillStopped = () =>
+	jsonResponse(200, {
+		messages: [
+			row({
+				id: 'd2',
+				role: 'assistant',
+				text: 'Stopped.',
+				toolName: 'grill_done',
+			}),
+		],
+		body: BODY,
+		hash: HASH_A,
+		changed: false,
+		grill: 'done',
+	})
+
+function grillButton() {
+	return screen.getByRole('button', { name: ARTICLE_EDITOR_COPY.grillMe })
+}
+
+function stopGrillingButton() {
+	return screen.getByRole('button', { name: ARTICLE_EDITOR_COPY.stopGrilling })
+}
+
+/** The sheet's list, once the sheet is open. */
+async function sheetList() {
+	const sheet = await screen.findByRole('dialog', {
+		name: CHAT_SHELL_COPY.chatTitle,
+	})
+	const list = sheet.querySelector('[data-chat-list]')
+	if (!(list instanceof HTMLElement)) throw new Error('no chat list')
+	return list
+}
 
 const chatCalls = (calls: Call[]) =>
 	calls.filter(c => c.url === '/resources/article-chat')
@@ -1403,7 +1508,7 @@ test('a failed save shows Could not save. with Try now in the dock, and Try now 
 	})
 })
 
-test('the bar slot holds the Markdown toggle alone on the phone, and nothing while it is null; the save mark stays in the dock', async () => {
+test('the bar slot holds Grill me then the Markdown toggle on the phone, and nothing while it is null; the save mark stays in the dock', async () => {
 	const user = userEvent.setup()
 	const { unmount } = renderEditor({ barSlot: null })
 	await richEditor()
@@ -1421,6 +1526,10 @@ test('the bar slot holds the Markdown toggle alone on the phone, and nothing whi
 		const toggle = within(slot).getByRole('button', {
 			name: ARTICLE_EDITOR_COPY.markdown,
 		})
+		const grill = within(slot).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.grillMe,
+		})
+		expect(within(slot).getAllByRole('button')).toEqual([grill, toggle])
 		expect(slot.querySelector('[data-save-state]')).toBeNull()
 		expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
 		expect(dock().contains(saveState())).toBe(true)
@@ -1431,4 +1540,308 @@ test('the bar slot holds the Markdown toggle alone on the phone, and nothing whi
 	} finally {
 		slot.remove()
 	}
+})
+
+test('Grill me posts mode grill with the hash and no text; the question opens the sheet, the box asks for the answer, and the button reads Stop grilling', async () => {
+	const user = userEvent.setup()
+	let finishChat: (response: Response) => void = () => {}
+	const chatLands = new Promise<Response>(resolve => {
+		finishChat = resolve
+	})
+	const { calls } = mockFetch({ chat: () => chatLands })
+	renderEditor()
+	await richEditor()
+	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.placeholder)
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.stopGrilling }),
+	).toBeNull()
+
+	await user.click(grillButton())
+	await waitFor(() => expect(chatCalls(calls)).toHaveLength(1))
+	expect(calls[0]?.body).toEqual({
+		articleId: 'a1',
+		mode: 'grill',
+		baseHash: HASH_A,
+	})
+	expect(saveCalls(calls)).toHaveLength(0)
+	// while it runs: the button is off, the dock shows the working dots, the sheet stays closed
+	expect(grillButton().hasAttribute('disabled')).toBe(true)
+	expect(statusLine().textContent).toContain(ARTICLE_CHAT_COPY.working)
+	expect(noChatSheet()).toBeNull()
+
+	finishChat(grillStart())
+	// the sheet opens on the question, labelled as one
+	const list = await sheetList()
+	expect(within(list).getByText(Q1)).toBeTruthy()
+	expect(within(list).getByText(ARTICLE_CHAT_COPY.question)).toBeTruthy()
+	expect(list.querySelectorAll('[data-grill-question]')).toHaveLength(1)
+	expect(noStatusLine()).toBeNull()
+	// the box asks for the answer and has the focus; the bar button flips
+	expect(composer().placeholder).toBe('Answer here, or say skip')
+	await waitFor(() => expect(document.activeElement).toBe(composer()))
+	expect(stopGrillingButton().hasAttribute('disabled')).toBe(false)
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.grillMe }),
+	).toBeNull()
+	// nothing changed in the article
+	expect(hiddenBody()).toBe(BODY)
+	expect(saveState().dataset.saveState).toBe('idle')
+})
+
+test('an answer during a grill posts as a normal turn; the next question keeps the grill and takes the status line over the change; grill_done ends it', async () => {
+	const user = userEvent.setup()
+	const { calls } = mockFetch({
+		chat: body =>
+			body.mode === 'grill'
+				? grillStart()
+				: body.text === ANSWER_1
+					? grillNext(body)
+					: grillEnd(body),
+	})
+	renderEditor()
+	await richEditor()
+	await user.click(grillButton())
+	await sheetList()
+	// she answers from the dock with the sheet closed
+	await closeChat(user)
+	expect(noStatusLine()).toBeNull()
+	await user.type(composer(), ANSWER_1)
+	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
+	await waitFor(() => expect(hiddenBody()).toBe(BODY_CHANGED))
+	expect(calls[1]?.body).toEqual({
+		articleId: 'a1',
+		text: ANSWER_1,
+		baseHash: HASH_A,
+	})
+	await expectSaved()
+
+	// the next question waits on the status line, over the change it came with
+	const line = statusLine()
+	expect(line.textContent).toContain(Q2)
+	expect(line.textContent).not.toContain('Changed:')
+	expect(
+		within(line).getByRole('button', { name: CHAT_SHELL_COPY.open }),
+	).toBeTruthy()
+	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.grillPlaceholder)
+	expect(composer().value).toBe('')
+	expect(stopGrillingButton()).toBeTruthy()
+	// the article changed in place all the same
+	await waitFor(() =>
+		expect(preview().querySelector('mark.review-changed')?.textContent).toBe(
+			'15 to 25',
+		),
+	)
+
+	// "skip" is an ordinary turn too; the Done row ends the grill
+	await user.type(composer(), 'skip')
+	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
+	await waitFor(() => expect(chatCalls(calls)).toHaveLength(3))
+	expect(calls[2]?.body).toEqual({
+		articleId: 'a1',
+		text: 'skip',
+		baseHash: HASH_B,
+	})
+	await waitFor(() =>
+		expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.placeholder),
+	)
+	expect(grillButton()).toBeTruthy()
+	expect(statusLine().textContent).toContain(GRILL_DONE)
+
+	// in the conversation the questions carry the label and the Done row is a plain answer
+	await openChat(user)
+	const list = await sheetList()
+	expect(within(list).getByText(Q1)).toBeTruthy()
+	expect(within(list).getByText(Q2)).toBeTruthy()
+	expect(within(list).getByText(GRILL_DONE)).toBeTruthy()
+	expect(within(list).getByText(ANSWER_1)).toBeTruthy()
+	expect(within(list).getByText('Changed: said 15 to 25 units.')).toBeTruthy()
+	expect(list.querySelectorAll('[data-grill-question]')).toHaveLength(2)
+	expect(within(list).getAllByText(ARTICLE_CHAT_COPY.question)).toHaveLength(2)
+})
+
+test('Stop grilling posts mode grill_stop with the hash; the Stopped. row lands and the box returns to normal with her words kept', async () => {
+	const user = userEvent.setup()
+	const { calls } = mockFetch({
+		chat: body =>
+			body.mode === 'grill'
+				? grillStart()
+				: body.mode === 'grill_stop'
+					? grillStopped()
+					: jsonResponse(500, { error: 'unexpected' }),
+	})
+	renderEditor()
+	await richEditor()
+	await user.click(grillButton())
+	const list = await sheetList()
+	await user.type(composer(), 'About four')
+
+	await user.click(stopGrillingButton())
+	await waitFor(() => expect(chatCalls(calls)).toHaveLength(2))
+	expect(calls[1]?.body).toEqual({
+		articleId: 'a1',
+		mode: 'grill_stop',
+		baseHash: HASH_A,
+	})
+	await waitFor(() =>
+		expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.placeholder),
+	)
+	expect(grillButton()).toBeTruthy()
+	expect(composer().value).toBe('About four')
+	// the sheet stays open and shows the end as a plain answer
+	expect(within(list).getByText('Stopped.')).toBeTruthy()
+	expect(list.querySelectorAll('[data-grill-question]')).toHaveLength(1)
+	expect(hiddenBody()).toBe(BODY)
+})
+
+test('a grill start that fails shows the error with Try again, and Try again posts mode grill once more', async () => {
+	const user = userEvent.setup()
+	let attempts = 0
+	const { calls } = mockFetch({
+		chat: () => {
+			attempts += 1
+			return attempts === 1
+				? jsonResponse(502, { error: 'The assistant did not answer.' })
+				: grillStart()
+		},
+	})
+	renderEditor()
+	await richEditor()
+	await user.click(grillButton())
+	expect(await screen.findByText(ARTICLE_CHAT_COPY.noAnswer)).toBeTruthy()
+	expect(statusLine().contains(screen.getByRole('alert'))).toBe(true)
+	expect(noChatSheet()).toBeNull()
+	// no grill yet: the button and the box read as before
+	expect(grillButton().hasAttribute('disabled')).toBe(false)
+	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.placeholder)
+
+	await user.click(
+		within(statusLine()).getByRole('button', {
+			name: ARTICLE_CHAT_COPY.tryAgain,
+		}),
+	)
+	await waitFor(() => expect(chatCalls(calls)).toHaveLength(2))
+	expect(calls[1]?.body).toEqual({
+		articleId: 'a1',
+		mode: 'grill',
+		baseHash: HASH_A,
+	})
+	const list = await sheetList()
+	expect(within(list).getByText(Q1)).toBeTruthy()
+	expect(screen.queryByText(ARTICLE_CHAT_COPY.noAnswer)).toBeNull()
+	expect(stopGrillingButton()).toBeTruthy()
+})
+
+test('Grill me is absent for a decided row and an own-words row; a stored open grill starts active and a closed one does not', async () => {
+	const decided = renderEditor({ readOnly: true })
+	await screen.findByText(ARTICLE_CHAT_COPY.decidedComposer)
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.grillMe }),
+	).toBeNull()
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.stopGrilling }),
+	).toBeNull()
+	decided.unmount()
+
+	const ownWords = renderEditor({ article: { ...ARTICLE, isReference: true } })
+	await richEditor()
+	expect(markdownToggle()).toBeTruthy()
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.grillMe }),
+	).toBeNull()
+	ownWords.unmount()
+
+	const question = row({
+		id: 'q1',
+		role: 'assistant',
+		text: Q1,
+		toolName: 'grill_question',
+	})
+	const open = renderEditor({ history: [question] })
+	await richEditor()
+	expect(stopGrillingButton()).toBeTruthy()
+	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.grillPlaceholder)
+	open.unmount()
+
+	renderEditor({
+		history: [
+			question,
+			row({
+				id: 'd1',
+				role: 'assistant',
+				text: GRILL_DONE,
+				toolName: 'grill_done',
+			}),
+		],
+	})
+	await richEditor()
+	expect(grillButton()).toBeTruthy()
+	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.placeholder)
+})
+
+test('Grill me while the server already runs a grill (409 grill_active) takes the thread from the server and flips to Stop grilling', async () => {
+	const user = userEvent.setup()
+	const { calls } = mockFetch({
+		chat: () =>
+			jsonResponse(409, {
+				error: 'grill_active',
+				message:
+					'A grill is already running. Answer in the chat, or stop it first.',
+			}),
+		history: () =>
+			jsonResponse(200, {
+				messages: [
+					row({ id: 'h1', role: 'user', text: 'Is 20 units usual?' }),
+					row({
+						id: 'q1',
+						role: 'assistant',
+						text: Q1,
+						toolName: 'grill_question',
+					}),
+				],
+				grill: 'active',
+			}),
+	})
+	renderEditor()
+	await richEditor()
+	await user.click(grillButton())
+
+	// the sheet opens on the thread as stored, with the question that waits
+	const list = await sheetList()
+	expect(within(list).getByText('Is 20 units usual?')).toBeTruthy()
+	expect(within(list).getByText(Q1)).toBeTruthy()
+	expect(list.querySelectorAll('[data-grill-question]')).toHaveLength(1)
+	expect(screen.queryByRole('alert')).toBeNull()
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_CHAT_COPY.tryAgain }),
+	).toBeNull()
+	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.grillPlaceholder)
+	await waitFor(() => expect(document.activeElement).toBe(composer()))
+	expect(stopGrillingButton()).toBeTruthy()
+	expect(calls.map(c => c.url)).toEqual([
+		'/resources/article-chat',
+		'/resources/article-chat?articleId=a1',
+	])
+	expect(hiddenBody()).toBe(BODY)
+})
+
+test('the same 409 with the thread unreadable shows the server’s line in the chat and still flips to Stop grilling', async () => {
+	const user = userEvent.setup()
+	const line =
+		'A grill is already running. Answer in the chat, or stop it first.'
+	mockFetch({
+		chat: () => jsonResponse(409, { error: 'grill_active', message: line }),
+	})
+	renderEditor()
+	await richEditor()
+	await user.click(grillButton())
+
+	const list = await sheetList()
+	expect(within(list).getByText(line)).toBeTruthy()
+	expect(list.querySelector('[data-grill-question]')).toBeNull()
+	expect(screen.queryByRole('alert')).toBeNull()
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_CHAT_COPY.tryAgain }),
+	).toBeNull()
+	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.grillPlaceholder)
+	expect(stopGrillingButton()).toBeTruthy()
 })

@@ -1,19 +1,31 @@
 import { describe, expect, test } from 'vitest'
 import {
+	ARTICLE_CHAT_GRILL_MAX_QUESTIONS,
 	ARTICLE_CHAT_HISTORY_CHARS,
 	ARTICLE_CHAT_HISTORY_ROWS,
 	ARTICLE_CHAT_MAX_TEXT_CHARS,
 	ArticleChatRequestSchema,
+	CHAT_COPY,
 	CHAT_TOOL_NAMES,
 	CHAT_TOOLS,
+	EndGrillArgsSchema,
+	GRILL_RULES,
+	GRILL_TOOL_NAMES,
+	GRILL_TOOLS,
 	ReplacePictureArgsSchema,
 	ReplaceTextArgsSchema,
+	SaveFactArgsSchema,
 	applyReplaceText,
 	applyRewrite,
 	buildChatSystemPrompt,
 	buildChatUserTurn,
+	grillQuestionsAsked,
+	grillStateOf,
 	guardChange,
 	historyToMessages,
+	isGrillStop,
+	looksLikeQuestion,
+	saysGrillDone,
 	summaryLine,
 	turnNamesPicture,
 	type ChatHistoryRow,
@@ -288,7 +300,10 @@ describe('historyToMessages', () => {
 			{ role: 'user', text: 'her turn' },
 			{ role: 'assistant', text: 'its answer' },
 		]
-		expect(historyToMessages(rows).map(m => m.role)).toEqual(['user', 'assistant'])
+		expect(historyToMessages(rows).map(m => m.role)).toEqual([
+			'user',
+			'assistant',
+		])
 	})
 })
 
@@ -470,5 +485,214 @@ describe('turnNamesPicture and summaryLine', () => {
 		expect(summaryLine('RN credentials kept.')).toBe(
 			'Changed: RN credentials kept.',
 		)
+	})
+})
+
+describe('the grill (phase 5)', () => {
+	const FACTS = [
+		{
+			source: 'grill',
+			fact: 'Sarah uses 20 units per side.',
+			tags: 'botox',
+			question: 'Q1: How many units per side?',
+			updatedAt: new Date('2026-09-16T12:00:00Z'),
+		},
+		{
+			source: 'docs',
+			fact: 'Sarah charges $12 per unit of Botox.',
+			tags: 'botox, pricing',
+			question: null,
+			updatedAt: new Date('2026-09-10T12:00:00Z'),
+		},
+	]
+
+	test('the request accepts a mode with no text and refuses an unknown one', () => {
+		const parsed = ArticleChatRequestSchema.parse({
+			articleId: 'a1',
+			baseHash: HASH,
+			mode: 'grill',
+		})
+		expect(parsed).toMatchObject({ text: '', mode: 'grill' })
+		expect(
+			ArticleChatRequestSchema.safeParse({
+				articleId: 'a1',
+				baseHash: HASH,
+				mode: 'grill_stop',
+			}).success,
+		).toBe(true)
+		expect(
+			ArticleChatRequestSchema.safeParse({
+				articleId: 'a1',
+				baseHash: HASH,
+				mode: 'roast',
+			}).success,
+		).toBe(false)
+	})
+
+	test('the grill tools are the three plus save_fact and end_grill', () => {
+		expect(GRILL_TOOLS.map(t => t.function.name)).toEqual([
+			...CHAT_TOOL_NAMES,
+			...GRILL_TOOL_NAMES,
+		])
+		const required = Object.fromEntries(
+			GRILL_TOOLS.slice(3).map(t => [
+				t.function.name,
+				[...t.function.parameters.required],
+			]),
+		)
+		expect(required).toEqual({
+			save_fact: ['question', 'answer', 'fact'],
+			end_grill: ['summary'],
+		})
+		expect(
+			SaveFactArgsSchema.parse({
+				question: 'q',
+				answer: 'a',
+				fact: 'f',
+				tags: ['Botox', ' pricing ', 'botox'],
+			}).tags,
+		).toBe('botox, pricing')
+		expect(
+			SaveFactArgsSchema.parse({ question: 'q', answer: 'a', fact: 'f' }).tags,
+		).toBe('')
+		expect(
+			SaveFactArgsSchema.safeParse({ question: '', answer: 'a', fact: 'f' })
+				.success,
+		).toBe(false)
+		expect(
+			EndGrillArgsSchema.parse({ summary: 'x'.repeat(400) }).summary,
+		).toHaveLength(300)
+	})
+
+	test('the system prompt carries the bank on every turn and the grill rules on a grill turn', () => {
+		const plain = buildChatSystemPrompt({
+			links: LINKS,
+			pictures: [],
+			markdown: ARTICLE,
+		})
+		expect(plain).toContain('WHAT SARAH HAS ALREADY TOLD US:\n(nothing yet)\n')
+		expect(plain).not.toContain('GRILL MODE.')
+		expect(plain.endsWith(`ARTIFACT (markdown):\n${ARTICLE}`)).toBe(true)
+
+		const withFacts = buildChatSystemPrompt({
+			links: LINKS,
+			pictures: [],
+			markdown: ARTICLE,
+			facts: FACTS,
+		})
+		// docs rows first, then the grill row with its question
+		expect(withFacts).toContain(
+			'WHAT SARAH HAS ALREADY TOLD US:\n- [botox, pricing] Sarah charges $12 per unit of Botox.\n- [botox] Sarah uses 20 units per side. (asked: "Q1: How many units per side?")\n',
+		)
+		expect(withFacts.indexOf('WHAT SARAH HAS ALREADY TOLD US')).toBeLessThan(
+			withFacts.indexOf('ARTIFACT (markdown)'),
+		)
+
+		const grill = buildChatSystemPrompt({
+			links: LINKS,
+			pictures: [],
+			markdown: ARTICLE,
+			facts: FACTS,
+			grill: { asked: 2, start: false },
+		})
+		expect(grill).toContain(
+			`\n\n${GRILL_RULES}\nAsked so far: 2 of ${ARTICLE_CHAT_GRILL_MAX_QUESTIONS}.\n\nLINKS THAT MUST STAY:`,
+		)
+		expect(grill).not.toContain('This is the start')
+		expect(grill).not.toContain('That was the last answer')
+		expect(GRILL_RULES).toContain('one question per turn')
+		expect(GRILL_RULES).toContain('call end_grill')
+
+		expect(
+			buildChatSystemPrompt({
+				links: [],
+				pictures: [],
+				markdown: '# T',
+				grill: { asked: 0, start: true },
+			}),
+		).toContain('Asked so far: 0 of 6.\nThis is the start: ask Q1 now')
+		expect(
+			buildChatSystemPrompt({
+				links: [],
+				pictures: [],
+				markdown: '# T',
+				grill: { asked: ARTICLE_CHAT_GRILL_MAX_QUESTIONS, start: false },
+			}),
+		).toContain(
+			'That was the last answer: apply it, save the fact, then call end_grill.',
+		)
+	})
+
+	test('the history window may open with a grill question, behind "Grill me."', () => {
+		const rows: ChatHistoryRow[] = [
+			{ role: 'assistant', text: 'Q1: units?', toolName: 'grill_question' },
+			{ role: 'user', text: '20' },
+			{ role: 'change', text: 'Said 20 units.', toolName: 'replace_text' },
+			{ role: 'assistant', text: 'Q2: months?', toolName: 'grill_question' },
+		]
+		expect(historyToMessages(rows)).toEqual([
+			{ role: 'user', content: CHAT_COPY.grillStart },
+			{ role: 'assistant', content: 'Q1: units?' },
+			{ role: 'user', content: '20' },
+			{ role: 'assistant', content: 'Changed: said 20 units.' },
+			{ role: 'assistant', content: 'Q2: months?' },
+		])
+		// a plain answer or a grill_done row in front is still dropped
+		expect(
+			historyToMessages([
+				{ role: 'assistant', text: 'Stopped.', toolName: 'grill_done' },
+				{ role: 'user', text: 'hi' },
+			]),
+		).toEqual([{ role: 'user', content: 'hi' }])
+	})
+
+	test('grillStateOf and grillQuestionsAsked read the marker rows', () => {
+		expect(grillStateOf([])).toBeNull()
+		expect(
+			grillStateOf([{ toolName: null }, { toolName: 'replace_text' }]),
+		).toBeNull()
+		expect(
+			grillStateOf([
+				{ toolName: 'grill_question' },
+				{ toolName: 'replace_text' },
+			]),
+		).toBe('active')
+		expect(
+			grillStateOf([
+				{ toolName: 'grill_question' },
+				{ toolName: 'grill_done' },
+			]),
+		).toBe('done')
+		expect(
+			grillQuestionsAsked([
+				{ toolName: 'grill_question' },
+				{ toolName: 'grill_done' },
+				{ toolName: 'grill_question' },
+				{ toolName: null },
+				{ toolName: 'grill_question' },
+			]),
+		).toBe(2)
+	})
+
+	test('her stop words, a question, and a done line', () => {
+		for (const words of [
+			'stop',
+			'Stop.',
+			'enough',
+			"that's all",
+			'That’s all!',
+			'no more questions',
+		]) {
+			expect(isGrillStop(words)).toBe(true)
+		}
+		for (const words of ['stop saying Botox', '20 units', 'skip', 'done']) {
+			expect(isGrillStop(words)).toBe(false)
+		}
+		expect(looksLikeQuestion('Q2: How long does it last?')).toBe(true)
+		expect(looksLikeQuestion('Q2 next: the price, 12 or 14 dollars')).toBe(true)
+		expect(looksLikeQuestion('Thanks, I added that.')).toBe(false)
+		expect(saysGrillDone('Done. Nothing more to ask.')).toBe(true)
+		expect(saysGrillDone('I have nothing else to ask.')).toBe(true)
+		expect(saysGrillDone('Q3: Is that done by you or by staff?')).toBe(false)
 	})
 })

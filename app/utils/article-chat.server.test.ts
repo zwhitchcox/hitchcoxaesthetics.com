@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { consoleError } from '#tests/setup/setup-test-env.ts'
 import {
 	loadChatHistory,
+	loadGrillState,
 	runArticleChatTurn,
 } from '#app/utils/article-chat.server.ts'
 import { CHAT_COPY } from '#app/utils/article-chat.ts'
@@ -628,5 +629,345 @@ describe('loadChatHistory', () => {
 		})
 		expect(await loadChatHistory(id, 2)).toHaveLength(2)
 		expect((await loadChatHistory(id, 2))[0]?.text).toBe('second')
+	})
+})
+
+describe('the grill (phase 5)', () => {
+	// normalises to "units side use", like the reworded asking below
+	const Q1 = 'Q1: How many units per side do you use?'
+	const saveFact = (
+		question: string,
+		answer: string,
+		fact: string,
+		tags: string | string[] = 'botox, pricing',
+	): Call => ({ name: 'save_fact', args: { question, answer, fact, tags } })
+	const endGrill = (summary: string): Call => ({
+		name: 'end_grill',
+		args: { summary },
+	})
+	const toolNames = (request: Record<string, unknown>) =>
+		(request.tools as Array<{ function: { name: string } }>).map(
+			t => t.function.name,
+		)
+	const markers = (out: Awaited<ReturnType<typeof runArticleChatTurn>>) =>
+		out.ok ? out.messages.map(m => [m.role, m.toolName]) : out
+
+	async function start(id: string, question = Q1) {
+		const out = await turn(id, [textReply(question)], {
+			text: '',
+			mode: 'grill',
+		}).result
+		expect(out).toMatchObject({ ok: true, grill: 'active' })
+		return out
+	}
+
+	test('grill start: the first question is a grill_question row and no user row', async () => {
+		const { id } = await seed()
+		const { result, requests } = turn(id, [textReply(Q1)], {
+			text: '',
+			mode: 'grill',
+		})
+		const out = await result
+		expect(out).toMatchObject({
+			ok: true,
+			changed: false,
+			body: BODY,
+			grill: 'active',
+		})
+		expect(markers(out)).toEqual([['assistant', 'grill_question']])
+		const rows = await rowsOf(id)
+		expect(rows).toHaveLength(1)
+		expect(rows[0]).toMatchObject({
+			role: 'assistant',
+			text: Q1,
+			toolName: 'grill_question',
+		})
+		expect(await loadGrillState(id)).toEqual({ active: true, asked: 1 })
+
+		expect(requests).toHaveLength(1)
+		const request = requests[0]!
+		expect(toolNames(request)).toEqual([
+			'replace_text',
+			'rewrite_article',
+			'replace_picture',
+			'save_fact',
+			'end_grill',
+		])
+		const messages = messagesOf(request)
+		const system = String(messages[0]?.content)
+		expect(system).toContain('GRILL MODE.')
+		expect(system).toContain('Asked so far: 0 of 6.')
+		expect(system).toContain('This is the start')
+		expect(system).toContain('WHAT SARAH HAS ALREADY TOLD US:\n(nothing yet)')
+		expect(messages.at(-1)).toEqual({
+			role: 'user',
+			content: CHAT_COPY.grillStart,
+		})
+	})
+
+	test('an answer turn: the edit, save_fact and the next question; the same question twice makes one bank row', async () => {
+		const { id } = await seed()
+		await start(id)
+		const { result, requests } = turn(
+			id,
+			[
+				toolReply([
+					replaceText('20 units', '15 to 25 units', 'Said 15 to 25 units.'),
+					saveFact(
+						Q1,
+						'15 to 25, it depends on the jaw',
+						'Sarah uses 15 to 25 units per side for TMJ.',
+					),
+				]),
+				textReply('Q2: How long do your patients say it lasts?'),
+			],
+			{ text: '15 to 25, it depends on the jaw' },
+		)
+		const first = await result
+		expect(first).toMatchObject({ ok: true, changed: true, grill: 'active' })
+		if (!first.ok) return
+		expect(markers(first)).toEqual([
+			['user', null],
+			['change', 'replace_text'],
+			['assistant', 'grill_question'],
+		])
+		expect(first.body).toContain('15 to 25 units')
+		expect(first.messages[2]?.text).toBe(
+			'Q2: How long do your patients say it lasts?',
+		)
+		expect(await loadGrillState(id)).toEqual({ active: true, asked: 2 })
+
+		// the answer turn carried the grill rules, the count, and the history
+		// opened with "Grill me." then the question
+		const messages = messagesOf(requests[0]!)
+		expect(String(messages[0]?.content)).toContain('Asked so far: 1 of 6.')
+		expect(String(messages[0]?.content)).not.toContain('This is the start')
+		expect(messages.slice(1, 4)).toEqual([
+			{ role: 'user', content: CHAT_COPY.grillStart },
+			{ role: 'assistant', content: Q1 },
+			{ role: 'user', content: '15 to 25, it depends on the jaw' },
+		])
+		expect(
+			JSON.parse(String(messagesOf(requests[1]!).at(-1)?.content)),
+		).toEqual({ ok: true })
+
+		const facts = await prisma.reviewFact.findMany()
+		expect(facts).toHaveLength(1)
+		expect(facts[0]).toMatchObject({
+			source: 'grill',
+			question: Q1,
+			answer: '15 to 25, it depends on the jaw',
+			fact: 'Sarah uses 15 to 25 units per side for TMJ.',
+			tags: 'botox, pricing',
+			articleId: id,
+			userId: 'u1',
+			retiredAt: null,
+		})
+
+		// the same question, worded again: the row is updated, not doubled;
+		// end_grill closes the grill with its summary
+		const second = await turn(
+			id,
+			[
+				toolReply([
+					saveFact(
+						'Units per side: how many do you use?',
+						'about 20',
+						'Sarah uses about 20 units per side for TMJ.',
+						['Botox', 'dose'],
+					),
+					endGrill('The unit count is now hers.'),
+				]),
+				textReply(''),
+			],
+			{ text: 'about 20', baseHash: hashBody(first.body) },
+		).result
+		expect(second).toMatchObject({ ok: true, changed: false, grill: 'done' })
+		expect(markers(second)).toEqual([
+			['user', null],
+			['assistant', 'grill_done'],
+		])
+		if (second.ok) {
+			expect(second.messages[1]?.text).toBe(
+				'Done. Here is what changed: The unit count is now hers.',
+			)
+		}
+		const after = await prisma.reviewFact.findMany()
+		expect(after).toHaveLength(1)
+		expect(after[0]).toMatchObject({
+			id: facts[0]!.id,
+			question: 'Units per side: how many do you use?',
+			fact: 'Sarah uses about 20 units per side for TMJ.',
+			tags: 'botox, dose',
+		})
+		expect(await loadGrillState(id)).toEqual({ active: false, asked: 0 })
+	})
+
+	test('a bare "stop" ends the grill with no model call', async () => {
+		const { id } = await seed()
+		await start(id)
+		const { result, fetchImpl } = turn(id, [], { text: "That's all." })
+		const out = await result
+		expect(out).toMatchObject({ ok: true, changed: false, grill: 'done' })
+		expect(markers(out)).toEqual([
+			['user', null],
+			['assistant', 'grill_done'],
+		])
+		if (out.ok) expect(out.messages[1]?.text).toBe(CHAT_COPY.grillStopped)
+		expect(fetchImpl).not.toHaveBeenCalled()
+		expect(await loadGrillState(id)).toEqual({ active: false, asked: 0 })
+		expect(await prisma.reviewFact.count()).toBe(0)
+	})
+
+	test('grill_stop writes Stopped. once; Grill me while a grill runs is grill_active', async () => {
+		const { id } = await seed()
+		expect(await turn(id, [], { text: '', mode: 'grill_stop' }).result).toEqual(
+			{
+				ok: true,
+				messages: [],
+				body: BODY,
+				hash: hashBody(BODY),
+				changed: false,
+				grill: null,
+			},
+		)
+		await start(id)
+		const { result, fetchImpl } = turn(id, [], { text: '', mode: 'grill' })
+		expect(await result).toEqual({ ok: false, kind: 'grill_active' })
+		expect(fetchImpl).not.toHaveBeenCalled()
+		const stopped = await turn(id, [], { text: '', mode: 'grill_stop' }).result
+		expect(stopped).toMatchObject({ ok: true, grill: 'done' })
+		expect(markers(stopped)).toEqual([['assistant', 'grill_done']])
+		// a stop needs no key
+		expect(
+			await turn(id, [], { text: '', mode: 'grill_stop', config: null }).result,
+		).toMatchObject({ ok: true, messages: [], grill: null })
+		expect((await rowsOf(id)).map(r => r.toolName)).toEqual([
+			'grill_question',
+			'grill_done',
+		])
+	})
+
+	test('an ordinary turn reads the bank in its prompt and cannot save a fact', async () => {
+		const { id } = await seed()
+		await prisma.reviewFact.create({
+			data: {
+				source: 'docs',
+				key: 'pricing.md:1',
+				fact: 'Sarah charges $12 per unit of Botox.',
+				tags: 'botox, pricing',
+				question: 'What do you charge per unit?',
+			},
+		})
+		const { result, requests } = turn(
+			id,
+			[
+				toolReply([saveFact('x', 'y', 'z')]),
+				textReply('We charge $12 per unit.'),
+			],
+			{ text: 'What do we charge?' },
+		)
+		const out = await result
+		expect(out).toMatchObject({ ok: true, changed: false, grill: null })
+		expect(markers(out)).toEqual([
+			['user', null],
+			['assistant', null],
+		])
+		const request = requests[0]!
+		expect(toolNames(request)).toHaveLength(3)
+		const system = String(messagesOf(request)[0]?.content)
+		expect(system).not.toContain('GRILL MODE.')
+		expect(system).toContain(
+			'WHAT SARAH HAS ALREADY TOLD US:\n- [botox, pricing] Sarah charges $12 per unit of Botox. (asked: "What do you charge per unit?")\n',
+		)
+		expect(
+			JSON.parse(String(messagesOf(requests[1]!).at(-1)?.content)),
+		).toEqual({ ok: false, reason: 'bad_arguments' })
+		expect(await prisma.reviewFact.count()).toBe(1)
+	})
+
+	test('no text and no end_grill: the grill ends with what this turn changed', async () => {
+		const { id } = await seed()
+		await start(id)
+		const out = await turn(
+			id,
+			[
+				toolReply([replaceText('3 months', '4 months', 'Said 4 months.')]),
+				textReply(null),
+			],
+			{ text: 'four months' },
+		).result
+		expect(out).toMatchObject({ ok: true, changed: true, grill: 'done' })
+		expect(markers(out)).toEqual([
+			['user', null],
+			['change', 'replace_text'],
+			['assistant', 'grill_done'],
+		])
+		if (out.ok) {
+			expect(out.messages[2]?.text).toBe(
+				'Done. Here is what changed: Said 4 months.',
+			)
+		}
+	})
+
+	test('at the cap a further question becomes the ending', async () => {
+		const { id } = await seed()
+		const at = (s: number) => new Date(NOW.getTime() + s * 1000)
+		await prisma.articleChatMessage.createMany({
+			data: Array.from({ length: 6 }, (_, i) => ({
+				articleId: id,
+				role: 'assistant',
+				text: `Q${i + 1}: something?`,
+				toolName: 'grill_question',
+				createdAt: at(i),
+			})),
+		})
+		expect(await loadGrillState(id)).toEqual({ active: true, asked: 6 })
+		const { result, requests } = turn(id, [textReply('Q7: one more?')], {
+			text: 'skip',
+			now: at(10),
+		})
+		const out = await result
+		expect(out).toMatchObject({ ok: true, grill: 'done' })
+		expect(markers(out)).toEqual([
+			['user', null],
+			['assistant', 'grill_done'],
+		])
+		if (out.ok) {
+			expect(out.messages[1]?.text).toBe(
+				`Done. Here is what changed: ${CHAT_COPY.grillNothingChanged}`,
+			)
+		}
+		expect(String(messagesOf(requests[0]!)[0]?.content)).toContain(
+			'That was the last answer',
+		)
+	})
+
+	test('a grill turn may make six tool calls; the seventh is refused', async () => {
+		const { id } = await seed()
+		await start(id)
+		const { result, requests } = turn(
+			id,
+			[
+				toolReply([
+					replaceText('20 units', '15 units'),
+					replaceText('3 months', '4 months'),
+					replaceText('Bearden', 'Farragut'),
+					replaceText('jaw pain', 'TMJ pain'),
+					saveFact(Q1, '15', 'Sarah uses 15 units per side.'),
+					replaceText('Most patients', 'Many patients'),
+					replaceText('at rest', 'resting'),
+				]),
+				textReply('never called'),
+			],
+			{ text: '15' },
+		)
+		const out = await result
+		expect(out).toMatchObject({ ok: true, changed: true, grill: 'done' })
+		expect(requests).toHaveLength(1)
+		if (!out.ok) return
+		expect(out.messages.filter(m => m.role === 'change')).toHaveLength(5)
+		expect(out.body).toContain('at rest')
+		expect(await prisma.reviewFact.count()).toBe(1)
 	})
 })

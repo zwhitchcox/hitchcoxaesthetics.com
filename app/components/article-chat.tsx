@@ -13,8 +13,11 @@ import {
 import { Icon } from '#app/components/ui/icon'
 import {
 	CHAT_COPY,
+	GRILL_ROW_MARKERS,
+	grillStateOf,
 	summaryLine,
 	type ChatMessageJson,
+	type ChatMode,
 } from '#app/utils/article-chat.ts'
 import { cn } from '#app/utils/misc.tsx'
 
@@ -31,6 +34,8 @@ export const ARTICLE_CHAT_COPY = {
 		'For example: is 20 units the usual dose? Or: make the second paragraph shorter, and say we offer Dysport too.',
 	placeholder: 'Say or type what to change…',
 	quotePlaceholder: 'What should change here? Or ask about it.',
+	grillPlaceholder: CHAT_COPY.grillPlaceholder,
+	question: 'Question',
 	send: 'Send',
 	removeQuote: 'Remove the quote',
 	showPicture: 'Show the picture larger',
@@ -69,11 +74,12 @@ const ROW_LINK_CLASS = 'text-primary underline-offset-2 hover:underline'
 /** The same links in the phone dock: a 44 px tap target. */
 export const DOCK_TARGET_CLASS = 'inline-flex min-h-11 items-center px-3'
 
-/** What one send carries; kept for Try again. */
+/** What one send carries; kept for Try again. A grill start or stop has `mode` and nothing else. */
 export type ComposerPayload = {
 	text: string
 	quote: string | null
 	imageId: string | null
+	mode?: ChatMode
 }
 
 export type ChatEntry =
@@ -82,6 +88,22 @@ export type ChatEntry =
 			pending?: boolean
 	  })
 	| { id: string; role: 'error'; text: string; retry: ComposerPayload }
+
+/** A grill question: the assistant row that waits for her answer. */
+export function isGrillQuestion(entry: ChatEntry): boolean {
+	return (
+		entry.role === 'assistant' && entry.toolName === GRILL_ROW_MARKERS.question
+	)
+}
+
+/** True while the newest grill question has no grill_done row after it: the server's rule, on the rows she sees. */
+export function grillActiveIn(entries: ReadonlyArray<ChatEntry>): boolean {
+	return (
+		grillStateOf(
+			entries.map(e => ({ toolName: e.role === 'error' ? null : e.toolName })),
+		) === 'active'
+	)
+}
 
 /** What `useArticleAttachment` returns: the picture attached to the next message and its state. */
 export type AttachmentState = ReturnType<typeof useArticleAttachment>
@@ -309,9 +331,23 @@ export function ChatRow({
 		)
 	}
 	if (entry.role === 'assistant') {
+		// A grill question stands apart from an answer: a label and a line down its side.
+		const question = isGrillQuestion(entry)
 		return (
-			<div className="prose prose-sm max-w-none whitespace-pre-wrap dark:prose-invert">
-				<span className="sr-only">{ARTICLE_CHAT_COPY.assistant} </span>
+			<div
+				data-grill-question={question ? '' : undefined}
+				className={cn(
+					'prose prose-sm max-w-none whitespace-pre-wrap dark:prose-invert',
+					question ? 'border-l-2 border-primary pl-3' : '',
+				)}
+			>
+				{question ? (
+					<span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+						{ARTICLE_CHAT_COPY.question}
+					</span>
+				) : (
+					<span className="sr-only">{ARTICLE_CHAT_COPY.assistant} </span>
+				)}
 				{entry.text}
 			</div>
 		)
@@ -401,6 +437,7 @@ export function ChatComposer({
 	canSend,
 	onSend,
 	enterSends,
+	grill = false,
 	boxRef,
 	trailing,
 	className,
@@ -420,6 +457,8 @@ export function ChatComposer({
 	onSend: () => void
 	/** Enter sends (a physical keyboard); else Enter is a new line. */
 	enterSends: boolean
+	/** A grill question waits: the empty box asks for her answer. */
+	grill?: boolean
 	boxRef: React.RefObject<HTMLTextAreaElement>
 	/** Rendered after the Send button, inside the row (the phone dock's save mark). */
 	trailing?: React.ReactNode
@@ -519,7 +558,9 @@ export function ChatComposer({
 						placeholder={
 							quote
 								? ARTICLE_CHAT_COPY.quotePlaceholder
-								: ARTICLE_CHAT_COPY.placeholder
+								: grill
+									? ARTICLE_CHAT_COPY.grillPlaceholder
+									: ARTICLE_CHAT_COPY.placeholder
 						}
 						onChange={event => onTextChange(event.currentTarget.value)}
 						onKeyDown={event => {

@@ -922,6 +922,7 @@ model Article {
   images ArticleImage[]
   events ArticleReviewEvent[]
   chat   ArticleChatMessage[]
+  facts  ReviewFact[]
 
   @@index([kind, status])
 }
@@ -960,6 +961,32 @@ model ArticleChatMessage {
   articleId String
 
   @@index([articleId, createdAt])
+}
+
+// The fact bank (phase 5): one row per thing Sarah told us, so no question
+// is asked twice and the writer uses her facts from the start.
+// source: grill (her answer in a grill), docs (a markdown file in the pbn
+// repo, mirrored by the sync; key is its stable id), manual (/admin/facts).
+// fact is one sentence a writer can use. tags are lowercase, comma-separated.
+// A retired row stays out of the prompts and the sync until it is restored.
+model ReviewFact {
+  id        String    @id @default(cuid())
+  source    String    @default("grill")
+  key       String?   @unique
+  question  String?
+  answer    String?
+  fact      String
+  tags      String    @default("")
+  userId    String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  retiredAt DateTime?
+
+  article   Article? @relation(fields: [articleId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  articleId String?
+
+  @@index([source, retiredAt])
+  @@index([updatedAt])
 }
 
 // Per-reviewer settings for /review. One row per admin who opens it.

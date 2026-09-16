@@ -29,7 +29,14 @@ import { expect, test } from '#tests/playwright-utils.ts'
  * becomes a quote through "Comment on this" in the format row. An attached
  * picture (the upload is mocked) shows a thumbnail in the dock, goes out
  * with her words, and lands in the text as a `user-` picture line; the chat
- * sheet shows both bubbles. "Write a different article" on the next card
+ * sheet shows both bubbles. "Grill me" in the top bar (phase 5, R1-R5)
+ * posts a grill start with no text; the (mocked) first question opens the
+ * sheet as a labelled question row, the button reads "Stop grilling" and
+ * the box asks for the answer. Her answer goes out as an ordinary turn;
+ * the (mocked) turn changes the text in place and asks the next question.
+ * "skip" ends the (mocked) grill with a plain done row; the button and the
+ * box return to normal, and the stored text is exactly what the mock
+ * returned. "Write a different article" on the next card
  * (no note field; the "…" sheet has no Deny and no note to the writer),
  * the sync endpoint answers `meta` for the same text and `kept` for
  * different text while she waits, then "Keep this one". The blog post gets
@@ -121,6 +128,20 @@ const SHORT_BODY_CHANGED = SHORT_BODY.replace(
 /** The change row's text. Lowercase first, so the line reads the same whether summaryLine folds it or not. */
 const CHANGE_SUMMARY = 'the dose is now a range.'
 const CHAT_WORDS = 'Say 15 to 25 units, it depends on the person.'
+
+/** The (mocked) grill: two questions, her answer, what it changes, the ending (phase 5). */
+const GRILL_Q1 =
+	'Q1: How often do your jaw patients come back for a top-up? For example: every three months, or every four.'
+const GRILL_ANSWER = 'Most come back every four months.'
+const GRILL_Q2 =
+	'Q2: Do you ever treat the temples with the masseter, or only the jaw?'
+/** The grill's change row. Lowercase first, so the line reads the same whether summaryLine folds it or not. */
+const GRILL_CHANGE_SUMMARY =
+	'the byline now says how often her jaw patients come back.'
+const GRILL_DONE = `Done. Here is what changed: ${GRILL_CHANGE_SUMMARY}`
+/** What the grill's answer writes into the byline line. */
+const GRILL_SENTENCE =
+	'in Knoxville, and most of her jaw patients come back every four months.'
 
 /** A little longer than SHORT_BODY, so it is served second in the 2 min lane. */
 const SECOND_BODY = [
@@ -238,6 +259,31 @@ function markdownToggle(page: Page) {
 	return page
 		.locator('[data-editor-bar-slot]')
 		.getByRole('button', { name: 'Markdown', exact: true })
+}
+
+/** "Grill me" in the editor's slot in the top bar: present while no grill runs. */
+function grillMeButton(page: Page) {
+	return page
+		.locator('[data-editor-bar-slot]')
+		.getByRole('button', { name: 'Grill me', exact: true })
+}
+
+/** The same button while a grill runs: it reads "Stop grilling". */
+function stopGrillingButton(page: Page) {
+	return page
+		.locator('[data-editor-bar-slot]')
+		.getByRole('button', { name: 'Stop grilling', exact: true })
+}
+
+/** One row as the chat resource sends it: the fields it always carries, then the row's own. */
+function chatRow(row: {
+	id: string
+	role: 'user' | 'assistant' | 'change'
+	text: string
+	toolName?: string | null
+	createdAt: string
+}) {
+	return { quote: null, imageId: null, imageUrl: null, toolName: null, ...row }
 }
 
 /** The save mark at the end of the dock's composer row; `data-save-state` is idle, saving, saved, error or conflict. */
@@ -916,6 +962,200 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await markdownToggle(page).click()
 		await expect(richEditor(page)).toBeVisible()
 		await page.screenshot({ path: shot('picture-in-place'), fullPage: true })
+
+		/* Phase 5, R1-R2: "Grill me" in the top bar posts a grill start with no text; the (mocked) first question opens the sheet */
+		const SHORT_BODY_GRILLED = SHORT_BODY_PICTURE.replace(
+			'in Knoxville.',
+			GRILL_SENTENCE,
+		)
+		expect(SHORT_BODY_GRILLED).not.toBe(SHORT_BODY_PICTURE)
+		await expect(grillMeButton(page)).toBeVisible()
+		await expect(stopGrillingButton(page)).toHaveCount(0)
+		await expect(chatTab(page)).toHaveAttribute('aria-expanded', 'false')
+		let grillStart: unknown = null
+		await page.route('**/resources/article-chat', async route => {
+			grillStart = route.request().postDataJSON()
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					messages: [
+						chatRow({
+							id: `mock-grill-q1-${stamp}`,
+							role: 'assistant',
+							text: GRILL_Q1,
+							toolName: 'grill_question',
+							createdAt: new Date().toISOString(),
+						}),
+					],
+					body: SHORT_BODY_PICTURE,
+					hash: hashBody(SHORT_BODY_PICTURE),
+					changed: false,
+					grill: 'active',
+				}),
+			})
+		})
+		await grillMeButton(page).click()
+		// the sheet opens on the question
+		await expect(
+			page.getByRole('dialog', { name: 'Chat', exact: true }),
+		).toBeVisible()
+		await page.unroute('**/resources/article-chat')
+		// the start carries the mode and the hash, and no text
+		expect(grillStart).toEqual({
+			articleId: short.id,
+			mode: 'grill',
+			baseHash: hashBody(SHORT_BODY_PICTURE),
+		})
+		await expect(chatTab(page)).toHaveAttribute('aria-expanded', 'true')
+		// the question is a labelled row in the list; the button flips; the box asks for the answer
+		const questions = chatList.locator('[data-grill-question]')
+		await expect(questions).toHaveCount(1)
+		await expect(questions.first()).toContainText('Question')
+		await expect(questions.first()).toContainText(GRILL_Q1)
+		await expect(stopGrillingButton(page)).toBeVisible()
+		await expect(grillMeButton(page)).toHaveCount(0)
+		const answerBox = page.getByPlaceholder('Answer here, or say skip')
+		await expect(answerBox).toBeVisible()
+		await expect(composer).toHaveCount(0)
+		await expectNoSidewaysScroll(page)
+		await page.screenshot({ path: shot('grill-question'), fullPage: true })
+
+		/* R4: her answer is an ordinary turn; the (mocked) turn applies it in place and asks the next question */
+		let grillAnswer: unknown = null
+		await page.route('**/resources/article-chat', async route => {
+			grillAnswer = route.request().postDataJSON()
+			await prisma.article.update({
+				where: { id: short.id },
+				data: { body: SHORT_BODY_GRILLED },
+			})
+			const createdAt = new Date().toISOString()
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					messages: [
+						chatRow({
+							id: `mock-grill-answer-${stamp}`,
+							role: 'user',
+							text: GRILL_ANSWER,
+							createdAt,
+						}),
+						chatRow({
+							id: `mock-grill-change-${stamp}`,
+							role: 'change',
+							text: GRILL_CHANGE_SUMMARY,
+							toolName: 'replace_text',
+							createdAt,
+						}),
+						chatRow({
+							id: `mock-grill-q2-${stamp}`,
+							role: 'assistant',
+							text: GRILL_Q2,
+							toolName: 'grill_question',
+							createdAt,
+						}),
+					],
+					body: SHORT_BODY_GRILLED,
+					hash: hashBody(SHORT_BODY_GRILLED),
+					changed: true,
+					grill: 'active',
+				}),
+			})
+		})
+		await answerBox.fill(GRILL_ANSWER)
+		await page.getByRole('button', { name: 'Send', exact: true }).click()
+		await expect(questions).toHaveCount(2)
+		await page.unroute('**/resources/article-chat')
+		expect(grillAnswer).toEqual({
+			articleId: short.id,
+			text: GRILL_ANSWER,
+			baseHash: hashBody(SHORT_BODY_PICTURE),
+		})
+		await expect(chatList.getByText(GRILL_ANSWER)).toBeVisible()
+		await expect(
+			chatList.getByText(`Changed: ${GRILL_CHANGE_SUMMARY}`),
+		).toBeVisible()
+		await expect(questions.last()).toContainText('Question')
+		await expect(questions.last()).toContainText(GRILL_Q2)
+		await expect(stopGrillingButton(page)).toBeVisible()
+		await expect(answerBox).toHaveValue('')
+		// the article took her answer in place, with the green mark
+		await expect(article(page)).toContainText(GRILL_SENTENCE)
+		await expect(article(page).locator('mark.review-changed')).toBeVisible()
+		await page.screenshot({ path: shot('grill-answered'), fullPage: true })
+
+		/* "skip" ends the (mocked) grill: a plain done row; the button and the box return to normal (R4, R5) */
+		let grillSkip: unknown = null
+		await page.route('**/resources/article-chat', async route => {
+			grillSkip = route.request().postDataJSON()
+			const createdAt = new Date().toISOString()
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					messages: [
+						chatRow({
+							id: `mock-grill-skip-${stamp}`,
+							role: 'user',
+							text: 'skip',
+							createdAt,
+						}),
+						chatRow({
+							id: `mock-grill-done-${stamp}`,
+							role: 'assistant',
+							text: GRILL_DONE,
+							toolName: 'grill_done',
+							createdAt,
+						}),
+					],
+					body: SHORT_BODY_GRILLED,
+					hash: hashBody(SHORT_BODY_GRILLED),
+					changed: false,
+					grill: 'done',
+				}),
+			})
+		})
+		await answerBox.fill('skip')
+		await page.getByRole('button', { name: 'Send', exact: true }).click()
+		await expect(chatList.getByText(GRILL_DONE)).toBeVisible()
+		await page.unroute('**/resources/article-chat')
+		expect(grillSkip).toEqual({
+			articleId: short.id,
+			text: 'skip',
+			baseHash: hashBody(SHORT_BODY_GRILLED),
+		})
+		// the done row is not a question; the grill is over
+		await expect(questions).toHaveCount(2)
+		await expect(
+			chatList.locator('[data-grill-question]', { hasText: GRILL_DONE }),
+		).toHaveCount(0)
+		await expect(grillMeButton(page)).toBeVisible()
+		await expect(stopGrillingButton(page)).toHaveCount(0)
+		await expect(composer).toBeVisible()
+		await expect(page.getByPlaceholder('Answer here, or say skip')).toHaveCount(
+			0,
+		)
+		await page.screenshot({ path: shot('grill-done'), fullPage: true })
+		await closeChat(page)
+		// the mock's write is the only one: the stored text is what it returned, and the saves are still the Undo's
+		await markdownToggle(page).click()
+		await expect(page.getByLabel('Article text')).toHaveValue(
+			SHORT_BODY_GRILLED,
+		)
+		await markdownToggle(page).click()
+		await expect(richEditor(page)).toBeVisible()
+		expect(
+			(
+				await prisma.article.findUniqueOrThrow({
+					where: { id: short.id },
+					select: { body: true },
+				})
+			).body,
+		).toBe(SHORT_BODY_GRILLED)
+		expect(await eventsOfKind(short.id, 'saved')).toEqual([
+			expect.objectContaining({ note: 'ai', userId: user.id }),
+		])
 
 		/* Back to the feed */
 		await page

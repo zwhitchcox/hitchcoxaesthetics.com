@@ -1,6 +1,6 @@
 /**
- * The article chat, server side (spec phase 3, section 2): one turn that
- * answers or edits.
+ * The article chat, server side (spec phase 3, section 2; phase 5 adds
+ * the grill): one turn that answers or edits.
  *
  * Order of work: the rules (missing, decided, base hash, picture, key);
  * her user row is written before the model runs, so a crash keeps her
@@ -8,10 +8,21 @@
  * saved once through saveWorkingCopy (the 409 rules apply); then one
  * change row per applied tool call and the assistant row are written.
  *
- * Logs carry lengths, counts and the model id. Never the text, never the key.
+ * The grill (R2 to R5): mode 'grill' writes no user row; the model asks
+ * the first question, stored as an assistant row marked grill_question.
+ * While the last marker row is a question, every turn is an answer turn:
+ * it runs with the GRILL rules and the two grill tools (save_fact,
+ * end_grill), and its final row is marked grill_question or grill_done.
+ * mode 'grill_stop', or her bare "stop", writes the grill_done row
+ * 'Stopped.' with no model call.
+ *
+ * Logs carry lengths, counts and the model id. Never the text, never her
+ * answers, never the key.
  */
 import {
 	ARTICLE_CHAT_DEFAULT_MODEL,
+	ARTICLE_CHAT_GRILL_EXTRA_TOOL_CALLS,
+	ARTICLE_CHAT_GRILL_MAX_QUESTIONS,
 	ARTICLE_CHAT_HISTORY_ROWS,
 	ARTICLE_CHAT_MAX_OUTPUT_TOKENS,
 	ARTICLE_CHAT_MAX_TOOL_CALLS,
@@ -20,18 +31,31 @@ import {
 	CHAT_COPY,
 	CHAT_ROLES,
 	CHAT_TOOLS,
+	EndGrillArgsSchema,
+	GRILL_ROW_MARKERS,
+	GRILL_TOOLS,
 	ReplacePictureArgsSchema,
 	ReplaceTextArgsSchema,
 	RewriteArticleArgsSchema,
+	SaveFactArgsSchema,
 	applyReplaceText,
 	applyRewrite,
 	buildChatSystemPrompt,
 	buildChatUserTurn,
+	grillQuestionsAsked,
+	grillStateOf,
 	guardChange,
 	historyToMessages,
+	isGrillStop,
+	looksLikeQuestion,
+	saysGrillDone,
 	turnNamesPicture,
 	type ChatMessageJson,
+	type ChatMode,
 	type ChatRole,
+	type EndGrillArgs,
+	type GrillState,
+	type SaveFactArgs,
 	type ToolFailure,
 } from '#app/utils/article-chat.ts'
 import {
@@ -52,6 +76,7 @@ import {
 	type ToolCall,
 } from '#app/utils/openrouter.server.ts'
 import { recordReviewEvent } from '#app/utils/review-events.server.ts'
+import { loadFactBank, saveFact } from '#app/utils/review-facts.server.ts'
 
 export type ArticleChatConfig = { apiKey: string; model: string }
 
@@ -68,11 +93,17 @@ export function getArticleChatConfig(): ArticleChatConfig | null {
 export type ChatTurnInput = {
 	articleId: string
 	userId: string
+	/** Her words. Empty with a `mode`. */
 	text: string
 	quote?: string | null
 	imageId?: string | null
 	/** hashBody of the text her page shows. Must equal the stored text. */
 	baseHash: string
+	/**
+	 * 'grill' starts a grill, 'grill_stop' ends one. Without it: a chat
+	 * turn, or an answer turn while a grill is active.
+	 */
+	mode?: ChatMode | null
 	config?: ArticleChatConfig | null
 	fetchImpl?: typeof fetch
 	/** The user row's time. Tests pass a fixed date. */
@@ -88,6 +119,8 @@ export type ChatTurnResult =
 			body: string
 			hash: string
 			changed: boolean
+			/** 'active' while a question waits for her, 'done' when this turn ended a grill. */
+			grill: GrillState
 	  }
 	| { ok: false; kind: 'missing' }
 	| { ok: false; kind: 'decided' }
@@ -96,6 +129,8 @@ export type ChatTurnResult =
 	| { ok: false; kind: 'not_configured' }
 	| { ok: false; kind: 'no_answer'; status?: number }
 	| { ok: false; kind: 'timeout' }
+	/** Grill me while a grill runs. */
+	| { ok: false; kind: 'grill_active' }
 
 type StoredRow = {
 	id: string
@@ -124,6 +159,8 @@ type ToolResultJson = { ok: true } | ToolFailure
 
 /** One applied tool call, kept until the copy is saved. */
 type AppliedChange = { toolName: string; text: string; imageId: string | null }
+
+type GrillMarker = (typeof GRILL_ROW_MARKERS)[keyof typeof GRILL_ROW_MARKERS]
 
 const IMAGE_SELECT = {
 	id: true,
@@ -162,6 +199,27 @@ export async function loadChatHistory(
 	return rows.reverse().map(toJson)
 }
 
+/**
+ * The grill this thread is in, read from the marker rows: active while
+ * the last one is a question (R4), with the questions asked so far.
+ */
+export async function loadGrillState(
+	articleId: string,
+): Promise<{ active: boolean; asked: number }> {
+	const markers = await prisma.articleChatMessage.findMany({
+		where: {
+			articleId,
+			toolName: { in: [GRILL_ROW_MARKERS.question, GRILL_ROW_MARKERS.done] },
+		},
+		orderBy: { createdAt: 'asc' },
+		select: { toolName: true },
+	})
+	return {
+		active: grillStateOf(markers) === 'active',
+		asked: grillQuestionsAsked(markers),
+	}
+}
+
 /** Strictly increasing row times, so the order on reload is the order here. */
 function stamper(first: Date) {
 	let last = first.getTime()
@@ -182,6 +240,7 @@ export async function runArticleChatTurn({
 	quote = null,
 	imageId = null,
 	baseHash,
+	mode = null,
 	config = getArticleChatConfig(),
 	fetchImpl = fetch,
 	now = new Date(),
@@ -208,30 +267,84 @@ export async function runArticleChatTurn({
 		? (article.images.find(im => im.id === imageId) ?? null)
 		: null
 	if (imageId && !attached) return { ok: false, kind: 'unknown_image' }
+
+	const before = await loadGrillState(articleId)
+	const stamp = stamper(now)
+	const unchanged = { body: article.body, hash: current, changed: false }
+
+	// Stop grilling needs no model and no key. Stopping twice is not an error.
+	if (mode === 'grill_stop') {
+		if (!before.active) {
+			return { ok: true, messages: [], ...unchanged, grill: null }
+		}
+		const row = await prisma.articleChatMessage.create({
+			data: {
+				articleId,
+				role: 'assistant',
+				text: CHAT_COPY.grillStopped,
+				toolName: GRILL_ROW_MARKERS.done,
+				createdAt: stamp(),
+			},
+		})
+		console.log(`Article chat: grill stopped after ${before.asked} questions`)
+		return { ok: true, messages: [toJson(row)], ...unchanged, grill: 'done' }
+	}
+	if (mode === 'grill' && before.active) {
+		return { ok: false, kind: 'grill_active' }
+	}
 	if (!config) return { ok: false, kind: 'not_configured' }
 
+	const grill = mode === 'grill' || before.active
 	const links: ArticleLink[] = parseLinks(article.linksJson)
 	const history = historyToMessages(
 		await loadChatHistory(articleId, ARTICLE_CHAT_HISTORY_ROWS),
 	)
-	const userRow = await prisma.articleChatMessage.create({
-		data: {
-			articleId,
-			role: 'user',
-			text,
-			quote: quote?.trim() || null,
-			imageId: attached?.id ?? null,
-			createdAt: now,
-		},
-	})
-	const stamp = stamper(now)
+	const userRow =
+		mode === 'grill'
+			? null
+			: await prisma.articleChatMessage.create({
+					data: {
+						articleId,
+						role: 'user',
+						text,
+						quote: quote?.trim() || null,
+						imageId: attached?.id ?? null,
+						createdAt: now,
+					},
+				})
 
-	const userTurn = buildChatUserTurn({
-		text,
-		quote,
-		markdown: article.body,
-		image: attached,
-	})
+	// Her bare "stop" ends the grill here, with no model call (R4).
+	if (grill && userRow && isGrillStop(text)) {
+		const row = await prisma.articleChatMessage.create({
+			data: {
+				articleId,
+				role: 'assistant',
+				text: CHAT_COPY.grillStopped,
+				toolName: GRILL_ROW_MARKERS.done,
+				createdAt: stamp(),
+			},
+		})
+		console.log(
+			`Article chat: grill stopped by her words after ${before.asked} questions`,
+		)
+		return {
+			ok: true,
+			messages: [userRow, row].map(toJson),
+			...unchanged,
+			grill: 'done',
+		}
+	}
+
+	const facts = await loadFactBank()
+	const userTurn =
+		mode === 'grill'
+			? CHAT_COPY.grillStart
+			: buildChatUserTurn({
+					text,
+					quote,
+					markdown: article.body,
+					image: attached,
+				})
 	const messages: OutMessage[] = [
 		{
 			role: 'system',
@@ -239,22 +352,30 @@ export async function runArticleChatTurn({
 				links,
 				pictures: pictureList(article.body, article.images),
 				markdown: article.body,
+				facts,
+				grill: grill ? { asked: before.asked, start: mode === 'grill' } : null,
 			}),
 		},
 		...history,
 		{ role: 'user', content: userTurn },
 	]
 	const inChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0)
-	const context = {
+	const context: ToolContext = {
 		links,
 		images: article.images,
 		quoted: Boolean(quote?.trim()),
 		namesPicture: turnNamesPicture(text, attached?.id),
+		grill,
 	}
+	const maxCalls = grill
+		? ARTICLE_CHAT_MAX_TOOL_CALLS + ARTICLE_CHAT_GRILL_EXTRA_TOOL_CALLS
+		: ARTICLE_CHAT_MAX_TOOL_CALLS
 
 	const deadline = started + timeoutMs
 	let working = article.body
 	const applied: AppliedChange[] = []
+	const factsToSave: SaveFactArgs[] = []
+	let ended: EndGrillArgs | null = null
 	let toolCalls = 0
 	let replies = 0
 	let outChars = 0
@@ -274,7 +395,7 @@ export async function runArticleChatTurn({
 				fetchImpl,
 				body: {
 					messages,
-					tools: CHAT_TOOLS,
+					tools: grill ? GRILL_TOOLS : CHAT_TOOLS,
 					tool_choice: 'auto',
 					temperature: ARTICLE_CHAT_TEMPERATURE,
 					max_tokens: ARTICLE_CHAT_MAX_OUTPUT_TOKENS,
@@ -313,7 +434,7 @@ export async function runArticleChatTurn({
 		for (const call of calls) {
 			outChars += call.function.arguments.length
 			let result: ToolResultJson
-			if (toolCalls >= ARTICLE_CHAT_MAX_TOOL_CALLS) {
+			if (toolCalls >= maxCalls) {
 				result = { ok: false, reason: 'too_many_calls' }
 			} else {
 				toolCalls++
@@ -323,6 +444,8 @@ export async function runArticleChatTurn({
 					working = outcome.next
 					applied.push(outcome.change)
 				}
+				if (outcome.fact) factsToSave.push(outcome.fact)
+				if (outcome.end) ended = outcome.end
 			}
 			messages.push({
 				role: 'tool',
@@ -330,7 +453,7 @@ export async function runArticleChatTurn({
 				content: JSON.stringify(result),
 			})
 		}
-		if (toolCalls >= ARTICLE_CHAT_MAX_TOOL_CALLS) break
+		if (toolCalls >= maxCalls) break
 	}
 
 	if (failure && replies === 0) {
@@ -338,10 +461,15 @@ export async function runArticleChatTurn({
 		return { ok: false, ...failure }
 	}
 
+	// What she said is kept even when the article save fails below.
+	for (const fact of factsToSave) {
+		await saveFact({ ...fact, source: 'grill', articleId, userId })
+	}
+
 	let body = article.body
 	let hash = current
 	let changed = false
-	const rows: StoredRow[] = [userRow]
+	const rows: StoredRow[] = userRow ? [userRow] : []
 
 	if (applied.length > 0) {
 		if (working !== article.body) {
@@ -389,24 +517,98 @@ export async function runArticleChatTurn({
 		}
 	}
 
-	const answer = finalText || (applied.length === 0 ? CHAT_COPY.fallback : '')
-	if (answer) {
-		rows.push(
-			await prisma.articleChatMessage.create({
-				data: {
-					articleId,
-					role: 'assistant',
-					text: answer,
-					createdAt: stamp(),
-				},
-			}),
-		)
+	let grillState: GrillState = null
+	if (!grill) {
+		const answer = finalText || (applied.length === 0 ? CHAT_COPY.fallback : '')
+		if (answer) {
+			rows.push(
+				await prisma.articleChatMessage.create({
+					data: {
+						articleId,
+						role: 'assistant',
+						text: answer,
+						createdAt: stamp(),
+					},
+				}),
+			)
+		}
+	} else {
+		const closing = grillClosing({
+			ended,
+			finalText,
+			failed: Boolean(failure),
+			asked: before.asked,
+			applied,
+		})
+		if (closing) {
+			rows.push(
+				await prisma.articleChatMessage.create({
+					data: {
+						articleId,
+						role: 'assistant',
+						text: closing.text,
+						toolName: closing.marker,
+						createdAt: stamp(),
+					},
+				}),
+			)
+			grillState =
+				closing.marker === GRILL_ROW_MARKERS.question ? 'active' : 'done'
+		} else if (rows.length === 0 && failure) {
+			// a failed start with nothing to show: the client offers Try again
+			return { ok: false, ...failure }
+		} else {
+			// the model failed mid-turn: the previous question, if any, stays open
+			grillState = before.active ? 'active' : null
+		}
 	}
 
 	console.log(
-		`Article chat: model ${config.model}, text ${text.length} chars, quote ${quote?.trim().length ?? 0} chars, image ${attached ? 'yes' : 'no'}, history ${history.length}, tools ${toolCalls}, applied ${applied.length}, in ${inChars} chars, out ${outChars} chars, ${Date.now() - started} ms`,
+		`Article chat: ${mode ?? (grill ? 'answer' : 'chat')}, model ${config.model}, text ${text.length} chars, quote ${quote?.trim().length ?? 0} chars, image ${attached ? 'yes' : 'no'}, history ${history.length}, facts ${facts.length}, tools ${toolCalls}, applied ${applied.length}, saved ${factsToSave.length}, grill ${grillState ?? 'none'}, in ${inChars} chars, out ${outChars} chars, ${Date.now() - started} ms`,
 	)
-	return { ok: true, messages: rows.map(toJson), body, hash, changed }
+	return {
+		ok: true,
+		messages: rows.map(toJson),
+		body,
+		hash,
+		changed,
+		grill: grillState,
+	}
+}
+
+/**
+ * The row that closes a grill turn (R3, R4). end_grill wins. Else the
+ * model's text is the ending when it says so, and the next question
+ * otherwise (she can answer or say skip). No text ends the grill with
+ * what this turn changed. At the cap a further question becomes the
+ * ending. Null: the model failed mid-turn with nothing to store.
+ */
+function grillClosing({
+	ended,
+	finalText,
+	failed,
+	asked,
+	applied,
+}: {
+	ended: EndGrillArgs | null
+	finalText: string
+	failed: boolean
+	asked: number
+	applied: AppliedChange[]
+}): { text: string; marker: GrillMarker } | null {
+	const turnSummary = applied.length
+		? applied.map(c => c.text).join(' ')
+		: CHAT_COPY.grillNothingChanged
+	const done = (text: string) => ({ text, marker: GRILL_ROW_MARKERS.done })
+	if (ended) return done(CHAT_COPY.grillDone(ended.summary))
+	if (!finalText) return failed ? null : done(CHAT_COPY.grillDone(turnSummary))
+	if (saysGrillDone(finalText) && !looksLikeQuestion(finalText)) {
+		return done(finalText)
+	}
+	if (asked >= ARTICLE_CHAT_GRILL_MAX_QUESTIONS) {
+		return done(CHAT_COPY.grillDone(turnSummary))
+	}
+	return { text: finalText, marker: GRILL_ROW_MARKERS.question }
 }
 
 type ToolContext = {
@@ -414,19 +616,28 @@ type ToolContext = {
 	images: ImageRow[]
 	quoted: boolean
 	namesPicture: boolean
+	/** The two grill tools answer only on a grill turn. */
+	grill: boolean
 }
 
 const BAD_ARGUMENTS: ToolResultJson = { ok: false, reason: 'bad_arguments' }
 
 /**
  * Apply one tool call to the working copy. `next` and `change` are set
- * only when the call was applied; `result` is what the model reads.
+ * only when the call was applied; `fact` and `end` carry the two grill
+ * tools' arguments; `result` is what the model reads.
  */
 function applyToolCall(
 	call: ToolCall,
 	working: string,
 	context: ToolContext,
-): { result: ToolResultJson; next?: string; change?: AppliedChange } {
+): {
+	result: ToolResultJson
+	next?: string
+	change?: AppliedChange
+	fact?: SaveFactArgs
+	end?: EndGrillArgs
+} {
 	let args: unknown
 	try {
 		args = JSON.parse(call.function.arguments || '{}')
@@ -497,6 +708,18 @@ function applyToolCall(
 					imageId: image.id,
 				},
 			}
+		}
+		case 'save_fact': {
+			if (!context.grill) return { result: BAD_ARGUMENTS }
+			const parsed = SaveFactArgsSchema.safeParse(args)
+			if (!parsed.success) return { result: BAD_ARGUMENTS }
+			return { result: { ok: true }, fact: parsed.data }
+		}
+		case 'end_grill': {
+			if (!context.grill) return { result: BAD_ARGUMENTS }
+			const parsed = EndGrillArgsSchema.safeParse(args)
+			if (!parsed.success) return { result: BAD_ARGUMENTS }
+			return { result: { ok: true }, end: parsed.data }
 		}
 		default:
 			return { result: BAD_ARGUMENTS }
