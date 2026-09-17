@@ -15,13 +15,16 @@ import { expect, test } from '#tests/playwright-utils.ts'
  * spot for (both too long for 2 min). The walk: pick 2 min, the shortest is
  * served with its picture in the prose and inert claim marks, read to the
  * end, Approve, the approved card and its record, the next one below it,
- * Undo. "Change it" opens the editor page (phase 4.1 facts R1-R7): the
- * article fills the screen in the rich editor, the top bar holds Back to
- * the article, the Markdown toggle and Approve, and one dock sits at the
+ * Undo. "Change it" opens the editor page (phase 4.1 facts R1-R7; phase 5.2
+ * R1-R6): the article fills the screen in the rich editor, the top bar
+ * holds Back to the article and an empty slot, and one dock sits at the
  * bottom with the composer, the save mark at the end of its row (a spinner
  * while a save waits or runs, a check after it; `data-save-state` carries
- * the state) and a tab on its top edge that opens the chat sheet. There is
- * no tab strip and no status line before the first turn. Opening the editor
+ * the state) and two tabs on its top edge: the chat, which opens the chat
+ * sheet, and the decisions, which opens a panel above the dock with
+ * Approve, then Grill me and the Markdown toggle (opening either closes
+ * the other). There is no tab strip and no status line before the first
+ * turn. Opening the editor
  * never saves. A (mocked) chat turn from the dock changes the text in
  * place: the status line reads "Changed: …" with "See it" and "Undo", the
  * green mark shows, the Markdown toggle holds the new text, and "Undo" puts
@@ -29,10 +32,11 @@ import { expect, test } from '#tests/playwright-utils.ts'
  * becomes a quote through "Comment on this" in the format row. An attached
  * picture (the upload is mocked) shows a thumbnail in the dock, goes out
  * with her words, and lands in the text as a `user-` picture line; the chat
- * sheet shows both bubbles. "Grill me" in the top bar (phase 5, R1-R5)
- * posts a grill start with no text; the (mocked) first question opens the
- * sheet as a labelled question row, the button reads "Stop grilling" and
- * the box asks for the answer. Her answer goes out as an ordinary turn;
+ * sheet shows both bubbles. "Grill me" in the decisions panel (phase 5,
+ * R1-R5) posts a grill start with no text; the (mocked) first question
+ * opens the sheet as a labelled question row, the button reads "Stop
+ * grilling" and the box asks for the answer. Her answer goes out as an
+ * ordinary turn;
  * the (mocked) turn changes the text in place and asks the next question.
  * "skip" ends the (mocked) grill with a plain done row; the button and the
  * box return to normal, and the stored text is exactly what the mock
@@ -45,7 +49,8 @@ import { expect, test } from '#tests/playwright-utils.ts'
  * reload; the dock stays inside the screen with the box focused. The guest
  * post gets no "Approve anyway"; a selected passage on the reading page
  * opens the editor with the quote in the dock; Change it opens the editor
- * with no edit, and Back keeps the stored text byte for byte.
+ * with no edit, and Back keeps the stored text byte for byte. Last, Approve
+ * from the editor's decisions panel approves the stored text (phase 5.2).
  *
  * The chat turn is mocked at /resources/article-chat (no OpenRouter call):
  * the mock writes the changed text with prisma, as the real resource does,
@@ -254,25 +259,71 @@ function statusLine(page: Page) {
 	return page.locator('[data-chat-dock] [data-status-line]')
 }
 
-/** The "Markdown" toggle in the editor's slot in the top bar; `aria-pressed` carries its state. */
-function markdownToggle(page: Page) {
-	return page
-		.locator('[data-editor-bar-slot]')
-		.getByRole('button', { name: 'Markdown', exact: true })
+/** The decisions panel above the dock: Approve, then Grill me and the Markdown toggle. On the page only while open. */
+function decisionsPanel(page: Page) {
+	return page.getByRole('dialog', { name: 'Decisions', exact: true })
 }
 
-/** "Grill me" in the editor's slot in the top bar: present while no grill runs. */
+/** The "Markdown" toggle in the decisions panel; `aria-pressed` carries its state. */
+function markdownToggle(page: Page) {
+	return decisionsPanel(page).getByRole('button', {
+		name: 'Markdown',
+		exact: true,
+	})
+}
+
+/** "Grill me" in the decisions panel: present while no grill runs. */
 function grillMeButton(page: Page) {
-	return page
-		.locator('[data-editor-bar-slot]')
-		.getByRole('button', { name: 'Grill me', exact: true })
+	return decisionsPanel(page).getByRole('button', {
+		name: 'Grill me',
+		exact: true,
+	})
 }
 
 /** The same button while a grill runs: it reads "Stop grilling". */
 function stopGrillingButton(page: Page) {
-	return page
-		.locator('[data-editor-bar-slot]')
-		.getByRole('button', { name: 'Stop grilling', exact: true })
+	return decisionsPanel(page).getByRole('button', {
+		name: 'Stop grilling',
+		exact: true,
+	})
+}
+
+/** The second tab on the dock's top edge: "Open the decisions" while the panel is closed, "Close the decisions" while it is open. */
+function decisionsTab(page: Page) {
+	return page.locator('[data-chat-dock] [aria-controls="article-decisions"]')
+}
+
+/** The decisions tab opens the panel above the dock and flips to "Close the decisions", expanded; the chat sheet, if open, closes. */
+async function openDecisions(page: Page) {
+	await expect(decisionsTab(page)).toHaveAttribute('aria-expanded', 'false')
+	await page
+		.locator('[data-chat-dock]')
+		.getByRole('button', { name: 'Open the decisions', exact: true })
+		.click()
+	await expect(decisionsPanel(page)).toBeVisible()
+	await expect(decisionsTab(page)).toHaveAttribute(
+		'aria-label',
+		'Close the decisions',
+	)
+	await expect(decisionsTab(page)).toHaveAttribute('aria-expanded', 'true')
+	await expect(
+		page.getByRole('dialog', { name: 'Chat', exact: true }),
+	).toHaveCount(0)
+	await expect(chatTab(page)).toHaveAttribute('aria-expanded', 'false')
+}
+
+/** The decisions tab closes the panel and flips back. */
+async function closeDecisions(page: Page) {
+	await page
+		.locator('[data-chat-dock]')
+		.getByRole('button', { name: 'Close the decisions', exact: true })
+		.click()
+	await expect(decisionsPanel(page)).toHaveCount(0)
+	await expect(decisionsTab(page)).toHaveAttribute(
+		'aria-label',
+		'Open the decisions',
+	)
+	await expect(decisionsTab(page)).toHaveAttribute('aria-expanded', 'false')
 }
 
 /** One row as the chat resource sends it: the fields it always carries, then the row's own. */
@@ -615,14 +666,54 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await page.getByRole('link', { name: 'Change it' }).click()
 		await expect(page).toHaveURL(new RegExp(`/review/${short.id}/change$`))
 		await expect(page.getByRole('tab')).toHaveCount(0)
-		// the top bar: Back to the article, the editor's slot with the Markdown toggle, Approve (R2, R7)
+		// the top bar: Back to the article and the editor's slot, empty on a phone (R2, R7; 5.2 R4)
 		await expect(
 			page.getByRole('link', { name: /Back to the article/ }).first(),
 		).toBeVisible()
-		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'false')
+		await expect(page.locator('[data-editor-bar-slot] *')).toHaveCount(0)
+		// two tabs side by side on the dock's top edge: the chat, then the decisions (5.2 R2)
+		await expect(chatTab(page)).toHaveAttribute('aria-label', 'Open the chat')
+		await expect(decisionsTab(page)).toHaveAttribute(
+			'aria-label',
+			'Open the decisions',
+		)
+		const chatTabBox = await chatTab(page).boundingBox()
+		const decisionsTabBox = await decisionsTab(page).boundingBox()
+		expect(chatTabBox!.y).toBe(decisionsTabBox!.y)
+		expect(chatTabBox!.x + chatTabBox!.width).toBeLessThanOrEqual(
+			decisionsTabBox!.x,
+		)
+		// the panel is not on the page while closed: no Approve anywhere (5.2 R3)
+		await expect(decisionsPanel(page)).toHaveCount(0)
 		await expect(
 			page.getByRole('button', { name: 'Approve', exact: true }),
-		).toBeVisible()
+		).toHaveCount(0)
+		// the decisions panel rises above the dock: Approve, then Grill me and the Markdown toggle, in one row
+		await openDecisions(page)
+		await expect(decisionsPanel(page).getByRole('button')).toHaveText([
+			'Approve',
+			'Grill me',
+			'Markdown',
+		])
+		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'false')
+		// its bottom edge meets the dock's top edge, once its slide-in has landed
+		await expect
+			.poll(
+				async () => {
+					const panelBox = await decisionsPanel(page).boundingBox()
+					const dockBox = await page.locator('[data-chat-dock]').boundingBox()
+					return Math.abs(panelBox!.y + panelBox!.height - dockBox!.y)
+				},
+				{ message: 'the panel sits on the dock' },
+			)
+			.toBeLessThanOrEqual(1)
+		await expectNoSidewaysScroll(page)
+		await page.screenshot({ path: shot('decisions'), fullPage: true })
+		// the chat tab closes the panel and opens the sheet; the decisions tab does the reverse
+		await openChat(page)
+		await expect(decisionsPanel(page)).toHaveCount(0)
+		await openDecisions(page)
+		await closeDecisions(page)
 		await expect(page.getByRole('button', { name: 'Save edits' })).toHaveCount(
 			0,
 		)
@@ -739,7 +830,8 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		).toBeInViewport()
 		await page.screenshot({ path: shot('see-it'), fullPage: true })
 
-		/* The Markdown toggle shows the same working copy */
+		/* The Markdown toggle, in the decisions panel, shows the same working copy */
+		await openDecisions(page)
 		await markdownToggle(page).click()
 		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'true')
 		await expect(page.getByLabel('Article text')).toHaveValue(
@@ -748,6 +840,7 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await markdownToggle(page).click()
 		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'false')
 		await expect(richEditor(page)).toBeVisible()
+		await closeDecisions(page)
 
 		/* "Undo" on the status line puts the old text back, with a real save */
 		await undoChange.click()
@@ -955,6 +1048,7 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await expect(
 			article(page).locator('[data-picture-placeholder]'),
 		).toHaveCount(0)
+		await openDecisions(page)
 		await markdownToggle(page).click()
 		await expect(page.getByLabel('Article text')).toHaveValue(
 			SHORT_BODY_PICTURE,
@@ -963,7 +1057,7 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await expect(richEditor(page)).toBeVisible()
 		await page.screenshot({ path: shot('picture-in-place'), fullPage: true })
 
-		/* Phase 5, R1-R2: "Grill me" in the top bar posts a grill start with no text; the (mocked) first question opens the sheet */
+		/* Phase 5, R1-R2: "Grill me" in the decisions panel posts a grill start with no text; the (mocked) first question opens the sheet */
 		const SHORT_BODY_GRILLED = SHORT_BODY_PICTURE.replace(
 			'in Knoxville.',
 			GRILL_SENTENCE,
@@ -996,10 +1090,11 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 			})
 		})
 		await grillMeButton(page).click()
-		// the sheet opens on the question
+		// the sheet opens on the question, which closes the decisions panel
 		await expect(
 			page.getByRole('dialog', { name: 'Chat', exact: true }),
 		).toBeVisible()
+		await expect(decisionsPanel(page)).toHaveCount(0)
 		await page.unroute('**/resources/article-chat')
 		// the start carries the mode and the hash, and no text
 		expect(grillStart).toEqual({
@@ -1013,13 +1108,18 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await expect(questions).toHaveCount(1)
 		await expect(questions.first()).toContainText('Question')
 		await expect(questions.first()).toContainText(GRILL_Q1)
-		await expect(stopGrillingButton(page)).toBeVisible()
-		await expect(grillMeButton(page)).toHaveCount(0)
 		const answerBox = page.getByPlaceholder('Answer here, or say skip')
 		await expect(answerBox).toBeVisible()
 		await expect(composer).toHaveCount(0)
 		await expectNoSidewaysScroll(page)
 		await page.screenshot({ path: shot('grill-question'), fullPage: true })
+		// the button in the decisions panel now reads Stop grilling (the panel takes the sheet's place; the box stays in the dock)
+		await openDecisions(page)
+		await expect(stopGrillingButton(page)).toBeVisible()
+		await expect(grillMeButton(page)).toHaveCount(0)
+		await expect(answerBox).toBeVisible()
+		await closeDecisions(page)
+		await openChat(page)
 
 		/* R4: her answer is an ordinary turn; the (mocked) turn applies it in place and asks the next question */
 		let grillAnswer: unknown = null
@@ -1078,7 +1178,10 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		).toBeVisible()
 		await expect(questions.last()).toContainText('Question')
 		await expect(questions.last()).toContainText(GRILL_Q2)
+		await openDecisions(page)
 		await expect(stopGrillingButton(page)).toBeVisible()
+		await closeDecisions(page)
+		await openChat(page)
 		await expect(answerBox).toHaveValue('')
 		// the article took her answer in place, with the green mark
 		await expect(article(page)).toContainText(GRILL_SENTENCE)
@@ -1130,14 +1233,15 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		await expect(
 			chatList.locator('[data-grill-question]', { hasText: GRILL_DONE }),
 		).toHaveCount(0)
-		await expect(grillMeButton(page)).toBeVisible()
-		await expect(stopGrillingButton(page)).toHaveCount(0)
 		await expect(composer).toBeVisible()
 		await expect(page.getByPlaceholder('Answer here, or say skip')).toHaveCount(
 			0,
 		)
 		await page.screenshot({ path: shot('grill-done'), fullPage: true })
-		await closeChat(page)
+		// the button in the panel reads Grill me again
+		await openDecisions(page)
+		await expect(grillMeButton(page)).toBeVisible()
+		await expect(stopGrillingButton(page)).toHaveCount(0)
 		// the mock's write is the only one: the stored text is what it returned, and the saves are still the Undo's
 		await markdownToggle(page).click()
 		await expect(page.getByLabel('Article text')).toHaveValue(
@@ -1145,6 +1249,7 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		)
 		await markdownToggle(page).click()
 		await expect(richEditor(page)).toBeVisible()
+		await closeDecisions(page)
 		expect(
 			(
 				await prisma.article.findUniqueOrThrow({
@@ -1380,6 +1485,7 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 			expect.objectContaining({ note: 'auto', userId: user.id }),
 		])
 
+		await openDecisions(page)
 		await markdownToggle(page).click()
 		const editor = page.getByLabel('Article text')
 		await expect(editor).toHaveValue(BLOG_BODY_TYPED)
@@ -1400,8 +1506,11 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		])
 
 		await page.reload()
-		// the toggle is not in the address, so a reload opens the rich view
+		// the toggle is not in the address, so a reload opens the rich view; the panel starts closed
+		await expect(decisionsPanel(page)).toHaveCount(0)
+		await openDecisions(page)
 		await expect(markdownToggle(page)).toHaveAttribute('aria-pressed', 'false')
+		await closeDecisions(page)
 		// the save landed, so nothing is offered back from the browser mirror
 		await expect(
 			page.getByRole('button', { name: 'Restore your unsaved edit' }),
@@ -1515,6 +1624,25 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		expect(untouched.reviewNote).toBeNull()
 		expect(await eventsOfKind(held.id, 'saved')).toHaveLength(0)
 		expect(await eventKinds(held.id)).toContain('opened')
+
+		/* Phase 5.2: Approve from the editor's decisions panel approves the stored text and goes back to the feed */
+		await page.getByRole('link', { name: 'Change it' }).click()
+		await expect(page).toHaveURL(new RegExp(`/review/${held.id}/change$`))
+		await expect(richEditor(page)).toBeVisible()
+		await openDecisions(page)
+		await decisionsPanel(page)
+			.getByRole('button', { name: 'Approve', exact: true })
+			.click()
+		await expect(page).toHaveURL(new RegExp(`/review/${held.id}$`))
+		// the feed's own Approve shows the S7 card from its response; a redirect shows the stored decision
+		await expect(card(page, held.id)).toBeVisible()
+		const approvedFromPanel = await prisma.article.findUniqueOrThrow({
+			where: { id: held.id },
+		})
+		expect(approvedFromPanel.status).toBe('approved')
+		expect(approvedFromPanel.body).toBe(HELD_BODY)
+		expect(approvedFromPanel.approvedBodyHash).toBe(hashBody(HELD_BODY))
+		expect(approvedFromPanel.reviewedBy).toBe(user.name)
 	} finally {
 		await Promise.all(
 			others.map(o =>

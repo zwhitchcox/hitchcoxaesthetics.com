@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useRef } from 'react'
 import {
 	ChatRow,
 	DOCK_TARGET_CLASS,
@@ -8,15 +8,15 @@ import {
 } from '#app/components/article-chat.tsx'
 import { Icon } from '#app/components/ui/icon'
 import { cn } from '#app/utils/misc.tsx'
-import { useMeasuredHeight } from '#app/utils/viewport.ts'
 
 /**
- * The chat's shell: where the chat sits on the page. The phone has a fixed
- * dock at the bottom (the composer, one status line, a tab on its top edge
- * that opens the chat) and a sheet that slides up between the page's top
- * bar and the dock. A wide screen has a
- * round launcher bottom-right and a popup above it. Every piece of chat
- * state lives in ArticleEditor; these components only place its children.
+ * The chat's shell: where the chat sits on the page. The phone has a dock
+ * at the bottom (the composer, one status line, two tabs on its top edge:
+ * the chat and the decisions), a sheet that slides up between the page's
+ * top bar and the dock, and a decisions panel that rises above the dock. A
+ * wide screen has a round launcher bottom-right and a popup above it. Every
+ * piece of chat state lives in ArticleEditor; these components only place
+ * its children.
  *
  * Geometry goes through CSS variables and classes, not inline `calc()`:
  * `--editor-top` and `--editor-bottom` come from the editor root (the
@@ -32,6 +32,9 @@ export const CHAT_SHELL_COPY = {
 	closeChat: 'Close the chat',
 	chatTitle: 'Chat',
 	open: 'Open',
+	openDecisions: 'Open the decisions',
+	closeDecisions: 'Close the decisions',
+	decisionsTitle: 'Decisions',
 } as const
 
 /** The status line shows this much of an answer. */
@@ -41,43 +44,83 @@ export const SHEET_SWIPE_PX = 60
 
 const CHAT_SHEET_ID = 'article-chat-sheet'
 const CHAT_POPUP_ID = 'article-chat-popup'
-/** Above the page's bottom bar, while the keyboard is down. */
-const DOCK_BOTTOM_CLASS = 'bottom-[var(--editor-bottom)]'
-/** The keyboard is up: anchored at the top, moved down by a transform, and no more padding than the row needs. */
-const DOCK_KEYBOARD_CLASS = 'top-0 py-1'
+const DECISIONS_ID = 'article-decisions'
+/** The rail with the keyboard down: at the layout viewport's bottom, above the page's bottom bar. */
+const RAIL_BOTTOM_CLASS = 'bottom-[var(--editor-bottom)]'
+/** The rail with the keyboard up: anchored at the top; a transform moves it down to the visual viewport's bottom edge. */
+const RAIL_KEYBOARD_CLASS = 'top-0'
+/** The dock with the keyboard up: no more padding than the row needs. */
+const DOCK_KEYBOARD_CLASS = 'py-1'
 const SHEET_BOTTOM_CLASS =
 	'bottom-[calc(var(--dock-height)+var(--editor-bottom))]'
 const CORNER_BOTTOM_CLASS = 'bottom-[calc(var(--editor-bottom)+1rem)]'
 const POPUP_HEIGHT_CLASS =
 	'h-[min(70vh,calc(100vh-var(--editor-top)-var(--editor-bottom)-2rem))]'
 const SAFE_AREA_PADDING_CLASS = 'pb-[max(0.75rem,env(safe-area-inset-bottom))]'
+/** One tab on the dock's top edge. `relative` for the chat tab's dot. */
+const TAB_CLASS =
+	'relative flex h-7 w-12 items-center justify-center rounded-t-lg border border-b-0 bg-background'
 
 const noop = () => {}
 
+/**
+ * A tab acts on the pointer's down. With the caret in the article the dock
+ * is folded; the tap's own default then takes the focus, the article lets
+ * go (the keyboard closes) and the dock unfolds. Acting first, the tab has
+ * done its work before anything moves, and what opens sits on the unfolded
+ * dock, where the next tap finds a still target. The click that follows a
+ * pointer adds nothing; a click with no pointer behind it (`detail` 0: a
+ * keyboard's activation) acts instead. The pointerdown is not cancelled:
+ * a click after a cancelled one is not a given on iOS, and the format
+ * row's buttons, which do cancel theirs, never wait for one either.
+ */
+function tabHandlers(act: () => void) {
+	return {
+		onPointerDown: () => act(),
+		onClick: (event: React.MouseEvent) => {
+			if (event.detail === 0) act()
+		},
+	}
+}
+
 /* ------------------------------------------------------------------------ */
-/* The phone: the dock and its tab, the status line, the sheet              */
+/* The phone: the dock and its tabs, the status line, the sheet, the panel  */
 /* ------------------------------------------------------------------------ */
 
+/** A tab on the dock's top edge and what it opens. */
+export type DockTab = {
+	open: boolean
+	onOpen: () => void
+	onClose: () => void
+}
+
 /**
- * The fixed container at the bottom of the phone screen. One DOM element in
- * both chat states, so the composer inside it never remounts. With the
- * keyboard down it sits above the page's bottom bar. The ChatComposer
- * inside it takes `className="space-y-2 px-3 pt-2"` (the dock's own top
- * line is the only one) and `trailing={<SaveState … />}`.
+ * The container at the bottom of the phone screen: a zero-height fixed
+ * rail and the dock hanging from it (`absolute inset-x-0 bottom-0`), so the
+ * dock's bottom edge is the rail's line whatever the dock's height. The
+ * rail is there in both keyboard modes and the dock is one DOM element in
+ * every state, so the composer inside it never remounts (a remount would
+ * drop the focus, and the keyboard with it). The ChatComposer inside it
+ * takes `className="space-y-2 px-3 pt-2"` (the dock's own top line is the
+ * only one) and `trailing={<SaveState … />}`.
  *
- * While the keyboard is up (`keyboardInset` > 0) the dock hugs it: it is
- * anchored at the top of the layout viewport and a transform moves it down
- * to the visual viewport's bottom edge (`viewportBottom`) less its own
- * measured height. iOS positions a fixed element against the layout
- * viewport, whose height is not always `innerHeight`, so a `bottom` offset
- * can float above the keyboard or hide under it; an offset from the top to
- * the visual viewport's own edge cannot. The keyboard leaves little room,
- * so the padding is then the least (`py-1`, no safe area).
+ * Keyboard down: the rail sits at the layout viewport's bottom, above the
+ * page's bottom bar (`--editor-bottom`), and the dock keeps the safe-area
+ * padding. Keyboard up (`keyboardInset` > 0): the rail is anchored at the
+ * top of the layout viewport and a transform moves it down to the visual
+ * viewport's bottom edge (`viewportBottom`); no height goes into that
+ * offset, so a measurement can never lag behind a fold of the dock. iOS
+ * positions a fixed element against the layout viewport, whose height is
+ * not always `innerHeight`, so a `bottom` offset can float above the
+ * keyboard or hide under it; an offset from the top to the visual
+ * viewport's own edge cannot. The keyboard leaves little room, so the
+ * padding is then the least (`py-1`, no safe area).
  *
- * With `chat`, a small tab protrudes from the dock's top edge on the right
- * and opens or closes the sheet; the dock is `fixed`, so the tab's
- * `absolute` offset counts from it. No tab without `chat` (an own-words
- * row: the dock holds the format row alone).
+ * Two tabs protrude from the dock's top edge on the right, in both
+ * keyboard modes: `chat` opens the sheet (a dot on it while an answer waits
+ * unseen), `decisions` opens the DecisionsPanel above the dock. Either is
+ * absent without its prop (an own-words row has no chat; a row with no
+ * route bar and no decisions has no panel).
  */
 export const ChatDock = forwardRef<
 	HTMLDivElement,
@@ -85,59 +128,134 @@ export const ChatDock = forwardRef<
 		keyboardInset: number
 		/** px from the layout viewport's top to the visual viewport's bottom edge (useKeyboardInset). */
 		viewportBottom: number
-		chat?: { open: boolean; onOpen: () => void; onClose: () => void }
+		chat?: DockTab & {
+			/** An answer arrived while the sheet was closed: the tab shows a dot. */
+			unseen?: boolean
+		}
+		decisions?: DockTab & {
+			/** The panel's row: the route's decision buttons, then the editor's bar items. */
+			panel: React.ReactNode
+		}
 		children: React.ReactNode
 	}
->(function ChatDock({ keyboardInset, viewportBottom, chat, children }, ref) {
-	// The dock measures itself for the transform; the forwarded ref gets the same element.
-	const ownRef = useRef<HTMLDivElement | null>(null)
-	const setRef = useCallback(
-		(el: HTMLDivElement | null) => {
-			ownRef.current = el
-			if (typeof ref === 'function') ref(el)
-			else if (ref) ref.current = el
-		},
-		[ref],
-	)
-	const height = useMeasuredHeight(ownRef)
+>(function ChatDock(
+	{ keyboardInset, viewportBottom, chat, decisions, children },
+	ref,
+) {
 	const onKeyboard = keyboardInset > 0
 	return (
 		<div
-			ref={setRef}
-			data-chat-dock=""
+			data-chat-rail=""
 			className={cn(
-				'fixed inset-x-0 z-30 overflow-visible border-t bg-background/95 backdrop-blur',
-				onKeyboard
-					? DOCK_KEYBOARD_CLASS
-					: cn(DOCK_BOTTOM_CLASS, SAFE_AREA_PADDING_CLASS),
+				'fixed inset-x-0 z-30 h-0',
+				onKeyboard ? RAIL_KEYBOARD_CLASS : RAIL_BOTTOM_CLASS,
 			)}
 			style={
 				onKeyboard
-					? { transform: `translate3d(0, ${viewportBottom - height}px, 0)` }
+					? { transform: `translate3d(0, ${viewportBottom}px, 0)` }
 					: undefined
 			}
 		>
-			{chat ? (
-				<button
-					type="button"
-					aria-label={
-						chat.open ? CHAT_SHELL_COPY.closeChat : CHAT_SHELL_COPY.openChat
-					}
-					aria-expanded={chat.open}
-					aria-controls={CHAT_SHEET_ID}
-					onClick={chat.open ? chat.onClose : chat.onOpen}
-					className="absolute -top-7 right-3 flex h-7 w-12 items-center justify-center rounded-t-lg border border-b-0 bg-background"
-				>
-					<Icon
-						name={chat.open ? 'chevron-down' : 'chevron-up'}
-						className="h-5 w-5"
-					/>
-				</button>
-			) : null}
-			{children}
+			<div
+				ref={ref}
+				data-chat-dock=""
+				className={cn(
+					'absolute inset-x-0 bottom-0 overflow-visible border-t bg-background/95 backdrop-blur',
+					onKeyboard ? DOCK_KEYBOARD_CLASS : SAFE_AREA_PADDING_CLASS,
+				)}
+			>
+				{/* Before the tabs in the tree: they paint over its bottom band. */}
+				{decisions?.open ? (
+					<DecisionsPanel onClose={decisions.onClose}>
+						{decisions.panel}
+					</DecisionsPanel>
+				) : null}
+				{chat || decisions ? (
+					<div className="absolute -top-7 right-3 flex gap-1">
+						{chat ? (
+							<button
+								type="button"
+								aria-label={
+									chat.open
+										? CHAT_SHELL_COPY.closeChat
+										: CHAT_SHELL_COPY.openChat
+								}
+								aria-expanded={chat.open}
+								aria-controls={CHAT_SHEET_ID}
+								{...tabHandlers(chat.open ? chat.onClose : chat.onOpen)}
+								className={TAB_CLASS}
+							>
+								<Icon name="chat-bubble" className="h-5 w-5" />
+								{chat.unseen && !chat.open ? (
+									<span
+										aria-hidden="true"
+										className="absolute right-1.5 top-1 h-2 w-2 rounded-full bg-green-600"
+									/>
+								) : null}
+							</button>
+						) : null}
+						{decisions ? (
+							<button
+								type="button"
+								aria-label={
+									decisions.open
+										? CHAT_SHELL_COPY.closeDecisions
+										: CHAT_SHELL_COPY.openDecisions
+								}
+								aria-expanded={decisions.open}
+								aria-controls={DECISIONS_ID}
+								{...tabHandlers(
+									decisions.open ? decisions.onClose : decisions.onOpen,
+								)}
+								className={TAB_CLASS}
+							>
+								<Icon name="check" className="h-5 w-5" />
+							</button>
+						) : null}
+					</div>
+				) : null}
+				{children}
+			</div>
 		</div>
 	)
 })
+
+/**
+ * The decisions on the phone: the route's decision buttons (Approve; Write
+ * a different article), then the editor's bar items (Grill me, the
+ * Markdown toggle), in one wrapping row above the dock. It rides on the
+ * dock's top edge (`bottom-full` inside the dock), so it follows the dock
+ * in both keyboard modes with no measurement. The dock's tabs protrude
+ * into its bottom band and paint over it; that band is padding (`pb-9`:
+ * the tabs are 28 px tall). Not modal: the article and the dock stay in
+ * reach. Escape closes it. Mount it only while open; a decision that
+ * submits leaves the page, which closes it too.
+ */
+function DecisionsPanel({
+	onClose,
+	children,
+}: {
+	onClose: () => void
+	children: React.ReactNode
+}) {
+	useEffect(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') onClose()
+		}
+		document.addEventListener('keydown', onKeyDown)
+		return () => document.removeEventListener('keydown', onKeyDown)
+	}, [onClose])
+	return (
+		<section
+			id={DECISIONS_ID}
+			role="dialog"
+			aria-label={CHAT_SHELL_COPY.decisionsTitle}
+			className="absolute inset-x-0 bottom-full flex flex-wrap items-center gap-2 border-t bg-background/95 px-3 pb-9 pt-3 backdrop-blur motion-safe:duration-200 motion-safe:animate-in motion-safe:slide-in-from-bottom"
+		>
+			{children}
+		</section>
+	)
+}
 
 export type StatusLineProps = {
 	/** A chat turn runs. */
@@ -232,8 +350,10 @@ function cutAnswer(text: string): string {
  * The phone chat, fixed between the page's top bar and the dock. Not modal:
  * the top bar and the dock stay in reach. Closes on the `×`, Escape, and a
  * swipe down its header. Mount it only while the chat is open. While the
- * keyboard is up its bottom edge is the dock's top edge, measured from the
- * visual viewport as the dock is (see ChatDock).
+ * keyboard is up its bottom edge is the dock's top edge: the rail's line
+ * (`viewportBottom`, see ChatDock) less the dock's measured height. That
+ * measurement can lag a frame behind a fold of the dock, which the seam
+ * can bear (the dock paints over it); the dock itself needs no height.
  */
 export function ChatSheet({
 	stickyTop,

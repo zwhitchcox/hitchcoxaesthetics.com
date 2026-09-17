@@ -487,6 +487,52 @@ test('a 409 keeps the conflict card in flow above the article, and the save mark
 	expect(mark?.getAttribute('data-save-state')).toBe('saved')
 })
 
+test('a wide screen leaves the route’s decisions to the route: the bar items still portal to the slot, and there is no dock, no tab and no decisions panel', async () => {
+	const slot = document.body.appendChild(document.createElement('div'))
+	slot.setAttribute('data-editor-bar-slot', '')
+	try {
+		renderEditor({
+			barSlot: slot,
+			decisions: (
+				<button type="submit" name="intent" value="approve">
+					Approve this
+				</button>
+			),
+		})
+		await screen.findByRole('textbox', { name: RICH_EDITOR_COPY.label })
+		// the slot: [Grill me][save mark][Markdown], as before
+		const grill = within(slot).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.grillMe,
+		})
+		const toggle = within(slot).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.markdown,
+		})
+		const mark = slot.querySelector('[data-save-state]')
+		if (!(mark instanceof HTMLElement)) throw new Error('no save mark')
+		expect(within(slot).getAllByRole('button')).toEqual([grill, toggle])
+		expect(
+			grill.compareDocumentPosition(mark) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy()
+		expect(
+			mark.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy()
+		// the editor renders none of the phone's things
+		expect(screen.queryByRole('button', { name: 'Approve this' })).toBeNull()
+		expect(document.querySelector('[data-chat-dock]')).toBeNull()
+		expect(document.querySelector('[data-chat-rail]')).toBeNull()
+		expect(document.getElementById('article-decisions')).toBeNull()
+		expect(
+			screen.queryByRole('button', { name: CHAT_SHELL_COPY.openDecisions }),
+		).toBeNull()
+		expect(
+			screen.queryByRole('dialog', { name: CHAT_SHELL_COPY.decisionsTitle }),
+		).toBeNull()
+		expect(launcher()).toBeTruthy()
+	} finally {
+		slot.remove()
+	}
+})
+
 test('the bar slot holds the save mark then the Markdown toggle, and nothing while it is null', async () => {
 	vi.useFakeTimers({ shouldAdvanceTime: true })
 	mockFetch({

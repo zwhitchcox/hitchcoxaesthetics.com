@@ -567,9 +567,44 @@ const SITE_HEADER_PX = 48
 const BAR_GAP_PX = 12
 
 /**
+ * Approve and "Write a different article": one pair of buttons, rendered
+ * in the decision bar on a wide screen and in the editor's decisions panel
+ * on the phone, so the copy and the intents stay one.
+ */
+function DecisionButtons({
+	approveLabel,
+	disabled,
+	canRewrite,
+	onRewrite,
+}: {
+	approveLabel: string
+	disabled: boolean
+	/** A pending article can be sent back for a new one; a decided one cannot. */
+	canRewrite: boolean
+	onRewrite: () => void
+}) {
+	return (
+		<>
+			<Button type="submit" name="intent" value="approve" disabled={disabled}>
+				<Icon name="check" className="mr-1 h-4 w-4" /> {approveLabel}
+			</Button>
+			{canRewrite ? (
+				<Button type="button" variant="outline" onClick={onRewrite}>
+					{REWRITE_COPY.action}
+				</Button>
+			) : null}
+		</>
+	)
+}
+
+/**
  * The editor (the article, edited in place; the chat folds into a popup or
- * a dock) and under it the decision bar, stuck to the bottom of the screen
- * so she reads first and decides last (Zane 2026-09-16). Every change saves
+ * a dock) and its decisions. On a wide screen (lg and up) they sit in a
+ * bar under it, stuck to the bottom of the screen so she reads first and
+ * decides last (Zane 2026-09-16), with the editor's bar slot at its end.
+ * On the phone the bar is not rendered: the editor shows the same buttons
+ * in its decisions panel above the dock (Zane 2026-09-17), with the bar
+ * items after them and the action's message under them. Every change saves
  * itself and the working copy sits in a hidden field named `body`, so every
  * button here submits it after any save in flight. A decided article is
  * read-only until Reopen.
@@ -623,6 +658,7 @@ function Editor({
 	// The editor portals its bar items (the save state, Markdown) in here once the element exists.
 	const [barSlot, setBarSlot] = useState<HTMLElement | null>(null)
 	const barRef = useRef<HTMLDivElement>(null)
+	// 0 on the phone: the bar is hidden there, so the editor's dock sits at the screen's bottom.
 	const barHeight = useMeasuredHeight(barRef)
 	const disabled = busy || chatBusy
 	const approveLabel =
@@ -633,6 +669,14 @@ function Editor({
 				: group === 'sent'
 					? 'Mark approved'
 					: 'Approve'
+	const decisionButtons = (
+		<DecisionButtons
+			approveLabel={approveLabel}
+			disabled={disabled}
+			canRewrite={!article.readOnly}
+			onRewrite={() => setRewriteOpen(true)}
+		/>
+	)
 
 	return (
 		<>
@@ -660,34 +704,30 @@ function Editor({
 					readOnly={article.readOnly}
 					showHeader={false}
 					stickyTop={SITE_HEADER_PX + BAR_GAP_PX}
-					stickyBottom={barHeight + BAR_GAP_PX}
+					stickyBottom={barHeight ? barHeight + BAR_GAP_PX : 0}
 					flushRef={flushRef}
 					onBusyChange={setChatBusy}
 					barSlot={barSlot}
+					decisions={
+						<>
+							{decisionButtons}
+							{error || ok ? (
+								// A line of its own under the buttons.
+								<div className="basis-full space-y-2">
+									<Messages error={error} ok={ok} />
+								</div>
+							) : null}
+						</>
+					}
 				/>
 
+				{/* Wide screens only: the phone decides in the editor's panel. */}
 				<div
 					ref={barRef}
-					className="sticky bottom-0 z-10 space-y-2 rounded-lg border bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow"
+					className="sticky bottom-0 z-10 hidden space-y-2 rounded-lg border bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow lg:flex lg:flex-col"
 				>
 					<div className="flex flex-wrap items-center gap-2">
-						<Button
-							type="submit"
-							name="intent"
-							value="approve"
-							disabled={disabled}
-						>
-							<Icon name="check" className="mr-1 h-4 w-4" /> {approveLabel}
-						</Button>
-						{!article.readOnly ? (
-							<Button
-								type="button"
-								variant="outline"
-								onClick={() => setRewriteOpen(true)}
-							>
-								{REWRITE_COPY.action}
-							</Button>
-						) : null}
+						{decisionButtons}
 						<div
 							data-editor-bar-slot=""
 							className="ml-auto flex items-center gap-2"

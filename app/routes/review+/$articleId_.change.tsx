@@ -32,11 +32,15 @@ import {
 
 /**
  * "Change it": the article editor under a sticky top bar with "Back to the
- * article", the editor's bar items (the Markdown toggle) and Approve. She
- * edits the article in place; the chat folds into a dock at the bottom.
- * Every change saves itself. Approve waits for a save in flight, then stores
- * the working copy and approves it in one action, so what she approved is
- * what goes out.
+ * article" and the editor's bar slot. She edits the article in place; the
+ * chat folds into a dock at the bottom, and Approve goes to the editor as
+ * `decisions`: on the phone it sits in the decisions panel above the dock,
+ * with the editor's bar items (Grill me, the Markdown toggle) after it, and
+ * the slot stays empty. A wide window (lg and up) has no dock, so the bar
+ * holds Approve and the slot's items there: the same contract as the admin
+ * page. Every change saves itself. Approve waits for a save in flight, then
+ * stores the working copy and approves it in one action, so what she
+ * approved is what goes out.
  *
  * `?quote=` (from "Comment on this" on the reading page) is attached to the
  * chat composer on mount and then dropped from the URL.
@@ -47,7 +51,6 @@ export const handle: SEOHandle = {
 
 export const CHANGE_COPY = {
 	back: 'Back to the article',
-	backShort: 'Back',
 	approve: 'Approve',
 	approveBlog: 'Approve and publish',
 } as const
@@ -135,6 +138,30 @@ export async function action({ params, request }: ActionFunctionArgs) {
 /** The sticky top bar is this tall (`h-11`); the editor's sheet sits under it. */
 const TOP_BAR_PX = 44
 
+/** The one Approve: in the phone's decisions panel, and in the bar on a wide window. */
+function ApproveButton({
+	label,
+	disabled,
+	size,
+}: {
+	label: string
+	disabled: boolean
+	size?: 'sm'
+}) {
+	return (
+		<Button
+			type="submit"
+			name="intent"
+			value="approve"
+			size={size}
+			className="shrink-0"
+			disabled={disabled}
+		>
+			{label}
+		</Button>
+	)
+}
+
 export default function ChangeArticle() {
 	const { view, claims, history, quote } = useLoaderData<typeof loader>()
 	const { article, images, links } = view
@@ -152,6 +179,7 @@ export default function ChangeArticle() {
 	const error = actionData && 'error' in actionData ? actionData.error : null
 	const approveLabel =
 		article.kind === 'blog' ? CHANGE_COPY.approveBlog : CHANGE_COPY.approve
+	const approveDisabled = submitting || chatBusy
 
 	return (
 		<Form method="post" onSubmit={submitAfterSave}>
@@ -161,29 +189,25 @@ export default function ChangeArticle() {
 			>
 				<Link
 					to={`/review/${article.id}`}
-					aria-label={CHANGE_COPY.back}
 					className="inline-flex min-w-0 shrink-0 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
 				>
 					<Icon name="chevron-left" className="h-4 w-4 shrink-0" />
-					{/* A small screen shows "Back": the bar also holds Grill me, Markdown and Approve. */}
-					<span className="sm:hidden">{CHANGE_COPY.backShort}</span>
-					<span className="hidden truncate sm:inline">{CHANGE_COPY.back}</span>
+					<span className="truncate">{CHANGE_COPY.back}</span>
 				</Link>
+				{/* The editor's bar items land here on a wide window; the phone shows them in the decisions panel, so the slot is empty there. */}
 				<div
 					data-editor-bar-slot=""
 					className="flex items-center gap-2"
 					ref={setBarSlot}
 				/>
-				<Button
-					type="submit"
-					name="intent"
-					value="approve"
-					size="sm"
-					className="shrink-0"
-					disabled={submitting || chatBusy}
-				>
-					{approveLabel}
-				</Button>
+				{/* A wide window has no dock and no panel: Approve stays in the bar there. */}
+				<div className="hidden lg:block">
+					<ApproveButton
+						label={approveLabel}
+						disabled={approveDisabled}
+						size="sm"
+					/>
+				</div>
 			</div>
 
 			{error ? (
@@ -218,6 +242,9 @@ export default function ChangeArticle() {
 					flushRef={flushRef}
 					onBusyChange={setChatBusy}
 					barSlot={barSlot}
+					decisions={
+						<ApproveButton label={approveLabel} disabled={approveDisabled} />
+					}
 				/>
 			</div>
 		</Form>

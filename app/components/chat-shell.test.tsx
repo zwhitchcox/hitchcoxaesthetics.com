@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createRef } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -76,25 +76,16 @@ function pointer(el: Element, type: string, clientY: number) {
 	fireEvent(el, new MouseEvent(type, { bubbles: true, clientY }))
 }
 
-/** jsdom has no ResizeObserver: the dock measures itself through this one. */
-class FakeResizeObserver {
-	static instances: FakeResizeObserver[] = []
-	observed: Element[] = []
-	constructor(private callback: () => void) {
-		FakeResizeObserver.instances.push(this)
-	}
-	observe(el: Element) {
-		this.observed.push(el)
-	}
-	disconnect() {}
-	fire() {
-		this.callback()
-	}
+/** The rail and the dock hanging from it, once rendered. */
+function railAndDock(container: HTMLElement) {
+	const rail = container.querySelector<HTMLElement>('[data-chat-rail]')
+	const dock = container.querySelector<HTMLElement>('[data-chat-dock]')
+	if (!rail || !dock) throw new Error('no rail or no dock')
+	return { rail, dock }
 }
 
 afterEach(() => {
 	vi.unstubAllGlobals()
-	FakeResizeObserver.instances = []
 })
 
 /* ------------------------------------------------------------------------ */
@@ -221,66 +212,68 @@ test('the status line is absent with nothing unseen and no turn running: the inv
 })
 
 /* ------------------------------------------------------------------------ */
-/* The dock and its tab, the sheet                                          */
+/* The rail and the dock, its tabs, the sheet, the decisions panel          */
 /* ------------------------------------------------------------------------ */
 
-test('the dock sits above the page bottom bar with the keyboard down, and hugs the keyboard from the visual viewport’s bottom edge with it up', () => {
-	vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+test('the rail sits above the page bottom bar with the keyboard down and at the visual viewport’s bottom edge with it up; the dock hangs from it with no height in the offset', () => {
 	const ref = createRef<HTMLDivElement>()
 	const { container, rerender } = render(
 		<ChatDock keyboardInset={0} viewportBottom={844} ref={ref}>
 			<p>the composer</p>
 		</ChatDock>,
 	)
-	const dock = container.querySelector<HTMLElement>('[data-chat-dock]')
-	if (!dock) throw new Error('no dock')
+	const { rail, dock } = railAndDock(container)
+	expect(rail.contains(dock)).toBe(true)
 	expect(ref.current).toBe(dock)
 	expect(dock).toHaveTextContent('the composer')
-	const classes = () => dock.className.split(' ')
-	expect(classes()).toContain('fixed')
-	expect(classes()).toContain('bottom-[var(--editor-bottom)]')
-	expect(classes()).toContain('pb-[max(0.75rem,env(safe-area-inset-bottom))]')
-	expect(classes()).not.toContain('top-0')
-	expect(classes()).not.toContain('py-1')
+	const railClasses = () => rail.className.split(' ')
+	const dockClasses = () => dock.className.split(' ')
+	// the rail: fixed, no height, at the layout viewport's bottom above the page bar
+	expect(railClasses()).toContain('fixed')
+	expect(railClasses()).toContain('h-0')
+	expect(railClasses()).toContain('inset-x-0')
+	expect(railClasses()).toContain('bottom-[var(--editor-bottom)]')
+	expect(railClasses()).not.toContain('top-0')
+	expect(rail.style.transform).toBe('')
+	// the dock hangs from the rail: its bottom edge is the rail's line
+	expect(dockClasses()).toContain('absolute')
+	expect(dockClasses()).toContain('inset-x-0')
+	expect(dockClasses()).toContain('bottom-0')
+	expect(dockClasses()).not.toContain('fixed')
+	expect(dockClasses()).toContain(
+		'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+	)
+	expect(dockClasses()).not.toContain('py-1')
 	expect(dock.style.transform).toBe('')
-
-	// The dock measures itself: 72 px tall.
-	dock.getBoundingClientRect = () => ({ height: 72 }) as DOMRect
-	const observer = FakeResizeObserver.instances[0]
-	if (!observer) throw new Error('the dock has no ResizeObserver')
-	expect(observer.observed).toEqual([dock])
-	act(() => {
-		observer.fire()
-	})
+	// nothing measures the dock: no ResizeObserver is asked for
+	expect(typeof ResizeObserver).toBe('undefined')
 
 	// The keyboard is up: the visual viewport ends 500 px from the layout
-	// viewport's top, so the dock's top goes to 500 - 72.
+	// viewport's top, so the rail goes there and the dock's bottom with it.
 	rerender(
 		<ChatDock keyboardInset={300} viewportBottom={500} ref={ref}>
 			<p>the composer</p>
 		</ChatDock>,
 	)
+	// the same two elements: the composer inside never remounts
+	expect(railAndDock(container)).toEqual({ rail, dock })
 	expect(ref.current).toBe(dock)
-	expect(classes()).toContain('top-0')
-	expect(classes()).toContain('py-1')
-	expect(classes()).not.toContain('bottom-[var(--editor-bottom)]')
+	expect(railClasses()).toContain('top-0')
+	expect(railClasses()).not.toContain('bottom-[var(--editor-bottom)]')
+	expect(rail.style.transform).toBe('translate3d(0, 500px, 0)')
+	expect(dockClasses()).toContain('absolute')
+	expect(dockClasses()).toContain('bottom-0')
+	expect(dockClasses()).toContain('py-1')
 	expect(dock.className).not.toContain('safe-area-inset-bottom')
-	expect(dock.style.transform).toBe('translate3d(0, 428px, 0)')
+	expect(dock.style.transform).toBe('')
 
-	// The visual viewport pans 40 px: the dock follows its edge.
+	// The visual viewport pans 40 px: the rail follows its edge.
 	rerender(
 		<ChatDock keyboardInset={260} viewportBottom={540} ref={ref}>
 			<p>the composer</p>
 		</ChatDock>,
 	)
-	expect(dock.style.transform).toBe('translate3d(0, 468px, 0)')
-
-	// The dock grows (a longer row): the transform keeps its bottom on the edge.
-	dock.getBoundingClientRect = () => ({ height: 100 }) as DOMRect
-	act(() => {
-		observer.fire()
-	})
-	expect(dock.style.transform).toBe('translate3d(0, 440px, 0)')
+	expect(rail.style.transform).toBe('translate3d(0, 540px, 0)')
 
 	// The keyboard goes down: back to the bottom class, and no transform.
 	rerender(
@@ -288,9 +281,14 @@ test('the dock sits above the page bottom bar with the keyboard down, and hugs t
 			<p>the composer</p>
 		</ChatDock>,
 	)
-	expect(classes()).toContain('bottom-[var(--editor-bottom)]')
-	expect(classes()).not.toContain('top-0')
-	expect(dock.style.transform).toBe('')
+	expect(railAndDock(container)).toEqual({ rail, dock })
+	expect(railClasses()).toContain('bottom-[var(--editor-bottom)]')
+	expect(railClasses()).not.toContain('top-0')
+	expect(rail.style.transform).toBe('')
+	expect(dockClasses()).toContain(
+		'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+	)
+	expect(dockClasses()).not.toContain('py-1')
 })
 
 test('the composer note line drops its top border inside the dock', () => {
@@ -370,70 +368,261 @@ test("the sheet's top is stickyTop; its bottom is the dock height above the page
 	expect(sheet.className).not.toContain('bottom-[')
 })
 
-test('the dock’s tab protrudes from its top edge, reads Open the chat then Close the chat with aria-expanded and aria-controls, and its icon flips; no tab without chat', async () => {
+test('two tabs protrude from the dock’s top-right edge in both keyboard modes: the chat (a dot while an answer waits unseen) and the decisions, each with its names, aria-expanded and aria-controls; either is absent without its prop', async () => {
 	const user = userEvent.setup()
-	const onOpen = vi.fn()
-	const onClose = vi.fn()
+	const chat = { open: false, onOpen: vi.fn(), onClose: vi.fn() }
+	const decisions = {
+		open: false,
+		onOpen: vi.fn(),
+		onClose: vi.fn(),
+		panel: <button type="button">Approve</button>,
+	}
 	const { container, rerender } = render(
 		<ChatDock
 			keyboardInset={0}
 			viewportBottom={844}
-			chat={{ open: false, onOpen, onClose }}
+			chat={chat}
+			decisions={decisions}
 		>
 			<p>the composer</p>
 		</ChatDock>,
 	)
-	const dock = container.querySelector<HTMLElement>('[data-chat-dock]')
-	if (!dock) throw new Error('no dock')
+	const { dock } = railAndDock(container)
 	expect(dock.className).toContain('overflow-visible')
-	const closed = screen.getByRole('button', { name: CHAT_SHELL_COPY.openChat })
-	expect(dock.contains(closed)).toBe(true)
-	expect(closed).toHaveAttribute('aria-expanded', 'false')
-	expect(closed).toHaveAttribute('aria-controls', 'article-chat-sheet')
-	const classes = closed.className.split(' ')
-	for (const cls of [
-		'absolute',
-		'-top-7',
-		'right-3',
-		'h-7',
-		'w-12',
-		'rounded-t-lg',
-		'border',
-		'border-b-0',
-		'bg-background',
-	]) {
-		expect(classes, cls).toContain(cls)
+	const chatTab = screen.getByRole('button', { name: CHAT_SHELL_COPY.openChat })
+	const decisionsTab = screen.getByRole('button', {
+		name: CHAT_SHELL_COPY.openDecisions,
+	})
+	// one group at the dock's top right, the chat tab first
+	const group = chatTab.parentElement
+	if (!group) throw new Error('no tab group')
+	expect(dock.contains(group)).toBe(true)
+	expect(group.parentElement).toBe(dock)
+	expect(Array.from(group.children)).toEqual([chatTab, decisionsTab])
+	const groupClasses = group.className.split(' ')
+	for (const cls of ['absolute', '-top-7', 'right-3', 'flex', 'gap-1']) {
+		expect(groupClasses, cls).toContain(cls)
 	}
-	expect(iconOf(closed)).toBe('chevron-up')
-	await user.click(closed)
-	expect(onOpen).toHaveBeenCalledTimes(1)
-	expect(onClose).not.toHaveBeenCalled()
+	for (const tab of [chatTab, decisionsTab]) {
+		const classes = tab.className.split(' ')
+		for (const cls of [
+			'h-7',
+			'w-12',
+			'rounded-t-lg',
+			'border',
+			'border-b-0',
+			'bg-background',
+		]) {
+			expect(classes, cls).toContain(cls)
+		}
+	}
+	expect(chatTab).toHaveAttribute('aria-expanded', 'false')
+	expect(chatTab).toHaveAttribute('aria-controls', 'article-chat-sheet')
+	expect(iconOf(chatTab)).toBe('chat-bubble')
+	expect(chatTab.querySelector('span[aria-hidden="true"]')).toBeNull()
+	expect(decisionsTab).toHaveAttribute('aria-expanded', 'false')
+	expect(decisionsTab).toHaveAttribute('aria-controls', 'article-decisions')
+	expect(iconOf(decisionsTab)).toBe('check')
+	// the panel is not there while closed
+	expect(screen.queryByRole('dialog')).toBeNull()
+	expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
+	// a tab acts on the pointer's down, before the tap's focus change can move
+	// the dock under the finger; the pointerdown keeps its default (the focus goes)
+	const pointerDown = (el: Element) =>
+		fireEvent(
+			el,
+			new MouseEvent('pointerdown', { bubbles: true, cancelable: true }),
+		)
+	expect(pointerDown(chatTab)).toBe(true)
+	expect(chat.onOpen).toHaveBeenCalledTimes(1)
+	expect(pointerDown(decisionsTab)).toBe(true)
+	expect(decisions.onOpen).toHaveBeenCalledTimes(1)
+	// the click behind a pointer adds nothing; a keyboard's click (no pointer, detail 0) acts
+	fireEvent.click(chatTab, { detail: 1 })
+	fireEvent.click(decisionsTab, { detail: 1 })
+	expect(chat.onOpen).toHaveBeenCalledTimes(1)
+	expect(decisions.onOpen).toHaveBeenCalledTimes(1)
+	fireEvent.click(chatTab, { detail: 0 })
+	fireEvent.click(decisionsTab, { detail: 0 })
+	expect(chat.onOpen).toHaveBeenCalledTimes(2)
+	expect(decisions.onOpen).toHaveBeenCalledTimes(2)
+	expect(chat.onClose).not.toHaveBeenCalled()
+	expect(decisions.onClose).not.toHaveBeenCalled()
+	// a whole tap (user-event: pointer, then click) acts once
+	chat.onOpen.mockClear()
+	decisions.onOpen.mockClear()
+	await user.click(chatTab)
+	expect(chat.onOpen).toHaveBeenCalledTimes(1)
+	expect(chat.onClose).not.toHaveBeenCalled()
+	await user.click(decisionsTab)
+	expect(decisions.onOpen).toHaveBeenCalledTimes(1)
+	expect(decisions.onClose).not.toHaveBeenCalled()
 
+	// an answer waits unseen: the dot on the chat tab, the name unchanged
 	rerender(
 		<ChatDock
 			keyboardInset={0}
 			viewportBottom={844}
-			chat={{ open: true, onOpen, onClose }}
+			chat={{ ...chat, unseen: true }}
+			decisions={decisions}
 		>
 			<p>the composer</p>
 		</ChatDock>,
 	)
-	const open = screen.getByRole('button', { name: CHAT_SHELL_COPY.closeChat })
-	expect(open).toBe(closed)
-	expect(open).toHaveAttribute('aria-expanded', 'true')
-	expect(iconOf(open)).toBe('chevron-down')
-	await user.click(open)
-	expect(onClose).toHaveBeenCalledTimes(1)
-	expect(onOpen).toHaveBeenCalledTimes(1)
+	expect(screen.getByRole('button', { name: CHAT_SHELL_COPY.openChat })).toBe(
+		chatTab,
+	)
+	expect(chatTab.querySelector('span[aria-hidden="true"]')).not.toBeNull()
 
-	// an own-words row: no chat, so no tab
+	// open: the names flip, the chat's icon stays, the dot goes
+	rerender(
+		<ChatDock
+			keyboardInset={300}
+			viewportBottom={500}
+			chat={{ ...chat, open: true, unseen: true }}
+			decisions={{ ...decisions, open: true }}
+		>
+			<p>the composer</p>
+		</ChatDock>,
+	)
+	const chatOpen = screen.getByRole('button', {
+		name: CHAT_SHELL_COPY.closeChat,
+	})
+	expect(chatOpen).toBe(chatTab)
+	expect(chatOpen).toHaveAttribute('aria-expanded', 'true')
+	expect(iconOf(chatOpen)).toBe('chat-bubble')
+	expect(chatOpen.querySelector('span[aria-hidden="true"]')).toBeNull()
+	const decisionsOpen = screen.getByRole('button', {
+		name: CHAT_SHELL_COPY.closeDecisions,
+	})
+	expect(decisionsOpen).toBe(decisionsTab)
+	expect(decisionsOpen).toHaveAttribute('aria-expanded', 'true')
+	// the tabs stay while the keyboard is up
+	expect(dock.contains(group)).toBe(true)
+	await user.click(chatOpen)
+	expect(chat.onClose).toHaveBeenCalledTimes(1)
+	expect(chat.onOpen).toHaveBeenCalledTimes(1)
+	await user.click(decisionsOpen)
+	expect(decisions.onClose).toHaveBeenCalledTimes(1)
+	expect(decisions.onOpen).toHaveBeenCalledTimes(1)
+
+	// an own-words row: no chat, so no chat tab; the decisions tab stays
+	rerender(
+		<ChatDock keyboardInset={0} viewportBottom={844} decisions={decisions}>
+			<p>the composer</p>
+		</ChatDock>,
+	)
+	expect(screen.getAllByRole('button')).toEqual([
+		screen.getByRole('button', { name: CHAT_SHELL_COPY.openDecisions }),
+	])
+
+	// no decisions and no chat: no tabs at all
 	rerender(
 		<ChatDock keyboardInset={0} viewportBottom={844}>
 			<p>the composer</p>
 		</ChatDock>,
 	)
 	expect(screen.queryByRole('button')).toBeNull()
+	expect(dock.querySelector('.-top-7')).toBeNull()
 	expect(dock).toHaveTextContent('the composer')
+})
+
+test('the decisions panel rides on the dock’s top edge with the dock’s look, before the tabs so they paint over its bottom band; Escape closes it; it is gone while closed', () => {
+	const onClose = vi.fn()
+	const decisions = {
+		open: true,
+		onOpen: vi.fn(),
+		onClose,
+		panel: (
+			<>
+				<button type="button">Approve</button>
+				<button type="button">Grill me</button>
+			</>
+		),
+	}
+	const { container, rerender } = render(
+		<ChatDock
+			keyboardInset={0}
+			viewportBottom={844}
+			chat={{ open: false, onOpen: vi.fn(), onClose: vi.fn() }}
+			decisions={decisions}
+		>
+			<p>the composer</p>
+		</ChatDock>,
+	)
+	const { dock } = railAndDock(container)
+	const panel = screen.getByRole('dialog', {
+		name: CHAT_SHELL_COPY.decisionsTitle,
+	})
+	expect(panel.id).toBe('article-decisions')
+	expect(panel).not.toHaveAttribute('aria-modal')
+	expect(panel.parentElement).toBe(dock)
+	expect(
+		within(panel)
+			.getAllByRole('button')
+			.map(b => b.textContent),
+	).toEqual(['Approve', 'Grill me'])
+	const classes = panel.className.split(' ')
+	for (const cls of [
+		'absolute',
+		'inset-x-0',
+		'bottom-full',
+		'flex',
+		'flex-wrap',
+		'border-t',
+		'bg-background/95',
+		'backdrop-blur',
+		'pb-9',
+	]) {
+		expect(classes, cls).toContain(cls)
+	}
+	// the dock's own look, so the seam is one line
+	expect(dock.className).toContain('border-t')
+	expect(dock.className).toContain('bg-background/95')
+	// before the tab group in the tree
+	const group = screen.getByRole('button', {
+		name: CHAT_SHELL_COPY.closeDecisions,
+	}).parentElement
+	if (!group) throw new Error('no tab group')
+	expect(
+		panel.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING,
+	).toBeTruthy()
+	// the composer is still in the dock after the panel
+	expect(dock).toHaveTextContent('the composer')
+
+	fireEvent.keyDown(document, { key: 'Escape' })
+	expect(onClose).toHaveBeenCalledTimes(1)
+
+	// the keyboard comes up: the panel stays on the dock's top edge
+	rerender(
+		<ChatDock
+			keyboardInset={300}
+			viewportBottom={500}
+			chat={{ open: false, onOpen: vi.fn(), onClose: vi.fn() }}
+			decisions={decisions}
+		>
+			<p>the composer</p>
+		</ChatDock>,
+	)
+	expect(
+		screen.getByRole('dialog', { name: CHAT_SHELL_COPY.decisionsTitle }),
+	).toBe(panel)
+	expect(panel.parentElement).toBe(dock)
+
+	rerender(
+		<ChatDock
+			keyboardInset={0}
+			viewportBottom={844}
+			chat={{ open: false, onOpen: vi.fn(), onClose: vi.fn() }}
+			decisions={{ ...decisions, open: false }}
+		>
+			<p>the composer</p>
+		</ChatDock>,
+	)
+	expect(screen.queryByRole('dialog')).toBeNull()
+	expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
+	fireEvent.keyDown(document, { key: 'Escape' })
+	expect(onClose).toHaveBeenCalledTimes(1)
 })
 
 test('Escape closes the sheet and the popup; a 60 px drag down the sheet header closes it', async () => {

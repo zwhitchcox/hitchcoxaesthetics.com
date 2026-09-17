@@ -91,24 +91,27 @@ import { useKeyboardInset, useMeasuredHeight } from '#app/utils/viewport.ts'
  * what she sees. Render it inside a <Form method="post"> whose onSubmit is
  * `useSubmitAfterSave(flushRef)`.
  *
- * Phone: a fixed dock at the bottom holds the status line and the composer,
- * with the save mark at the end of its row; a tab on the dock's top edge
- * opens the conversation as a sheet. While the caret is in the article
- * (or the link row is open) the dock folds to the format row alone, with
- * the save mark at its end: the keyboard leaves little room. The composer
- * and the status line return when the article lets go of the focus.
- * Desktop (lg): a launcher bottom-right opens it as a popup. Every piece
- * of chat state lives here; the shell components (chat-shell.tsx) only
- * place it.
+ * Phone: a dock at the bottom holds the status line and the composer, with
+ * the save mark at the end of its row; two tabs on the dock's top edge open
+ * the conversation as a sheet and the decisions as a panel above the dock
+ * (one at a time: opening either closes the other). While the caret is in
+ * the article (or the link row is open) the dock folds to the format row
+ * alone, with the save mark at its end: the keyboard leaves little room.
+ * The composer and the status line return when the article lets go of the
+ * focus. Desktop (lg): a launcher bottom-right opens it as a popup. Every
+ * piece of chat state lives here; the shell components (chat-shell.tsx)
+ * only place it.
  *
  * Grill me starts a grill: the server asks what only she knows, one
  * question at a time (assistant rows with toolName `grill_question`), and
  * her answers go through the same send path as any message. A
  * `grill_done` row, or Stop grilling, ends it.
  *
- * The Grill me button, the Markdown toggle, and the save mark when no dock
- * holds it, go into the route's bar through `barSlot` (a portal), so the
- * editor has no bar of its own.
+ * The bar items (the Grill me button, the Markdown toggle, and the save
+ * mark when no dock holds it) go into the route's bar through `barSlot` (a
+ * portal) on a wide screen, so the editor has no bar of its own. On the
+ * phone, where a dock renders, they go into the decisions panel after the
+ * route's `decisions`, and the slot stays empty.
  */
 export type ArticleEditorProps = {
 	article: {
@@ -148,9 +151,18 @@ export type ArticleEditorProps = {
 	 * it, the save mark: the items render into it through a portal. `null`
 	 * while the route has no element yet (the server render): nothing
 	 * renders. Undefined (no route, the unit tests): a plain right-aligned
-	 * row at the top of the editor holds them.
+	 * row at the top of the editor holds them. On the phone the items go
+	 * into the decisions panel instead and the slot stays empty.
 	 */
 	barSlot?: HTMLElement | null
+	/**
+	 * The route's decision buttons (Approve; Write a different article): the
+	 * buttons alone, no bar chrome. They render inside the route's <Form>, so
+	 * the hidden body input goes with Approve. The phone shows them in the
+	 * decisions panel above the dock, before the bar items; a wide screen
+	 * never renders them (the route's own bar holds them there).
+	 */
+	decisions?: React.ReactNode
 	/** The unit tests type through the rich editor's view. */
 	editorViewRef?: React.MutableRefObject<EditorView | null>
 }
@@ -418,6 +430,7 @@ export function ArticleEditor({
 	flushRef,
 	onBusyChange,
 	barSlot,
+	decisions,
 	editorViewRef,
 }: ArticleEditorProps) {
 	const articleId = article.id
@@ -477,6 +490,8 @@ export function ArticleEditor({
 	const [zoom, setZoom] = useState<ZoomTarget | null>(null)
 	/** Her open or close; null until she chooses. */
 	const [chatOpenChoice, setChatOpenChoice] = useState<boolean | null>(null)
+	/** The phone's decisions panel is up. */
+	const [decisionsOpen, setDecisionsOpen] = useState(false)
 	/** The rows she has seen, by id: the stored history, then whatever was there when she last opened or closed the chat. By id, because a failed turn drops rows. */
 	const [seenIds, setSeenIds] = useState<ReadonlySet<string>>(
 		() => new Set(history.map(row => row.id)),
@@ -509,6 +524,8 @@ export function ArticleEditor({
 		flushSync(() => {
 			setChatOpenChoice(true)
 			setSeenIds(new Set(entriesRef.current.map(e => e.id)))
+			// One thing above the dock at a time.
+			setDecisionsOpen(false)
 		})
 		// The popup mounts with its box: focus it in the same gesture. The
 		// phone keeps the keyboard down; its composer is in the dock.
@@ -518,6 +535,12 @@ export function ArticleEditor({
 		setChatOpenChoice(false)
 		setSeenIds(new Set(entriesRef.current.map(e => e.id)))
 	}, [])
+	function openDecisions() {
+		setDecisionsOpen(true)
+		// The sheet closes and its rows count as seen; a closed chat keeps its unseen answer.
+		if (chatOpen) closeChat()
+	}
+	const closeDecisions = useCallback(() => setDecisionsOpen(false), [])
 
 	const dictation = useDictation({
 		onInterim: setGhost,
@@ -1043,7 +1066,16 @@ export function ArticleEditor({
 	const richOn = hydrated && !readOnly && !raw
 	const formatRowOn =
 		richOn && !locked && !chatOpen && (editorFocused || linkOpen)
-	const dockOn = !wide && (chatSurface || formatRowOn)
+	/**
+	 * The route gave the editor its decisions or a bar: on the phone both go
+	 * into the decisions panel above the dock, so the dock renders to carry
+	 * the panel's tab (an own-words row has no chat to give it one). The
+	 * panel closes when the caret enters the article (see the rich editor's
+	 * onFocusChange): the dock folds then, and a panel riding on it would
+	 * move under the next tap. The tabs stay, so she can open it again.
+	 */
+	const panelOn = !wide && (decisions != null || barSlot !== undefined)
+	const dockOn = !wide && (chatSurface || formatRowOn || panelOn)
 	/**
 	 * The phone's chat lives in the dock: the composer row with the save mark
 	 * at its end, and the conflict card above them so the choice is on
@@ -1053,6 +1085,12 @@ export function ArticleEditor({
 	 * save mark ends that row instead.
 	 */
 	const chatInDock = !wide && chatSurface
+	/**
+	 * The save mark ends a row of the dock: the composer's, the format row,
+	 * or a row of its own on an own-words row with a route (its panel is
+	 * closed most of the time, so the mark cannot live there).
+	 */
+	const markInDock = chatInDock || panelOn
 	const conflictCard = autoSave.conflict ? (
 		<div
 			role="alert"
@@ -1077,13 +1115,14 @@ export function ArticleEditor({
 	}
 
 	// The card is above the mark in the dock, and in flow above the desktop's
-	// bottom bar; only a narrow page's top bar (an own-words row) has it below.
+	// bottom bar; only a narrow page's top row (an own-words row with no
+	// route) has it below.
 	const saveState = readOnly ? null : (
 		<SaveState
 			status={autoSave.status}
 			message={autoSave.message}
 			conflictNote={
-				chatInDock || wide
+				markInDock || wide
 					? ARTICLE_EDITOR_COPY.conflictAbove
 					: ARTICLE_EDITOR_COPY.conflictBelow
 			}
@@ -1131,16 +1170,16 @@ export function ArticleEditor({
 	const barItems = (
 		<>
 			{grillButton}
-			{chatInDock ? null : saveState}
+			{markInDock ? null : saveState}
 			{markdownToggle}
 		</>
 	)
-	const bar =
-		barSlot === undefined ? (
-			<div className="flex items-center justify-end gap-2">{barItems}</div>
-		) : barSlot === null ? null : (
-			createPortal(barItems, barSlot)
-		)
+	// The phone's panel holds the items; the slot stays empty there.
+	const bar = panelOn ? null : barSlot === undefined ? (
+		<div className="flex items-center justify-end gap-2">{barItems}</div>
+	) : barSlot === null ? null : (
+		createPortal(barItems, barSlot)
+	)
 
 	function onCommand(command: EditorCommand) {
 		const view = viewRef.current
@@ -1208,7 +1247,11 @@ export function ArticleEditor({
 				scrollMargin={wide ? 0 : dockHeight}
 				onChange={updateBody}
 				onBlur={() => void autoSave.flush(false, 0)}
-				onFocusChange={setEditorFocused}
+				onFocusChange={focused => {
+					setEditorFocused(focused)
+					// The caret in the article folds the dock: the panel leaves it (the tabs stay).
+					if (focused) setDecisionsOpen(false)
+				}}
 				onSelection={setSelection}
 				onImageFile={file => {
 					attachment.pickFile(file)
@@ -1263,7 +1306,27 @@ export function ArticleEditor({
 			viewportBottom={keyboard.bottom}
 			chat={
 				chatSurface
-					? { open: chatOpen, onOpen: openChat, onClose: closeChat }
+					? {
+							open: chatOpen,
+							onOpen: openChat,
+							onClose: closeChat,
+							unseen: answers.length > 0,
+						}
+					: undefined
+			}
+			decisions={
+				panelOn
+					? {
+							open: decisionsOpen,
+							onOpen: openDecisions,
+							onClose: closeDecisions,
+							panel: (
+								<>
+									{decisions}
+									{barItems}
+								</>
+							),
+						}
 					: undefined
 			}
 		>
@@ -1284,7 +1347,7 @@ export function ArticleEditor({
 			{formatRowOn ? (
 				<FormatRow
 					{...toolbarProps}
-					trailing={chatInDock ? saveState : undefined}
+					trailing={markInDock ? saveState : undefined}
 				/>
 			) : null}
 			{!chatSurface || formatRowOn ? null : composerNote ? (
@@ -1302,6 +1365,10 @@ export function ArticleEditor({
 					trailing={saveState}
 				/>
 			)}
+			{!chatSurface && !formatRowOn && markInDock && saveState ? (
+				// An own-words row has no composer row to end: the mark gets a row of its own.
+				<div className="flex items-center justify-end px-3">{saveState}</div>
+			) : null}
 		</ChatDock>
 	) : null
 

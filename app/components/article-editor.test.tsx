@@ -218,6 +218,42 @@ function noChatSheet() {
 	return screen.queryByRole('dialog', { name: CHAT_SHELL_COPY.chatTitle })
 }
 
+/** The decisions tab on the dock: "Open the decisions" while the panel is closed. */
+async function openDecisions(user: ReturnType<typeof userEvent.setup>) {
+	await user.click(
+		within(dock()).getByRole('button', {
+			name: CHAT_SHELL_COPY.openDecisions,
+		}),
+	)
+}
+
+async function closeDecisions(user: ReturnType<typeof userEvent.setup>) {
+	await user.click(
+		within(dock()).getByRole('button', {
+			name: CHAT_SHELL_COPY.closeDecisions,
+		}),
+	)
+}
+
+/** The decisions panel above the dock, while open. */
+function decisionsPanel() {
+	return screen.getByRole('dialog', { name: CHAT_SHELL_COPY.decisionsTitle })
+}
+
+function noDecisionsPanel() {
+	return screen.queryByRole('dialog', {
+		name: CHAT_SHELL_COPY.decisionsTitle,
+	})
+}
+
+/** The route's decision button, as the routes pass it: inside the form, no bar chrome. */
+const APPROVE_THIS = 'Approve this'
+const decisionsStub = (
+	<button type="submit" name="intent" value="approve">
+		{APPROVE_THIS}
+	</button>
+)
+
 function view(): EditorView {
 	if (!viewRef.current) throw new Error('the rich editor is not mounted')
 	return viewRef.current
@@ -1169,8 +1205,8 @@ test('the caret in the article folds the dock to the format row and the save mar
 	expect(
 		within(dock()).getByRole('button', { name: CHAT_SHELL_COPY.openChat }),
 	).toBeTruthy()
-	// nothing else in the dock: the card, the line and the box all wait
-	expect(dock().querySelectorAll(':scope > *')).toHaveLength(2)
+	// nothing else in the dock (the tabs and the row): the card, the line and the box all wait
+	expect(dock().children).toHaveLength(2)
 
 	fireEvent.blur(prose)
 	expect(
@@ -1310,7 +1346,7 @@ test('the sheet opens from the tab, and See it from inside it closes it', async 
 		name: CHAT_SHELL_COPY.openChat,
 	})
 	expect(tab.getAttribute('aria-expanded')).toBe('false')
-	expect(tab.className).toContain('-top-7')
+	expect(tab.parentElement?.className).toContain('-top-7')
 	await user.click(tab)
 	expect(chatSheet().querySelector('[data-chat-list]')).toBeTruthy()
 	expect(noStatusLine()).toBeNull()
@@ -1599,38 +1635,274 @@ test('a failed save shows Could not save. with Try now in the dock, and Try now 
 	})
 })
 
-test('the bar slot holds Grill me then the Markdown toggle on the phone, and nothing while it is null; the save mark stays in the dock', async () => {
+test('on the phone the route’s decisions, then Grill me and the Markdown toggle, live in the decisions panel above the dock; the bar slot stays empty; the save mark stays in the dock', async () => {
 	const user = userEvent.setup()
 	const { unmount } = renderEditor({ barSlot: null })
 	await richEditor()
+	// the route's bar is not mounted yet: nothing renders, and the panel waits closed
 	expect(
 		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.markdown }),
 	).toBeNull()
+	expect(noDecisionsPanel()).toBeNull()
 	expect(dock().contains(saveState())).toBe(true)
 	unmount()
 
 	const slot = document.body.appendChild(document.createElement('div'))
 	slot.setAttribute('data-editor-bar-slot', '')
 	try {
-		renderEditor({ barSlot: slot })
+		renderEditor({ barSlot: slot, decisions: decisionsStub })
 		await richEditor()
-		const toggle = within(slot).getByRole('button', {
-			name: ARTICLE_EDITOR_COPY.markdown,
+		// nothing goes into the slot; the panel is closed, so its buttons are not on the page
+		expect(slot.querySelectorAll('*')).toHaveLength(0)
+		expect(noDecisionsPanel()).toBeNull()
+		expect(screen.queryByRole('button', { name: APPROVE_THIS })).toBeNull()
+		expect(
+			screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.markdown }),
+		).toBeNull()
+		expect(
+			screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.grillMe }),
+		).toBeNull()
+		// the two tabs on the dock, side by side: the chat, then the decisions
+		const chatTab = within(dock()).getByRole('button', {
+			name: CHAT_SHELL_COPY.openChat,
 		})
-		const grill = within(slot).getByRole('button', {
+		const tab = within(dock()).getByRole('button', {
+			name: CHAT_SHELL_COPY.openDecisions,
+		})
+		expect(tab.getAttribute('aria-expanded')).toBe('false')
+		expect(tab.getAttribute('aria-controls')).toBe('article-decisions')
+		expect(chatTab.parentElement).toBe(tab.parentElement)
+		expect(tab.parentElement?.className).toContain('-top-7')
+
+		await openDecisions(user)
+		const panel = decisionsPanel()
+		expect(panel.id).toBe('article-decisions')
+		expect(dock().contains(panel)).toBe(true)
+		expect(panel.className).toContain('bottom-full')
+		// the route's decision first, then the editor's bar items, and no save mark
+		const approve = within(panel).getByRole('button', { name: APPROVE_THIS })
+		const grill = within(panel).getByRole('button', {
 			name: ARTICLE_EDITOR_COPY.grillMe,
 		})
-		expect(within(slot).getAllByRole('button')).toEqual([grill, toggle])
-		expect(slot.querySelector('[data-save-state]')).toBeNull()
+		const toggle = within(panel).getByRole('button', {
+			name: ARTICLE_EDITOR_COPY.markdown,
+		})
+		expect(within(panel).getAllByRole('button')).toEqual([
+			approve,
+			grill,
+			toggle,
+		])
+		expect(approve.getAttribute('value')).toBe('approve')
+		expect(panel.querySelector('[data-save-state]')).toBeNull()
 		expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
-		expect(dock().contains(saveState())).toBe(true)
-		// the toggle works from the slot
+		expect(
+			screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send })
+				.parentElement,
+		).toContainElement(saveState())
+		expect(slot.querySelectorAll('*')).toHaveLength(0)
+		expect(tab.getAttribute('aria-expanded')).toBe('true')
+		expect(
+			within(dock()).getByRole('button', {
+				name: CHAT_SHELL_COPY.closeDecisions,
+			}),
+		).toBe(tab)
+		// the composer is still in the dock under the panel
+		expect(composer()).toBeTruthy()
+
+		// the toggle works from the panel, which stays open
 		await user.click(toggle)
 		expect(toggle.getAttribute('aria-pressed')).toBe('true')
 		expect(screen.getByLabelText(ARTICLE_EDITOR_COPY.textLabel)).toBeTruthy()
+		expect(decisionsPanel()).toBe(panel)
+		await user.click(toggle)
+		expect(await richEditor()).toBeTruthy()
+
+		// the tab closes it; Escape closes it too
+		await closeDecisions(user)
+		expect(noDecisionsPanel()).toBeNull()
+		expect(screen.queryByRole('button', { name: APPROVE_THIS })).toBeNull()
+		expect(tab.getAttribute('aria-expanded')).toBe('false')
+		await openDecisions(user)
+		expect(decisionsPanel()).toBeTruthy()
+		fireEvent.keyDown(document, { key: 'Escape' })
+		expect(noDecisionsPanel()).toBeNull()
 	} finally {
 		slot.remove()
 	}
+})
+
+test('opening the chat closes the decisions panel and opening the decisions closes the chat; an unseen answer marks the chat tab until she opens it', async () => {
+	const user = userEvent.setup()
+	mockFetch({ chat: chatChanged })
+	renderEditor({ decisions: decisionsStub })
+	await richEditor()
+	const chatTab = () =>
+		within(dock()).getByRole('button', {
+			name: new RegExp(
+				`^${CHAT_SHELL_COPY.openChat}$|^${CHAT_SHELL_COPY.closeChat}$`,
+			),
+		})
+	const dot = () => chatTab().querySelector('span[aria-hidden="true"]')
+
+	await openDecisions(user)
+	expect(decisionsPanel()).toBeTruthy()
+	await openChat(user)
+	expect(chatSheet()).toBeTruthy()
+	expect(noDecisionsPanel()).toBeNull()
+	expect(
+		within(dock()).getByRole('button', {
+			name: CHAT_SHELL_COPY.openDecisions,
+		}),
+	).toBeTruthy()
+
+	await openDecisions(user)
+	expect(decisionsPanel()).toBeTruthy()
+	expect(noChatSheet()).toBeNull()
+	expect(chatTab().getAttribute('aria-label')).toBe(CHAT_SHELL_COPY.openChat)
+	await closeDecisions(user)
+
+	// a turn lands while the sheet is closed: the dot on the chat tab, the status line under it
+	expect(dot()).toBeNull()
+	await user.type(composer(), THE_ASK)
+	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
+	await waitFor(() => expect(hiddenBody()).toBe(BODY_CHANGED))
+	expect(dot()).not.toBeNull()
+	expect(chatTab().getAttribute('aria-label')).toBe(CHAT_SHELL_COPY.openChat)
+	expect(statusLine().textContent).toContain('Changed:')
+	// the decisions panel does not count as seeing it
+	await openDecisions(user)
+	expect(dot()).not.toBeNull()
+	await closeDecisions(user)
+	expect(statusLine().textContent).toContain('Changed:')
+	// opening the chat does
+	await openChat(user)
+	expect(dot()).toBeNull()
+	await closeChat(user)
+	expect(dot()).toBeNull()
+	expect(noStatusLine()).toBeNull()
+})
+
+test('a decided row with no decisions has no decisions tab; with decisions it keeps the tab, and the panel holds them with the Markdown toggle and no Grill me', async () => {
+	const user = userEvent.setup()
+	const plain = renderEditor({ readOnly: true })
+	await screen.findByText(ARTICLE_CHAT_COPY.decidedComposer)
+	expect(
+		within(dock()).getByRole('button', { name: CHAT_SHELL_COPY.openChat }),
+	).toBeTruthy()
+	expect(
+		screen.queryByRole('button', { name: CHAT_SHELL_COPY.openDecisions }),
+	).toBeNull()
+	expect(noDecisionsPanel()).toBeNull()
+	plain.unmount()
+
+	renderEditor({
+		readOnly: true,
+		decisions: <button type="submit">Reopen it</button>,
+	})
+	await screen.findByText(ARTICLE_CHAT_COPY.decidedComposer)
+	await openDecisions(user)
+	const panel = decisionsPanel()
+	expect(
+		within(panel)
+			.getAllByRole('button')
+			.map(b => b.textContent),
+	).toEqual(['Reopen it', ARTICLE_EDITOR_COPY.markdown])
+	expect(panel.querySelector('[data-save-state]')).toBeNull()
+	expect(document.querySelector('[data-save-state]')).toBeNull()
+})
+
+test('an own-words row with a route keeps the dock for the decisions tab alone, with the save mark on a row of its own, then at the end of the format row', async () => {
+	const user = userEvent.setup()
+	renderEditor({
+		article: { ...ARTICLE, isReference: true },
+		decisions: decisionsStub,
+	})
+	const prose = await richEditor()
+	// no chat: no composer, no chat tab; the decisions tab and the mark
+	expect(screen.queryByLabelText('Message')).toBeNull()
+	expect(
+		within(dock()).queryByRole('button', { name: CHAT_SHELL_COPY.openChat }),
+	).toBeNull()
+	const tab = within(dock()).getByRole('button', {
+		name: CHAT_SHELL_COPY.openDecisions,
+	})
+	expect(dock().contains(saveState())).toBe(true)
+	expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
+	expect(
+		screen.queryByRole('button', { name: ARTICLE_EDITOR_COPY.markdown }),
+	).toBeNull()
+
+	// the caret in the article: the format row, the mark at its end, the tab still there
+	fireEvent.focus(prose)
+	const toolbar = within(dock()).getByRole('toolbar', {
+		name: TOOLBAR_COPY.toolbar,
+	})
+	expect(toolbar.lastElementChild).toBe(saveState())
+	expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
+	expect(
+		within(dock()).getByRole('button', {
+			name: CHAT_SHELL_COPY.openDecisions,
+		}),
+	).toBe(tab)
+	fireEvent.blur(prose)
+	expect(
+		screen.queryByRole('toolbar', { name: TOOLBAR_COPY.toolbar }),
+	).toBeNull()
+	expect(dock().contains(saveState())).toBe(true)
+
+	await openDecisions(user)
+	expect(
+		within(decisionsPanel())
+			.getAllByRole('button')
+			.map(b => b.textContent),
+	).toEqual([APPROVE_THIS, ARTICLE_EDITOR_COPY.markdown])
+})
+
+test('with the caret in the article, the decisions tab opens the panel and the article lets go (the row unfolds under it); the caret back in the article closes the panel; the chat tab lets go too', async () => {
+	const user = userEvent.setup()
+	renderEditor({ decisions: decisionsStub })
+	const prose = await richEditor()
+	fireEvent.focus(prose)
+	const toolbar = () =>
+		screen.queryByRole('toolbar', { name: TOOLBAR_COPY.toolbar })
+	expect(toolbar()).toBeTruthy()
+	expect(screen.queryByLabelText('Message')).toBeNull()
+
+	// the tab acts on the pointer's down, so the panel is up before the tap
+	// takes the focus. jsdom's synthetic focus does not move with a click, so
+	// the blur a browser fires then is fired by hand: the dock unfolds under
+	// the panel, which stays open, and the next tap finds a still target
+	await openDecisions(user)
+	expect(decisionsPanel()).toBeTruthy()
+	fireEvent.blur(prose)
+	expect(decisionsPanel()).toBeTruthy()
+	expect(toolbar()).toBeNull()
+	expect(composer()).toBeTruthy()
+	expect(
+		within(decisionsPanel()).getByRole('button', { name: APPROVE_THIS }),
+	).toBeTruthy()
+	// the panel comes before the composer row in the dock
+	// (`Node` is prosemirror-model's type here; the DOM constant is on `document` too)
+	expect(
+		decisionsPanel().compareDocumentPosition(composer()) &
+			document.DOCUMENT_POSITION_FOLLOWING,
+	).toBeTruthy()
+
+	// the caret back in the article folds the dock and closes the panel; the tabs stay
+	fireEvent.focus(prose)
+	expect(noDecisionsPanel()).toBeNull()
+	expect(toolbar()).toBeTruthy()
+	const tab = within(dock()).getByRole('button', {
+		name: CHAT_SHELL_COPY.openDecisions,
+	})
+	expect(tab.getAttribute('aria-expanded')).toBe('false')
+
+	// the chat tab takes the focus with it too: the row folds away and the composer returns under the sheet
+	await openChat(user)
+	expect(chatSheet()).toBeTruthy()
+	expect(toolbar()).toBeNull()
+	expect(composer()).toBeTruthy()
+	expect(noDecisionsPanel()).toBeNull()
 })
 
 test('Grill me posts mode grill with the hash and no text; the question opens the sheet, the box asks for the answer, and the button reads Stop grilling', async () => {
