@@ -369,6 +369,8 @@ export type RichEditorProps = {
 	locked: boolean
 	/** The dock's measured height on the phone, 0 on the desktop: the caret scrolls above it. */
 	scrollMargin: number
+	/** The page's sticky top bar height on the phone: the caret scrolls below it. 0 on the desktop. */
+	scrollTop?: number
 	/** Every user transaction that changed the document, serialised. */
 	onChange: (markdown: string) => void
 	/** The editor lost focus (the parent flushes the save). */
@@ -406,6 +408,35 @@ function imageFileIn(files: ArrayLike<File> | null | undefined): File | null {
  * inside it, the parent's scroll-to-mark effect searches it, and a click
  * on a picture bubbles to the parent's handler on an ancestor.
  */
+/**
+ * On the phone, ProseMirror's own scroll-into-view measures against the
+ * layout viewport, which iOS keeps under the keyboard, so every keystroke
+ * near the bottom scrolled the page down and WebKit scrolled it back: the
+ * text jumped. This scrolls the caret into the band between the sticky top
+ * bar and the dock, measured against the visual viewport, and returns true
+ * so ProseMirror does nothing. With no dock (band.bottom 0) ProseMirror
+ * keeps its own behaviour.
+ */
+export function scrollCaretIntoBand(
+	view: Pick<EditorView, 'coordsAtPos' | 'state'>,
+	band: { top: number; bottom: number },
+	win: Pick<Window, 'visualViewport' | 'innerHeight' | 'scrollBy'> = window,
+): boolean {
+	if (band.bottom <= 0) return false
+	const vv = win.visualViewport
+	const viewTop = vv ? vv.offsetTop : 0
+	const viewBottom = vv ? vv.offsetTop + vv.height : win.innerHeight
+	const top = viewTop + band.top + CARET_GAP_PX
+	const bottom = viewBottom - band.bottom - CARET_GAP_PX
+	if (bottom <= top) return true
+	const caret = view.coordsAtPos(view.state.selection.head)
+	if (caret.top < top) win.scrollBy(0, caret.top - top)
+	else if (caret.bottom > bottom) win.scrollBy(0, caret.bottom - bottom)
+	return true
+}
+/** Breathing room between the caret and the band's edges. */
+const CARET_GAP_PX = 8
+
 export const RichEditor = forwardRef<HTMLDivElement, RichEditorProps>(
 	function RichEditor(
 		{
@@ -415,6 +446,7 @@ export const RichEditor = forwardRef<HTMLDivElement, RichEditorProps>(
 			changedFrom,
 			locked,
 			scrollMargin,
+			scrollTop = 0,
 			onChange,
 			onBlur,
 			onFocusChange,
@@ -427,6 +459,7 @@ export const RichEditor = forwardRef<HTMLDivElement, RichEditorProps>(
 		ref,
 	) {
 		const rootRef = useRef<HTMLDivElement>(null)
+		const bandRef = useRef({ top: scrollTop, bottom: scrollMargin })
 		const viewRef = useRef<EditorView | null>(null)
 		/** The last markdown handed to `onChange`, or applied from `body`. */
 		const lastEmittedRef = useRef<string | null>(null)
@@ -503,6 +536,7 @@ export const RichEditor = forwardRef<HTMLDivElement, RichEditorProps>(
 				attributes,
 				scrollMargin,
 				scrollThreshold: scrollMargin,
+				handleScrollToSelection: v => scrollCaretIntoBand(v, bandRef.current),
 				nodeViews: {
 					image: node => new PictureView(node, resolverRef.current),
 				},
@@ -595,6 +629,7 @@ export const RichEditor = forwardRef<HTMLDivElement, RichEditorProps>(
 			if (!view || view.props.scrollMargin === scrollMargin) return
 			view.setProps({ scrollMargin, scrollThreshold: scrollMargin })
 		}, [scrollMargin])
+		bandRef.current = { top: scrollTop, bottom: scrollMargin }
 
 		/* A picture uploaded this visit: the picture nodes resolve again. */
 		useLayoutEffect(() => {

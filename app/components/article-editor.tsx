@@ -1245,6 +1245,7 @@ export function ArticleEditor({
 				changedFrom={changed?.from ?? null}
 				locked={locked}
 				scrollMargin={wide ? 0 : dockHeight}
+				scrollTop={wide ? 0 : stickyTop}
 				onChange={updateBody}
 				onBlur={() => void autoSave.flush(false, 0)}
 				onFocusChange={focused => {

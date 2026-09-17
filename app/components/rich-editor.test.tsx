@@ -13,6 +13,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import {
 	RICH_EDITOR_COPY,
 	RichEditor,
+	scrollCaretIntoBand,
 	type EditorSelection,
 	type RichEditorProps,
 } from '#app/components/rich-editor.tsx'
@@ -487,4 +488,34 @@ test('a selection that starts where a link ends is not on that link', () => {
 	expect(last().link).toBe('https://a.b')
 	select(view, now.to)
 	expect(last().link).toBeNull()
+})
+
+test('on the phone the caret scrolls into the band between the top bar and the dock, measured against the visual viewport', () => {
+	const scrollBy = vi.fn()
+	const win = {
+		visualViewport: { offsetTop: 100, height: 500 } as VisualViewport,
+		innerHeight: 800,
+		scrollBy,
+	}
+	const at = (top: number, bottom: number) =>
+		({
+			state: { selection: { head: 1 } },
+			coordsAtPos: () => ({ top, bottom, left: 0, right: 0 }),
+		}) as unknown as Pick<EditorView, 'coordsAtPos' | 'state'>
+	const band = { top: 44, bottom: 60 }
+	// the band is [100 + 44 + 8, 600 - 60 - 8] = [152, 532]
+	expect(scrollCaretIntoBand(at(300, 320), band, win)).toBe(true)
+	expect(scrollBy).not.toHaveBeenCalled()
+	expect(scrollCaretIntoBand(at(560, 580), band, win)).toBe(true)
+	expect(scrollBy).toHaveBeenLastCalledWith(0, 580 - 532)
+	expect(scrollCaretIntoBand(at(120, 140), band, win)).toBe(true)
+	expect(scrollBy).toHaveBeenLastCalledWith(0, 120 - 152)
+	// no dock: ProseMirror keeps its own scrolling
+	expect(scrollCaretIntoBand(at(560, 580), { top: 0, bottom: 0 }, win)).toBe(
+		false,
+	)
+	// no visual viewport: the window height stands in
+	const plain = { visualViewport: null, innerHeight: 800, scrollBy: vi.fn() }
+	expect(scrollCaretIntoBand(at(790, 800), band, plain)).toBe(true)
+	expect(plain.scrollBy).toHaveBeenLastCalledWith(0, 800 - (800 - 60 - 8))
 })
