@@ -91,12 +91,15 @@ import { useKeyboardInset, useMeasuredHeight } from '#app/utils/viewport.ts'
  * what she sees. Render it inside a <Form method="post"> whose onSubmit is
  * `useSubmitAfterSave(flushRef)`.
  *
- * Phone: a fixed dock at the bottom holds the status line, the format row
- * (while the caret is in the article) and the composer, with the save mark
- * at the end of its row; a tab on the dock's top edge opens the
- * conversation as a sheet. Desktop (lg): a launcher bottom-right opens it
- * as a popup. Every piece of chat state lives here; the shell components
- * (chat-shell.tsx) only place it.
+ * Phone: a fixed dock at the bottom holds the status line and the composer,
+ * with the save mark at the end of its row; a tab on the dock's top edge
+ * opens the conversation as a sheet. While the caret is in the article
+ * (or the link row is open) the dock folds to the format row alone, with
+ * the save mark at its end: the keyboard leaves little room. The composer
+ * and the status line return when the article lets go of the focus.
+ * Desktop (lg): a launcher bottom-right opens it as a popup. Every piece
+ * of chat state lives here; the shell components (chat-shell.tsx) only
+ * place it.
  *
  * Grill me starts a grill: the server asks what only she knows, one
  * question at a time (assistant rows with toolName `grill_question`), and
@@ -499,7 +502,7 @@ export function ArticleEditor({
 	)
 	/** The article takes no input while a chat turn runs: the answer lands on the text it was built on. */
 	const locked = running
-	const keyboardInset = useKeyboardInset(!wide)
+	const keyboard = useKeyboardInset(!wide)
 	const dockHeight = useMeasuredHeight(dockRef)
 
 	const openChat = useCallback(() => {
@@ -652,13 +655,19 @@ export function ArticleEditor({
 
 	const onPickQuote = useCallback(
 		(text: string) => {
-			setQuote(text)
 			if (wide) {
+				setQuote(text)
 				openChat()
 				const list = document.querySelector('[data-chat-list]')
 				if (list) list.scrollTop = list.scrollHeight
 			} else {
-				// In the same gesture, so iOS opens the keyboard when it can.
+				// The dock holds the format row alone while the article has the
+				// focus, so the composer must be back before it can take the
+				// focus: in the same gesture, so iOS opens the keyboard when it can.
+				flushSync(() => {
+					setQuote(text)
+					setEditorFocused(false)
+				})
 				boxRef.current?.focus()
 			}
 		},
@@ -1039,7 +1048,9 @@ export function ArticleEditor({
 	 * The phone's chat lives in the dock: the composer row with the save mark
 	 * at its end, and the conflict card above them so the choice is on
 	 * screen. Elsewhere the card is in flow above the article and the save
-	 * mark goes into the route's bar.
+	 * mark goes into the route's bar. While the format row shows, the dock
+	 * holds it alone (the card stays: its choice blocks the save) and the
+	 * save mark ends that row instead.
 	 */
 	const chatInDock = !wide && chatSurface
 	const conflictCard = autoSave.conflict ? (
@@ -1248,7 +1259,8 @@ export function ArticleEditor({
 	const dock = dockOn ? (
 		<ChatDock
 			ref={dockRef}
-			keyboardInset={keyboardInset}
+			keyboardInset={keyboard.inset}
+			viewportBottom={keyboard.bottom}
 			chat={
 				chatSurface
 					? { open: chatOpen, onOpen: openChat, onClose: closeChat }
@@ -1256,7 +1268,7 @@ export function ArticleEditor({
 			}
 		>
 			{chatInDock ? conflictCard : null}
-			{chatOn && !chatOpen ? (
+			{chatOn && !chatOpen && !formatRowOn ? (
 				<StatusLine
 					running={running}
 					entry={statusEntry}
@@ -1269,8 +1281,13 @@ export function ArticleEditor({
 					onRetry={payload => void send(payload)}
 				/>
 			) : null}
-			{formatRowOn ? <FormatRow {...toolbarProps} /> : null}
-			{!chatSurface ? null : composerNote ? (
+			{formatRowOn ? (
+				<FormatRow
+					{...toolbarProps}
+					trailing={chatInDock ? saveState : undefined}
+				/>
+			) : null}
+			{!chatSurface || formatRowOn ? null : composerNote ? (
 				// The note takes the composer's place; the save mark keeps the row's end.
 				<div className="flex items-center gap-2 pr-3">
 					<div className="min-w-0 flex-1">
@@ -1292,7 +1309,8 @@ export function ArticleEditor({
 		!wide && chatOpen ? (
 			<ChatSheet
 				stickyTop={stickyTop}
-				keyboardInset={keyboardInset}
+				keyboardInset={keyboard.inset}
+				viewportBottom={keyboard.bottom}
 				dockHeight={dockHeight}
 				onClose={closeChat}
 			>

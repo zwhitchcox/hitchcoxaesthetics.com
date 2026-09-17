@@ -46,15 +46,17 @@ import {
 } from '#app/utils/review-events.server.ts'
 import { redirectWithToast } from '#app/utils/toast.server.ts'
 import { useMeasuredHeight } from '#app/utils/viewport.ts'
+import {
+	ARTICLE_TOPICS,
+	REWRITE_TOPIC_COPY,
+	rewriteNote,
+} from '#app/utils/article-topics.ts'
 
 export const handle: SEOHandle & { stickyToWindow: boolean } = {
 	getSitemapEntries: () => null,
 	/** No scroll box around this page (admin _layout): the decision bar sticks to the window. */
 	stickyToWindow: true,
 }
-
-/** The reviewNote for "Write a different article". The mini reads the prefix; she adds no words. */
-const NEW_ARTICLE_NOTE = 'NEW ARTICLE: a different article'
 
 export const REWRITE_COPY = {
 	action: 'Write a different article',
@@ -191,8 +193,8 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			})
 		}
 		case 'rewrite': {
-			// "Write a different article": a clean-room draft from the mini. No
-			// note goes with it: the writer never sees this text.
+			// "Write a different article": a clean-room draft from the mini. The
+			// writer never sees this text; it gets the topic she chose, if any.
 			if (article.status !== 'pending') {
 				return json({ error: 'This one is already decided.' }, { status: 400 })
 			}
@@ -200,7 +202,10 @@ export async function action({ params, request }: ActionFunctionArgs) {
 				where: { id },
 				data: {
 					status: 'changes_requested',
-					reviewNote: NEW_ARTICLE_NOTE,
+					reviewNote: rewriteNote({
+						topic: String(form.get('topic') ?? ''),
+						words: String(form.get('words') ?? ''),
+					}),
 					rewriteRequested: true,
 					reviewedAt: now,
 					reviewedBy: who,
@@ -705,7 +710,48 @@ function Editor({
 	)
 }
 
-/** "Write a different article": the confirm sheet. No note: the writer never sees this text. */
+/** The topic choice inside a "Write a different article" sheet: the bank as a select, or her own words. */
+export function RewriteTopicFields({ idPrefix }: { idPrefix: string }) {
+	return (
+		<div className="space-y-2">
+			<label
+				htmlFor={`${idPrefix}-topic`}
+				className="block text-sm font-medium"
+			>
+				{REWRITE_TOPIC_COPY.label}
+			</label>
+			<select
+				id={`${idPrefix}-topic`}
+				name="topic"
+				defaultValue=""
+				className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+			>
+				<option value="">{REWRITE_TOPIC_COPY.writerChooses}</option>
+				{ARTICLE_TOPICS.map(t => (
+					<option key={t.key} value={t.key}>
+						{t.title}
+					</option>
+				))}
+			</select>
+			<label
+				htmlFor={`${idPrefix}-words`}
+				className="block text-sm font-medium"
+			>
+				{REWRITE_TOPIC_COPY.wordsLabel}
+			</label>
+			<input
+				id={`${idPrefix}-words`}
+				name="words"
+				type="text"
+				maxLength={300}
+				placeholder={REWRITE_TOPIC_COPY.wordsPlaceholder}
+				className="h-10 w-full rounded-md border bg-background px-3 text-sm placeholder:text-muted-foreground/60"
+			/>
+		</div>
+	)
+}
+
+/** "Write a different article": the confirm sheet with the topic choice. The writer never sees this text. */
 function RewriteSheet({
 	publisherWaiting,
 	busy,
@@ -727,6 +773,7 @@ function RewriteSheet({
 						{REWRITE_COPY.publisherWaiting}
 					</p>
 				) : null}
+				<RewriteTopicFields idPrefix="admin-rewrite" />
 				{error ? <SheetError>{error}</SheetError> : null}
 				<div className="flex flex-wrap items-center gap-2">
 					<Button

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useRef } from 'react'
 import {
 	ChatRow,
 	DOCK_TARGET_CLASS,
@@ -8,6 +8,7 @@ import {
 } from '#app/components/article-chat.tsx'
 import { Icon } from '#app/components/ui/icon'
 import { cn } from '#app/utils/misc.tsx'
+import { useMeasuredHeight } from '#app/utils/viewport.ts'
 
 /**
  * The chat's shell: where the chat sits on the page. The phone has a fixed
@@ -19,8 +20,10 @@ import { cn } from '#app/utils/misc.tsx'
  *
  * Geometry goes through CSS variables and classes, not inline `calc()`:
  * `--editor-top` and `--editor-bottom` come from the editor root (the
- * page's sticky bars), `--keyboard-inset` is the software keyboard's height
- * and `--dock-height` the dock's measured height.
+ * page's sticky bars) and `--dock-height` is the dock's measured height.
+ * The software keyboard is the one inline value: while it is up, the dock
+ * and the sheet are placed from the visual viewport's bottom edge
+ * (`viewportBottom`, see ChatDock), not from the layout viewport's bottom.
  */
 
 export const CHAT_SHELL_COPY = {
@@ -38,11 +41,12 @@ export const SHEET_SWIPE_PX = 60
 
 const CHAT_SHEET_ID = 'article-chat-sheet'
 const CHAT_POPUP_ID = 'article-chat-popup'
-/** Above the page's bottom bar, plus the keyboard when it is up. */
-const DOCK_BOTTOM_CLASS =
-	'bottom-[calc(var(--keyboard-inset)+var(--editor-bottom))]'
+/** Above the page's bottom bar, while the keyboard is down. */
+const DOCK_BOTTOM_CLASS = 'bottom-[var(--editor-bottom)]'
+/** The keyboard is up: anchored at the top, moved down by a transform, and no more padding than the row needs. */
+const DOCK_KEYBOARD_CLASS = 'top-0 py-1'
 const SHEET_BOTTOM_CLASS =
-	'bottom-[calc(var(--keyboard-inset)+var(--dock-height)+var(--editor-bottom))]'
+	'bottom-[calc(var(--dock-height)+var(--editor-bottom))]'
 const CORNER_BOTTOM_CLASS = 'bottom-[calc(var(--editor-bottom)+1rem)]'
 const POPUP_HEIGHT_CLASS =
 	'h-[min(70vh,calc(100vh-var(--editor-top)-var(--editor-bottom)-2rem))]'
@@ -56,10 +60,19 @@ const noop = () => {}
 
 /**
  * The fixed container at the bottom of the phone screen. One DOM element in
- * both chat states, so the composer inside it never remounts. It rises with
- * the keyboard (`keyboardInset`) and sits above the page's bottom bar. The
- * ChatComposer inside it takes `className="space-y-2 px-3 pt-2"` (the dock's
- * own top line is the only one) and `trailing={<SaveState … />}`.
+ * both chat states, so the composer inside it never remounts. With the
+ * keyboard down it sits above the page's bottom bar. The ChatComposer
+ * inside it takes `className="space-y-2 px-3 pt-2"` (the dock's own top
+ * line is the only one) and `trailing={<SaveState … />}`.
+ *
+ * While the keyboard is up (`keyboardInset` > 0) the dock hugs it: it is
+ * anchored at the top of the layout viewport and a transform moves it down
+ * to the visual viewport's bottom edge (`viewportBottom`) less its own
+ * measured height. iOS positions a fixed element against the layout
+ * viewport, whose height is not always `innerHeight`, so a `bottom` offset
+ * can float above the keyboard or hide under it; an offset from the top to
+ * the visual viewport's own edge cannot. The keyboard leaves little room,
+ * so the padding is then the least (`py-1`, no safe area).
  *
  * With `chat`, a small tab protrudes from the dock's top edge on the right
  * and opens or closes the sheet; the dock is `fixed`, so the tab's
@@ -70,21 +83,38 @@ export const ChatDock = forwardRef<
 	HTMLDivElement,
 	{
 		keyboardInset: number
+		/** px from the layout viewport's top to the visual viewport's bottom edge (useKeyboardInset). */
+		viewportBottom: number
 		chat?: { open: boolean; onOpen: () => void; onClose: () => void }
 		children: React.ReactNode
 	}
->(function ChatDock({ keyboardInset, chat, children }, ref) {
+>(function ChatDock({ keyboardInset, viewportBottom, chat, children }, ref) {
+	// The dock measures itself for the transform; the forwarded ref gets the same element.
+	const ownRef = useRef<HTMLDivElement | null>(null)
+	const setRef = useCallback(
+		(el: HTMLDivElement | null) => {
+			ownRef.current = el
+			if (typeof ref === 'function') ref(el)
+			else if (ref) ref.current = el
+		},
+		[ref],
+	)
+	const height = useMeasuredHeight(ownRef)
+	const onKeyboard = keyboardInset > 0
 	return (
 		<div
-			ref={ref}
+			ref={setRef}
 			data-chat-dock=""
 			className={cn(
 				'fixed inset-x-0 z-30 overflow-visible border-t bg-background/95 backdrop-blur',
-				DOCK_BOTTOM_CLASS,
-				keyboardInset ? 'pb-2' : SAFE_AREA_PADDING_CLASS,
+				onKeyboard
+					? DOCK_KEYBOARD_CLASS
+					: cn(DOCK_BOTTOM_CLASS, SAFE_AREA_PADDING_CLASS),
 			)}
 			style={
-				{ '--keyboard-inset': `${keyboardInset}px` } as React.CSSProperties
+				onKeyboard
+					? { transform: `translate3d(0, ${viewportBottom - height}px, 0)` }
+					: undefined
 			}
 		>
 			{chat ? (
@@ -201,11 +231,14 @@ function cutAnswer(text: string): string {
 /**
  * The phone chat, fixed between the page's top bar and the dock. Not modal:
  * the top bar and the dock stay in reach. Closes on the `×`, Escape, and a
- * swipe down its header. Mount it only while the chat is open.
+ * swipe down its header. Mount it only while the chat is open. While the
+ * keyboard is up its bottom edge is the dock's top edge, measured from the
+ * visual viewport as the dock is (see ChatDock).
  */
 export function ChatSheet({
 	stickyTop,
 	keyboardInset,
+	viewportBottom,
 	dockHeight,
 	onClose,
 	children,
@@ -213,6 +246,8 @@ export function ChatSheet({
 	/** px: the page's sticky top bar; the sheet starts under it. */
 	stickyTop: number
 	keyboardInset: number
+	/** px from the layout viewport's top to the visual viewport's bottom edge (useKeyboardInset). */
+	viewportBottom: number
 	dockHeight: number
 	onClose: () => void
 	/** The ChatList, with `className="min-h-0 flex-1 overscroll-contain px-4 pb-7"` (the dock's tab covers the list's bottom-right corner). */
@@ -227,6 +262,7 @@ export function ChatSheet({
 	}, [onClose])
 
 	const swipe = useRef<{ startY: number; passed: boolean } | null>(null)
+	const onKeyboard = keyboardInset > 0
 
 	return (
 		<section
@@ -235,14 +271,18 @@ export function ChatSheet({
 			aria-label={CHAT_SHELL_COPY.chatTitle}
 			className={cn(
 				'fixed inset-x-0 z-[29] flex flex-col bg-background motion-safe:animate-in motion-safe:slide-in-from-bottom motion-safe:duration-200',
-				SHEET_BOTTOM_CLASS,
+				onKeyboard ? null : SHEET_BOTTOM_CLASS,
 			)}
 			style={
-				{
-					top: `${stickyTop}px`,
-					'--keyboard-inset': `${keyboardInset}px`,
-					'--dock-height': `${dockHeight}px`,
-				} as React.CSSProperties
+				onKeyboard
+					? {
+							top: `${stickyTop}px`,
+							height: `${Math.max(0, viewportBottom - dockHeight - stickyTop)}px`,
+						}
+					: ({
+							top: `${stickyTop}px`,
+							'--dock-height': `${dockHeight}px`,
+						} as React.CSSProperties)
 			}
 		>
 			<div

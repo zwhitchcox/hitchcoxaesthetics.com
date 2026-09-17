@@ -141,7 +141,9 @@ function ToolButton({
 /**
  * The seven controls, shared by the row and the bubble. A heading action
  * shows its letters alone. `compact` (the phone row) shows "Comment" on
- * the comment button; its name stays "Comment on this".
+ * the comment button (its name stays "Comment on this") and closes up the
+ * space around it: the row, its save mark included, must fit a 375 px
+ * screen on one line.
  */
 function FormatButtons({
 	selection,
@@ -184,7 +186,10 @@ function FormatButtons({
 				<>
 					<hr
 						aria-orientation="vertical"
-						className="mx-1 h-6 w-px shrink-0 border-0 bg-border"
+						className={cn(
+							'h-6 w-px shrink-0 border-0 bg-border',
+							compact ? 'mx-0.5' : 'mx-1',
+						)}
 					/>
 					<ToolButton
 						label={TOOLBAR_COPY.comment}
@@ -192,7 +197,7 @@ function FormatButtons({
 						onAct={() => {
 							if (quote !== null) comment(quote)
 						}}
-						className={cn(buttonClass, 'ml-auto px-2')}
+						className={cn(buttonClass, 'ml-auto', compact ? 'px-1.5' : 'px-2')}
 					>
 						{compact ? null : <Icon name="chat-bubble" size="sm" />}
 						<span>
@@ -205,7 +210,12 @@ function FormatButtons({
 	)
 }
 
-/** The phone row in the dock: a plain wrapping row of ghost buttons (no band, no border), or the link row in their place. */
+/**
+ * The phone row in the dock: a plain wrapping row of ghost buttons (no
+ * band, no border), or the link row in their place. `trailing` (the dock's
+ * save mark) ends either row. The gaps are the least that keep the buttons
+ * apart, so the whole row fits a 375 px screen on one line.
+ */
 export function FormatRow({
 	selection,
 	onCommand,
@@ -215,15 +225,26 @@ export function FormatRow({
 	onLinkDone,
 	view,
 	locked,
-}: ToolbarProps) {
+	trailing,
+}: ToolbarProps & {
+	/** Rendered at the row's right end, after the last button. */
+	trailing?: React.ReactNode
+}) {
 	if (!view || (locked ?? !view.editable)) return null
 	if (linkOpen)
-		return <LinkRow view={view} selection={selection} onDone={onLinkDone} />
+		return (
+			<div className="flex items-center pr-2">
+				<div className="min-w-0 flex-1">
+					<LinkRow view={view} selection={selection} onDone={onLinkDone} />
+				</div>
+				{trailing}
+			</div>
+		)
 	return (
 		<div
 			role="toolbar"
 			aria-label={TOOLBAR_COPY.toolbar}
-			className="flex flex-wrap items-center gap-1 px-2 pt-1"
+			className="flex flex-wrap items-center gap-0.5 px-1 pt-1"
 		>
 			<FormatButtons
 				selection={selection}
@@ -233,6 +254,7 @@ export function FormatRow({
 				buttonClass="h-11 min-w-10 rounded-md"
 				compact
 			/>
+			{trailing}
 		</div>
 	)
 }

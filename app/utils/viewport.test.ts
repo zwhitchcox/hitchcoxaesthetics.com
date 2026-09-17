@@ -102,7 +102,7 @@ test('useKeyboardInset is 0 without visualViewport and 0 when disabled', () => {
 	expect(window.visualViewport).toBeUndefined()
 	focusedInput()
 	const bare = renderHook(() => useKeyboardInset(true))
-	expect(bare.result.current).toBe(0)
+	expect(bare.result.current).toEqual({ inset: 0, bottom: 0 })
 
 	Object.defineProperty(window, 'innerHeight', {
 		value: INNER_HEIGHT,
@@ -111,10 +111,10 @@ test('useKeyboardInset is 0 without visualViewport and 0 when disabled', () => {
 	})
 	fakeViewport({ height: 500, offsetTop: 0 })
 	const off = renderHook(() => useKeyboardInset(false))
-	expect(off.result.current).toBe(0)
+	expect(off.result.current).toEqual({ inset: 0, bottom: 0 })
 })
 
-test('useKeyboardInset follows visualViewport resize and scroll', () => {
+test('useKeyboardInset follows visualViewport resize and scroll, with the inset and the bottom edge from one measure', () => {
 	useFrameTimers()
 	Object.defineProperty(window, 'innerHeight', {
 		value: INNER_HEIGHT,
@@ -124,24 +124,43 @@ test('useKeyboardInset follows visualViewport resize and scroll', () => {
 	const vv = fakeViewport({ height: 500, offsetTop: 0 })
 	focusedInput()
 	const { result } = renderHook(() => useKeyboardInset(true))
-	expect(result.current).toBe(300)
+	expect(result.current).toEqual({ inset: 300, bottom: 500 })
 
+	// The visual viewport pans down 40 px inside the layout viewport: the
+	// keyboard's edge is 40 px lower, and the inset 40 px smaller.
 	vv.offsetTop = 40
 	act(() => {
 		vv.dispatchEvent(new Event('scroll'))
 	})
 	frame()
-	expect(result.current).toBe(260)
+	expect(result.current).toEqual({ inset: 260, bottom: 540 })
+
+	// A pan that changes nothing keeps the same object: no re-render.
+	const before = result.current
+	act(() => {
+		vv.dispatchEvent(new Event('scroll'))
+	})
+	frame()
+	expect(result.current).toBe(before)
 
 	vv.height = INNER_HEIGHT - 40
 	act(() => {
 		vv.dispatchEvent(new Event('resize'))
 	})
 	frame()
-	expect(result.current).toBe(0)
+	expect(result.current).toEqual({ inset: 0, bottom: INNER_HEIGHT })
+
+	// Fractions round to whole px.
+	vv.offsetTop = 40.4
+	vv.height = 500.3
+	act(() => {
+		vv.dispatchEvent(new Event('resize'))
+	})
+	frame()
+	expect(result.current).toEqual({ inset: 259, bottom: 541 })
 })
 
-test('useKeyboardInset clamps to 0 when nothing has focus and re-measures after focusout', () => {
+test('useKeyboardInset clamps the inset to 0 when nothing has focus (the bottom edge stays measured) and re-measures after focusout', () => {
 	useFrameTimers()
 	Object.defineProperty(window, 'innerHeight', {
 		value: INNER_HEIGHT,
@@ -151,7 +170,7 @@ test('useKeyboardInset clamps to 0 when nothing has focus and re-measures after 
 	fakeViewport({ height: 500, offsetTop: 0 })
 	const input = focusedInput()
 	const { result } = renderHook(() => useKeyboardInset(true))
-	expect(result.current).toBe(300)
+	expect(result.current).toEqual({ inset: 300, bottom: 500 })
 
 	// The keyboard closes but the viewport stays short (iOS 26).
 	act(() => {
@@ -160,19 +179,19 @@ test('useKeyboardInset clamps to 0 when nothing has focus and re-measures after 
 	act(() => {
 		vi.advanceTimersByTime(KEYBOARD_SETTLE_MS - 100)
 	})
-	expect(result.current).toBe(300)
+	expect(result.current.inset).toBe(300)
 	act(() => {
 		vi.advanceTimersByTime(100)
 	})
 	frame()
-	expect(result.current).toBe(0)
+	expect(result.current).toEqual({ inset: 0, bottom: 500 })
 
 	// The focus returns: measured at once.
 	act(() => {
 		input.focus()
 	})
 	frame()
-	expect(result.current).toBe(300)
+	expect(result.current).toEqual({ inset: 300, bottom: 500 })
 })
 
 test('useMeasuredHeight reports the element height, follows a ResizeObserver, and is 0 for a null ref', () => {

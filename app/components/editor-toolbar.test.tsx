@@ -439,7 +439,7 @@ test('the phone row is a plain wrapping row with no band: 44 px buttons, letters
 	const editor = mount('row', { comment: vi.fn() })
 	editor.selectText('20 units')
 	const row = toolbar()!
-	expect(row.className).toBe('flex flex-wrap items-center gap-1 px-2 pt-1')
+	expect(row.className).toBe('flex flex-wrap items-center gap-0.5 px-1 pt-1')
 	expect(row.className).not.toMatch(/border|bg-|overflow/)
 	for (const el of within(row).getAllByRole('button')) {
 		expect(el.className, el.getAttribute('aria-label') ?? '').toContain('h-11')

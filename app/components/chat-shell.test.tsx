@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createRef } from 'react'
-import { expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import {
 	ARTICLE_CHAT_COPY,
 	ChatComposer,
@@ -75,6 +75,27 @@ function iconOf(button: HTMLElement): string {
 function pointer(el: Element, type: string, clientY: number) {
 	fireEvent(el, new MouseEvent(type, { bubbles: true, clientY }))
 }
+
+/** jsdom has no ResizeObserver: the dock measures itself through this one. */
+class FakeResizeObserver {
+	static instances: FakeResizeObserver[] = []
+	observed: Element[] = []
+	constructor(private callback: () => void) {
+		FakeResizeObserver.instances.push(this)
+	}
+	observe(el: Element) {
+		this.observed.push(el)
+	}
+	disconnect() {}
+	fire() {
+		this.callback()
+	}
+}
+
+afterEach(() => {
+	vi.unstubAllGlobals()
+	FakeResizeObserver.instances = []
+})
 
 /* ------------------------------------------------------------------------ */
 /* The status line                                                          */
@@ -203,10 +224,11 @@ test('the status line is absent with nothing unseen and no turn running: the inv
 /* The dock and its tab, the sheet                                          */
 /* ------------------------------------------------------------------------ */
 
-test('the dock sits at the keyboard inset plus the page bottom bar and drops the safe-area padding with the keyboard up', () => {
+test('the dock sits above the page bottom bar with the keyboard down, and hugs the keyboard from the visual viewport’s bottom edge with it up', () => {
+	vi.stubGlobal('ResizeObserver', FakeResizeObserver)
 	const ref = createRef<HTMLDivElement>()
 	const { container, rerender } = render(
-		<ChatDock keyboardInset={120} ref={ref}>
+		<ChatDock keyboardInset={0} viewportBottom={844} ref={ref}>
 			<p>the composer</p>
 		</ChatDock>,
 	)
@@ -214,24 +236,61 @@ test('the dock sits at the keyboard inset plus the page bottom bar and drops the
 	if (!dock) throw new Error('no dock')
 	expect(ref.current).toBe(dock)
 	expect(dock).toHaveTextContent('the composer')
-	expect(dock.className).toContain('fixed')
-	expect(dock.className).toContain(
-		'bottom-[calc(var(--keyboard-inset)+var(--editor-bottom))]',
-	)
-	expect(dock.style.getPropertyValue('--keyboard-inset')).toBe('120px')
-	expect(dock.className).toContain('pb-2')
-	expect(dock.className).not.toContain('safe-area-inset-bottom')
+	const classes = () => dock.className.split(' ')
+	expect(classes()).toContain('fixed')
+	expect(classes()).toContain('bottom-[var(--editor-bottom)]')
+	expect(classes()).toContain('pb-[max(0.75rem,env(safe-area-inset-bottom))]')
+	expect(classes()).not.toContain('top-0')
+	expect(classes()).not.toContain('py-1')
+	expect(dock.style.transform).toBe('')
 
+	// The dock measures itself: 72 px tall.
+	dock.getBoundingClientRect = () => ({ height: 72 }) as DOMRect
+	const observer = FakeResizeObserver.instances[0]
+	if (!observer) throw new Error('the dock has no ResizeObserver')
+	expect(observer.observed).toEqual([dock])
+	act(() => {
+		observer.fire()
+	})
+
+	// The keyboard is up: the visual viewport ends 500 px from the layout
+	// viewport's top, so the dock's top goes to 500 - 72.
 	rerender(
-		<ChatDock keyboardInset={0} ref={ref}>
+		<ChatDock keyboardInset={300} viewportBottom={500} ref={ref}>
 			<p>the composer</p>
 		</ChatDock>,
 	)
-	expect(dock.style.getPropertyValue('--keyboard-inset')).toBe('0px')
-	expect(dock.className).toContain(
-		'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+	expect(ref.current).toBe(dock)
+	expect(classes()).toContain('top-0')
+	expect(classes()).toContain('py-1')
+	expect(classes()).not.toContain('bottom-[var(--editor-bottom)]')
+	expect(dock.className).not.toContain('safe-area-inset-bottom')
+	expect(dock.style.transform).toBe('translate3d(0, 428px, 0)')
+
+	// The visual viewport pans 40 px: the dock follows its edge.
+	rerender(
+		<ChatDock keyboardInset={260} viewportBottom={540} ref={ref}>
+			<p>the composer</p>
+		</ChatDock>,
 	)
-	expect(dock.className).not.toContain('pb-2')
+	expect(dock.style.transform).toBe('translate3d(0, 468px, 0)')
+
+	// The dock grows (a longer row): the transform keeps its bottom on the edge.
+	dock.getBoundingClientRect = () => ({ height: 100 }) as DOMRect
+	act(() => {
+		observer.fire()
+	})
+	expect(dock.style.transform).toBe('translate3d(0, 440px, 0)')
+
+	// The keyboard goes down: back to the bottom class, and no transform.
+	rerender(
+		<ChatDock keyboardInset={0} viewportBottom={844} ref={ref}>
+			<p>the composer</p>
+		</ChatDock>,
+	)
+	expect(classes()).toContain('bottom-[var(--editor-bottom)]')
+	expect(classes()).not.toContain('top-0')
+	expect(dock.style.transform).toBe('')
 })
 
 test('the composer note line drops its top border inside the dock', () => {
@@ -268,11 +327,12 @@ test('the composer note line drops its top border inside the dock', () => {
 	expect(alone?.className).toContain('border-t')
 })
 
-test("the sheet's top is stickyTop and its bottom is the inset plus the dock height", () => {
-	render(
+test("the sheet's top is stickyTop; its bottom is the dock height above the page bar, or the dock's top edge from the visual viewport with the keyboard up", () => {
+	const { rerender } = render(
 		<ChatSheet
 			stickyTop={44}
-			keyboardInset={120}
+			keyboardInset={0}
+			viewportBottom={844}
 			dockHeight={96}
 			onClose={vi.fn()}
 		>
@@ -283,15 +343,31 @@ test("the sheet's top is stickyTop and its bottom is the inset plus the dock hei
 	expect(sheet.id).toBe('article-chat-sheet')
 	expect(sheet).not.toHaveAttribute('aria-modal')
 	expect(sheet.style.top).toBe('44px')
-	expect(sheet.style.getPropertyValue('--keyboard-inset')).toBe('120px')
 	expect(sheet.style.getPropertyValue('--dock-height')).toBe('96px')
 	expect(sheet.className).toContain(
-		'bottom-[calc(var(--keyboard-inset)+var(--dock-height)+var(--editor-bottom))]',
+		'bottom-[calc(var(--dock-height)+var(--editor-bottom))]',
 	)
+	expect(sheet.style.height).toBe('')
 	expect(
 		within(sheet).getByRole('heading', { name: CHAT_SHELL_COPY.chatTitle }),
 	).toBeInTheDocument()
 	expect(sheet).toHaveTextContent('the list')
+
+	// The keyboard is up: the sheet ends where the dock starts, 500 - 96.
+	rerender(
+		<ChatSheet
+			stickyTop={44}
+			keyboardInset={300}
+			viewportBottom={500}
+			dockHeight={96}
+			onClose={vi.fn()}
+		>
+			<p>the list</p>
+		</ChatSheet>,
+	)
+	expect(sheet.style.top).toBe('44px')
+	expect(sheet.style.height).toBe('360px')
+	expect(sheet.className).not.toContain('bottom-[')
 })
 
 test('the dock’s tab protrudes from its top edge, reads Open the chat then Close the chat with aria-expanded and aria-controls, and its icon flips; no tab without chat', async () => {
@@ -299,7 +375,11 @@ test('the dock’s tab protrudes from its top edge, reads Open the chat then Clo
 	const onOpen = vi.fn()
 	const onClose = vi.fn()
 	const { container, rerender } = render(
-		<ChatDock keyboardInset={0} chat={{ open: false, onOpen, onClose }}>
+		<ChatDock
+			keyboardInset={0}
+			viewportBottom={844}
+			chat={{ open: false, onOpen, onClose }}
+		>
 			<p>the composer</p>
 		</ChatDock>,
 	)
@@ -330,7 +410,11 @@ test('the dock’s tab protrudes from its top edge, reads Open the chat then Clo
 	expect(onClose).not.toHaveBeenCalled()
 
 	rerender(
-		<ChatDock keyboardInset={0} chat={{ open: true, onOpen, onClose }}>
+		<ChatDock
+			keyboardInset={0}
+			viewportBottom={844}
+			chat={{ open: true, onOpen, onClose }}
+		>
 			<p>the composer</p>
 		</ChatDock>,
 	)
@@ -344,7 +428,7 @@ test('the dock’s tab protrudes from its top edge, reads Open the chat then Clo
 
 	// an own-words row: no chat, so no tab
 	rerender(
-		<ChatDock keyboardInset={0}>
+		<ChatDock keyboardInset={0} viewportBottom={844}>
 			<p>the composer</p>
 		</ChatDock>,
 	)
@@ -359,6 +443,7 @@ test('Escape closes the sheet and the popup; a 60 px drag down the sheet header 
 		<ChatSheet
 			stickyTop={44}
 			keyboardInset={0}
+			viewportBottom={844}
 			dockHeight={80}
 			onClose={onCloseSheet}
 		>
@@ -514,6 +599,7 @@ test('a pointer down on the × does not capture the pointer, and its click close
 		<ChatSheet
 			stickyTop={44}
 			keyboardInset={0}
+			viewportBottom={844}
 			dockHeight={80}
 			onClose={onClose}
 		>

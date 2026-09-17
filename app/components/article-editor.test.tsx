@@ -1122,6 +1122,8 @@ test('Comment on this from the format row attaches the folded selection to the c
 
 	selectInArticle(CLAIM)
 	expect(comment.hasAttribute('disabled')).toBe(false)
+	// the folded dock has no box yet: the tap brings it back and focuses it in one gesture
+	expect(screen.queryByLabelText('Message')).toBeNull()
 	fireEvent.pointerDown(comment)
 
 	expect(
@@ -1129,7 +1131,86 @@ test('Comment on this from the format row attaches the folded selection to the c
 	).toBeTruthy()
 	expect(composer().placeholder).toBe(ARTICLE_CHAT_COPY.quotePlaceholder)
 	expect(document.activeElement).toBe(composer())
+	expect(
+		screen.queryByRole('toolbar', { name: TOOLBAR_COPY.toolbar }),
+	).toBeNull()
+	expect(dock().contains(saveState())).toBe(true)
 	expect(noChatSheet()).toBeNull()
+})
+
+test('the caret in the article folds the dock to the format row and the save mark; the composer and the status line return on blur', async () => {
+	const user = userEvent.setup()
+	mockFetch({ chat: chatChanged })
+	renderEditor()
+	const prose = await richEditor()
+	// a change turn first, so the status line has something to show
+	await user.type(composer(), THE_ASK)
+	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
+	await waitFor(() => expect(hiddenBody()).toBe(BODY_CHANGED))
+	expect(statusLine().textContent).toContain('Changed:')
+	expect(
+		screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }).parentElement,
+	).toContainElement(saveState())
+
+	fireEvent.focus(prose)
+	// only the format row, the save mark at its end, and the tab
+	const toolbar = within(dock()).getByRole('toolbar', {
+		name: TOOLBAR_COPY.toolbar,
+	})
+	expect(screen.queryByLabelText('Message')).toBeNull()
+	expect(
+		within(dock()).queryByRole('button', { name: ARTICLE_CHAT_COPY.send }),
+	).toBeNull()
+	expect(noStatusLine()).toBeNull()
+	expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
+	expect(toolbar.lastElementChild).toBe(saveState())
+	// the check from the turn's save is still readable there
+	expect(saveState().dataset.saveState).toBe('saved')
+	expect(
+		within(dock()).getByRole('button', { name: CHAT_SHELL_COPY.openChat }),
+	).toBeTruthy()
+	// nothing else in the dock: the card, the line and the box all wait
+	expect(dock().querySelectorAll(':scope > *')).toHaveLength(2)
+
+	fireEvent.blur(prose)
+	expect(
+		screen.queryByRole('toolbar', { name: TOOLBAR_COPY.toolbar }),
+	).toBeNull()
+	expect(composer()).toBeTruthy()
+	expect(statusLine().textContent).toContain('Changed:')
+	expect(document.querySelectorAll('[data-save-state]')).toHaveLength(1)
+	expect(
+		screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }).parentElement,
+	).toContainElement(saveState())
+})
+
+test('the link row keeps the save mark at its end inside the folded dock', async () => {
+	renderEditor()
+	const prose = await richEditor()
+	fireEvent.focus(prose)
+	selectInArticle('20 units')
+	fireEvent.pointerDown(
+		within(dock()).getByRole('button', { name: TOOLBAR_COPY.link }),
+	)
+	const address = within(dock()).getByLabelText(TOOLBAR_COPY.linkLabel)
+	expect(address).toBeTruthy()
+	expect(
+		screen.queryByRole('toolbar', { name: TOOLBAR_COPY.toolbar }),
+	).toBeNull()
+	expect(screen.queryByLabelText('Message')).toBeNull()
+	// the mark ends the link row, as it ends the format row
+	const linkRow = address.closest('[data-chat-dock] > *')
+	expect(linkRow?.lastElementChild).toBe(saveState())
+
+	fireEvent.click(
+		within(dock()).getByRole('button', { name: TOOLBAR_COPY.cancel }),
+	)
+	expect(within(dock()).queryByLabelText(TOOLBAR_COPY.linkLabel)).toBeNull()
+	const toolbar = within(dock()).getByRole('toolbar', {
+		name: TOOLBAR_COPY.toolbar,
+	})
+	expect(toolbar.lastElementChild).toBe(saveState())
+	expect(screen.queryByLabelText('Message')).toBeNull()
 })
 
 test('the format row shows while the article has focus and hides on blur and while running', async () => {
@@ -1153,25 +1234,35 @@ test('the format row shows while the article has focus and hides on blur and whi
 	// before the first turn there is no status line at all
 	expect(noStatusLine()).toBeNull()
 
-	// with the caret in the article the format row shows in the dock
+	// with the caret in the article the format row shows in the dock, alone
 	fireEvent.focus(prose)
 	expect(toolbar()).toBeTruthy()
 	expect(dock().contains(toolbar())).toBe(true)
 	expect(noStatusLine()).toBeNull()
+	expect(screen.queryByLabelText('Message')).toBeNull()
 	fireEvent.blur(prose)
 	expect(toolbar()).toBeNull()
 	expect(noStatusLine()).toBeNull()
+	expect(composer()).toBeTruthy()
 
-	fireEvent.focus(prose)
-	expect(toolbar()).toBeTruthy()
 	await user.type(composer(), THE_ASK)
 	await user.click(screen.getByRole('button', { name: ARTICLE_CHAT_COPY.send }))
 	await waitFor(() => expect(chatCalls(calls)).toHaveLength(1))
-	await waitFor(() => expect(toolbar()).toBeNull())
 	expect(statusLine().textContent).toContain(ARTICLE_CHAT_COPY.working)
+	// the article is locked while the turn runs: the caret in it brings no row, and the line stays
+	fireEvent.focus(prose)
+	expect(toolbar()).toBeNull()
+	expect(statusLine().textContent).toContain(ARTICLE_CHAT_COPY.working)
+	expect(composer()).toBeTruthy()
 
 	finishChat(chatChanged(asked))
 	await waitFor(() => expect(hiddenBody()).toBe(BODY_CHANGED))
+	// the turn is over and the caret is still in the article: the row is back, alone
+	await waitFor(() => expect(toolbar()).toBeTruthy())
+	expect(noStatusLine()).toBeNull()
+	expect(screen.queryByLabelText('Message')).toBeNull()
+	fireEvent.blur(prose)
+	expect(statusLine().textContent).toContain('Changed:')
 })
 
 test('Bold from the format row toggles the mark and serialises', async () => {

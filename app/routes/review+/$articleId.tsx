@@ -45,6 +45,13 @@ import {
 	type ZoomTarget,
 } from '#app/utils/article-images.ts'
 import { reviewerName } from '#app/utils/articles.server.ts'
+import {
+	REWRITE_TOPIC_COPY,
+	ARTICLE_TOPICS,
+	isRewriteNote,
+	rewriteNote,
+	rewriteWords,
+} from '#app/utils/article-topics.ts'
 import { formatDate, REFERENCE_NOTE } from '#app/utils/articles.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
@@ -98,8 +105,6 @@ const QUOTE_MAX_CHARS = 1000
 const PROSE_CLASS =
 	'prose prose-lg max-w-none dark:prose-invert [&_li]:leading-[1.6] [&_p]:leading-[1.6] [&_[data-paragraph]]:scroll-mt-4 [&_mark]:rounded-sm [&_mark]:bg-amber-200 [&_mark]:px-0.5 [&_mark]:text-inherit dark:[&_mark]:bg-amber-700 [&_.review-changed]:bg-green-200 dark:[&_.review-changed]:bg-green-800 [&_.review-marker]:my-4 [&_.review-marker]:inline-block [&_.review-marker]:rounded-full [&_.review-marker]:bg-primary [&_.review-marker]:px-3 [&_.review-marker]:py-1 [&_.review-marker]:text-xs [&_.review-marker]:font-medium [&_.review-marker]:text-primary-foreground'
 /** Her "Write a different article" note carries this prefix on the ledger. */
-const REWRITE_PREFIX = 'NEW ARTICLE: '
-const REWRITE_DEFAULT_NOTE = 'a different article'
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
@@ -206,7 +211,10 @@ export async function action({ params, request }: ActionFunctionArgs) {
 				where: { id },
 				data: {
 					status: 'changes_requested',
-					reviewNote: `${REWRITE_PREFIX}${REWRITE_DEFAULT_NOTE}`,
+					reviewNote: rewriteNote({
+						topic: String(form.get('topic') ?? ''),
+						words: String(form.get('words') ?? ''),
+					}),
 					rewriteRequested: true,
 					reviewedAt: now,
 					reviewedBy: who,
@@ -344,17 +352,6 @@ function scrollTo(el: Element | null | undefined) {
 
 function cardElementId(id: string): string {
 	return `feed-${id}`
-}
-
-/** Her words from a "Write a different article" note, or '' for the default. */
-function rewriteWords(note: string | null): string {
-	if (!note || !note.startsWith(REWRITE_PREFIX)) return ''
-	const words = note.slice(REWRITE_PREFIX.length).trim()
-	return words === REWRITE_DEFAULT_NOTE ? '' : words
-}
-
-function isRewriteNote(note: string | null): boolean {
-	return Boolean(note && note.startsWith(REWRITE_PREFIX))
 }
 
 /** The editor. With a quote, the chat starts with that passage attached. */
@@ -1495,6 +1492,41 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 						className="mt-3 space-y-3"
 					>
 						<input type="hidden" name="intent" value="rewrite" />
+						<div className="space-y-2">
+							<label
+								htmlFor={`review-rewrite-topic-${id}`}
+								className="block text-sm font-medium"
+							>
+								{REWRITE_TOPIC_COPY.label}
+							</label>
+							<select
+								id={`review-rewrite-topic-${id}`}
+								name="topic"
+								defaultValue=""
+								className="h-11 w-full rounded-md border bg-background px-3 text-base"
+							>
+								<option value="">{REWRITE_TOPIC_COPY.writerChooses}</option>
+								{ARTICLE_TOPICS.map(t => (
+									<option key={t.key} value={t.key}>
+										{t.title}
+									</option>
+								))}
+							</select>
+							<label
+								htmlFor={`review-rewrite-words-${id}`}
+								className="block text-sm font-medium"
+							>
+								{REWRITE_TOPIC_COPY.wordsLabel}
+							</label>
+							<input
+								id={`review-rewrite-words-${id}`}
+								name="words"
+								type="text"
+								maxLength={300}
+								placeholder={REWRITE_TOPIC_COPY.wordsPlaceholder}
+								className="h-11 w-full rounded-md border bg-background px-3 text-base placeholder:text-muted-foreground/60"
+							/>
+						</div>
 						{error && errorSheet === 'rewrite' ? (
 							<SheetError>{error}</SheetError>
 						) : null}

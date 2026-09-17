@@ -281,7 +281,7 @@ test('an admin can read, edit and approve an article', async ({
 		).toHaveCount(0)
 		await expect(page.getByLabel('Note for the writer')).toHaveCount(0)
 
-		// "Write a different article" opens the confirm sheet: no note field; Cancel keeps the article.
+		// "Write a different article" opens the confirm sheet with the topic choice; Cancel keeps the article.
 		await bar
 			.getByRole('button', { name: 'Write a different article', exact: true })
 			.click()
@@ -295,7 +295,17 @@ test('an admin can read, edit and approve an article', async ({
 				'The writer starts over with a new topic and never sees this text. The new article comes back here for you.',
 			),
 		).toBeVisible()
-		await expect(rewriteSheet.getByRole('textbox')).toHaveCount(0)
+		// the topic choice: the bank as a select, or her own words
+		const topicPick = rewriteSheet.getByRole('combobox', {
+			name: 'What should it be about?',
+		})
+		await expect(topicPick).toHaveValue('')
+		await expect(topicPick.locator('option')).toHaveCount(27)
+		await expect(
+			rewriteSheet.getByRole('textbox', {
+				name: 'Or say it in your own words (optional)',
+			}),
+		).toBeVisible()
 		await expect(
 			rewriteSheet.getByRole('button', {
 				name: 'Write a different article',

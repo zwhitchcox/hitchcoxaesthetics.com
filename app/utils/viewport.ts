@@ -9,18 +9,39 @@ import { useEffect, useRef, useState } from 'react'
 /** A `focusout` re-measure waits this long for the keyboard to close. */
 export const KEYBOARD_SETTLE_MS = 300
 
+/** The software keyboard, as the visual viewport shows it. */
+export type KeyboardViewport = {
+	/**
+	 * px between the layout viewport's bottom and the visual viewport's
+	 * bottom: the software keyboard's height on iOS. 0 on a wide screen
+	 * (`enabled` false), 0 with no `visualViewport`, and 0 while no element
+	 * has focus (iOS 26 leaves `visualViewport.height` short after the
+	 * keyboard closes; with nothing focused there is no keyboard).
+	 */
+	inset: number
+	/**
+	 * px from the layout viewport's top to the visual viewport's bottom
+	 * edge (`offsetTop + height`): the edge the dock sits on while the
+	 * keyboard is up. iOS positions a `fixed` element against the layout
+	 * viewport, whose height is not always `innerHeight`, so a `bottom`
+	 * offset can miss the keyboard; an offset from the top to this edge
+	 * does not. 0 until measured.
+	 */
+	bottom: number
+}
+
+const NO_KEYBOARD: KeyboardViewport = { inset: 0, bottom: 0 }
+
 /**
- * px between the layout viewport's bottom and the visual viewport's bottom:
- * the software keyboard's height on iOS. 0 on a wide screen (`enabled`
- * false), 0 with no `visualViewport`, and 0 while no element has focus (iOS
- * 26 leaves `visualViewport.height` short after the keyboard closes; with
- * nothing focused there is no keyboard).
+ * The keyboard's inset and the visual viewport's bottom edge, measured
+ * together on every visual viewport resize or scroll, so the two never
+ * come from different frames.
  */
-export function useKeyboardInset(enabled: boolean): number {
-	const [inset, setInset] = useState(0)
+export function useKeyboardInset(enabled: boolean): KeyboardViewport {
+	const [viewport, setViewport] = useState(NO_KEYBOARD)
 	useEffect(() => {
 		if (!enabled) {
-			setInset(0)
+			setViewport(NO_KEYBOARD)
 			return
 		}
 		const vv = window.visualViewport
@@ -31,13 +52,14 @@ export function useKeyboardInset(enabled: boolean): number {
 			frame = 0
 			const active = document.activeElement
 			const focused = active !== null && active !== document.body
-			setInset(
-				focused
-					? Math.max(
-							0,
-							Math.round(window.innerHeight - (vv.offsetTop + vv.height)),
-						)
-					: 0,
+			const bottom = Math.round(vv.offsetTop + vv.height)
+			const inset = focused
+				? Math.max(0, Math.round(window.innerHeight) - bottom)
+				: 0
+			setViewport(current =>
+				current.inset === inset && current.bottom === bottom
+					? current
+					: { inset, bottom },
 			)
 		}
 		const queue = () => {
@@ -63,7 +85,7 @@ export function useKeyboardInset(enabled: boolean): number {
 			document.removeEventListener('focusout', onFocusOut)
 		}
 	}, [enabled])
-	return inset
+	return viewport
 }
 
 /**

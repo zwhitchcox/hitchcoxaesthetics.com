@@ -1210,11 +1210,17 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 				'The writer starts over with a new topic and never sees this text. The new article comes back here for you.',
 			),
 		).toBeVisible()
-		// no note field: the writer never sees this text, or her words about it
+		// the topic choice: she picks one from the bank (or writes her own words)
+		const topicPick = rewriteSheet.getByRole('combobox', {
+			name: 'What should it be about?',
+		})
+		await expect(topicPick).toHaveValue('')
 		await expect(
-			rewriteSheet.getByLabel('Anything to tell the writer? (optional)'),
-		).toHaveCount(0)
-		await expect(rewriteSheet.getByRole('textbox')).toHaveCount(0)
+			rewriteSheet.getByRole('textbox', {
+				name: 'Or say it in your own words (optional)',
+			}),
+		).toBeVisible()
+		await topicPick.selectOption('laser-hair-prep')
 		await page.screenshot({ path: shot('rewrite-sheet') })
 		await rewriteSheet
 			.getByRole('button', { name: 'Write a different article', exact: true })
@@ -1240,7 +1246,8 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 		expect(rewrite.status).toBe('changes_requested')
 		expect(rewrite.rewriteRequested).toBe(true)
 		// the ledger note is the fixed prefix and default: no words of hers go to the writer
-		expect(rewrite.reviewNote).toBe('NEW ARTICLE: a different article')
+		// the topic she picked travels to the writer as a key
+		expect(rewrite.reviewNote).toBe('NEW ARTICLE: topic=laser-hair-prep')
 		expect(rewrite.reviewedBy).toBe(user.name)
 		expect(rewrite.reviewedAt).not.toBeNull()
 		expect(rewrite.approvedBodyHash).toBeNull()
