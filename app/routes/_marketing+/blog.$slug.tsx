@@ -12,7 +12,7 @@ import {
 import { prisma } from '#app/utils/db.server.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
 
-/** One skincare guide. Live only after Sarah approves it in /admin/articles. */
+/** One skincare guide. Live only after Sarah approves it in /admin/outreach. */
 export async function loader({ params }: LoaderFunctionArgs) {
 	const post = await prisma.article.findFirst({
 		where: { kind: 'blog', status: 'approved', slug: params.slug ?? '' },

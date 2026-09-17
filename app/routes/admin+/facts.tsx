@@ -324,7 +324,7 @@ function FactTableRow({ row, busy }: { row: FactRow; busy: boolean }) {
 			</td>
 			<td className="max-w-xs px-3 py-2 text-muted-foreground">
 				{row.articleId ? (
-					<Link to={`/admin/articles/${row.articleId}`} className="underline">
+					<Link to={`/admin/outreach/${row.articleId}`} className="underline">
 						{row.article?.title ?? 'article'}
 					</Link>
 				) : (

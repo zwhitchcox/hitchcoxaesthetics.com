@@ -3,6 +3,7 @@
 // which keeps the /admin/bg status UI working unchanged.
 import {
 	getJobStatuses,
+	runArticleReminderJob,
 	runBlvdAppointmentBackfillJob,
 	runBlvdAppointmentSyncJob,
 	runBlvdRealRevenueSyncJob,
@@ -64,6 +65,9 @@ export function createActivities() {
 				runReviewAppointmentSyncJob,
 			)
 		},
+		async articleReminderActivity() {
+			await runJobAndReport('articleReminder', runArticleReminderJob)
+		},
 		async plaidSyncActivity() {
 			await runJobAndReport('plaidSync', runPlaidSyncJob)
 		},
@@ -86,10 +90,7 @@ export function createActivities() {
 			await runJobAndReport('appointmentLedger', runAppointmentLedgerJob)
 		},
 		async googleReviewsReportsActivity() {
-			await runJobAndReport(
-				'googleReviewsReports',
-				runGoogleReviewsReportsJob,
-			)
+			await runJobAndReport('googleReviewsReports', runGoogleReviewsReportsJob)
 		},
 		async lapsedPatientsActivity() {
 			await runJobAndReport('lapsedPatients', runLapsedPatientsJob)

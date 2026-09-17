@@ -214,8 +214,8 @@ test('an admin can read, edit and approve an article', async ({
 	let fact: { id: string } | null = null
 
 	try {
-		await page.goto('/admin/articles')
-		await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible()
+		await page.goto('/admin/outreach')
+		await expect(page.getByRole('heading', { name: 'Outreach' })).toBeVisible()
 		await expect(page.getByText('Ready for your review')).toBeVisible()
 		await page.screenshot({
 			path:
@@ -647,7 +647,7 @@ test('an admin can read, edit and approve an article', async ({
 		).toBe(grillBody)
 
 		await page.getByRole('button', { name: 'Approve', exact: true }).click()
-		await expect(page).toHaveURL(/\/admin\/articles$/)
+		await expect(page).toHaveURL(/\/admin\/outreach$/)
 		await expect(page.getByText('Approved').first()).toBeVisible()
 
 		const updated = await prisma.article.findUniqueOrThrow({
@@ -696,7 +696,7 @@ test('an admin can read, edit and approve an article', async ({
 		await expect(liveRow).toContainText('grill')
 		await expect(
 			liveRow.getByRole('link', { name: article.title }),
-		).toHaveAttribute('href', `/admin/articles/${article.id}`)
+		).toHaveAttribute('href', `/admin/outreach/${article.id}`)
 		await expect(retired.locator('tr', { hasText: FACT })).toHaveCount(0)
 		await page.screenshot({
 			path: 'test-results/admin-facts.png',

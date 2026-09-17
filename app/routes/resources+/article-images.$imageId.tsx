@@ -2,7 +2,7 @@ import { invariantResponse } from '@epic-web/invariant'
 import { type LoaderFunctionArgs } from '@remix-run/node'
 import { prisma } from '#app/utils/db.server.ts'
 
-/** Pictures attached to articles (see /admin/articles). Same shape as note-images. */
+/** Pictures attached to articles (see /admin/outreach). Same shape as note-images. */
 export async function loader({ params }: LoaderFunctionArgs) {
 	invariantResponse(params.imageId, 'Image ID is required', { status: 400 })
 	const image = await prisma.articleImage.findUnique({

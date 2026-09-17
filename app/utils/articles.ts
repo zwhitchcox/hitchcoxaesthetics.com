@@ -1,5 +1,5 @@
 /**
- * Shared, browser-safe helpers for the article review pages (/admin/articles).
+ * Shared, browser-safe helpers for the article review pages (/admin/outreach).
  * Server-only logic lives in articles.server.ts.
  */
 

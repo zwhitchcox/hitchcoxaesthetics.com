@@ -10,6 +10,7 @@ import { syncGoogleAdsSpend } from '#app/utils/google-ads-spend.server.ts'
 import { reconcileMissingAttributionFromPostHog } from '#app/utils/blvd-attribution-reconcile.server.ts'
 import { syncReviewAppointments } from '#app/utils/review-link-sync.server.ts'
 import { sendReviewReminderTexts } from '#app/utils/review-reminder-sms.server.ts'
+import { sendArticleReminderText } from '#app/utils/article-reminder.server.ts'
 import { syncCallRailPhoneConversionsToPostHog } from '#app/utils/callrail-posthog-conversions.server.ts'
 import { syncFollowUpContacts } from '#app/utils/follow-ups.server.ts'
 import { syncRetellDirectCallsToPostHog } from '#app/utils/retell-direct-calls.server.ts'
@@ -102,6 +103,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	reviewAppointmentSync: {
 		id: 'reviewAppointmentSync',
 		name: 'Review Appointment Sync',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	articleReminder: {
+		id: 'articleReminder',
+		name: 'Article Reminder Texts',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -427,6 +437,32 @@ export async function runReviewAppointmentSyncJob(): Promise<void> {
 	}
 }
 
+export async function runArticleReminderJob(): Promise<void> {
+	const job = jobStatuses['articleReminder']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+
+	try {
+		// The module logs the kind and the counts when a text goes out.
+		await sendArticleReminderText()
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Article reminder texts failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getArticleReminderIntervalMs(),
+		).toISOString()
+	}
+}
+
 // Initialize the background jobs scheduler
 export async function runPlaidSyncJob(): Promise<void> {
 	const job = jobStatuses['plaidSync']
@@ -504,9 +540,8 @@ export async function runAppointmentLedgerJob(): Promise<void> {
 		// Piggybacks on the hourly cadence: mine WHY recent client cancels
 		// happened from the CallRail call near each cancellation (bounded,
 		// append-only; see cancellation-reasons.server.ts).
-		const { mineCancellationReasons } = await import(
-			'#app/utils/cancellation-reasons.server.ts'
-		)
+		const { mineCancellationReasons } =
+			await import('#app/utils/cancellation-reasons.server.ts')
 		const minedCount = await mineCancellationReasons().catch(error => {
 			console.error('Cancellation reason mining failed', error)
 			return 0
@@ -698,17 +733,19 @@ let consecutivePrimaryReads = 0
 
 async function reconcileTemporalWorker(temporalAddress: string) {
 	try {
-		const { startTemporalWorker, pauseTemporalWorker, isTemporalWorkerRunning } =
-			await import('#app/temporal/worker.server.ts')
+		const {
+			startTemporalWorker,
+			pauseTemporalWorker,
+			isTemporalWorkerRunning,
+		} = await import('#app/temporal/worker.server.ts')
 		const isPrimary = isLiteFsPrimary()
 		consecutivePrimaryReads = isPrimary ? consecutivePrimaryReads + 1 : 0
 		if (consecutivePrimaryReads >= 2 && !isTemporalWorkerRunning()) {
 			console.log('LiteFS primary, starting Temporal worker')
 			await startTemporalWorker(temporalAddress)
 			if (!temporalSchedulesEnsured) {
-				const { ensureSchedules } = await import(
-					'#app/temporal/schedules.server.ts'
-				)
+				const { ensureSchedules } =
+					await import('#app/temporal/schedules.server.ts')
 				await ensureSchedules(temporalAddress)
 				temporalSchedulesEnsured = true
 			}
@@ -716,10 +753,7 @@ async function reconcileTemporalWorker(temporalAddress: string) {
 			pauseTemporalWorker()
 		}
 	} catch (error) {
-		console.error(
-			'Temporal worker reconcile failed (will retry in 30s)',
-			error,
-		)
+		console.error('Temporal worker reconcile failed (will retry in 30s)', error)
 	}
 }
 
@@ -826,6 +860,22 @@ function initializeIntervalScheduling() {
 		setTimeout(() => {
 			runReviewAppointmentSyncJob().catch(console.error)
 		}, 60_000)
+	}
+
+	if (shouldAutoRunArticleReminder()) {
+		const intervalMs = getArticleReminderIntervalMs()
+		jobIntervals.articleReminder = setInterval(() => {
+			runArticleReminderJob().catch(console.error)
+		}, intervalMs)
+
+		const articleReminder = jobStatuses['articleReminder']
+		if (articleReminder) {
+			articleReminder.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		}
+
+		setTimeout(() => {
+			runArticleReminderJob().catch(console.error)
+		}, 90_000)
 	}
 
 	if (shouldAutoRunPlaidSync()) {
@@ -1135,6 +1185,22 @@ export function getReviewAppointmentSyncIntervalMs() {
 		10,
 	)
 	const safeMinutes = Number.isFinite(minutes) && minutes >= 3 ? minutes : 10
+	return safeMinutes * 60 * 1000
+}
+
+function shouldAutoRunArticleReminder() {
+	return (
+		process.env.NODE_ENV === 'production' ||
+		process.env.ENABLE_DEV_BACKGROUND_JOBS === '1'
+	)
+}
+
+export function getArticleReminderIntervalMs() {
+	const minutes = Number.parseInt(
+		process.env.ARTICLE_REMINDER_INTERVAL_MINUTES ?? '5',
+		10,
+	)
+	const safeMinutes = Number.isFinite(minutes) && minutes >= 1 ? minutes : 5
 	return safeMinutes * 60 * 1000
 }
 

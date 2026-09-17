@@ -12,6 +12,11 @@ import {
 } from '#app/utils/articles.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import {
+	listAnswersForSync,
+	syncOpenAsks,
+} from '#app/utils/review-asks.server.ts'
+import { SyncAsksPayloadSchema, isAsksPayload } from '#app/utils/review-asks.ts'
+import {
 	listFactsForSync,
 	upsertDocFacts,
 } from '#app/utils/review-facts.server.ts'
@@ -29,10 +34,18 @@ import {
  *                                                       [{ key, fact, tags, question?, answer? }], at most 500,
  *                                                       upserted by key with source 'docs'; a key that is not
  *                                                       sent is left alone. -> { upserted, unchanged }
+ *   POST /resources/article-sync   {asks: [...]}       mirror the open questions for Sarah (phase 6, A2):
+ *                                                       [{ key, targetId?, domain, ask, effort?, about?,
+ *                                                       standing?, files? }], at most 200, upserted by key;
+ *                                                       an open key that is not sent is closed.
+ *                                                       -> { open, closed }
  *   GET  /resources/article-sync?since=<ISO>            review state changed since then
  *   GET  /resources/article-sync?facts=1                the non-retired fact rows: { now, facts: [{ id, key,
  *                                                       source, fact, tags, question, answer, updatedAt }] };
  *                                                       add &since=<ISO> for rows updated after that time
+ *   GET  /resources/article-sync?asks=1                 her answers: { now, asks: [{ key, targetId, answer,
+ *                                                       answeredAt, answeredBy }] }; add &since=<ISO> for
+ *                                                       answers after that time
  *   GET  /resources/article-sync?image=<id>             the bytes of one stored picture (a picture Sarah
  *                                                       added in the chat, named images/user-<id>.<ext>
  *                                                       in approved.md; the mini's pull downloads it)
@@ -60,6 +73,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	if (imageId) return imageResponse(imageId)
 	const since = params.get('since')
 	if (params.get('facts')) return factsResponse(since)
+	if (params.get('asks')) return asksResponse(since)
 	const sinceDate = since ? new Date(since) : null
 	const where =
 		sinceDate && !Number.isNaN(sinceDate.getTime())
@@ -131,6 +145,15 @@ async function factsResponse(since: string | null) {
 	return json({ now: new Date().toISOString(), facts })
 }
 
+/** Her answers for the mini (phase 6). The token was checked by the caller. */
+async function asksResponse(since: string | null) {
+	const sinceDate = since ? new Date(since) : null
+	const asks = await listAnswersForSync(
+		sinceDate && !Number.isNaN(sinceDate.getTime()) ? sinceDate : null,
+	)
+	return json({ now: new Date().toISOString(), asks })
+}
+
 /** One stored picture as a download. The token was checked by the caller. */
 async function imageResponse(imageId: string) {
 	const image = await prisma.articleImage.findUnique({
@@ -169,6 +192,16 @@ export async function action({ request }: ActionFunctionArgs) {
 			)
 		}
 		return json(await upsertDocFacts(facts.data.facts))
+	}
+	if (isAsksPayload(raw)) {
+		const asks = SyncAsksPayloadSchema.safeParse(raw)
+		if (!asks.success) {
+			return json(
+				{ error: 'invalid payload', issues: asks.error.issues.slice(0, 10) },
+				{ status: 400 },
+			)
+		}
+		return json(await syncOpenAsks(asks.data.asks))
 	}
 	const parsed = SyncPayloadSchema.safeParse(raw)
 	if (!parsed.success) {

@@ -5,7 +5,7 @@ import { getSocialMetas } from '#app/utils/seo.ts'
 
 /**
  * Skincare guides. A guide is live only after Sarah approves it in
- * /admin/articles. With nothing approved the page does not exist.
+ * /admin/outreach. With nothing approved the page does not exist.
  */
 export async function loader() {
 	const posts = await prisma.article.findMany({

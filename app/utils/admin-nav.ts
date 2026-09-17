@@ -22,7 +22,7 @@ export const adminMenuItems = [
 	{ path: '/admin/google-ads', label: 'Google Ads', icon: 'update' as const },
 	{ path: '/admin/call-tags', label: 'Call Tags', icon: 'phone' as const },
 	{ path: '/admin/follow-ups', label: 'Follow-ups', icon: 'check' as const },
-	{ path: '/admin/articles', label: 'Articles', icon: 'file-text' as const },
+	{ path: '/admin/outreach', label: 'Outreach', icon: 'file-text' as const },
 	{ path: '/admin/facts', label: 'Facts', icon: 'list-bullet' as const },
 	{ path: '/admin/podcast', label: 'Podcast', icon: 'camera' as const },
 ]

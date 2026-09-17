@@ -112,6 +112,10 @@ function paragraphs(count: number, offset = 0): string {
 const SHORT_CLAIM =
 	'A tight jaw from clenching often responds to 20 units on each side, spread over three points in the masseter.'
 
+/** The (seeded) question from the outreach ledger and her answer (phase 6). */
+const ASK_TEXT = 'Which days of the week are you open for new patients?'
+const ASK_ANSWER = 'Tuesday to Saturday, from ten.'
+
 /** About 100 words: fits the 2 min lane. Has a claim, the byline, the link, and a picture in place. */
 const SHORT_BODY = [
 	'# Botox for a tight jaw',
@@ -463,6 +467,20 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 	})
 
 	const stamp = Date.now()
+
+	// Phase 6: one open question from the outreach ledger, answered from the home page.
+	const askKey = `test:phone-ask:${stamp}`
+	const ask = await prisma.reviewAsk.create({
+		data: {
+			key: askKey,
+			domain: 'example-directory.com',
+			ask: ASK_TEXT,
+			effort: '2min',
+			about: 'They list local clinics with their hours.',
+			openedAt: new Date(),
+		},
+	})
+
 	const short = await prisma.article.create({
 		data: {
 			...articleData(SHORT_BODY),
@@ -527,6 +545,36 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 	})
 
 	try {
+		/* Phase 6: the question card under the article card, her answer, the card is gone */
+		// The seeded ask may sit beyond the first three on a shared db: open them all.
+		await page.goto('/review?questions=all')
+		const questionsHeading = page.getByRole('heading', {
+			name: 'Questions for you',
+		})
+		await expect(questionsHeading).toBeVisible()
+		// the article card comes first; the questions sit under it
+		const nextOne = page.getByText('Next one', { exact: true })
+		await expect(nextOne).toBeVisible()
+		expect((await nextOne.boundingBox())!.y).toBeLessThan(
+			(await questionsHeading.boundingBox())!.y,
+		)
+		const askCard = page.locator('li', { hasText: ASK_TEXT })
+		await expect(askCard).toHaveCount(1)
+		await expect(askCard.getByText('example-directory.com')).toBeVisible()
+		await expect(askCard.getByText('about 2 minutes')).toBeVisible()
+		await askCard.getByRole('textbox', { name: 'Your answer' }).fill(ASK_ANSWER)
+		await askCard.getByRole('button', { name: 'Send' }).click()
+		await expect(page).toHaveURL(/\/review\?questions=all&answered=1$/)
+		await expect(page.getByText('Sent to the team.')).toBeVisible()
+		await page.goto('/review?questions=all')
+		await expect(page.locator('li', { hasText: ASK_TEXT })).toHaveCount(0)
+		const answeredAsk = await prisma.reviewAsk.findUniqueOrThrow({
+			where: { id: ask.id },
+		})
+		expect(answeredAsk.answer).toBe(ASK_ANSWER)
+		expect(answeredAsk.answeredBy).toBe(user.name)
+		expect(answeredAsk.answeredAt).not.toBeNull()
+
 		/* S2: home, the lane pick, the short one is served */
 		await page.goto('/review')
 		await expect(page.getByText('How long do you have?')).toBeVisible()
@@ -1660,6 +1708,9 @@ test('Sarah reviews on her phone: lane, approve, undo, the editor and its dock, 
 			.catch(() => {})
 		await prisma.reviewSetting
 			.deleteMany({ where: { userId: user.id } })
+			.catch(() => {})
+		await prisma.reviewAsk
+			.deleteMany({ where: { key: askKey } })
 			.catch(() => {})
 	}
 })

@@ -851,7 +851,7 @@ model PlaidTransaction {
 }
 
 // Articles written under the practice's name, for Sarah to approve, deny or edit
-// in /admin/articles before they go anywhere. kind "guest" = written for another
+// in /admin/outreach before they go anywhere. kind "guest" = written for another
 // publication (pushed here by the outreach system on the Mac mini, which polls
 // the review back and only then submits it). kind "blog" = a guide for this
 // site's /blog, live only once approved.
@@ -999,6 +999,32 @@ model ReviewSetting {
   lastOpenAt        DateTime?
   lastDailyEmailAt  DateTime?
   lastWeeklyEmailAt DateTime?
+}
+
+// One open question for Sarah from the outreach ledger on the mini (phase 6).
+// key: the ledger's "row:<id>:<hash>" for the ask. The mini sends the open set;
+// a key it stops sending is closed (closedAt). Her answer goes back through the
+// sync (answeredAt, answeredBy). No phone number and no money live here.
+model ReviewAsk {
+  id         String    @id @default(cuid())
+  key        String    @unique
+  targetId   Int?
+  domain     String
+  ask        String
+  effort     String?
+  about      String?
+  standing   String?
+  filesJson  String?
+  openedAt   DateTime
+  closedAt   DateTime?
+  answer     String?
+  answeredAt DateTime?
+  answeredBy String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([closedAt, answeredAt])
+  @@index([answeredAt])
 }
 
 model ArticleImage {

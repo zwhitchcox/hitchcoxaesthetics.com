@@ -7,6 +7,7 @@ import {
 
 import {
 	BLVD_APPOINTMENT_BACKFILL_INTERVAL_MS,
+	getArticleReminderIntervalMs,
 	getBlvdAppointmentSyncIntervalMs,
 	getBlvdRevenueSyncIntervalMs,
 	getGoogleAdsSpendSyncIntervalMs,
@@ -22,6 +23,7 @@ import {
 	getScheduleHealthAlertIntervalMs,
 	hasPodcastTopicsConfig,
 } from '#app/utils/background-jobs.server.ts'
+import { articleReminderDestination } from '#app/utils/article-reminder.server.ts'
 import { hasFinanceReportsConfig } from '#app/utils/finance-reports.server.ts'
 import { hasGoogleReviewsReportsConfig } from '#app/utils/google-reviews-reports.server.ts'
 import { hasAppointmentLedgerConfig } from '#app/utils/appointment-ledger.server.ts'
@@ -82,6 +84,14 @@ function getScheduleDefinitions(): Array<ScheduleDefinition> {
 			workflowType: 'reviewAppointmentSyncWorkflow',
 			intervalMs: getReviewAppointmentSyncIntervalMs(),
 			enabled: true,
+		},
+		{
+			scheduleId: 'article-reminder',
+			jobId: 'articleReminder',
+			workflowType: 'articleReminderWorkflow',
+			intervalMs: getArticleReminderIntervalMs(),
+			// Needs a destination number for the texts.
+			enabled: Boolean(articleReminderDestination()),
 		},
 		{
 			scheduleId: 'plaid-sync',
@@ -185,26 +195,29 @@ export async function describeSchedules(
 	try {
 		const enabled = getScheduleDefinitions().filter(d => d.enabled)
 		const statuses = await Promise.all(
-			enabled.map(async (definition): Promise<TemporalScheduleStatus | null> => {
-				try {
-					const description = await client.schedule
-						.getHandle(definition.scheduleId)
-						.describe()
-					const recent = description.info.recentActions
-					return {
-						scheduleId: definition.scheduleId,
-						jobId: definition.jobId,
-						lastRun: recent.length
-							? recent[recent.length - 1]!.takenAt.toISOString()
-							: null,
-						nextRun: description.info.nextActionTimes[0]?.toISOString() ?? null,
-						running: description.info.runningActions.length > 0,
-						paused: description.state.paused,
+			enabled.map(
+				async (definition): Promise<TemporalScheduleStatus | null> => {
+					try {
+						const description = await client.schedule
+							.getHandle(definition.scheduleId)
+							.describe()
+						const recent = description.info.recentActions
+						return {
+							scheduleId: definition.scheduleId,
+							jobId: definition.jobId,
+							lastRun: recent.length
+								? recent[recent.length - 1]!.takenAt.toISOString()
+								: null,
+							nextRun:
+								description.info.nextActionTimes[0]?.toISOString() ?? null,
+							running: description.info.runningActions.length > 0,
+							paused: description.state.paused,
+						}
+					} catch {
+						return null
 					}
-				} catch {
-					return null
-				}
-			}),
+				},
+			),
 		)
 		return statuses.filter((s): s is TemporalScheduleStatus => s != null)
 	} finally {

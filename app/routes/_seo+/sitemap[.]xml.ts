@@ -26,7 +26,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		.filter(p => p.enabled)
 		.map(p => p.path)
 
-	// Skincare guides that Sarah approved in /admin/articles
+	// Skincare guides that Sarah approved in /admin/outreach
 	const guides = await prisma.article.findMany({
 		where: { kind: 'blog', status: 'approved', slug: { not: null } },
 		select: { slug: true },

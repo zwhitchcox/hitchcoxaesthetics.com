@@ -48,6 +48,10 @@ export async function reviewAppointmentSyncWorkflow(): Promise<void> {
 	await activities.reviewAppointmentSyncActivity()
 }
 
+export async function articleReminderWorkflow(): Promise<void> {
+	await activities.articleReminderActivity()
+}
+
 export async function plaidSyncWorkflow(): Promise<void> {
 	await activities.plaidSyncActivity()
 }

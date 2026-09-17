@@ -13,10 +13,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 // Admin quick links with icons for the dashboard
 const adminQuickLinks = [
 	{
-		title: 'Articles',
+		title: 'Outreach',
 		icon: 'file-text' as const,
-		description: 'Approve, deny or edit articles written under the practice\'s name',
-		path: '/admin/articles',
+		description:
+			"Articles and questions for the practice's name: approve, edit, answer",
+		path: '/admin/outreach',
 		color: 'bg-emerald-100 dark:bg-emerald-950',
 	},
 	{

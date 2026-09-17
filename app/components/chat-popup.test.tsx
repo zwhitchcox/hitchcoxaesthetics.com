@@ -84,7 +84,7 @@ function renderEditor(overrides: Partial<ArticleEditorProps> = {}) {
 	}
 	const RemixStub = createRemixStub([
 		{
-			path: '/admin/articles/a1',
+			path: '/admin/outreach/a1',
 			Component: () => (
 				<Form method="post">
 					<ArticleEditor {...props} />
@@ -93,7 +93,7 @@ function renderEditor(overrides: Partial<ArticleEditorProps> = {}) {
 			action: () => null,
 		},
 	])
-	return render(<RemixStub initialEntries={['/admin/articles/a1']} />)
+	return render(<RemixStub initialEntries={['/admin/outreach/a1']} />)
 }
 
 function hiddenBody() {

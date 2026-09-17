@@ -5,12 +5,21 @@ import {
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
 } from '@remix-run/node'
-import { Form, Link, useLoaderData, useNavigation } from '@remix-run/react'
+import {
+	Form,
+	Link,
+	useActionData,
+	useLoaderData,
+	useNavigation,
+} from '@remix-run/react'
+import { ASK_CARD_COPY, AskCard } from '#app/components/ask-card.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { reviewerName } from '#app/utils/articles.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import { aboutMinutes, splitParagraphs } from '#app/utils/review-aid.ts'
+import { answerAsk, listOpenAsks } from '#app/utils/review-asks.server.ts'
+import { parseAskFiles } from '#app/utils/review-asks.ts'
 import {
 	clearReviewSitting,
 	getReviewLane,
@@ -18,6 +27,10 @@ import {
 	parseLane,
 	setReviewLane,
 } from '#app/utils/review-queue.server.ts'
+import {
+	loadWaiting,
+	waitingSentenceFor,
+} from '#app/utils/review-waiting.server.ts'
 import {
 	approvedSince,
 	loadCards,
@@ -28,7 +41,10 @@ import {
 /**
  * S2, "Next one": the time picker and one card. S8, "That is plenty", shows
  * here after a decision that spent the sitting (?plenty=1). No counters,
- * no ages, no money.
+ * no ages, no money. Phase 6: one muted line carries the same count
+ * sentence the reminder text does, so the numbers agree; the open questions
+ * from the outreach ledger sit under the card, one AskCard each, the first
+ * three unless ?questions=all.
  */
 export const handle: SEOHandle = {
 	getSitemapEntries: () => null,
@@ -37,15 +53,21 @@ export const handle: SEOHandle = {
 /** The same values as REVIEW_LANES; that module is server only. */
 const LANES = [2, 5, 10] as const
 
+/** How many questions show under the card before "Show all". */
+const ASKS_SHOWN = 3
+
 export async function loader({ request }: LoaderFunctionArgs) {
 	const userId = await requireUserWithRole(request, 'admin')
 	const url = new URL(request.url)
 	const now = new Date()
 	const lane = getReviewLane(request)
 	const sitting = getReviewSitting(request, lane, now)
-	const cards = await loadCards(lane, now, {
-		ownEditsBy: await reviewerName(userId),
-	})
+	const who = await reviewerName(userId)
+	const [cards, asks, waiting] = await Promise.all([
+		loadCards(lane, now, { ownEditsBy: who }),
+		listOpenAsks(),
+		loadWaiting(now),
+	])
 	const top = cards[0] ?? null
 
 	// "Pick up where you left off": how far she got, as a share of the text
@@ -67,11 +89,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			? { approved: await approvedSince(new Date(sitting.startedAt)) }
 			: null
 	const week = await weekCounts(now)
+	const allAsks = url.searchParams.get('questions') === 'all'
 
 	return json({
 		lane,
 		plenty,
 		week,
+		waiting: waitingSentenceFor(waiting),
+		answered: url.searchParams.get('answered') === '1',
+		askTotal: asks.length,
+		allAsks,
+		asks: (allAsks ? asks : asks.slice(0, ASKS_SHOWN)).map(a => ({
+			id: a.id,
+			domain: a.domain,
+			ask: a.ask,
+			effort: a.effort,
+			about: a.about,
+			standing: a.standing,
+			files: parseAskFiles(a.filesJson),
+		})),
 		card: top
 			? {
 					id: top.article.id,
@@ -87,9 +123,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-	await requireUserWithRole(request, 'admin')
+	const userId = await requireUserWithRole(request, 'admin')
 	const form = await request.formData()
 	const intent = String(form.get('intent') ?? '')
+	if (intent === 'answer') {
+		const askId = String(form.get('askId') ?? '')
+		const answer = String(form.get('answer') ?? '').trim()
+		if (!answer) {
+			return json({ error: ASK_CARD_COPY.empty, askId }, { status: 400 })
+		}
+		const done = await answerAsk(askId, {
+			answer,
+			who: await reviewerName(userId),
+			userId,
+			now: new Date(),
+		})
+		// the form posts to the page's own URL, so the full list stays the full list
+		const back = new URLSearchParams()
+		if (new URL(request.url).searchParams.get('questions') === 'all') {
+			back.set('questions', 'all')
+		}
+		if (done) back.set('answered', '1')
+		const query = back.toString()
+		return redirect(query ? `/review?${query}` : '/review')
+	}
 	if (intent === 'lane') {
 		const lane = parseLane(form.get('lane'))
 		return redirect('/review', {
@@ -105,7 +162,19 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ReviewHome() {
-	const { lane, card, plenty, week } = useLoaderData<typeof loader>()
+	const {
+		lane,
+		card,
+		plenty,
+		week,
+		asks,
+		askTotal,
+		allAsks,
+		waiting,
+		answered,
+	} = useLoaderData<typeof loader>()
+	const actionData = useActionData<typeof action>()
+	const askError = actionData && 'askId' in actionData ? actionData : null
 	const navigation = useNavigation()
 	const busy = navigation.state !== 'idle'
 
@@ -137,13 +206,55 @@ export default function ReviewHome() {
 				</Form>
 			</section>
 
+			{waiting ? (
+				<p className="text-sm text-muted-foreground">{waiting}</p>
+			) : null}
+			{answered ? (
+				<p className="text-sm text-muted-foreground">{ASK_CARD_COPY.sent}</p>
+			) : null}
+
 			{plenty ? (
-				<Plenty approved={plenty.approved} nextId={card?.id ?? null} busy={busy} />
+				<Plenty
+					approved={plenty.approved}
+					nextId={card?.id ?? null}
+					busy={busy}
+				/>
 			) : card ? (
 				<NextCard card={card} />
-			) : (
+			) : askTotal > 0 ? null : (
 				<Empty />
 			)}
+
+			{askTotal > 0 ? (
+				<section>
+					<h2 className="text-lg font-semibold">{ASK_CARD_COPY.heading}</h2>
+					<ul className="mt-2 space-y-3">
+						{asks.map(ask => (
+							<AskCard
+								key={ask.id}
+								ask={ask}
+								busy={busy}
+								error={askError?.askId === ask.id ? askError.error : null}
+							/>
+						))}
+					</ul>
+					{askTotal > asks.length ? (
+						<Link
+							to="/review?questions=all"
+							className="mt-3 inline-block text-sm text-primary underline-offset-2 hover:underline"
+						>
+							{`Show all ${askTotal} questions`}
+						</Link>
+					) : allAsks && askTotal > ASKS_SHOWN ? (
+						<Link
+							to="/review"
+							className="mt-3 inline-block text-sm text-primary underline-offset-2 hover:underline"
+						>
+							Show fewer
+						</Link>
+					) : null}
+				</section>
+			) : null}
 
 			<div className="mt-auto space-y-2 pt-6">
 				{week.done > 0 || week.live > 0 ? (
@@ -214,7 +325,9 @@ function NextCard({ card }: { card: Card }) {
 function Empty() {
 	return (
 		<section className="rounded-xl border bg-card p-6 text-center shadow-sm">
-			<p className="text-base">Nothing needs you today. The writers are working.</p>
+			<p className="text-base">
+				Nothing needs you today. The writers are working.
+			</p>
 		</section>
 	)
 }
@@ -238,12 +351,22 @@ function Plenty({
 			<div className="mt-4 flex flex-col gap-2">
 				<Form method="post">
 					<input type="hidden" name="intent" value="stop" />
-					<Button type="submit" size="lg" className="w-full text-base" disabled={busy}>
+					<Button
+						type="submit"
+						size="lg"
+						className="w-full text-base"
+						disabled={busy}
+					>
 						Stop here
 					</Button>
 				</Form>
 				{nextId ? (
-					<Button asChild variant="outline" size="lg" className="w-full text-base">
+					<Button
+						asChild
+						variant="outline"
+						size="lg"
+						className="w-full text-base"
+					>
 						<Link to={`/review/${nextId}`}>One more anyway</Link>
 					</Button>
 				) : null}

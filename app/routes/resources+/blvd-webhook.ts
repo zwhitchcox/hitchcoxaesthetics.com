@@ -2,7 +2,9 @@
  * Boulevard webhook receiver. Registered via scripts/blvd-register-webhook.ts
  * for APPOINTMENT_COMPLETED so the provider's review-reminder text fires the
  * moment a client is checked out, instead of waiting on the 10-minute poll
- * (which stays on as the safety net).
+ * (which stays on as the safety net). The article reminder
+ * (article-reminder.server.ts) notes the exact checkout time from the same
+ * event.
  *
  * Security model: the payload is never trusted. We take the appointment id
  * and re-fetch it from the Boulevard Admin API; the text only sends if
@@ -13,6 +15,7 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { json, type ActionFunctionArgs } from '@remix-run/node'
+import { noteCheckout } from '#app/utils/article-reminder.server.ts'
 import { ensurePrimary } from '#app/utils/litefs.server.ts'
 import { sendReviewReminderForAppointment } from '#app/utils/review-reminder-sms.server.ts'
 
@@ -27,8 +30,12 @@ function verifySignature(rawBody: string, request: Request): string {
 	const secret = process.env.BLVD_SECRET_KEY?.trim()
 	if (!secret) return 'no-secret'
 	const digests = [
-		createHmac('sha256', Buffer.from(secret, 'base64')).update(rawBody).digest('hex'),
-		createHmac('sha256', Buffer.from(secret, 'base64')).update(rawBody).digest('base64'),
+		createHmac('sha256', Buffer.from(secret, 'base64'))
+			.update(rawBody)
+			.digest('hex'),
+		createHmac('sha256', Buffer.from(secret, 'base64'))
+			.update(rawBody)
+			.digest('base64'),
 		createHmac('sha256', secret).update(rawBody).digest('hex'),
 		createHmac('sha256', secret).update(rawBody).digest('base64'),
 	]
@@ -76,6 +83,14 @@ export async function action({ request }: ActionFunctionArgs) {
 			console.log(
 				`Review reminder sent via webhook for ${appointmentId} (signature: ${signature})`,
 			)
+		// The article reminder's gap rule keys off the exact checkout time.
+		if (eventType.includes('COMPLETED')) {
+			try {
+				await noteCheckout(String(appointmentId))
+			} catch (error) {
+				console.error('Boulevard webhook checkout note failed:', error)
+			}
+		}
 		return json({ ok: true, sent: result.sent })
 	} catch (error) {
 		console.error('Boulevard webhook reminder failed:', error)
