@@ -11,11 +11,13 @@
  * - morning: from 09:00 until her first client, on a day that starts at 10:00
  *   or later (until 11:00 when she has no clients). Once a day, only when she
  *   has not opened /review today.
- * - alert: something new landed after she cleared the queue. At most one text
- *   per 4 hours, never in the 10 minutes after a checkout.
+ * - alert: something new landed after she cleared the queue, or after the
+ *   last text told her what waited. At most one text per 4 hours, never in
+ *   the 10 minutes after a checkout.
  *
  * Nothing on a day off, before 09:00, from 21:00, while she is with a client,
- * or when nothing waits.
+ * when nothing waits, or within 90 minutes of the last text (a reminder that
+ * falls inside that spacing goes out once the spacing has passed).
  */
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { waitingText } from '#app/utils/review-waiting.ts'
@@ -77,6 +79,8 @@ const EOD_AFTER_MS = 20 * MINUTE_MS
 const RUN_OVER_MS = 30 * MINUTE_MS
 const ALERT_EVERY_MS = 4 * HOUR_MS
 const ALERT_AFTER_CHECKOUT_MS = 10 * MINUTE_MS
+/** No two texts closer than this, whatever their kinds. */
+const TEXT_SPACING_MS = 90 * MINUTE_MS
 const CHECKOUT_KEEP_MS = 2 * 24 * HOUR_MS
 
 const SKIPPED_STATES = new Set(['CANCELLED', 'NO_SHOW', 'NOSHOW'])
@@ -250,11 +254,12 @@ function alertDue(
 	lastOpenAt: Date | null,
 	ledger: ReminderLedger,
 ) {
-	const seenUntil = lastOpenAt?.getTime() ?? 0
+	// Seen: she looked at the page, or a text told her what waited.
 	const lastTextMs = ledger.lastTextAt ? Date.parse(ledger.lastTextAt) : 0
-	const unseen = arrivals.filter(t => t > seenUntil && t > lastTextMs)
+	const seenUntil = Math.max(lastOpenAt?.getTime() ?? 0, lastTextMs)
+	const unseen = arrivals.filter(t => t > seenUntil)
 	const seenPending = arrivals.filter(t => t <= seenUntil)
-	// She looked and left things pending: the daily reminders cover that.
+	// Things she knows about still wait: the daily reminders cover that.
 	if (unseen.length === 0 || seenPending.length > 0) return false
 	if (ledger.lastTextAt && nowMs - lastTextMs < ALERT_EVERY_MS) return false
 	// A client just left: wait for the next gap.
@@ -289,6 +294,11 @@ export function decideReminder(input: ReminderInput): ReminderDecision | null {
 		v => v.start <= nowMs && nowMs < v.end && !v.checkedOut,
 	)
 	if (busy) return null
+	if (
+		ledger.lastTextAt &&
+		nowMs - Date.parse(ledger.lastTextAt) < TEXT_SPACING_MS
+	)
+		return null
 
 	const openedToday =
 		lastOpenAt !== null &&

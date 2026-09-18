@@ -253,6 +253,22 @@ describe('end of day', () => {
 		).toBeNull()
 	})
 
+	test('waits 90 minutes after the last text of any kind', () => {
+		// an alert went out at 18:50; the end-of-day text is due at 19:00 and goes at 20:20
+		const evening = {
+			appointments: [appt('z', '17:30', '18:30', 'FINAL')],
+			ledger: ledger({
+				checkouts: { z: at('18:30').toISOString() },
+				lastTextAt: at('18:50').toISOString(),
+				lastAlertAt: at('18:50').toISOString(),
+			}),
+			lastOpenAt: LOOKED_YESTERDAY,
+		}
+		expect(kindAt(at('19:00'), evening)).toBeNull()
+		expect(kindAt(at('20:19'), evening)).toBeNull()
+		expect(kindAt(at('20:20'), evening)).toBe('eod')
+	})
+
 	test('wins over an alert that is due at the same tick', () => {
 		expect(
 			kindAt(at('10:20'), {
@@ -375,6 +391,20 @@ describe('alert', () => {
 
 	test('she never opened the page: everything is new', () => {
 		expect(kindAt(at('12:00'), { lastOpenAt: null })).toBe('alert')
+	})
+
+	test('what a text already told her about counts as seen, page opened or not', () => {
+		// the morning text covered the old article; a later arrival does not alert while it waits
+		expect(
+			kindAt(at('15:00'), {
+				lastOpenAt: null,
+				waiting: {
+					articles: [OLD_ARTICLE, article('New', at('12:00'))],
+					questions: [],
+				},
+				ledger: ledger({ lastTextAt: at('09:30').toISOString() }),
+			}),
+		).toBeNull()
 	})
 })
 
