@@ -221,6 +221,13 @@ export async function action({ params, request }: ActionFunctionArgs) {
 			})
 		}
 		case 'restore': {
+			// A decided article keeps the exact text of the decision. Reopen first.
+			if (article.status !== 'pending') {
+				return json(
+					{ error: 'Reopen the article before you put the original text back.' },
+					{ status: 400 },
+				)
+			}
 			await prisma.article.update({
 				where: { id },
 				data: { body: article.bodyOriginal, editedAt: null, editedBy: null },

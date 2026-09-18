@@ -5,7 +5,8 @@ const sendSMS = vi.fn(async (_args: { to: string; body: string }) => ({
 	status: 'success' as string,
 	error: undefined as string | undefined,
 }))
-vi.mock('#app/utils/sms.server.ts', () => ({
+vi.mock('#app/utils/sms.server.ts', async importOriginal => ({
+	...(await importOriginal<typeof import('#app/utils/sms.server.ts')>()),
 	sendSMS: (args: { to: string; body: string }) => sendSMS(args),
 }))
 
@@ -145,4 +146,28 @@ test('failed sends are not marked sent, so the next run retries', async () => {
 	sendSMS.mockResolvedValueOnce({ status: 'error', error: 'boom' })
 	expect(await sendReviewReminderTexts(LATER)).toEqual({ sent: 0 })
 	expect(await sendReviewReminderTexts(LATER)).toEqual({ sent: 1 })
+})
+
+test('a number that replied STOP is not texted again every run, and the rest still go out', async () => {
+	consoleError.mockImplementation(() => {})
+	await seedSnapshot([
+		{ id: 'a1', state: 'ARRIVED' },
+		{ id: 'a2', state: 'ARRIVED' },
+	])
+	await sendReviewReminderTexts(NOW)
+	await seedSnapshot([
+		{ id: 'a1', state: 'FINAL' },
+		{ id: 'a2', state: 'FINAL' },
+	])
+
+	sendSMS.mockResolvedValueOnce({
+		status: 'error',
+		error: 'Attempt to send to unsubscribed recipient',
+		code: 21610,
+	} as never)
+	// a1 is blocked, a2 still goes out in the same run
+	expect(await sendReviewReminderTexts(LATER)).toEqual({ sent: 1 })
+	sendSMS.mockClear()
+	expect(await sendReviewReminderTexts(LATER)).toEqual({ sent: 0 })
+	expect(sendSMS).not.toHaveBeenCalled()
 })

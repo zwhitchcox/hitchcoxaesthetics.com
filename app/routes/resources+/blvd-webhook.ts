@@ -77,20 +77,21 @@ export async function action({ request }: ActionFunctionArgs) {
 	if (!eventType.includes('APPOINTMENT') || !appointmentId)
 		return json({ ok: true, ignored: true })
 
+	// The article reminder's gap rule keys off the exact checkout time. It
+	// comes first: a failed review text must not lose the checkout.
+	if (eventType.includes('COMPLETED')) {
+		try {
+			await noteCheckout(String(appointmentId))
+		} catch (error) {
+			console.error('Boulevard webhook checkout note failed:', error)
+		}
+	}
 	try {
 		const result = await sendReviewReminderForAppointment(String(appointmentId))
 		if (result.sent > 0)
 			console.log(
 				`Review reminder sent via webhook for ${appointmentId} (signature: ${signature})`,
 			)
-		// The article reminder's gap rule keys off the exact checkout time.
-		if (eventType.includes('COMPLETED')) {
-			try {
-				await noteCheckout(String(appointmentId))
-			} catch (error) {
-				console.error('Boulevard webhook checkout note failed:', error)
-			}
-		}
 		return json({ ok: true, sent: result.sent })
 	} catch (error) {
 		console.error('Boulevard webhook reminder failed:', error)

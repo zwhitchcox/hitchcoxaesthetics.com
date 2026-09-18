@@ -19,7 +19,7 @@ import {
 	readAppointmentSnapshot,
 	type CachedAppointment,
 } from '#app/utils/review-link.server.ts'
-import { sendSMS } from '#app/utils/sms.server.ts'
+import { isPermanentSMSError, sendSMS } from '#app/utils/sms.server.ts'
 
 // Per-staff destination overrides, wins over the Boulevard profile number.
 const STAFF_PHONE_OVERRIDES: Record<string, string> = {
@@ -167,6 +167,9 @@ async function runReminderPass(
 		const result = await sendSMS({ to, body: reminderBody(appt) })
 		if (result.status !== 'success') {
 			console.error('Review reminder SMS failed:', appt.id, result.error)
+			// The number replied STOP, or is not a mobile: a retry cannot work.
+			// Keep the checkout state so this text is not sent again every run.
+			if (isPermanentSMSError(result)) continue
 			// Roll the remembered state back so the next run still sees the
 			// transition into checkout and retries the text.
 			if (prev) entry.state = prev.state

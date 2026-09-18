@@ -4,8 +4,10 @@ import { consoleError } from '#tests/setup/setup-test-env.ts'
 const sendSMS = vi.fn(async (_args: { to: string; body: string }) => ({
 	status: 'success' as string,
 	error: undefined as string | undefined,
+	code: undefined as number | undefined,
 }))
-vi.mock('#app/utils/sms.server.ts', () => ({
+vi.mock('#app/utils/sms.server.ts', async importOriginal => ({
+	...(await importOriginal<typeof import('#app/utils/sms.server.ts')>()),
 	sendSMS: (args: { to: string; body: string }) => sendSMS(args),
 }))
 
@@ -207,7 +209,11 @@ test('a failed send leaves the ledger unstamped, so the next tick retries', asyn
 	vi.stubEnv('ARTICLE_REMINDER_SMS_TO', TO)
 	await seedReviewer()
 	consoleError.mockImplementation(() => {})
-	sendSMS.mockResolvedValueOnce({ status: 'error', error: 'boom' })
+	sendSMS.mockResolvedValueOnce({
+		status: 'error',
+		error: 'boom',
+		code: undefined,
+	})
 	expect(await sendArticleReminderText(at('09:30'))).toEqual({
 		sent: 0,
 		kind: 'morning',
@@ -218,6 +224,59 @@ test('a failed send leaves the ledger unstamped, so the next tick retries', asyn
 		sent: 1,
 		kind: 'morning',
 	})
+})
+
+test('the number replied STOP: the stamp stays, so no retry every tick', async () => {
+	vi.stubEnv('ARTICLE_REMINDER_SMS_TO', TO)
+	await seedReviewer()
+	consoleError.mockImplementation(() => {})
+	sendSMS.mockResolvedValueOnce({
+		status: 'error',
+		error: 'Attempt to send to unsubscribed recipient',
+		code: 21610,
+	})
+	expect(await sendArticleReminderText(at('09:30'))).toEqual({
+		sent: 0,
+		kind: 'morning',
+		skipped: 'recipient blocked',
+	})
+	expect((await readLedger())?.morningAt).toBeDefined()
+	expect(await sendArticleReminderText(at('09:35'))).toEqual({ sent: 0 })
+	expect(sendSMS).toHaveBeenCalledTimes(1)
+})
+
+test('the stamp is written before the send, so a retry cannot text twice', async () => {
+	vi.stubEnv('ARTICLE_REMINDER_SMS_TO', TO)
+	await seedReviewer()
+	let stampedAtSend: unknown
+	sendSMS.mockImplementationOnce(async () => {
+		stampedAtSend = (await readLedger())?.morningAt
+		return { status: 'success', error: undefined, code: undefined }
+	})
+	await sendArticleReminderText(at('09:30'))
+	expect(stampedAtSend).toBeDefined()
+})
+
+test('work on the admin page counts as opened: no morning text after it', async () => {
+	vi.stubEnv('ARTICLE_REMINDER_SMS_TO', TO)
+	const reviewer = await seedReviewer()
+	const row = await prisma.article.create({
+		data: {
+			kind: 'guest',
+			sourceKey: 'test:opened-by-event',
+			title: 'Botox for TMJ',
+			body: 'text',
+			bodyOriginal: 'text',
+			bodyHash: 'hash',
+		},
+		select: { id: true },
+	})
+	// She saved an edit on /admin/outreach at 08:40. /review was never opened.
+	await prisma.articleReviewEvent.create({
+		data: { articleId: row.id, userId: reviewer.id, kind: 'saved', at: at('08:40') },
+	})
+	expect(await sendArticleReminderText(at('09:30'))).toEqual({ sent: 0 })
+	expect(sendSMS).not.toHaveBeenCalled()
 })
 
 test('nothing waiting: no Boulevard read, no text, checkouts still noted', async () => {

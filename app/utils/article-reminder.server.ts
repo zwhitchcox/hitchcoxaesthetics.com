@@ -26,7 +26,7 @@ import { prisma } from '#app/utils/db.server.ts'
 import { listAnswersForSync } from '#app/utils/review-asks.server.ts'
 import { readAppointmentSnapshot } from '#app/utils/review-link.server.ts'
 import { loadWaiting } from '#app/utils/review-waiting.server.ts'
-import { sendSMS } from '#app/utils/sms.server.ts'
+import { isPermanentSMSError, sendSMS } from '#app/utils/sms.server.ts'
 
 /** Sarah's Boulevard staff id: her shifts, her blocks, her appointments. */
 export const REVIEWER_STAFF_URN =
@@ -56,6 +56,11 @@ export function articleReminderDestination(): string | null {
 }
 
 let warnedNoReviewer = false
+
+function latestDate(...dates: Array<Date | null | undefined>): Date | null {
+	const times = dates.flatMap(d => (d ? [d.getTime()] : []))
+	return times.length ? new Date(Math.max(...times)) : null
+}
 
 /**
  * The reviewer: the user whose phone ends with the destination's last 10
@@ -148,11 +153,19 @@ export async function sendArticleReminderText(
 		return { sent: 0 }
 	}
 
-	const [availability, setting, decisions, answers] = await Promise.all([
+	const [availability, setting, lastEvent, decisions, answers] =
+		await Promise.all([
 		readStaffAvailability(REVIEWER_STAFF_URN, day, TIME_ZONE, now),
 		prisma.reviewSetting.findUnique({
 			where: { userId: reviewer.id },
 			select: { lastOpenAt: true },
+		}),
+		// Only /review stamps lastOpenAt. She also works on /admin/outreach,
+		// so a save, an edit or a decision there counts as "she opened it".
+		prisma.articleReviewEvent.findFirst({
+			where: { userId: reviewer.id },
+			orderBy: { at: 'desc' },
+			select: { at: true },
 		}),
 		prisma.articleReviewEvent.count({
 			where: {
@@ -169,7 +182,7 @@ export async function sendArticleReminderText(
 		working: availability.working ?? appointments.length > 0,
 		appointments,
 		waiting,
-		lastOpenAt: setting?.lastOpenAt ?? null,
+		lastOpenAt: latestDate(setting?.lastOpenAt, lastEvent?.at),
 		decidedToday: decisions > 0 || answers.length > 0,
 		ledger,
 	})
@@ -178,14 +191,21 @@ export async function sendArticleReminderText(
 		return { sent: 0 }
 	}
 
+	// The stamp is written before the send. If the write fails, no text went
+	// out, and the retry cannot send the same text twice.
+	await writeLedger(stampReminder(ledger, decision.kind, now))
 	const result = await sendSMS({ to, body: decision.body })
 	if (result.status !== 'success') {
-		// Unstamped, so the next tick tries again.
 		console.error('Article reminder text failed:', decision.kind, result.error)
+		// The number replied STOP, or is not a mobile: the stamp stays, so the
+		// job does not try again every tick. A person must text START.
+		if (isPermanentSMSError(result)) {
+			return { sent: 0, kind: decision.kind, skipped: 'recipient blocked' }
+		}
+		// Unstamped, so the next tick tries again.
 		await writeLedger(ledger)
 		return { sent: 0, kind: decision.kind, skipped: 'send failed' }
 	}
-	await writeLedger(stampReminder(ledger, decision.kind, now))
 	console.log(
 		`Article reminder text sent: kind=${decision.kind} articles=${counts.articles} questions=${counts.questions}`,
 	)
