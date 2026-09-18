@@ -414,8 +414,6 @@ type Undo = {
 	pictureSrc: string | null
 }
 
-const noSubscribe = () => () => {}
-
 export function ArticleEditor({
 	article,
 	images,
@@ -585,18 +583,19 @@ export function ArticleEditor({
 
 	/* ---- the mirror and the leave guard ---- */
 
-	const [mirrorDismissed, setMirrorDismissed] = useState(false)
-	const mirror = useSyncExternalStore(
-		noSubscribe,
-		() => readMirror(articleId),
-		() => null,
-	)
+	/**
+	 * The unsaved copy the browser held when this page opened: a save from
+	 * an earlier visit that never landed. Read once, after hydration. The
+	 * live mirror written below changes with every keystroke; comparing
+	 * that on each render made the restore card flash on and off with
+	 * every letter typed, which moved the article under her finger.
+	 */
+	const [mirror, setMirror] = useState<string | null>(null)
+	useEffect(() => {
+		setMirror(readMirror(articleId))
+	}, [articleId])
 	const offerRestore =
-		!readOnly &&
-		!mirrorDismissed &&
-		mirror !== null &&
-		mirror !== body &&
-		mirror !== article.body
+		!readOnly && mirror !== null && mirror !== body && mirror !== article.body
 	useEffect(() => {
 		if (readOnly) return
 		const owed =
@@ -655,7 +654,7 @@ export function ArticleEditor({
 			setBody(mirror)
 			void autoSave.saveNow(mirror, 'auto')
 		}
-		setMirrorDismissed(true)
+		setMirror(null)
 	}
 
 	function useNewText() {
@@ -1446,7 +1445,7 @@ export function ArticleEditor({
 						</Button>
 						<button
 							type="button"
-							onClick={() => setMirrorDismissed(true)}
+							onClick={() => setMirror(null)}
 							className="text-sm underline underline-offset-2"
 						>
 							{ARTICLE_EDITOR_COPY.forget}

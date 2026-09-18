@@ -694,6 +694,61 @@ test('a 409 keeps her copy: leaving asks first and the mirror still holds it', a
 	)
 })
 
+test('typing never flashes the restore card: the live mirror is not an offer', async () => {
+	vi.useFakeTimers({ shouldAdvanceTime: true })
+	mockFetch({ save: saveOk(HASH_B) })
+	renderEditor()
+	await richEditor()
+	// each keystroke rewrites the mirror; the card must not appear in between
+	for (const ch of [' ', 'm', 'o', 'r', 'e']) {
+		typeInArticle(ch)
+		expect(screen.queryByText(ARTICLE_EDITOR_COPY.restoreQuestion)).toBeNull()
+	}
+	await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 50)
+	await expectSaved()
+	expect(screen.queryByText(ARTICLE_EDITOR_COPY.restoreQuestion)).toBeNull()
+	// the save landed: the mirror is cleared
+	expect(window.sessionStorage.getItem('article-editor:a1')).toBeNull()
+})
+
+test('a copy left by an earlier visit is offered once, stays while she types, and restores', async () => {
+	vi.useFakeTimers({ shouldAdvanceTime: true })
+	const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+	mockFetch({ save: saveOk(HASH_B) })
+	window.sessionStorage.setItem('article-editor:a1', `${BODY} from before`)
+	renderEditor()
+	await richEditor()
+	expect(
+		await screen.findByText(ARTICLE_EDITOR_COPY.restoreQuestion),
+	).toBeTruthy()
+
+	// typing overwrites the stored mirror but the offer keeps the old copy
+	typeInArticle(' now')
+	expect(screen.getByText(ARTICLE_EDITOR_COPY.restoreQuestion)).toBeTruthy()
+
+	await user.click(
+		screen.getByRole('button', { name: ARTICLE_EDITOR_COPY.restore }),
+	)
+	expect(hiddenBody()).toBe(`${BODY} from before`)
+	expect(screen.queryByText(ARTICLE_EDITOR_COPY.restoreQuestion)).toBeNull()
+	await expectSaved()
+})
+
+test('Forget it drops the offered copy for good', async () => {
+	const user = userEvent.setup()
+	mockFetch({ save: saveOk(HASH_B) })
+	window.sessionStorage.setItem('article-editor:a1', `${BODY} from before`)
+	renderEditor()
+	await richEditor()
+	await user.click(
+		screen.getByRole('button', { name: ARTICLE_EDITOR_COPY.forget }),
+	)
+	expect(screen.queryByText(ARTICLE_EDITOR_COPY.restoreQuestion)).toBeNull()
+	typeInArticle(' x')
+	expect(screen.queryByText(ARTICLE_EDITOR_COPY.restoreQuestion)).toBeNull()
+	expect(hiddenBody()).toBe(`${BODY} x`)
+})
+
 test('the Markdown toggle and the article share one working copy', async () => {
 	const user = userEvent.setup()
 	mockFetch({ save: saveOk(HASH_B) })
