@@ -71,7 +71,11 @@ function normalizeOptionalEmail(value?: string | null) {
 	return trimmed && trimmed.includes('@') ? trimmed : null
 }
 
-function normalizeOptionalPhone(value?: string | null) {
+/**
+ * The phone form every PostHog `phone:` distinct id uses. Exported so the
+ * logged-in user identity builds the same id as the booking identity.
+ */
+export function normalizeOptionalPhone(value?: string | null) {
 	const trimmed = value?.trim()
 	if (!trimmed) return null
 

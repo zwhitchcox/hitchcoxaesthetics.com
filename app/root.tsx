@@ -70,6 +70,11 @@ import { BlvdProvider } from './utils/blvd-context'
 import { CTA } from './utils/cta'
 import { PhoneLink, PhoneProvider } from './utils/phone-context'
 import { PostHogProvider, usePostHog } from './utils/posthog'
+import {
+	buildUserPostHogIdentity,
+	syncPostHogAppUser,
+	type UserPostHogIdentity,
+} from './utils/posthog-user-identity.ts'
 
 export const links: LinksFunction = () => {
 	return [
@@ -114,6 +119,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 						select: {
 							id: true,
 							name: true,
+							// The phone builds the PostHog id (posthog-user-identity.ts).
+							phone: true,
 							type: true,
 							image: { select: { id: true } },
 							dob: true,
@@ -399,6 +406,18 @@ function App() {
 
 	useToast(data.toast)
 	useCallRailSwap()
+
+	// PostHog knows who is logged in, admins included, so one person's
+	// activity can be found or filtered out by name. The key is a string so a
+	// loader revalidation that returns the same user does not run it again.
+	const appUserIdentityKey = JSON.stringify(buildUserPostHogIdentity(data.user))
+	useEffect(() => {
+		if (!posthog) return
+		syncPostHogAppUser(
+			posthog,
+			JSON.parse(appUserIdentityKey) as UserPostHogIdentity | null,
+		)
+	}, [appUserIdentityKey, posthog])
 
 	useEffect(() => {
 		trackBookingAnalyticsPageView({

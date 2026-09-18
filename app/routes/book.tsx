@@ -54,6 +54,10 @@ import {
 	buildBookingPostHogIdentity,
 	type BookingPostHogIdentityInput,
 } from '#app/utils/posthog-booking-identity.ts'
+import {
+	APP_USER_ID_PROPERTY,
+	IDENTIFIED_DISTINCT_ID_PATTERN,
+} from '#app/utils/posthog-user-identity.ts'
 import { usePostHog } from '#app/utils/posthog.tsx'
 import {
 	BRANDS,
@@ -851,8 +855,11 @@ export default function BlvdBookRoute() {
 		const currentDistinctId = posthog.get_distinct_id?.()
 		const isAlreadyIdentified =
 			typeof currentDistinctId === 'string' &&
-			/^(email|phone|blvd-client):/.test(currentDistinctId)
+			IDENTIFIED_DISTINCT_ID_PATTERN.test(currentDistinctId)
 		if (isAlreadyIdentified && currentDistinctId !== identity.distinctId) {
+			// A logged-in user who books for a client keeps their own person:
+			// the client's name and phone must not overwrite theirs.
+			if (posthog.get_property?.(APP_USER_ID_PROPERTY)) return
 			posthog.setPersonProperties?.(identity.properties)
 			return
 		}
