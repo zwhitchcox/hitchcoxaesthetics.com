@@ -749,7 +749,9 @@ async function reconcileTemporalWorker(temporalAddress: string) {
 				await ensureSchedules(temporalAddress)
 				temporalSchedulesEnsured = true
 			}
-		} else if (!isPrimary && isTemporalWorkerRunning()) {
+		} else if (!isPrimary) {
+			// Every tick, not only while a child runs: a crashed worker's
+			// restart timer must not start a worker on a replica.
 			pauseTemporalWorker()
 		}
 	} catch (error) {
