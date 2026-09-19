@@ -84,7 +84,9 @@ test('first sighting already FINAL: texts only when scheduled end is recent', as
 	expect(sendSMS.mock.calls[0]![0].body).toContain('Jessica')
 })
 
-test("Sarah's reminders go to the front-desk override, not her Boulevard cell", async () => {
+test("Sarah's reminders go to REVIEW_REMINDER_SMS_TO, not her Boulevard practice line", async () => {
+	// A fictional destination. No real number is in this file.
+	vi.stubEnv('REVIEW_REMINDER_SMS_TO', '+15550003333')
 	const sarah = 'urn:blvd:Staff:c0069cf2-aee2-4a2c-a6eb-5abe62192e89'
 	await seedSnapshot([{ id: 'a1', state: 'ARRIVED' }])
 	// Re-seed with Sarah's real staff id on both passes.
@@ -106,7 +108,7 @@ test("Sarah's reminders go to the front-desk override, not her Boulevard cell", 
 	await reseed('FINAL')
 	expect(await sendReviewReminderTexts(LATER)).toEqual({ sent: 1 })
 	expect(sendSMS).toHaveBeenCalledWith(
-		expect.objectContaining({ to: '+18652489365' }),
+		expect.objectContaining({ to: '+15550003333' }),
 	)
 })
 

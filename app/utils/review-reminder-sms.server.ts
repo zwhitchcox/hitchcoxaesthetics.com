@@ -21,11 +21,14 @@ import {
 } from '#app/utils/review-link.server.ts'
 import { isPermanentSMSError, sendSMS } from '#app/utils/sms.server.ts'
 
-// Per-staff destination overrides, wins over the Boulevard profile number.
-const STAFF_PHONE_OVERRIDES: Record<string, string> = {
-	// Sarah Hitchcox: reminders go to the front-desk line, not her cell.
-	'urn:blvd:Staff:c0069cf2-aee2-4a2c-a6eb-5abe62192e89': '+18652489365',
-}
+// Staff whose Boulevard profile number is a practice line, not their own
+// phone. Their reminders go to REVIEW_REMINDER_SMS_TO. No phone number is kept
+// in this file: a personal number never goes in code.
+const STAFF_ON_ENV_DESTINATION = new Set([
+	// Sarah Hitchcox: her Boulevard profile number is not the phone she reads
+	// these texts on (commit 85a1bb7). The secret holds that phone.
+	'urn:blvd:Staff:c0069cf2-aee2-4a2c-a6eb-5abe62192e89',
+])
 
 const LEDGER_KEY = 'review-reminder-sms:ledger'
 // First-seen-FINAL appointments only text when scheduled to end this recently.
@@ -161,8 +164,9 @@ async function runReminderPass(
 			if (!Number.isFinite(end) || end < nowMs - firstSeenGraceMs) continue
 		}
 
-		const to =
-			STAFF_PHONE_OVERRIDES[appt.staffId] ?? (appt.staffPhone?.trim() || fallbackTo)
+		const to = STAFF_ON_ENV_DESTINATION.has(appt.staffId)
+			? fallbackTo
+			: appt.staffPhone?.trim() || fallbackTo
 		if (!to) continue
 		const result = await sendSMS({ to, body: reminderBody(appt) })
 		if (result.status !== 'success') {
