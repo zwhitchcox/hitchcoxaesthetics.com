@@ -72,14 +72,38 @@ async function findReviewer(destination: string) {
 		last10.length === 10
 			? await prisma.user.findFirst({
 					where: { phone: { endsWith: last10 } },
-					select: { id: true },
+					select: { id: true, name: true },
 				})
 			: null
 	if (byPhone) return byPhone
 	return prisma.user.findFirst({
 		where: { roles: { some: { name: 'admin' } }, name: { contains: 'sarah' } },
-		select: { id: true },
+		select: { id: true, name: true },
 	})
+}
+
+/**
+ * The reviewer as reports see her: the same person the reminder texts go to.
+ * With no reminder phone set (a dev machine), the user with the most review
+ * decisions stands in, so the report still has someone to count.
+ */
+export async function findReviewerUser() {
+	const to = articleReminderDestination()
+	const byDestination = await findReviewer(to ?? '')
+	if (byDestination) return byDestination
+	const [busiest] = await prisma.articleReviewEvent.groupBy({
+		by: ['userId'],
+		where: { userId: { not: null }, kind: { in: DECISION_KINDS } },
+		_count: { userId: true },
+		orderBy: { _count: { userId: 'desc' } },
+		take: 1,
+	})
+	return busiest?.userId
+		? prisma.user.findUnique({
+				where: { id: busiest.userId },
+				select: { id: true, name: true },
+			})
+		: null
 }
 
 async function readLedger(day: string): Promise<ReminderLedger> {

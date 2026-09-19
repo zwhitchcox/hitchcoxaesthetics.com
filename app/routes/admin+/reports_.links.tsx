@@ -10,11 +10,21 @@
  * here is REAL third-party referring domains, with everything else shown separately rather than
  * quietly folded in.
  */
-import { json, type LoaderFunctionArgs } from '@remix-run/node'
+import { json, type LoaderFunctionArgs, type SerializeFrom } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
-import { LineChart, ReportPage, SERIES, StatTile } from '#app/components/report-ui'
+import { BarChart, LineChart, ReportPage, SERIES, StatTile } from '#app/components/report-ui'
+import { findReviewerUser } from '#app/utils/article-reminder.server.ts'
+import { zoneDayStart } from '#app/utils/article-reminder.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
+import {
+	bucketReviewActivity,
+	REVIEW_DECISION_KINDS,
+} from '#app/utils/review-activity.ts'
+import { loadWaiting } from '#app/utils/review-waiting.server.ts'
+
+const TIME_ZONE = 'America/New_York'
+const REVIEW_DAYS = 30
 
 const BRANDS = [
 	{ key: 'sha', label: 'Sarah Hitchcox Aesthetics', site: 'hitchcoxaesthetics.com' },
@@ -24,6 +34,32 @@ const BRANDS = [
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
+
+	// Sarah's reviews per day. The articles behind the backlinks are hers to
+	// approve, so how many she decides each day is the pace of this whole page.
+	const now = new Date()
+	const reviewer = await findReviewerUser()
+	const days = bucketReviewActivity([], TIME_ZONE, REVIEW_DAYS, now)
+	const since = zoneDayStart(days[0]!.day, TIME_ZONE)
+	const [events, decidedAllTime, waiting] = reviewer
+		? await Promise.all([
+				prisma.articleReviewEvent.findMany({
+					where: { userId: reviewer.id, at: { gte: since } },
+					select: { articleId: true, kind: true, at: true },
+				}),
+				prisma.articleReviewEvent.count({
+					where: { userId: reviewer.id, kind: { in: [...REVIEW_DECISION_KINDS] } },
+				}),
+				loadWaiting(now),
+			])
+		: [[], 0, null]
+	const reviews = {
+		name: reviewer?.name?.trim() || 'Sarah',
+		found: reviewer != null,
+		days: bucketReviewActivity(events, TIME_ZONE, REVIEW_DAYS, now),
+		decidedAllTime,
+		waiting: waiting ? waiting.articles.length : null,
+	}
 
 	const brands = await Promise.all(
 		BRANDS.map(async brand => {
@@ -78,16 +114,74 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			}
 		}),
 	)
-	return json({ brands })
+	return json({ brands, reviews })
+}
+
+function ReviewPace({ reviews }: { reviews: SerializeFrom<typeof loader>['reviews'] }) {
+	const today = reviews.days.at(-1)
+	const week = reviews.days.slice(-7)
+	const decidedWeek = week.reduce((n, d) => n + d.decided, 0)
+	const workedWeek = week.reduce((n, d) => n + d.worked, 0)
+	const activeDays = reviews.days.filter(d => d.worked > 0).length
+	return (
+		<section style={{ marginBottom: 34 }}>
+			<h2>{reviews.name}'s reviews</h2>
+			{!reviews.found ? (
+				<p className="note">No reviewer account is set up, so there is nothing to count yet.</p>
+			) : (
+				<>
+					<div className="tiles">
+						<StatTile
+							label="Decided today"
+							value={String(today?.decided ?? 0)}
+							whisper={today?.worked ? `${today.worked} article${today.worked === 1 ? '' : 's'} worked on` : 'nothing opened yet today'}
+						/>
+						<StatTile
+							label="Decided, last 7 days"
+							value={String(decidedWeek)}
+							whisper={`${workedWeek} article-days of work`}
+						/>
+						<StatTile
+							label="Waiting on her"
+							value={reviews.waiting == null ? '-' : String(reviews.waiting)}
+							whisper="articles with no decision yet"
+							tone={reviews.waiting != null && reviews.waiting > 20 ? 'bad' : undefined}
+						/>
+						<StatTile
+							label="Decided all time"
+							value={String(reviews.decidedAllTime)}
+							whisper={`${activeDays} active day${activeDays === 1 ? '' : 's'} in the last ${REVIEW_DAYS}`}
+						/>
+					</div>
+					<BarChart
+						labels={reviews.days.map(d => d.day.slice(5))}
+						height={170}
+						format={(n: number) => String(Math.round(n))}
+						tickEvery={5}
+						showTotal={false}
+						series={[
+							{ name: 'Decided', color: SERIES[0]!, values: reviews.days.map(d => d.decided) },
+							{ name: 'Articles worked on', color: SERIES[2]!, values: reviews.days.map(d => d.worked) },
+						]}
+					/>
+					<p className="note">
+						A decision is approve, ask for changes, ask for a different article, or turn down.
+						Worked on means opened, read, edited, asked about or decided. Days are New York time.
+					</p>
+				</>
+			)}
+		</section>
+	)
 }
 
 export default function LinksReport() {
-	const { brands } = useLoaderData<typeof loader>()
+	const { brands, reviews } = useLoaderData<typeof loader>()
 	const any = brands.some(b => b.current)
 
 	if (!any)
 		return (
 			<ReportPage title="Backlinks" subtitle="What Google says links to us">
+				<ReviewPace reviews={reviews} />
 				<p className="note">
 					No snapshot yet. The Mac mini pushes one every morning at 04:45 from{' '}
 					<code>~/outreach/gsc-links.py</code>; run <code>gsc-links.py push</code> there to fill
@@ -101,6 +195,7 @@ export default function LinksReport() {
 			title="Backlinks"
 			subtitle="Google's own linking-sites report, per brand. Spam, our own network and search engines are counted out."
 		>
+			<ReviewPace reviews={reviews} />
 			{brands.map(b => {
 				const c = b.current
 				if (!c)

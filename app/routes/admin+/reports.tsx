@@ -50,7 +50,7 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 		entries: [
 			{ title: 'Maps & reach', desc: 'Rank map + competitor leaderboard, household reach, reach → $, GMB clients', path: '/geo-rank' },
 			{ title: 'Reach over time', desc: 'People reached + expected revenue, organic Google rank per site, backlinks & authority, week by week', path: '/admin/reports/reach' },
-			{ title: 'Backlinks', desc: "Google's own linking-sites report per brand: real referring domains after spam, which of our placements Google has actually seen", path: '/admin/reports/links' },
+			{ title: 'Backlinks', desc: "Sarah's reviews per day, then Google's own linking-sites report per brand: real referring domains after spam, which of our placements Google has actually seen", path: '/admin/reports/links' },
 			{
 				title: 'Competitors: link profiles',
 				desc: "Every competitor's backlinks classified, ours beside them, and the query ledger. Refreshed weekly on the Mac mini (needs the tailnet).",
