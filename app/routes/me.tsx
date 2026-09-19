@@ -4,7 +4,10 @@ import { prisma } from '#app/utils/db.server.ts'
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const userId = await requireUserId(request)
-	const user = await prisma.user.findUnique({ where: { id: userId } })
+	const user = await prisma.user.findUnique({
+		where: { id: userId },
+		select: { id: true },
+	})
 	if (!user) {
 		const requestUrl = new URL(request.url)
 		const loginParams = new URLSearchParams([
@@ -14,5 +17,5 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		await logout({ request, redirectTo })
 		return redirect(redirectTo)
 	}
-	return redirect(`/users/${user.id}`)
+	return redirect('/settings/profile')
 }

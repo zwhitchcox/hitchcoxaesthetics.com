@@ -13,7 +13,6 @@ export function loader({ request }: LoaderFunctionArgs) {
 		{ type: 'disallow', value: '/me' },
 		{ type: 'disallow', value: '/resources' },
 		{ type: 'disallow', value: '/settings' },
-		{ type: 'disallow', value: '/users' },
 		{ type: 'sitemap', value: `${getDomainUrl(request)}/sitemap.xml` },
 	])
 }
