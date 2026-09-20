@@ -12,6 +12,8 @@ export const GBP_CATEGORIES = config.gbpCategories
 
 export const locations = config.locations.map(loc => ({
 	...loc,
+	/** The ISO date the office shut, or null while it is open. */
+	closed: (loc as { closed?: string }).closed ?? null,
 	/** Full street address (line1 + suite), matching the GBP exactly. */
 	address: [loc.address.line1, loc.address.line2].filter(Boolean).join(' '),
 	addressParts: loc.address,
@@ -27,8 +29,14 @@ export const locations = config.locations.map(loc => ({
 
 export type Location = (typeof locations)[number]
 
-/** Public locations, shown in nav, footer, and the contact page (ghosts excluded). */
-export const publicLocations = locations.filter(location => !location.ghost)
+/**
+ * Open offices: every page, the sitemap, llms.txt, JSON-LD, booking and
+ * citations. A closed office stays in `locations` for its ids and history.
+ */
+export const openLocations = locations.filter(location => !location.closed)
+
+/** Public locations, shown in nav, footer, and the contact page (ghosts and closed excluded). */
+export const publicLocations = openLocations.filter(location => !location.ghost)
 
 /** Phone number, CallRail will swap this dynamically for tracking */
 export const PHONE = '(865) 489-8008'

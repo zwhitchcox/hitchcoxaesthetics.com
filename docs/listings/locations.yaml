@@ -60,6 +60,7 @@ locations:
       maps_cid: "4802252091183573764"
 
   - slug: west-hills
+    # CLOSED 2026-09-20 (Zane). Never list it again; remove existing citations; mark the GBP permanently closed.
     gbp_title: Sarah Hitchcox Aesthetics - Knoxville (West Hills)
     page: https://hitchcoxaesthetics.com/west-hills
     address:
@@ -76,6 +77,7 @@ locations:
       maps_cid: "4899187082724912434"
 
   - slug: cedar-bluff
+    # CLOSED 2026-09-20 (Zane). Never list it again; remove existing citations; mark the GBP permanently closed.
     gbp_title: Sarah Hitchcox Aesthetics (Cedar Bluff)
     page: https://hitchcoxaesthetics.com/cedar-bluff
     address:

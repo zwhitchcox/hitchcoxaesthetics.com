@@ -27,7 +27,7 @@ export const meta: MetaFunction = ({ location }) =>
 	getSocialMetas({
 		title: 'Careers | Sarah Hitchcox Aesthetics | Knoxville, TN',
 		description:
-			'Open positions at Sarah Hitchcox Aesthetics, a nurse-owned medical aesthetics practice with four West Knoxville offices: Licensed Medical Aesthetician and part-time Marketing and Patient Experience Assistant.',
+			'Open positions at Sarah Hitchcox Aesthetics, a nurse-owned medical aesthetics practice with two West Knoxville offices: Licensed Medical Aesthetician and part-time Marketing and Patient Experience Assistant.',
 		pathname: location.pathname,
 	})
 
@@ -96,7 +96,7 @@ const jobs = [
 		type: 'Full-time or part-time',
 		pay: 'Hourly, based on experience, plus commission on services and retail',
 		hours: 'Full-time or part-time, weekdays',
-		where: 'West Knoxville, with days at more than one of our four offices',
+		where: 'West Knoxville, with days at both of our offices',
 		summary:
 			'You will deliver medical-grade skincare services under the same roof as our nurse injector and help patients before and after their aesthetic treatments. We hire Licensed Medical Aestheticians only: a Tennessee esthetician license plus medical aesthetics training or certification and experience in a medical setting. An esthetician license on its own does not meet the requirement.',
 		duties: [
@@ -117,7 +117,7 @@ const jobs = [
 			'@type': 'JobPosting',
 			title: 'Licensed Medical Aesthetician (LMA)',
 			description:
-				'Licensed Medical Aesthetician at a nurse-owned medical aesthetics practice with four West Knoxville offices: facials, chemical peels, dermaplaning, skincare consultations, pre- and post-treatment care. Licensed Medical Aesthetician required: Tennessee esthetician license plus medical aesthetics certification or medical-setting experience; an esthetician license alone does not qualify.',
+				'Licensed Medical Aesthetician at a nurse-owned medical aesthetics practice with two West Knoxville offices: facials, chemical peels, dermaplaning, skincare consultations, pre- and post-treatment care. Licensed Medical Aesthetician required: Tennessee esthetician license plus medical aesthetics certification or medical-setting experience; an esthetician license alone does not qualify.',
 			datePosted: POSTED,
 			employmentType: ['FULL_TIME', 'PART_TIME'],
 			hiringOrganization: ORG,
@@ -266,8 +266,7 @@ export default function Careers() {
 				</h1>
 				<p className="mt-6 text-lg leading-relaxed text-gray-600">
 					Sarah Hitchcox Aesthetics is a nurse-owned medical aesthetics
-					practice with four West Knoxville offices: Bearden, Farragut, West
-					Hills, and Cedar Bluff. The owner, Sarah Hitchcox, RN, works in the
+					practice with two West Knoxville offices: Bearden and Farragut. The owner, Sarah Hitchcox, RN, works in the
 					offices every day. We offer Botox and dermal fillers, laser hair
 					removal, microneedling, skincare, and a medical weight loss program.
 				</p>

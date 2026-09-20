@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
-import { formatAddress, locations } from '#app/utils/locations.ts'
+import { formatAddress, openLocations } from '#app/utils/locations.ts'
 
 const BOOKING_URL = DEFAULT_BLVD_BOOKING_URL
 const CALL_LABEL = '(865) 426-1826'
@@ -298,7 +298,7 @@ function escapeHtml(value: string) {
 }
 
 function renderLocations() {
-	return locations
+	return openLocations
 		.map(
 			location => `
 				<div class="location-card">

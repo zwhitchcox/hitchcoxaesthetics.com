@@ -1,12 +1,14 @@
 # Sarah Hitchcox Aesthetics - West Hills
 
+> **Closed 2026-09-20.** The West Hills office no longer exists. Every listing in this record is a takedown task: remove it or mark it closed, never refresh it. The open offices are Bearden and Farragut.
+
 Last audited: 2026-07-30
 
 ## Canonical Identity
 
 | Field                | Value                                                          |
 | -------------------- | -------------------------------------------------------------- |
-| Operating status     | Business location per owner; application config update pending |
+| Operating status     | CLOSED 2026-09-20 (Zane). Remove every listing below; mark the Google profile permanently closed |
 | Public business name | Sarah Hitchcox Aesthetics                                      |
 | Primary category     | Medical Spa                                                    |
 | Address              | 7600 Kingston Pike, #1550 Suite 30, Knoxville, TN 37919        |

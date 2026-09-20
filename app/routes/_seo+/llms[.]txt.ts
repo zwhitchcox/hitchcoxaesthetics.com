@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs } from '@remix-run/node'
-import { locations, formatAddress, PHONE } from '#app/utils/locations.ts'
+import { openLocations, formatAddress, PHONE } from '#app/utils/locations.ts'
 import { getDomainUrl } from '#app/utils/misc.tsx'
 import {
 	getAllEnabledPages,
@@ -31,7 +31,7 @@ export function loader({ request }: LoaderFunctionArgs) {
 		})
 		.join('\n')
 
-	const locationLines = locations
+	const locationLines = openLocations
 		.map(
 			location =>
 				`- ${location.displayName}: ${formatAddress(location)}, ${location.phone}`,

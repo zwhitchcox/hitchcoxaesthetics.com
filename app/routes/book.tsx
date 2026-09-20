@@ -47,7 +47,7 @@ import {
 } from '#app/utils/booking-source-hints.ts'
 import {
 	type Location as SiteLocation,
-	locations as siteLocations,
+	openLocations as siteLocations,
 } from '#app/utils/locations.ts'
 import { cn, getErrorMessage } from '#app/utils/misc.tsx'
 import {

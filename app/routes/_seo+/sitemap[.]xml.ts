@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs } from '@remix-run/node'
 import { getDomainUrl } from '#app/utils/misc.tsx'
-import { locations } from '#app/utils/locations.ts'
+import { openLocations } from '#app/utils/locations.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { sitePages } from '#app/utils/site-pages.server.js'
 
@@ -11,9 +11,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const staticPaths = [
 		'',
 		'about',
-		// every location landing page, including ghost (orphaned) ones, so search
-		// engines can discover them, they aren't linked anywhere in the site nav
-		...locations.map(location => location.id),
+		// every open location page, including ghost (orphaned) ones, so search
+		// engines can discover them; they aren't linked anywhere in the site nav.
+		// A closed office's page redirects to Bearden and stays out.
+		...openLocations.map(location => location.id),
 		'book',
 		'support',
 		'careers',

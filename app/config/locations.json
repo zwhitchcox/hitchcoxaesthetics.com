@@ -1,5 +1,5 @@
 {
-	"_readme": "CANONICAL location config — the single source of truth for every per-location fact. The site (app/utils/locations.ts, JSON-LD), the GBP reconciler (scripts/gbp-reconcile.ts), and BrightLocal citations (scripts/brightlocal-citations.ts) all derive from this file. Rules: phones.real is the NAP line used on the site, JSON-LD, citations, and as the GBP additional phone; phones.tracking is the CallRail GMB number, used ONLY as the GBP primary phone. gbp.title must match the live listing title exactly. address.line1/line2 must match the GBP address exactly, suite included. description null = leave the live GBP description untouched.",
+	"_readme": "CANONICAL location config — the single source of truth for every per-location fact. The site (app/utils/locations.ts, JSON-LD), the GBP reconciler (scripts/gbp-reconcile.ts), and BrightLocal citations (scripts/brightlocal-citations.ts) all derive from this file. Rules: phones.real is the NAP line used on the site, JSON-LD, citations, and as the GBP additional phone; phones.tracking is the CallRail GMB number, used ONLY as the GBP primary phone. gbp.title must match the live listing title exactly. address.line1/line2 must match the GBP address exactly, suite included. description null = leave the live GBP description untouched. closed: the ISO date an office shut (West Hills and Cedar Bluff, 2026-09-20). A closed office stays here for its GBP and BrightLocal ids, but every page, the sitemap, llms.txt, JSON-LD, booking and citations use openLocations (not closed), and public lists use publicLocations (not closed, not ghost); its page redirects to Bearden.",
 	"brand": "Sarah Hitchcox Aesthetics",
 	"siteOrigin": "https://hitchcoxaesthetics.com",
 	"gbpCategories": {
@@ -75,6 +75,7 @@
 			"name": "West Hills",
 			"displayName": "Knoxville (West Hills)",
 			"ghost": true,
+			"closed": "2026-09-20",
 			"address": {
 				"line1": "7600 Kingston Pike",
 				"line2": "#1550 Suite 30",
@@ -104,6 +105,7 @@
 			"name": "Cedar Bluff",
 			"displayName": "Knoxville (Cedar Bluff)",
 			"ghost": true,
+			"closed": "2026-09-20",
 			"address": {
 				"line1": "9141 Cross Park Dr",
 				"line2": "Suite 30",
