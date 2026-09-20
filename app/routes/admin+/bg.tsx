@@ -19,6 +19,8 @@ import {
 	runFinanceReportsJob,
 	runPodcastTopicsJob,
 	runReviewerDaysJob,
+	runBlvdAppointmentSyncJob,
+	runBlvdAppointmentBackfillJob,
 	getJobStatuses,
 	clearJobError,
 } from '#app/utils/background-jobs.server'
@@ -42,6 +44,10 @@ const JOB_DESCRIPTIONS = {
 		'Recomputes the household budget + 6-month revenue projection and loads them into the reports database.',
 	podcastTopics:
 		'Mines industry news feeds and recent client questions, then proposes podcast episode ideas for /admin/podcast.',
+	blvdAppointmentSync:
+		'Refreshes the Boulevard appointment mirror for the last few days and the days ahead.',
+	blvdAppointmentBackfill:
+		'Rebuilds the whole Boulevard appointment mirror. Runs on its own once a day at 00:00 UTC.',
 	reviewerDays:
 		'Measures, per New York day, how long the reviewer spent on the review pages against the free time in her Boulevard shift, for the Backlinks report.',
 }
@@ -115,6 +121,16 @@ export async function action({ request }: Route['ActionArgs']) {
 			success: true,
 			message: 'Boulevard real revenue sync job started',
 		})
+	}
+
+	if (intent === 'run-blvdAppointmentSync') {
+		runBlvdAppointmentSyncJob().catch(console.error)
+		return json({ success: true, message: 'Boulevard appointment mirror (hot window) started' })
+	}
+
+	if (intent === 'run-blvdAppointmentBackfill') {
+		runBlvdAppointmentBackfillJob().catch(console.error)
+		return json({ success: true, message: 'Boulevard appointment mirror (full backfill) started' })
 	}
 
 	if (intent === 'run-reviewerDays') {
