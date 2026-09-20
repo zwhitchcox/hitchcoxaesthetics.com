@@ -24,6 +24,7 @@ import {
 	type ArticleEditorProps,
 } from '#app/components/article-editor.tsx'
 import { CHAT_SHELL_COPY } from '#app/components/chat-shell.tsx'
+import { NARRATION_COPY } from '#app/components/narration-button.tsx'
 import { COMMENT_COPY } from '#app/components/comment-on-this.tsx'
 import { TOOLBAR_COPY } from '#app/components/editor-toolbar.tsx'
 import { RICH_EDITOR_COPY } from '#app/components/rich-editor.tsx'
@@ -1690,7 +1691,7 @@ test('a failed save shows Could not save. with Try now in the dock, and Try now 
 	})
 })
 
-test('on the phone the route’s decisions, then Grill me and the Markdown toggle, live in the decisions panel above the dock; the bar slot stays empty; the save mark stays in the dock', async () => {
+test('on the phone the route’s decisions, then Read to me, Grill me and the Markdown toggle, live in the decisions panel above the dock; the bar slot stays empty; the save mark stays in the dock', async () => {
 	const user = userEvent.setup()
 	const { unmount } = renderEditor({ barSlot: null })
 	await richEditor()
@@ -1734,8 +1735,12 @@ test('on the phone the route’s decisions, then Grill me and the Markdown toggl
 		expect(panel.id).toBe('article-decisions')
 		expect(dock().contains(panel)).toBe(true)
 		expect(panel.className).toContain('bottom-full')
-		// the route's decision first, then the editor's bar items, and no save mark
+		// the route's decision first, then the editor's bar items (the Play
+		// button leads them when the route wired no slot for it), and no save mark
 		const approve = within(panel).getByRole('button', { name: APPROVE_THIS })
+		const play = within(panel).getByRole('button', {
+			name: NARRATION_COPY.play,
+		})
 		const grill = within(panel).getByRole('button', {
 			name: ARTICLE_EDITOR_COPY.grillMe,
 		})
@@ -1744,6 +1749,7 @@ test('on the phone the route’s decisions, then Grill me and the Markdown toggl
 		})
 		expect(within(panel).getAllByRole('button')).toEqual([
 			approve,
+			play,
 			grill,
 			toggle,
 		])
@@ -1861,7 +1867,7 @@ test('a decided row with no decisions has no decisions tab; with decisions it ke
 		within(panel)
 			.getAllByRole('button')
 			.map(b => b.textContent),
-	).toEqual(['Reopen it', ARTICLE_EDITOR_COPY.markdown])
+	).toEqual(['Reopen it', NARRATION_COPY.play, ARTICLE_EDITOR_COPY.markdown])
 	expect(panel.querySelector('[data-save-state]')).toBeNull()
 	expect(document.querySelector('[data-save-state]')).toBeNull()
 })
@@ -1910,7 +1916,7 @@ test('an own-words row with a route keeps the dock for the decisions tab alone, 
 		within(decisionsPanel())
 			.getAllByRole('button')
 			.map(b => b.textContent),
-	).toEqual([APPROVE_THIS, ARTICLE_EDITOR_COPY.markdown])
+	).toEqual([APPROVE_THIS, NARRATION_COPY.play, ARTICLE_EDITOR_COPY.markdown])
 })
 
 test('with the caret in the article, the decisions tab opens the panel and the article lets go (the row unfolds under it); the caret back in the article closes the panel; the chat tab lets go too', async () => {

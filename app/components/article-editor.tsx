@@ -157,7 +157,11 @@ export type ArticleEditorProps = {
 	 * into the decisions panel instead and the slot stays empty.
 	 */
 	barSlot?: HTMLElement | null
-	/** Where the route wants the read-aloud Play button; without a slot there is no button. */
+	/**
+	 * Where the route wants the read-aloud Play button. Without a slot it
+	 * goes with the bar items: the decisions panel on the phone, the bar on
+	 * a wide screen.
+	 */
 	narrationSlot?: HTMLElement | null
 	/**
 	 * The route's decision buttons (Approve; Write a different article): the
@@ -1183,14 +1187,17 @@ export function ArticleEditor({
 	const playButton = (
 		<NarrationButton narration={narration} onToggle={narration.toggle} size="sm" />
 	)
+	// A route that wired a slot for the Play button gets it there (null while
+	// the slot mounts). A route that did not gets it with the bar items: in
+	// the decisions panel on the phone, in the bar on a wide screen.
 	const barItems = (
 		<>
+			{narrationSlot === undefined ? playButton : null}
 			{grillButton}
 			{markInDock ? null : saveState}
 			{markdownToggle}
 		</>
 	)
-	// The phone's panel holds the items; the slot stays empty there.
 	const playInSlot = narrationSlot ? createPortal(playButton, narrationSlot) : null
 	const bar = panelOn ? null : barSlot === undefined ? (
 		<div className="flex items-center justify-end gap-2">{barItems}</div>
