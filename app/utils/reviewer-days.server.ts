@@ -38,7 +38,12 @@ const SKIPPED_STATES = new Set(['CANCELLED', 'NO_SHOW', 'NOSHOW'])
 /** The pages she reviews on. */
 const REVIEW_PATHS = ['/review', '/admin/outreach', '/admin/articles']
 
-export type ReviewerDaysResult = { days: number; skipped?: string }
+export type ReviewerDaysResult = {
+	days: number
+	/** Days left alone because the mirror has not tagged their appointments. */
+	untagged?: number
+	skipped?: string
+}
 
 export async function syncReviewerDays(
 	now = new Date(),
@@ -76,10 +81,25 @@ export async function syncReviewerDays(
 	])
 
 	let written = 0
+	let untaggedDays = 0
 	for (const day of todo) {
 		const window = {
 			start: zoneDayStart(day, TIME_ZONE).getTime(),
 			end: zoneDayStart(nextDay(day), TIME_ZONE).getTime(),
+		}
+		// The hot sync tags the last few days within minutes of a deploy; the
+		// daily backfill tags the rest. A day with untagged appointments would
+		// look free, so it waits for the backfill and is tried again next run.
+		const untagged = await prisma.blvdAppointment.count({
+			where: {
+				staffIds: null,
+				cancelled: false,
+				startAt: { gte: new Date(window.start), lt: new Date(window.end) },
+			},
+		})
+		if (untagged > 0) {
+			untaggedDays++
+			continue
 		}
 		let staffDay: Awaited<ReturnType<typeof fetchStaffDay>>
 		try {
@@ -123,7 +143,9 @@ export async function syncReviewerDays(
 	await prisma.reviewerDay.deleteMany({
 		where: { staffId: REVIEWER_STAFF_URN, day: { lt: days[0]! } },
 	})
-	return { days: written }
+	return untaggedDays
+		? { days: written, untagged: untaggedDays }
+		: { days: written }
 }
 
 /** Her sessions on the review pages: first event to last event, each. */

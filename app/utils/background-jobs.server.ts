@@ -684,7 +684,10 @@ export async function runReviewerDaysJob(): Promise<void> {
 		console.log(
 			result.skipped
 				? `Reviewer days: skipped (${result.skipped})`
-				: `Reviewer days: wrote ${result.days} day${result.days === 1 ? '' : 's'}`,
+				: `Reviewer days: wrote ${result.days} day${result.days === 1 ? '' : 's'}` +
+						(result.untagged
+							? `, ${result.untagged} waiting for the appointment backfill`
+							: ''),
 		)
 		job.status = 'completed'
 		job.lastError = null
