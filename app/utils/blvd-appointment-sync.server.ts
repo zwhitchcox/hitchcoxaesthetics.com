@@ -28,7 +28,7 @@ const APPOINTMENT_FIELDS = `id startAt createdAt state cancelled bookedByType ma
 	cancellation { reason notes cancelledAt }
 	location { id name }
 	client { id name mobilePhone appointmentCount createdAt }
-	appointmentServices { price duration service { name } }`
+	appointmentServices { price duration service { name } staff { id } }`
 
 type ApptNode = {
 	id?: string | null
@@ -56,6 +56,7 @@ type ApptNode = {
 		price?: number | null
 		duration?: number | null
 		service?: { name?: string | null } | null
+		staff?: { id?: string | null } | null
 	}> | null
 }
 
@@ -95,6 +96,16 @@ async function upsertPage(nodes: ApptNode[], fallbackLocation: { id: string; nam
 					price: s.price ?? null,
 					minutes: typeof s.duration === 'number' ? s.duration : null,
 				})),
+			),
+			// The providers on the appointment, as URNs, for per-provider time.
+			staffIds: JSON.stringify(
+				[
+					...new Set(
+						(node.appointmentServices ?? [])
+							.map(s => normalizeBlvdEntityId('Staff', s.staff?.id ?? null))
+							.filter((id): id is string => Boolean(id)),
+					),
+				],
 			),
 		}
 		await prisma.blvdAppointment.upsert({

@@ -18,6 +18,7 @@ import {
 	runReviewsFetchJob,
 	runFinanceReportsJob,
 	runPodcastTopicsJob,
+	runReviewerDaysJob,
 	getJobStatuses,
 	clearJobError,
 } from '#app/utils/background-jobs.server'
@@ -41,6 +42,8 @@ const JOB_DESCRIPTIONS = {
 		'Recomputes the household budget + 6-month revenue projection and loads them into the reports database.',
 	podcastTopics:
 		'Mines industry news feeds and recent client questions, then proposes podcast episode ideas for /admin/podcast.',
+	reviewerDays:
+		'Measures, per New York day, how long the reviewer spent on the review pages against the free time in her Boulevard shift, for the Backlinks report.',
 }
 
 // Maps the job status to the StatusButton status
@@ -112,6 +115,11 @@ export async function action({ request }: Route['ActionArgs']) {
 			success: true,
 			message: 'Boulevard real revenue sync job started',
 		})
+	}
+
+	if (intent === 'run-reviewerDays') {
+		runReviewerDaysJob().catch(console.error)
+		return json({ success: true, message: 'Reviewer time per day job started' })
 	}
 
 	if (intent?.toString().startsWith('clear-error-')) {

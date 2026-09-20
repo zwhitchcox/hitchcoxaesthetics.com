@@ -856,14 +856,14 @@ model PlaidTransaction {
 // the review back and only then submits it). kind "blog" = a guide for this
 // site's /blog, live only once approved.
 model Article {
-  id                String  @id @default(cuid())
+  id                String    @id @default(cuid())
   kind              String
-  sourceKey         String  @unique
+  sourceKey         String    @unique
   outreachRowId     Int?
   outreachArticleId Int?
   publication       String?
   publicationUrl    String?
-  slug              String? @unique
+  slug              String?   @unique
   title             String
   dek               String?
   byline            String?
@@ -872,22 +872,22 @@ model Article {
   bodyHash          String
   previousBody      String?
   writer            String?
-  isReference       Boolean @default(false)
+  isReference       Boolean   @default(false)
   wordCount         Int?
   linksJson         String?
   notes             String?
   outreachStatus    String?
   liveUrl           String?
-  status            String  @default("pending")
+  status            String    @default("pending")
   reviewNote        String?
   reviewedAt        DateTime?
   reviewedBy        String?
   editedAt          DateTime?
   editedBy          String?
   publishedAt       DateTime?
-  receivedAt        DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  receivedAt        DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // Sarah's phone review (/review). All optional, added 2026-09-16.
   // "Things to check" panel: the verified claim list and its hash.
@@ -913,11 +913,11 @@ model Article {
   revisionNote         String?
   revisionBaseBody     String?
   // Queue inputs from the outreach ledger.
-  publisherWaiting     Boolean @default(false)
+  publisherWaiting     Boolean   @default(false)
   placementUsd         Int?
   estimatedReadSeconds Int?
   // "Write a different article": the mini queues a clean-room draft.
-  rewriteRequested     Boolean @default(false)
+  rewriteRequested     Boolean   @default(false)
 
   images ArticleImage[]
   events ArticleReviewEvent[]
@@ -1031,6 +1031,27 @@ model ReviewAsk {
 // keyed by the text, the voice and the model, so a paragraph that appears in
 // two articles (or survives an edit) is paid for once. Nothing points at an
 // article: the text is the key.
+// One provider's day, for the review-pace report: how long she was on shift,
+// how much of it was booked, and how long she spent on the review pages.
+// Filled by the reviewer-days job from Boulevard (shifts, blocks), the
+// appointment mirror, and PostHog (time on /review and /admin/outreach).
+model ReviewerDay {
+  staffId            String
+  day                String // YYYY-MM-DD in America/New_York
+  shiftMinutes       Int?
+  blockMinutes       Int?
+  appointmentMinutes Int?
+  freeMinutes        Int?
+  reviewMinutes      Int
+  reviewSessions     Int
+  // posthog (her page sessions) or events (her saved edits and decisions)
+  reviewSource       String?
+  fetchedAt          DateTime @default(now())
+
+  @@id([staffId, day])
+  @@index([day])
+}
+
 model ArticleNarration {
   hash      String   @id
   voiceId   String
@@ -1044,8 +1065,8 @@ model ArticleNarration {
 }
 
 model ArticleImage {
-  id          String  @id @default(cuid())
-  position    Int     @default(0)
+  id          String   @id @default(cuid())
+  position    Int      @default(0)
   fileName    String
   contentType String
   altText     String?
@@ -1087,6 +1108,8 @@ model BlvdAppointment {
   clientCreatedAt        DateTime?
   // JSON text: [{ name, price, minutes }] snapshot of appointmentServices
   services               String
+  // JSON text: the staff URNs on the appointment's services, for per-provider time
+  staffIds               String?
 
   syncedAt DateTime @updatedAt
 
@@ -1132,20 +1155,20 @@ model RevenueItem {
 // accepts or dismisses them in /admin/podcast; accepted topics are her
 // recording queue.
 model PodcastTopic {
-  id     String @id @default(cuid())
-  title  String
+  id            String  @id @default(cuid())
+  title         String
   // The angle: why this topic, why now, in one or two sentences.
-  hook   String
+  hook          String
   // Markdown talking-point outline for the episode.
-  outline String
-  status String @default("proposed") // proposed | accepted | dismissed | recorded
-  score  Int    @default(0)
+  outline       String
+  status        String  @default("proposed") // proposed | accepted | dismissed | recorded
+  score         Int     @default(0)
   // JSON: [{ title, url, publisher, publishedAt }] news items behind the idea.
-  sourcesJson String @default("[]")
+  sourcesJson   String  @default("[]")
   // JSON: ["client question", ...] real questions clients texted or asked.
-  questionsJson String @default("[]")
+  questionsJson String  @default("[]")
   // Which mining run proposed it (YYYY-MM-DD of the run).
-  batchKey String?
+  batchKey      String?
 
   createdAt DateTime  @default(now())
   decidedAt DateTime?

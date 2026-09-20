@@ -84,7 +84,7 @@ export async function readStaffAvailability(
 
 	const fetchedAt = now.toISOString()
 	try {
-		const { shifts, blocks } = await fetchDay(staffUrn, dayYmd, zone)
+		const { shifts, blocks } = await fetchStaffDay(staffUrn, dayYmd, zone)
 		const working = shifts.some(
 			shift => !covered(shiftSpan(shift, dayYmd, zone), blocks),
 		)
@@ -100,7 +100,8 @@ export async function readStaffAvailability(
 	}
 }
 
-async function fetchDay(staffUrn: string, dayYmd: string, zone: string) {
+/** One day of shifts and blocks straight from Boulevard, no cache. */
+export async function fetchStaffDay(staffUrn: string, dayYmd: string, zone: string) {
 	const dayStart = fromZonedTime(`${dayYmd}T00:00:00`, zone)
 	const dayEnd = fromZonedTime(`${nextDay(dayYmd)}T00:00:00`, zone)
 	const staffUuid = uuidOf(staffUrn)
@@ -148,7 +149,7 @@ async function fetchDay(staffUrn: string, dayYmd: string, zone: string) {
 }
 
 /** The shift's clock times on that day, as instants. */
-function shiftSpan(
+export function shiftSpan(
 	shift: StaffShift,
 	dayYmd: string,
 	zone: string,

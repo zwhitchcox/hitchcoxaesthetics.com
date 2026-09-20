@@ -95,3 +95,8 @@ export async function podcastTopicsWorkflow(): Promise<void> {
 	// Feed fetches + one LLM call: the slow tier's generous timeout fits.
 	await slowActivities.podcastTopicsActivity()
 }
+
+export async function reviewerDaysWorkflow(): Promise<void> {
+	// The first run reads 35 days from Boulevard one by one: the slow tier.
+	await slowActivities.reviewerDaysActivity()
+}

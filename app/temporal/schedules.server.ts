@@ -20,6 +20,7 @@ import {
 	getPlaidSyncIntervalMs,
 	getPodcastTopicsIntervalMs,
 	getReviewAppointmentSyncIntervalMs,
+	getReviewerDaysIntervalMs,
 	getScheduleHealthAlertIntervalMs,
 	hasPodcastTopicsConfig,
 } from '#app/utils/background-jobs.server.ts'
@@ -145,6 +146,14 @@ function getScheduleDefinitions(): Array<ScheduleDefinition> {
 			jobId: 'blvdAppointmentBackfill',
 			workflowType: 'blvdAppointmentBackfillWorkflow',
 			intervalMs: BLVD_APPOINTMENT_BACKFILL_INTERVAL_MS,
+			enabled: Boolean(process.env.BLVD_API_KEY?.trim()),
+		},
+		{
+			scheduleId: 'reviewer-days',
+			jobId: 'reviewerDays',
+			workflowType: 'reviewerDaysWorkflow',
+			intervalMs: getReviewerDaysIntervalMs(),
+			// Reads her shifts from Boulevard and her sessions from PostHog.
 			enabled: Boolean(process.env.BLVD_API_KEY?.trim()),
 		},
 		{

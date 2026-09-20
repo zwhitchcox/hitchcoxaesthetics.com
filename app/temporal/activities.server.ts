@@ -18,6 +18,7 @@ import {
 	runLapsedPatientsJob,
 	runPodcastTopicsJob,
 	runReviewAppointmentSyncJob,
+	runReviewerDaysJob,
 	runReviewsFetchJob,
 	runScheduleHealthAlertJob,
 } from '#app/utils/background-jobs.server.ts'
@@ -97,6 +98,9 @@ export function createActivities() {
 		},
 		async scheduleHealthAlertActivity() {
 			await runJobAndReport('scheduleHealthAlert', runScheduleHealthAlertJob)
+		},
+		async reviewerDaysActivity() {
+			await runJobAndReport('reviewerDays', runReviewerDaysJob)
 		},
 		async podcastTopicsActivity() {
 			await runJobAndReport('podcastTopics', runPodcastTopicsJob)

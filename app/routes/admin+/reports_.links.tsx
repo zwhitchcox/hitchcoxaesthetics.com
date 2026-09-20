@@ -12,8 +12,12 @@
  */
 import { json, type LoaderFunctionArgs, type SerializeFrom } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
+import { formatInTimeZone } from 'date-fns-tz'
 import { BarChart, LineChart, ReportPage, SERIES, StatTile } from '#app/components/report-ui'
-import { findReviewerUser } from '#app/utils/article-reminder.server.ts'
+import {
+	findReviewerUser,
+	REVIEWER_STAFF_URN,
+} from '#app/utils/article-reminder.server.ts'
 import { zoneDayStart } from '#app/utils/article-reminder.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
@@ -41,7 +45,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const reviewer = await findReviewerUser()
 	const days = bucketReviewActivity([], TIME_ZONE, REVIEW_DAYS, now)
 	const since = zoneDayStart(days[0]!.day, TIME_ZONE)
-	const [events, decidedAllTime, waiting] = reviewer
+	const [events, decidedAllTime, waiting, timeRows] = reviewer
 		? await Promise.all([
 				prisma.articleReviewEvent.findMany({
 					where: { userId: reviewer.id, at: { gte: since } },
@@ -51,14 +55,44 @@ export async function loader({ request }: LoaderFunctionArgs) {
 					where: { userId: reviewer.id, kind: { in: [...REVIEW_DECISION_KINDS] } },
 				}),
 				loadWaiting(now),
+				// Her time per day, as the reviewer-days job last measured it.
+				prisma.reviewerDay.findMany({
+					where: { staffId: REVIEWER_STAFF_URN, day: { gte: days[0]!.day } },
+					select: {
+						day: true, shiftMinutes: true, blockMinutes: true, appointmentMinutes: true,
+						freeMinutes: true, reviewMinutes: true, reviewSessions: true, reviewSource: true, fetchedAt: true,
+					},
+				}),
 			])
-		: [[], 0, null]
+		: [[], 0, null, []]
+	const timeByDay = new Map(timeRows.map(r => [r.day, r]))
+	const measuredAt = timeRows.reduce<Date | null>(
+		(latest, r) => (latest && latest > r.fetchedAt ? latest : r.fetchedAt),
+		null,
+	)
 	const reviews = {
 		name: reviewer?.name?.trim() || 'Sarah',
 		found: reviewer != null,
-		days: bucketReviewActivity(events, TIME_ZONE, REVIEW_DAYS, now),
+		days: bucketReviewActivity(events, TIME_ZONE, REVIEW_DAYS, now).map(d => {
+			const t = timeByDay.get(d.day)
+			return {
+				...d,
+				time: t
+					? {
+							shift: t.shiftMinutes,
+							blocked: t.blockMinutes,
+							booked: t.appointmentMinutes,
+							free: t.freeMinutes,
+							reviewing: t.reviewMinutes,
+							sittings: t.reviewSessions,
+							source: t.reviewSource,
+						}
+					: null,
+			}
+		}),
 		decidedAllTime,
 		waiting: waiting ? waiting.articles.length : null,
+		measuredAt: measuredAt ? formatInTimeZone(measuredAt, TIME_ZONE, 'MMM d, h:mm a') : null,
 	}
 
 	const brands = await Promise.all(
@@ -117,12 +151,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return json({ brands, reviews })
 }
 
+/** Minutes as a short duration: 45 min, 2 h 05 min. */
+function hm(minutes: number) {
+	const h = Math.floor(minutes / 60)
+	const m = Math.round(minutes % 60)
+	return h ? `${h} h ${String(m).padStart(2, '0')} min` : `${m} min`
+}
+
 function ReviewPace({ reviews }: { reviews: SerializeFrom<typeof loader>['reviews'] }) {
 	const today = reviews.days.at(-1)
 	const week = reviews.days.slice(-7)
 	const decidedWeek = week.reduce((n, d) => n + d.decided, 0)
 	const workedWeek = week.reduce((n, d) => n + d.worked, 0)
 	const activeDays = reviews.days.filter(d => d.worked > 0).length
+	// Time only for the days the job has measured. Free time needs a shift.
+	const measured = reviews.days.filter(d => d.time)
+	const weekMeasured = week.filter(d => d.time)
+	const reviewingWeek = weekMeasured.reduce((n, d) => n + (d.time?.reviewing ?? 0), 0)
+	const freeWeek = weekMeasured.reduce((n, d) => n + (d.time?.free ?? 0), 0)
+	const shareWeek = freeWeek > 0 ? Math.round((100 * reviewingWeek) / freeWeek) : null
+	const todayTime = today?.time ?? null
 	return (
 		<section style={{ marginBottom: 34 }}>
 			<h2>{reviews.name}'s reviews</h2>
@@ -152,6 +200,28 @@ function ReviewPace({ reviews }: { reviews: SerializeFrom<typeof loader>['review
 							value={String(reviews.decidedAllTime)}
 							whisper={`${activeDays} active day${activeDays === 1 ? '' : 's'} in the last ${REVIEW_DAYS}`}
 						/>
+						<StatTile
+							label="Reviewing today"
+							value={todayTime ? hm(todayTime.reviewing) : '-'}
+							whisper={
+								!todayTime
+									? 'not measured yet'
+									: todayTime.free == null
+										? 'no shift in Boulevard today'
+										: `of ${hm(todayTime.free)} free time`
+							}
+						/>
+						<StatTile
+							label="Reviewing, last 7 days"
+							value={weekMeasured.length ? hm(reviewingWeek) : '-'}
+							whisper={
+								!weekMeasured.length
+									? 'not measured yet'
+									: shareWeek == null
+										? 'no shifts in Boulevard'
+										: `${shareWeek}% of ${hm(freeWeek)} free time`
+							}
+						/>
 					</div>
 					<BarChart
 						labels={reviews.days.map(d => d.day.slice(5))}
@@ -164,9 +234,39 @@ function ReviewPace({ reviews }: { reviews: SerializeFrom<typeof loader>['review
 							{ name: 'Articles worked on', color: SERIES[2]!, values: reviews.days.map(d => d.worked) },
 						]}
 					/>
+					{measured.length ? (
+						<>
+							<h3>Free time and time reviewing, per day</h3>
+							<BarChart
+								labels={reviews.days.map(d => d.day.slice(5))}
+								height={170}
+								format={hm}
+								tickEvery={5}
+								showTotal={false}
+								series={[
+									{ name: 'Free time', color: SERIES[1]!, values: reviews.days.map(d => d.time?.free ?? 0) },
+									{ name: 'Reviewing', color: SERIES[0]!, values: reviews.days.map(d => d.time?.reviewing ?? 0) },
+								]}
+								extraTipRows={i => {
+									const t = reviews.days[i]?.time
+									if (!t) return [{ name: 'Not measured', color: 'transparent', value: '' }]
+									return [
+										{ name: 'Shift', color: 'transparent', value: t.shift == null ? 'none' : hm(t.shift) },
+										{ name: 'Booked', color: 'transparent', value: hm(t.booked ?? 0) },
+										{ name: 'Blocked', color: 'transparent', value: hm(t.blocked ?? 0) },
+										{ name: 'Sittings', color: 'transparent', value: String(t.sittings) },
+									]
+								}}
+							/>
+						</>
+					) : null}
 					<p className="note">
 						A decision is approve, ask for changes, ask for a different article, or turn down.
 						Worked on means opened, read, edited, asked about or decided. Days are New York time.
+						Free time is her Boulevard shift minus booked appointments and blocked time; a day with
+						no shift shows no free time. Reviewing is her time on the review pages, measured from
+						her page sessions; days before September 19 are estimated from her saved edits and
+						decisions{reviews.measuredAt ? ` (last measured ${reviews.measuredAt})` : ''}.
 					</p>
 				</>
 			)}

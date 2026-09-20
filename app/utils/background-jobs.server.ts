@@ -41,6 +41,7 @@ import {
 	hasPodcastTopicsConfig,
 	minePodcastTopics,
 } from '#app/utils/podcast-topics.server.ts'
+import { syncReviewerDays } from '#app/utils/reviewer-days.server.ts'
 
 // Background job types and interfaces
 export interface JobStatus {
@@ -139,6 +140,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	blvdAppointmentBackfill: {
 		id: 'blvdAppointmentBackfill',
 		name: 'Boulevard Appointment Mirror (full backfill)',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	reviewerDays: {
+		id: 'reviewerDays',
+		name: 'Reviewer Time Per Day',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -659,6 +669,40 @@ export async function runPodcastTopicsJob(): Promise<void> {
 export function getPodcastTopicsIntervalMs() {
 	const hours = Number(process.env.PODCAST_TOPICS_INTERVAL_HOURS ?? '72')
 	return (Number.isFinite(hours) && hours > 0 ? hours : 72) * 60 * 60 * 1000
+}
+
+export async function runReviewerDaysJob(): Promise<void> {
+	const job = jobStatuses['reviewerDays']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+	try {
+		const result = await syncReviewerDays()
+		console.log(
+			result.skipped
+				? `Reviewer days: skipped (${result.skipped})`
+				: `Reviewer days: wrote ${result.days} day${result.days === 1 ? '' : 's'}`,
+		)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Reviewer days failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getReviewerDaysIntervalMs(),
+		).toISOString()
+	}
+}
+
+export function getReviewerDaysIntervalMs() {
+	const hours = Number(process.env.REVIEWER_DAYS_INTERVAL_HOURS ?? '6')
+	return (Number.isFinite(hours) && hours > 0 ? hours : 6) * 60 * 60 * 1000
 }
 
 export { hasPodcastTopicsConfig }

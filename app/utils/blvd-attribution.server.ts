@@ -132,7 +132,7 @@ function normalizeOptionalString(value?: string | null) {
  * so attribution touches (booking side) and revenue items (admin side) join.
  */
 export function normalizeBlvdEntityId(
-	kind: 'Client' | 'Appointment',
+	kind: 'Client' | 'Appointment' | 'Staff',
 	value?: string | null,
 ) {
 	const trimmed = normalizeOptionalString(value)
