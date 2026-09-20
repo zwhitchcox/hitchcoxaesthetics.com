@@ -10,6 +10,8 @@ import {
 	useSyncExternalStore,
 } from 'react'
 import { createPortal, flushSync } from 'react-dom'
+import { NarrationButton } from '#app/components/narration-button.tsx'
+import { useNarration } from '#app/utils/use-narration.ts'
 import { useHydrated } from 'remix-utils/use-hydrated'
 import {
 	ARTICLE_CHAT_COPY,
@@ -155,6 +157,8 @@ export type ArticleEditorProps = {
 	 * into the decisions panel instead and the slot stays empty.
 	 */
 	barSlot?: HTMLElement | null
+	/** Where the route wants the read-aloud Play button; without a slot there is no button. */
+	narrationSlot?: HTMLElement | null
 	/**
 	 * The route's decision buttons (Approve; Write a different article): the
 	 * buttons alone, no bar chrome. They render inside the route's <Form>, so
@@ -428,6 +432,7 @@ export function ArticleEditor({
 	flushRef,
 	onBusyChange,
 	barSlot,
+	narrationSlot,
 	decisions,
 	editorViewRef,
 }: ArticleEditorProps) {
@@ -463,6 +468,15 @@ export function ArticleEditor({
 	const ownViewRef = useRef<EditorView | null>(null)
 	const viewRef = editorViewRef ?? ownViewRef
 	const proseRef = useRef<HTMLDivElement>(null)
+	// Read aloud. A paragraph she is typing in waits; a chat change is read once it holds still.
+	const editorFocusedRef = useRef(false)
+	editorFocusedRef.current = editorFocused
+	const isBlockBusy = useCallback((el: HTMLElement) => {
+		if (!editorFocusedRef.current) return false
+		const node = window.getSelection()?.anchorNode
+		return Boolean(node && el.contains(node))
+	}, [])
+	const narration = useNarration({ containerRef: proseRef, version: body, isBlockBusy })
 	const bubbleBoxRef = useRef<HTMLDivElement>(null)
 
 	/* ---- the chat ---- */
@@ -1166,6 +1180,9 @@ export function ArticleEditor({
 				: ARTICLE_EDITOR_COPY.grillMe}
 		</button>
 	) : null
+	const playButton = (
+		<NarrationButton narration={narration} onToggle={narration.toggle} size="sm" />
+	)
 	const barItems = (
 		<>
 			{grillButton}
@@ -1174,6 +1191,7 @@ export function ArticleEditor({
 		</>
 	)
 	// The phone's panel holds the items; the slot stays empty there.
+	const playInSlot = narrationSlot ? createPortal(playButton, narrationSlot) : null
 	const bar = panelOn ? null : barSlot === undefined ? (
 		<div className="flex items-center justify-end gap-2">{barItems}</div>
 	) : barSlot === null ? null : (
@@ -1424,6 +1442,7 @@ export function ArticleEditor({
 					openChat()
 				}}
 			>
+				{playInSlot}
 				{bar}
 
 				{isReference ? (

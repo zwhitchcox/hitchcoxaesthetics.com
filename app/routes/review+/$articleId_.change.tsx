@@ -171,6 +171,8 @@ export default function ChangeArticle() {
 	const [chatBusy, setChatBusy] = useState(false)
 	// The editor portals its bar items (the Markdown toggle) in here once the element exists.
 	const [barSlot, setBarSlot] = useState<HTMLElement | null>(null)
+	// The Play button for read-aloud lives in the bar on every width.
+	const [narrationSlot, setNarrationSlot] = useState<HTMLElement | null>(null)
 	const flushRef = useRef<(() => Promise<void>) | null>(null)
 	const barRef = useRef<HTMLDivElement>(null)
 	// The bar's bottom edge: 92 px under the layout header, 44 px once that has scrolled away.
@@ -195,6 +197,11 @@ export default function ChangeArticle() {
 					<span className="truncate">{CHANGE_COPY.back}</span>
 				</Link>
 				{/* The editor's bar items land here on a wide window; the phone shows them in the decisions panel, so the slot is empty there. */}
+				<div
+					data-narration-slot=""
+					className="flex min-w-0 items-center"
+					ref={setNarrationSlot}
+				/>
 				<div
 					data-editor-bar-slot=""
 					className="flex items-center gap-2"
@@ -242,6 +249,7 @@ export default function ChangeArticle() {
 					flushRef={flushRef}
 					onBusyChange={setChatBusy}
 					barSlot={barSlot}
+					narrationSlot={narrationSlot}
 					decisions={
 						<ApproveButton label={approveLabel} disabled={approveDisabled} />
 					}

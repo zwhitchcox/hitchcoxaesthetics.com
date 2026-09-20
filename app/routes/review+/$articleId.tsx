@@ -32,6 +32,7 @@ import {
 	useDictation,
 } from '#app/components/dictation.tsx'
 import { MarkdownContent } from '#app/components/markdown-content.tsx'
+import { NarrationButton } from '#app/components/narration-button.tsx'
 import { Sheet, SheetError } from '#app/components/review-sheet.tsx'
 import { Button } from '#app/components/ui/button.tsx'
 import { Icon } from '#app/components/ui/icon'
@@ -61,6 +62,7 @@ import {
 	splitParagraphs,
 } from '#app/utils/review-aid.ts'
 import { recordReviewEvent } from '#app/utils/review-events.server.ts'
+import { type NarrationState, useNarration } from '#app/utils/use-narration.ts'
 import {
 	MARKER_ID,
 	reviewProsePlugin,
@@ -382,7 +384,19 @@ export default function ReviewArticle() {
 	)
 }
 
-type CardHandle = { tapApprove: () => void; openMore: () => void }
+type CardHandle = {
+	tapApprove: () => void
+	openMore: () => void
+	/** Read aloud from where she is, pause, or resume. */
+	toggleNarration: () => void
+}
+
+const NARRATION_IDLE: NarrationState = {
+	status: 'idle',
+	block: -1,
+	blocks: 0,
+	message: null,
+}
 
 function Feed({
 	first,
@@ -418,6 +432,11 @@ function Feed({
 	const loadingRef = useRef(false)
 	const sentinelSeenRef = useRef(false)
 	const handles = useRef(new Map<string, CardHandle>())
+	// The voice's state per card, so the bar's Play button can show it.
+	const [narrations, setNarrations] = useState<Record<string, NarrationState>>({})
+	const onNarration = useCallback((id: string, state: NarrationState) => {
+		setNarrations(prev => ({ ...prev, [id]: state }))
+	}, [])
 
 	/** True when a pending, undecided article sits after `id` in the feed. */
 	function pendingAfter(id: string): ArticleEntry | null {
@@ -651,6 +670,7 @@ function Feed({
 							onReopened={onReopened}
 							onLock={onLock}
 							onBusy={onBusy}
+							onNarration={onNarration}
 						/>
 					</div>
 				)
@@ -734,6 +754,14 @@ function Feed({
 								Change it
 							</Link>
 						</Button>
+						<NarrationButton
+							narration={(barArticle && narrations[barArticle.id]) ?? NARRATION_IDLE}
+							onToggle={() =>
+								barArticle && handles.current.get(barArticle.id)?.toggleNarration()
+							}
+							disabled={!barOn || !barArticle}
+							className="shrink-0"
+						/>
 						<Button
 							type="button"
 							variant="outline"
@@ -826,12 +854,24 @@ type CardProps = {
 	onReopened: (id: string, notice: string) => void
 	onLock: (id: string, on: boolean) => void
 	onBusy: (id: string, on: boolean) => void
+	/** The voice's state for this card, for the bar's Play button. */
+	onNarration: (id: string, state: NarrationState) => void
 }
 
 type CardSheet = SheetKey | 'end' | 'lapsed'
 
 const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
-	{ entry, first, active, lapsedIntent, onDecided, onReopened, onLock, onBusy },
+	{
+		entry,
+		first,
+		active,
+		lapsedIntent,
+		onDecided,
+		onReopened,
+		onLock,
+		onBusy,
+		onNarration,
+	},
 	ref,
 ) {
 	const { view, status, decision, notice } = entry
@@ -859,6 +899,13 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 	const [selecting, setSelecting] = useState(false)
 	const cardRef = useRef<HTMLElement>(null)
 	const proseRef = useRef<HTMLDivElement>(null)
+	// Read aloud: the paragraphs under proseRef, re-read when the body changes.
+	const narration = useNarration({ containerRef: proseRef, version: body })
+	const { toggle: toggleNarration } = narration
+	const { status: nStatus, block: nBlock, blocks: nBlocks, message: nMessage } = narration
+	useEffect(() => {
+		onNarration(id, { status: nStatus, block: nBlock, blocks: nBlocks, message: nMessage })
+	}, [id, onNarration, nStatus, nBlock, nBlocks, nMessage])
 	const endRef = useRef<HTMLParagraphElement>(null)
 	// The furthest paragraph she reached in this visit. "Take me there" reads it.
 	const maxSeenRef = useRef(-1)
@@ -1028,10 +1075,11 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 			openMore() {
 				setSheet('more')
 			},
+			toggleNarration,
 		}),
 		// approve() reads state that changes with these
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[reachedEnd, id],
+		[reachedEnd, id, toggleNarration],
 	)
 
 	/* ---- reading, recorded and never policed ---- */

@@ -186,3 +186,13 @@
 .icon-container:hover .wiggle-hover {
 	animation: wiggle-short 1s ease-in-out 1;
 }
+
+/* Read-aloud on the review pages: the word being spoken, and the paragraph it is in. */
+::highlight(narration-word) {
+	background-color: hsl(45 93% 58% / 0.55);
+	color: inherit;
+}
+[data-narrating='1'] {
+	box-shadow: -6px 0 0 0 hsl(45 93% 58% / 0.55);
+	transition: box-shadow 150ms ease;
+}

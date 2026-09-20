@@ -1027,6 +1027,22 @@ model ReviewAsk {
   @@index([answeredAt])
 }
 
+// Narration for the review pages: one paragraph's audio and word timings,
+// keyed by the text, the voice and the model, so a paragraph that appears in
+// two articles (or survives an edit) is paid for once. Nothing points at an
+// article: the text is the key.
+model ArticleNarration {
+  hash      String   @id
+  voiceId   String
+  modelId   String
+  chars     Int
+  durationS Float
+  // JSON: [[charStart, charEnd, startSeconds, endSeconds], ...] one per word
+  wordsJson String
+  audio     Bytes
+  createdAt DateTime @default(now())
+}
+
 model ArticleImage {
   id          String  @id @default(cuid())
   position    Int     @default(0)
