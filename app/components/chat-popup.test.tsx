@@ -21,6 +21,7 @@ import {
 	ARTICLE_EDITOR_COPY,
 	type ArticleEditorProps,
 } from '#app/components/article-editor.tsx'
+import { NARRATION_COPY } from '#app/components/narration-button.tsx'
 import { CHAT_SHELL_COPY } from '#app/components/chat-shell.tsx'
 import { RICH_EDITOR_COPY } from '#app/components/rich-editor.tsx'
 import { type ChatMessageJson } from '#app/utils/article-chat.ts'
@@ -500,7 +501,11 @@ test('a wide screen leaves the route’s decisions to the route: the bar items s
 			),
 		})
 		await screen.findByRole('textbox', { name: RICH_EDITOR_COPY.label })
-		// the slot: [Grill me][save mark][Markdown], as before
+		// the slot: [Read to me][Grill me][save mark][Markdown]; the Play button
+		// leads the bar items when the route wired no slot of its own for it
+		const play = within(slot).getByRole('button', {
+			name: NARRATION_COPY.play,
+		})
 		const grill = within(slot).getByRole('button', {
 			name: ARTICLE_EDITOR_COPY.grillMe,
 		})
@@ -509,7 +514,7 @@ test('a wide screen leaves the route’s decisions to the route: the bar items s
 		})
 		const mark = slot.querySelector('[data-save-state]')
 		if (!(mark instanceof HTMLElement)) throw new Error('no save mark')
-		expect(within(slot).getAllByRole('button')).toEqual([grill, toggle])
+		expect(within(slot).getAllByRole('button')).toEqual([play, grill, toggle])
 		expect(
 			grill.compareDocumentPosition(mark) & Node.DOCUMENT_POSITION_FOLLOWING,
 		).toBeTruthy()
