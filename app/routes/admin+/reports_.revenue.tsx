@@ -420,12 +420,40 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			)
 		: null
 
+	// The calendar's own count for each accuracy week: every appointment booked
+	// in the week, cancellations and no-shows removed. A future week shows what
+	// is on the books so far (Zane 2026-09-21: always show actual appointments,
+	// even before the week happens).
+	const accuracyRows = accuracy?.slice(-12) ?? null
+	const apptsByWeek: Record<string, number> = {}
+	if (accuracyRows?.length) {
+		const first = accuracyRows[0]!.week
+		const last = accuracyRows[accuracyRows.length - 1]!.week
+		const booked = await prisma.blvdAppointment
+			.findMany({
+				where: {
+					startAt: { gte: etMidnightUtc(first), lt: etMidnightUtc(shiftDay(last, 7)) },
+					cancelled: false,
+				},
+				select: { startAt: true, state: true },
+			})
+			.catch(() => [] as Array<{ startAt: Date; state: string | null }>)
+		for (const a of booked) {
+			if (['CANCELLED', 'NO_SHOW', 'NOSHOW'].includes((a.state ?? '').toUpperCase())) continue
+			const day = toEtDay(a.startAt)
+			const dow = (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7 // Mon=0
+			const monday = shiftDay(day, -dow)
+			apptsByWeek[monday] = (apptsByWeek[monday] ?? 0) + 1
+		}
+	}
+
 	return json({
 		configured: true as const,
 		currentMonday: weekDays[0]!,
 		lastFullWeek: lastWeekRow?.[0] ?? null,
 		thisWeekProj: thisWeekProj?.[0] ?? null,
-		accuracy: accuracy?.slice(-12) ?? null,
+		accuracy: accuracyRows,
+		apptsByWeek,
 		weekBreakdown,
 		projBreakdown,
 		summary: summary?.[0] ?? null,
@@ -679,6 +707,7 @@ export default function Revenue() {
 		lastFullWeek,
 		thisWeekProj,
 		accuracy,
+		apptsByWeek,
 		weekBreakdown,
 		projBreakdown,
 		summary,
@@ -1497,6 +1526,7 @@ export default function Revenue() {
 									// week completes, a.actual exists and frac pins to 1,
 									// so the error freezes on its own.
 									const isCurrent = a.week === currentMonday && a.actual == null
+									const isFuture = a.week > currentMonday
 									const weekTotalExpected =
 										thisWeekDaily?.reduce((t, d) => t + (d.expected ?? 0), 0) ?? 0
 									const frac = isCurrent
@@ -1504,18 +1534,22 @@ export default function Revenue() {
 											? weekToDate.expected / weekTotalExpected
 											: null
 										: 1
+									// Collected revenue: the frozen actual, this week's so far, or
+									// $0 for a week that has not started (nothing is checked out yet).
 									const actualUsd =
 										a.actual != null
 											? Number(a.actual)
 											: isCurrent && weekToDate
 												? Math.round(weekToDate.actual)
-												: null
+												: isFuture
+													? 0
+													: null
 									const weekBase =
 										frac != null && Number(a.projected) > 0
 											? Number(a.projected) * frac
 											: null
 									const weekErr =
-										actualUsd != null && weekBase
+										!isFuture && actualUsd != null && weekBase
 											? Math.round(((actualUsd - weekBase) / weekBase) * 100)
 											: null
 									// One line per service type: projected side, actual
@@ -1545,13 +1579,12 @@ export default function Revenue() {
 									const projCatTotal = projRows.reduce((t, r) => t + r.usd, 0)
 									const fillUsd = Math.round(Number(a.projected) - projCatTotal)
 									// Week-level counts: booked appointments at snapshot time
-									// (pre-snapshot weeks have none) and paid visits to date.
+									// (pre-snapshot weeks have none) and the calendar's count for
+									// the week, which a future week already has.
 									const projAppts = projRows.length
 										? projRows.reduce((t, r) => t + r.appts, 0)
 										: null
-									const actAppts = actRows.length
-										? actRows.reduce((t, r) => t + r.appts, 0)
-										: null
+									const actAppts = apptsByWeek[a.week] ?? null
 									return (
 									<tr key={a.week}>
 										<td>
@@ -1619,9 +1652,7 @@ export default function Revenue() {
 										<td className="num">
 											{a.lo != null && a.hi != null ? `${usd(Number(a.lo))} – ${usd(Number(a.hi))}` : '-'}
 										</td>
-										<td className="num">
-											{actAppts == null ? '-' : `${actAppts}${isCurrent ? ' so far' : ''}`}
-										</td>
+										<td className="num">{actAppts == null ? '-' : actAppts}</td>
 										<td className="num">
 											{actualUsd == null
 												? '-'
@@ -1640,7 +1671,11 @@ export default function Revenue() {
 						Positive (green) = actual beat the forecast; negative (red) = came
 						in under. The current week scores what has happened so far against
 						the forecast prorated to this point in the week, then freezes when
-						the week ends.
+						the week ends. Actual appts is the calendar: every appointment booked
+						in that week, cancellations and no-shows removed, so a coming week
+						shows what is on the books so far. Actual revenue is what has been
+						collected, which is $0 until a week begins. The per-type rows inside
+						a week count paid visits.
 					</p>
 				</section>
 			) : null}
