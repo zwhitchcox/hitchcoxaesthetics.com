@@ -79,7 +79,7 @@ const ImageCarousel = ({
 		<>
 			{/* Eagerly load the first image for LCP in head */}
 			{images.length > 0 && (
-				<link rel="preload" as="image" href={images[0]} fetchPriority="high" />
+				<link rel="preload" as="image" href={images[0]} fetchpriority="high" />
 			)}
 			{images.map((image, index) => {
 				// Eagerly load the first two images so the initial fade is smooth.
@@ -101,7 +101,7 @@ const ImageCarousel = ({
 							transitionDuration: `${transitionDuration}ms`,
 						}}
 						loading={index <= 1 ? 'eager' : 'lazy'}
-						fetchPriority={index === 0 ? 'high' : 'auto'}
+						fetchpriority={index === 0 ? 'high' : 'auto'}
 						decoding={index <= 1 ? 'sync' : 'async'}
 					/>
 				)

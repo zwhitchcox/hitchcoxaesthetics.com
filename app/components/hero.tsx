@@ -27,7 +27,7 @@ export function Hero({
 					alt={imageAlt}
 					className="z-10 mt-[-3rem] h-auto max-w-full translate-y-[7%] object-contain"
 					loading="eager"
-					fetchPriority="high"
+					fetchpriority="high"
 				/>
 			</div>
 			<div className="absolute bottom-0 z-10 w-full bg-background pb-6 text-foreground sm:relative sm:flex-1">
