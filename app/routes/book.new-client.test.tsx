@@ -4,7 +4,7 @@
 import { createRemixStub } from '@remix-run/testing'
 import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
-import { expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 
 import BlvdBookRoute from '#app/routes/book.tsx'
 
@@ -228,4 +228,99 @@ test('new clients can verify their phone and complete a mocked booking', async (
 			method: 'POST',
 		}),
 	)
+})
+
+const TIME_GONE = () =>
+	new Error(
+		'Time is no longer available, please select another.: ' +
+			JSON.stringify({
+				response: {
+					data: { checkoutCart: null },
+					errors: [
+						{
+							code: 'CART_TIME_NOT_AVAILABLE',
+							message: 'Time is no longer available, please select another.',
+						},
+					],
+				},
+			}),
+	)
+
+afterEach(() => {
+	checkoutMock.mockReset()
+})
+
+/** The same path as the test above, up to the Confirm button. */
+async function bookUpToConfirm() {
+	const user = userEvent.setup()
+	const okResponse = () =>
+		new Response(JSON.stringify({ ok: true }), {
+			headers: { 'Content-Type': 'application/json' },
+			status: 200,
+		})
+	vi.stubGlobal('fetch', vi.fn(async () => okResponse()))
+	vi.stubGlobal('scrollTo', vi.fn())
+	const RemixStub = createRemixStub([
+		{
+			Component: BlvdBookRoute,
+			loader: () => ({
+				apiKey: 'test-api-key',
+				brandId: 'sha',
+				businessId: 'test-business-id',
+				sourceHint: null,
+			}),
+			path: '/book',
+		},
+	])
+	render(<RemixStub initialEntries={['/book']} />)
+
+	await user.click(await screen.findByRole('button', { name: 'No' }))
+	const toxButtons = await screen.findAllByRole('button', { name: /Tox/i })
+	await user.click(toxButtons[0]!)
+	await user.click(await screen.findByRole('button', { name: /6:15 PM/i }))
+	await user.type(screen.getByLabelText(/Mobile phone/i), '8659780953')
+	await user.click(screen.getByRole('button', { name: /Text Me A Code/i }))
+	await user.type(await screen.findByPlaceholderText('ABC123'), '368tq8{Enter}')
+	await user.type(await screen.findByLabelText(/First name/i), 'Jane')
+	await user.type(screen.getByLabelText(/Last name/i), 'Smith')
+	await user.type(screen.getByLabelText(/Email/i), 'jane@example.com')
+	await user.click(screen.getByRole('button', { name: /^Next$/i }))
+	return user
+}
+
+test('a hold that ran out is taken again and the booking still completes', async () => {
+	const user = await bookUpToConfirm()
+	// Set after the cart exists: the cart factory installs the default first.
+	checkoutMock.mockImplementationOnce(async () => {
+		throw TIME_GONE()
+	})
+	await user.click(await screen.findByRole('button', { name: /^Confirm$/i }))
+
+	await expect(
+		screen.findByText(/Your appointment is confirmed/i),
+	).resolves.toBeVisible()
+	expect(checkoutMock).toHaveBeenCalledTimes(2)
+	expect(screen.queryByText(/could not book the appointment/i)).toBeNull()
+})
+
+test('a time that is really gone sends her back to the calendar with a clear message', async () => {
+	const user = await bookUpToConfirm()
+	checkoutMock
+		.mockImplementationOnce(async () => {
+			throw TIME_GONE()
+		})
+		.mockImplementationOnce(async () => {
+			throw TIME_GONE()
+		})
+	await user.click(await screen.findByRole('button', { name: /^Confirm$/i }))
+
+	await expect(
+		screen.findByText(/That time was just taken\. Please choose another time\./i),
+	).resolves.toBeVisible()
+	// back on the calendar with the times listed again, not stuck on Confirm
+	await expect(
+		screen.findByRole('button', { name: /6:15 PM/i }),
+	).resolves.toBeVisible()
+	expect(screen.queryByRole('button', { name: /^Confirm$/i })).toBeNull()
+	expect(checkoutMock).toHaveBeenCalledTimes(2)
 })

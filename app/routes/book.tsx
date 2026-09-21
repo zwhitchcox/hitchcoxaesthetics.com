@@ -1484,6 +1484,24 @@ export default function BlvdBookRoute() {
 		}
 	}
 
+	async function returnToScheduleAfterLostTime(message: string) {
+		setActiveStep(null)
+		setDetailsSubmitted(false)
+		setSelectedTimeId(null)
+		setStepError(message)
+		if (!selectedDateId || scheduleOptions.length === 0) return
+		setLoadingTimes(true)
+		try {
+			setBookableTimeEntries(
+				await loadTimeEntriesForDate(scheduleOptions, selectedDateId),
+			)
+		} catch {
+			// The old list stays; a taken time then fails with its own message.
+		} finally {
+			setLoadingTimes(false)
+		}
+	}
+
 	async function handleSelectTime(entry: BookableTimeEntry) {
 		setLoadingSchedule(true)
 		setStepError(null)
@@ -1661,7 +1679,23 @@ export default function BlvdBookRoute() {
 			nextCart = await ensureCartHasSelectedTime(nextCart, selectedTime)
 			setCart(nextCart)
 
-			const checkoutPayload = await nextCart.checkout()
+			let checkoutPayload: Awaited<ReturnType<typeof nextCart.checkout>>
+			try {
+				checkoutPayload = await nextCart.checkout()
+			} catch (error) {
+				if (!isCartTimeNotAvailable(error)) throw error
+				// Boulevard holds a time for a few minutes, and the hold can run out
+				// while she fills in the form. Take the time again if it is still
+				// free and check out once more. If it is gone, the catch below
+				// sends her back to the calendar.
+				try {
+					nextCart = await nextCart.reserveBookableItems(selectedTime)
+				} catch {
+					throw error
+				}
+				setCart(nextCart)
+				checkoutPayload = await nextCart.checkout()
+			}
 			setCart(checkoutPayload.cart)
 			identifyBookingPerson({
 				boulevardClientId:
@@ -1838,41 +1872,12 @@ export default function BlvdBookRoute() {
 				step: 'reserve',
 				userMessage: checkoutUserMessage,
 			})
-
-			if (error && typeof error === 'object') {
-				const err = error as any
-
-				// Try to extract from the standard `response` property
-				if (err.response?.errors?.[0]?.message) {
-					setStepError(checkoutUserMessage)
-					return
-				}
-
-				// Boulevard errors sometimes come wrapped as a stringified error object in message
-				if (
-					typeof err.message === 'string' &&
-					err.message.includes('CART_PAYMENT_METHOD_FAILED')
-				) {
-					setStepError(
-						'Please check your payment zip code and CVV and try again.',
-					)
-					return
-				}
-
-				if (typeof err.message === 'string' && err.message.includes('{')) {
-					try {
-						const match = err.message.match(/({.*})/)
-						if (match) {
-							// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-							const parsed: any = JSON.parse(match[1])
-							// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-							if (parsed?.response?.errors?.[0]?.message) {
-								setStepError(checkoutUserMessage)
-								return
-							}
-						}
-					} catch {}
-				}
+			if (isCartTimeNotAvailable(error)) {
+				// Trying the same time again can never work (one visitor tried 8
+				// times, 2026-09-15). Back to the calendar with fresh times; her
+				// details stay filled in.
+				await returnToScheduleAfterLostTime(checkoutUserMessage)
+				return
 			}
 			setStepError(checkoutUserMessage)
 		} finally {
@@ -4851,13 +4856,30 @@ function getVerifyCodeUserMessage(error: unknown) {
 	return 'We could not verify that code. Please try again.'
 }
 
+function isCartTimeNotAvailable(error: unknown) {
+	const details = getBookingErrorDetails(error)
+	return (
+		details.code === 'CART_TIME_NOT_AVAILABLE' ||
+		details.technicalMessage.includes('CART_TIME_NOT_AVAILABLE')
+	)
+}
+
 function getCheckoutUserMessage(error: unknown) {
 	const details = getBookingErrorDetails(error)
+	if (isCartTimeNotAvailable(error)) {
+		return 'That time was just taken. Please choose another time.'
+	}
 	if (
 		details.code === 'CART_PAYMENT_METHOD_FAILED' ||
 		details.technicalMessage.includes('CART_PAYMENT_METHOD_FAILED')
 	) {
 		return 'Please check your payment zip code and CVV and try again.'
+	}
+	// The card vault rejects a bad number or date before Boulevard sees it, and
+	// the SDK reads the card result before it checks for errors: both are the
+	// card, not the booking.
+	if (/addCartCardPaymentMethod|tokenize card/i.test(details.technicalMessage)) {
+		return 'We could not save that card. Please check the card number, expiration date, zip code and CVV.'
 	}
 
 	return 'We could not book the appointment. Please try again.'
