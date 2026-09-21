@@ -1017,7 +1017,7 @@ export default function BlvdBookRoute() {
 
 	useEffect(() => {
 		// Once the phone is verified, ask the server whether this booking needs
-		// a card on file (new client, or a prior cancellation/no-show). Fails
+		// a card on file (a prior late cancel or no-show and no revenue yet). Fails
 		// open: any error leaves the booking cardless rather than blocked.
 		if (!ownershipVerifiedPhone) {
 			setCardRisk(null)
@@ -1634,7 +1634,7 @@ export default function BlvdBookRoute() {
 			}
 
 			// Attach a card when Boulevard demands one OR when our own risk rule
-			// does (new client / prior cancellation without a card on file).
+			// does (a prior late cancel or no-show, no revenue yet, no card on file).
 			const mustAttachCard =
 				nextCart.summary.paymentMethodRequired || riskRequiresCard
 			if (mustAttachCard && selectedExistingPaymentMethod) {
@@ -3282,12 +3282,9 @@ export default function BlvdBookRoute() {
 																Card to hold your appointment
 															</h3>
 															<p className="text-sm text-muted-foreground">
-																{riskRequiresCard &&
-																cardRisk?.reason === 'prior-cancel'
+																{riskRequiresCard
 																	? 'A card on file is needed to hold this appointment. You will not be charged today.'
-																	: riskRequiresCard
-																		? 'We hold appointments for new clients with a card on file. You will not be charged today.'
-																		: 'A payment method is required to hold this booking. You will not be charged today.'}{' '}
+																	: 'A payment method is required to hold this booking. You will not be charged today.'}{' '}
 																Your card is stored securely by Boulevard, our
 																booking system.
 															</p>
@@ -4720,7 +4717,7 @@ async function requestBookingPhoneVerification(
 
 type BookingCardRiskResult = {
 	has_card_on_file: boolean
-	reason: 'new-client' | 'prior-cancel' | null
+	reason: 'late-cancel-unpaid' | null
 	require_card: boolean
 }
 
