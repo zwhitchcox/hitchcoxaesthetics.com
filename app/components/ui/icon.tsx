@@ -40,7 +40,14 @@ export const Icon = forwardRef<
 		name: IconName
 		size?: Size
 	}
->(function Icon({ name, size = 'font', className, children, ...props }, ref) {
+>(function IconImpl(
+	{ name, size = 'font', className, children, ...props },
+	ref,
+) {
+	// This render function must not be named Icon. Inside a named function
+	// expression that name is the function itself, so the <Icon> below would
+	// render this raw function and React would hand it a frozen context object
+	// as `ref`. The svg ref write then throws on every 404 page in development.
 	if (children) {
 		return (
 			<span
@@ -61,3 +68,4 @@ export const Icon = forwardRef<
 		</svg>
 	)
 })
+Icon.displayName = 'Icon'
