@@ -90,10 +90,12 @@ const KEYWORD_CATEGORY: Record<string, string> = {
 	'semaglutide near me': 'Weight Loss',
 }
 
-// Stale-while-revalidate for report_reach_weekly: serve the view as-is and
-// re-aggregate it in the background at most once per 12 hours. Grid captures
-// land weekly, so worst case the page shows data 12 hours older than the
-// newest capture, and no request ever waits the ~25s the refresh takes.
+// Stale-while-revalidate for the two map-pack views (report_reach_weekly and
+// mv_pack_rivals): serve them as-is and rebuild both in the background at most
+// once per 12 hours. The sha-reports worker rebuilds them after each weekly
+// capture; this is the fallback when it does not. No request ever waits the
+// ~25s the rebuild takes. Stamp only after both are rebuilt, so a stamp never
+// hides a stale view.
 let reachRefreshInFlight = false
 function maybeRefreshReachView() {
 	if (reachRefreshInFlight) return
@@ -108,6 +110,7 @@ function maybeRefreshReachView() {
 				await reportsQuery(
 					'REFRESH MATERIALIZED VIEW CONCURRENTLY report_reach_weekly',
 				)
+				await reportsQuery('REFRESH MATERIALIZED VIEW mv_pack_rivals')
 				await reportsQuery(
 					'UPDATE report_reach_meta SET refreshed_at = now() WHERE id = 1',
 				)
@@ -191,7 +194,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			),
 			// Map-pack rivals per keyword (latest capture), from mv_pack_rivals —
 			// the live five-CTE aggregate cost ~1.6s per view; the worker refreshes
-			// the MV post-capture. Listings sharing a domain count as one business.
+			// the MV post-capture and maybeRefreshReachView() above is the
+			// fallback. Listings sharing a domain count as one business.
 			reportsQuery<{
 				keyword: string
 				title: string
