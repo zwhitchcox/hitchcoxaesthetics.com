@@ -195,8 +195,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			// Map-pack rivals per keyword (latest capture), from mv_pack_rivals —
 			// the live five-CTE aggregate cost ~1.6s per view; the worker refreshes
 			// the MV post-capture and maybeRefreshReachView() above is the
-			// fallback. Listings sharing a domain count as one business.
+			// fallback. Listings sharing a domain count as one business, except
+			// ours: each of our offices has its own row.
 			reportsQuery<{
+				week: string
 				keyword: string
 				title: string
 				domain: string | null
@@ -212,8 +214,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			   SELECT *, row_number() OVER (
 			     PARTITION BY keyword ORDER BY homes_reached DESC) AS rn
 			   FROM mv_pack_rivals WHERE homes_reached > 0)
-			 SELECT keyword, title, domain, is_mine, avg_rank, rating, reviews,
-			   homes_reached, total_homes, reach_pct
+			 SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, title, domain,
+			   is_mine, avg_rank, rating, reviews, homes_reached, total_homes,
+			   reach_pct
 			 FROM ranked WHERE rn <= 10 OR is_mine
 			 ORDER BY keyword, homes_reached DESC`,
 			),
@@ -520,7 +523,7 @@ function MapPackView({ data }: { data: Data }) {
 /**
  * Who else is in the map box for one search at a time: every business with
  * top-3 presence in the latest grid capture, homes-weighted with the same
- * math as our own reach. Our row is highlighted.
+ * math as our own reach. Our rows, one per office, are highlighted.
  */
 function PackRivals({ rows }: { rows: Data['packRivals'] }) {
 	const keywords = [...new Set(rows.map(r => r.keyword))]
@@ -532,7 +535,9 @@ function PackRivals({ rows }: { rows: Data['packRivals'] }) {
 		<section>
 			<h2>
 				Who else is in the map box{' '}
-				<span className="mini">latest grid capture, one search at a time</span>
+				<span className="mini">
+					capture of {rows[0]!.week}, one search at a time
+				</span>
 			</h2>
 			<div className="choices">
 				<Choice
@@ -583,8 +588,8 @@ function PackRivals({ rows }: { rows: Data['packRivals'] }) {
 					: 'None of our listings is in the top 10 for this search. '}
 				Homes reached = the share of metro homes where the business is in the
 				top 3 of the map box. Average position is across the grid points where
-				it shows at all. Listings on one website count as one business, so our
-				two offices show as one row.
+				it shows at all. Listings on one website count as one business, except
+				ours: each of our offices has its own row.
 			</p>
 		</section>
 	)
