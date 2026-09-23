@@ -1,7 +1,17 @@
 /**
- * Reach over time, for each tracked keyword: how many people are inside our
- * top-3 map-pack zone (homes-weighted across the 1,222-cell metro grid) and
- * what that reach is worth per month.
+ * Rankings: where our three sites show up on Google for the searches we
+ * track, week by week. Two views, chosen with ?view=:
+ *
+ *   map (default)  the map pack: the share of metro homes that see one of
+ *                  our listings in the top 3 (homes-weighted across the
+ *                  1,222-cell grid), what that reach earns, and who else
+ *                  holds the pack for each search (?kw=).
+ *   organic        the blue links under the map: our rank for each tracked
+ *                  search, its history, and who beats us most often
+ *                  (?site=sha|bk|kwlc filters to one site).
+ *
+ * Backlinks (authority, linking sites, new and lost links, crawl status,
+ * competitors' authority) live on /admin/reports/links.
  *
  * Revenue model, every factor from real data where we have it:
  *   monthly searches (Google Ads, Knoxville DMA, keyword_search_volume)
@@ -10,25 +20,54 @@
  *   × click → new client (assumed 20%)
  *   × 6-month expected value per new client (client_value, real Boulevard cohorts)
  */
-import { json, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/node'
+import {
+	json,
+	type LoaderFunctionArgs,
+	type MetaFunction,
+	type SerializeFrom,
+} from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
-import { BarChart, LineChart, ReportPage, SERIES, StatTile, usd } from '#app/components/report-ui'
+import {
+	Choice,
+	LineChart,
+	RankSparkline,
+	ReportPage,
+	revalidateUnlessOnly,
+	SERIES,
+	StatTile,
+	usd,
+	useChoice,
+	usePersistedSearch,
+} from '#app/components/report-ui'
 import { requireUserWithRole } from '#app/utils/permissions.server'
+import {
+	OUR_SITES,
+	SITE_CHOICES,
+	SITE_CHOICE_VALUES,
+} from '#app/utils/report-sites.ts'
 import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
 
 export const meta: MetaFunction = () => [
-	{ title: 'Reach over time' },
+	{ title: 'Rankings' },
 	{ name: 'robots', content: 'noindex, nofollow' },
 ]
 
-/** Organic ranks past this are functionally "not ranking"; chart at the floor. */
+/** Organic ranks past this are functionally "not ranking"; charts stop here. */
 const RANK_FLOOR = 50
+
+/**
+ * A weekly capture reads about 95 results per search; the shortest normal
+ * one read 75. One that read fewer than this was cut short, so "not found"
+ * in it means "not checked": the 2026-09-21 capture read 13 to 59, and past
+ * the first page it held national pages, not Knoxville ones.
+ */
+const SHORT_CAPTURE = 70
 
 type SerpRankRow = {
 	week: string
 	keyword: string
 	target: string | null
-	rank_group: string | null
+	rank_group: number | null
 	my_domain: string | null
 	my_url: string | null
 	top_domain: string | null
@@ -86,130 +125,86 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	if (!hasReportsDb()) return json({ configured: false as const })
 	maybeRefreshReachView()
 
-	const [reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals, linkPages] = await Promise.all([
-		// Homes-weighted combined reach (any of our listings top-3) per
-		// keyword per capture date, read from the report_reach_weekly
-		// materialized view. The underlying aggregate scans every grid
-		// capture and took 18s live (measured 2026-08-03); the view reads in
-		// ~80ms and maybeRefreshReachView() below re-aggregates it in the
-		// background when captures land.
-		reportsQuery<{
-			week: string
-			keyword: string
-			homes_reached: string
-			total_homes: string
-			reach_pct: string | null
-		}>(
-			`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
+	const [reach, volumes, values, serpRanks, serpDepth, serpRivals, packRivals] =
+		await Promise.all([
+			// Homes-weighted combined reach (any of our listings top-3) per
+			// keyword per capture date, read from the report_reach_weekly
+			// materialized view. The underlying aggregate scans every grid
+			// capture and took 18s live (measured 2026-08-03); the view reads in
+			// ~80ms and maybeRefreshReachView() above re-aggregates it in the
+			// background when captures land.
+			reportsQuery<{
+				week: string
+				keyword: string
+				homes_reached: string
+				total_homes: string
+				reach_pct: string | null
+			}>(
+				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
 			   homes_reached, total_homes, reach_pct
 			 FROM report_reach_weekly ORDER BY 1, 2`,
-		),
-		reportsQuery<{
-			keyword: string
-			location: string
-			monthly_searches: string | null
-			estimated: boolean
-			fetched_at: string
-		}>(`SELECT keyword, location, monthly_searches, estimated, to_char(fetched_at, 'YYYY-MM-DD') AS fetched_at FROM keyword_search_volume`),
-		reportsQuery<{ category: string; expected_value: string; cohort_n: string }>(
-			`SELECT category, expected_value_per_conversion AS expected_value, cohort_n
+			),
+			reportsQuery<{
+				keyword: string
+				location: string
+				monthly_searches: string | null
+				estimated: boolean
+				fetched_at: string
+			}>(
+				`SELECT keyword, location, monthly_searches, estimated, to_char(fetched_at, 'YYYY-MM-DD') AS fetched_at FROM keyword_search_volume`,
+			),
+			reportsQuery<{
+				category: string
+				expected_value: string
+				cohort_n: string
+			}>(
+				`SELECT category, expected_value_per_conversion AS expected_value, cohort_n
 			 FROM client_value WHERE horizon_months = 6`,
-		),
-		// Organic ("blue link") Google rank per keyword per week, from
-		// sha-reports src/serp.ts. Metro-wide, unlike the grid above.
-		reportsQuery<SerpRankRow>(
-			`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, target,
+			),
+			// Organic ("blue link") Google rank per keyword per week, from
+			// sha-reports src/serp.ts. Metro-wide, unlike the grid.
+			reportsQuery<SerpRankRow>(
+				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, target,
 			   rank_group, my_domain, my_url, top_domain
 			 FROM report_serp_rank ORDER BY week, keyword`,
-		),
-		// Who else keeps landing in the organic top 10 this week.
-		reportsQuery<{ domain: string; keywords: string; best: string; avg_rank: string }>(
-			`WITH latest AS (SELECT max(week) AS week FROM raw_serp_organic)
+			),
+			// How many results each weekly capture read, so a capture that was cut
+			// short reads as "not checked", not "not in the top 100".
+			reportsQuery<{ week: string; keyword: string; depth: number }>(
+				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, count(*)::int AS depth
+			 FROM raw_serp_organic GROUP BY 1, 2`,
+			),
+			// Who else keeps landing in the organic top 10 this week.
+			reportsQuery<{
+				domain: string
+				keywords: number
+				best: number
+				avg_rank: string
+			}>(
+				`WITH latest AS (SELECT max(week) AS week FROM raw_serp_organic)
 			 SELECT domain, count(DISTINCT keyword)::int AS keywords,
 			   min(rank_group)::int AS best, round(avg(rank_group), 1) AS avg_rank
 			 FROM raw_serp_organic, latest
 			 WHERE raw_serp_organic.week = latest.week
 			   AND rank_group <= 10 AND domain <> ''
 			 GROUP BY domain ORDER BY keywords DESC, avg_rank ASC LIMIT 15`,
-		),
-		// Authority + backlink counts per site, every 3 days
-		// (sha-reports src/backlinks.ts).
-		// New referring domains per ISO week (clean only), from the per-domain
-		// first-seen ledger. The seed week counts every pre-existing domain as
-		// "new", ignore the first bar.
-		reportsQuery<{ week: string; target: string; gained: string }>(
-			`SELECT to_char(date_trunc('week', first_seen), 'YYYY-MM-DD') AS week,
-			   target, count(*)::int AS gained
-			 FROM backlink_domains WHERE spam < 25
-			 GROUP BY 1, 2 ORDER BY 1`,
-		),
-		// The actual newest links, so the weekly number is auditable.
-		reportsQuery<{ domain: string; target: string; rank: string | null; first_seen: string }>(
-			`SELECT domain, target, rank, to_char(first_seen, 'YYYY-MM-DD') AS first_seen
-			 FROM backlink_domains WHERE spam < 25
-			 ORDER BY first_seen DESC, rank DESC NULLS LAST LIMIT 25`,
-		),
-		// Lost links: a domain whose last sighting predates the newest capture
-		// has stopped linking. Loss week = week it was last seen.
-		reportsQuery<{ week: string; target: string; lost: string }>(
-			`SELECT to_char(date_trunc('week', last_seen), 'YYYY-MM-DD') AS week,
-			   target, count(*)::int AS lost
-			 FROM backlink_domains
-			 WHERE spam < 25
-			   AND last_seen < (SELECT max(day) FROM raw_backlink_summary)
-			 GROUP BY 1, 2 ORDER BY 1`,
-		),
-		reportsQuery<{ domain: string; target: string; rank: string | null; last_seen: string }>(
-			`SELECT domain, target, rank, to_char(last_seen, 'YYYY-MM-DD') AS last_seen
-			 FROM backlink_domains
-			 WHERE spam < 25
-			   AND last_seen < (SELECT max(day) FROM raw_backlink_summary)
-			 ORDER BY last_seen DESC, rank DESC NULLS LAST LIMIT 15`,
-		),
-		reportsQuery<{
-			day: string
-			target: string
-			rank: string | null
-			backlinks: string | null
-			referring_domains: string | null
-			clean_referring_domains: string | null
-			spam_referring_domains: string | null
-		}>(
-			`SELECT to_char(day, 'YYYY-MM-DD') AS day, target, rank, backlinks,
-			   referring_domains, clean_referring_domains, spam_referring_domains
-			 FROM raw_backlink_summary ORDER BY day, target`,
-		),
-		// Competitor authority + backlink snapshots, same cadence as ours
-		// (sha-reports src/backlinks.ts COMPETITORS).
-		reportsQuery<{
-			day: string
-			domain: string
-			rank: string | null
-			backlinks: string | null
-			referring_domains: string | null
-			clean_referring_domains: string | null
-			spam_referring_domains: string | null
-		}>(
-			`SELECT to_char(day, 'YYYY-MM-DD') AS day, domain, rank, backlinks,
-			   referring_domains, clean_referring_domains, spam_referring_domains
-			 FROM raw_competitor_authority ORDER BY day, domain`,
-		),
-		// Map-pack rivals per keyword (latest capture), from mv_pack_rivals —
-		// the live five-CTE aggregate cost ~1.6s per view; the worker refreshes
-		// the MV post-capture. Listings sharing a domain count as one business.
-		reportsQuery<{
-			keyword: string
-			title: string
-			domain: string | null
-			is_mine: boolean
-			avg_rank: string
-			rating: string | null
-			reviews: string | null
-			homes_reached: string
-			total_homes: string
-			reach_pct: string | null
-		}>(
-			`WITH ranked AS (
+			),
+			// Map-pack rivals per keyword (latest capture), from mv_pack_rivals —
+			// the live five-CTE aggregate cost ~1.6s per view; the worker refreshes
+			// the MV post-capture. Listings sharing a domain count as one business.
+			reportsQuery<{
+				keyword: string
+				title: string
+				domain: string | null
+				is_mine: boolean
+				avg_rank: string
+				rating: string | null
+				reviews: string | null
+				homes_reached: string
+				total_homes: string
+				reach_pct: string | null
+			}>(
+				`WITH ranked AS (
 			   SELECT *, row_number() OVER (
 			     PARTITION BY keyword ORDER BY homes_reached DESC) AS rn
 			   FROM mv_pack_rivals WHERE homes_reached > 0)
@@ -217,85 +212,130 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			   homes_reached, total_homes, reach_pct
 			 FROM ranked WHERE rn <= 10 OR is_mine
 			 ORDER BY keyword, homes_reached DESC`,
-		),
-		// Clean linking pages and whether Google has crawled each one yet
-		// (sha-reports src/backlinks.ts polls a site: query every 3 days;
-		// google_indexed_confirmed is the first day the page proved indexed).
-		reportsQuery<{
-			target: string
-			domain: string
-			url_from: string
-			dofollow: boolean | null
-			first_seen: string
-			google_indexed_confirmed: string | null
-		}>(
-			`SELECT target, domain, url_from, dofollow,
-			   to_char(first_seen, 'YYYY-MM-DD') AS first_seen,
-			   to_char(google_indexed_confirmed, 'YYYY-MM-DD') AS google_indexed_confirmed
-			 FROM backlink_pages WHERE spam < 25
-			 ORDER BY google_indexed_confirmed NULLS FIRST, first_seen DESC
-			 LIMIT 60`,
-		),
-	])
+			),
+		])
 	return json({
 		configured: true as const,
 		reach,
 		volumes,
 		values,
 		serpRanks,
+		serpDepth,
 		serpRivals,
-		linkGains,
-		newLinks,
-		linkLosses,
-		lostLinks,
-		backlinks,
-		rivalAuthority,
 		packRivals,
-		linkPages,
 	})
 }
+
+// Switching views, sites or keywords only re-renders; the data stays.
+export const shouldRevalidate = revalidateUnlessOnly([
+	'view',
+	'site',
+	'kw',
+	'metric',
+])
+
+type Data = Extract<SerializeFrom<typeof loader>, { configured: true }>
 
 const people = (n: number) =>
 	n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n))
 
-export default function ReachReport() {
+const site = (d: string | null) => (d ?? '').replace(/^www\./, '')
+
+const VIEWS = [
+	{ value: 'map', label: 'Map pack' },
+	{ value: 'organic', label: 'Organic results' },
+] as const
+
+export default function RankingsReport() {
+	usePersistedSearch()
 	const data = useLoaderData<typeof loader>()
+	const [view, setView] = useChoice('view', ['map', 'organic'] as const, 'map')
 	if (!data.configured)
-		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { reach, volumes, values, serpRanks, serpRivals, linkGains, newLinks, linkLosses, lostLinks, backlinks, rivalAuthority, packRivals, linkPages } = data
+		return (
+			<p style={{ padding: 32 }}>
+				Reports database is not configured (REPORTS_DATABASE_URL).
+			</p>
+		)
+
+	return (
+		<ReportPage
+			title="Rankings"
+			subtitle="Where our sites show up on Google for the searches we track, week by week. Backlinks are on the Backlinks page."
+		>
+			<div className="choices">
+				<Choice
+					label="Which Google results"
+					value={view}
+					options={VIEWS}
+					onChange={setView}
+				/>
+			</div>
+			{view === 'map' ? (
+				<MapPackView data={data} />
+			) : (
+				<OrganicView data={data} />
+			)}
+		</ReportPage>
+	)
+}
+
+/* ------------------------------------------------------------------------ */
+/* Map pack                                                                 */
+/* ------------------------------------------------------------------------ */
+
+function MapPackView({ data }: { data: Data }) {
+	const { reach, volumes, values, packRivals } = data
+	const [metric, setMetric] = useChoice(
+		'metric',
+		['people', 'revenue'] as const,
+		'people',
+	)
 
 	const volumeByKw = new Map(volumes.map(v => [v.keyword, v]))
-	const valueByCat = new Map(values.map(v => [v.category, Number(v.expected_value)]))
-	// Chart/table the canonical keywords (the ones with volume data), in a
-	// stable order; one-off experimental capture keywords stay out of the way.
+	const valueByCat = new Map(
+		values.map(v => [v.category, Number(v.expected_value)]),
+	)
+	// The canonical keywords (the ones with volume data), in a stable order;
+	// one-off experimental capture keywords stay out of the way.
 	const keywords = Object.keys(KEYWORD_CATEGORY).filter(k =>
 		reach.some(r => r.keyword === k),
 	)
 	const weeks = [...new Set(reach.map(r => r.week))].sort()
 	const cell = new Map(reach.map(r => [`${r.week}|${r.keyword}`, r]))
+	const latestWeek = weeks[weeks.length - 1]
+	const priorWeek = weeks[weeks.length - 2]
 
 	const peopleReached = (r: { homes_reached: string } | undefined) =>
 		r ? Number(r.homes_reached) * PERSONS_PER_HOUSEHOLD : null
-	const monthlyRevenue = (kw: string, r: { homes_reached: string; total_homes: string } | undefined) => {
+	const valueFor = (kw: string) =>
+		valueByCat.get(KEYWORD_CATEGORY[kw]!) ?? valueByCat.get('ALL') ?? 0
+	const monthlyRevenue = (
+		kw: string,
+		r: { homes_reached: string; total_homes: string } | undefined,
+	) => {
 		const vol = Number(volumeByKw.get(kw)?.monthly_searches ?? 0)
-		const value = valueByCat.get(KEYWORD_CATEGORY[kw]!) ?? valueByCat.get('ALL') ?? 0
+		const value = valueFor(kw)
 		if (!r || !vol || !value) return null
 		const share = Number(r.homes_reached) / Math.max(1, Number(r.total_homes))
 		return vol * share * PACK_CLICK_SHARE * CLICK_TO_CLIENT * value
 	}
 
-	const latestWeek = weeks[weeks.length - 1]
 	const latest = keywords.map(kw => {
 		const r = cell.get(`${latestWeek}|${kw}`)
+		const prev = priorWeek ? cell.get(`${priorWeek}|${kw}`) : undefined
 		const vol = volumeByKw.get(kw)
-		const value = valueByCat.get(KEYWORD_CATEGORY[kw]!) ?? valueByCat.get('ALL') ?? 0
+		const value = valueFor(kw)
 		const searches = Number(vol?.monthly_searches ?? 0)
-		const share = r ? Number(r.homes_reached) / Math.max(1, Number(r.total_homes)) : 0
+		const share = r
+			? Number(r.homes_reached) / Math.max(1, Number(r.total_homes))
+			: 0
 		const clients = searches * share * PACK_CLICK_SHARE * CLICK_TO_CLIENT
+		const reachPct = r?.reach_pct != null ? Number(r.reach_pct) : null
+		const prevPct = prev?.reach_pct != null ? Number(prev.reach_pct) : null
 		return {
 			kw,
-			reachPct: r?.reach_pct != null ? Number(r.reach_pct) : null,
-			households: r ? Number(r.homes_reached) : null,
+			reachPct,
+			change: reachPct != null && prevPct != null ? reachPct - prevPct : null,
 			people: peopleReached(r),
 			searches,
 			estimated: vol?.estimated ?? false,
@@ -305,111 +345,102 @@ export default function ReachReport() {
 		}
 	})
 	const totals = latest.reduce(
-		(acc, l) => ({ clients: acc.clients + l.clients, revenue: acc.revenue + l.revenue }),
+		(acc, l) => ({
+			clients: acc.clients + l.clients,
+			revenue: acc.revenue + l.revenue,
+		}),
 		{ clients: 0, revenue: 0 },
 	)
-	const maxPeople = Math.max(...latest.map(l => l.people ?? 0))
+	const best = [...latest].sort(
+		(a, b) => (b.reachPct ?? -1) - (a.reachPct ?? -1),
+	)[0]
+	const totalHomes = Number(reach[0]?.total_homes ?? 0)
 
 	return (
-		<ReportPage
-			title="Reach over time"
-			subtitle={`People inside our top-3 map zone per keyword, and what that reach earns, metro grid of ${people(Number(reach[0]?.total_homes ?? 0))} households, ${volumes[0] ? `search volumes ${volumes[0].location} (${volumes[0].fetched_at})` : 'no search volumes yet'}`}
-		>
+		<>
+			<p className="lede">
+				The map box at the top of Google shows three businesses. We check who is
+				in it from 1,222 points across the Knoxville metro, and weight each
+				point by the homes around it. Reach is the share of the metro's{' '}
+				{people(totalHomes)} homes where one of our listings is in the box.
+			</p>
 			<div className="tiles">
 				<StatTile
-					label="People reached (best keyword)"
-					value={people(maxPeople)}
-					whisper={`as of ${latestWeek}`}
+					label="Best reach"
+					value={best?.reachPct != null ? `${best.reachPct}%` : '-'}
+					whisper={
+						best ? `${best.kw}, ${people(best.people ?? 0)} people` : undefined
+					}
 				/>
 				<StatTile
-					label="Est. new clients / month"
+					label="New clients a month"
 					value={totals.clients.toFixed(1)}
-					whisper="across tracked keywords"
+					whisper="estimate, all six searches"
 				/>
 				<StatTile
-					label="Est. revenue / month"
+					label="Revenue a month"
 					value={usd(totals.revenue)}
-					whisper="6-month value of those clients"
+					whisper="estimate, 6-month value of those clients"
 				/>
 			</div>
 
 			<section>
 				<h2>
-					People reached <span className="mini">households in our top-3 zone × {PERSONS_PER_HOUSEHOLD} people</span>
-				</h2>
-				<LineChart
-					labels={weeks}
-					series={keywords.map((kw, i) => ({
-						name: kw.replace(' near me', ''),
-						color: SERIES[i % SERIES.length]!,
-						values: weeks.map(w => peopleReached(cell.get(`${w}|${kw}`))),
-					}))}
-					height={220}
-					format={people}
-				/>
-			</section>
-
-			<section>
-				<h2>
-					Expected revenue per month <span className="mini">searches × reach × clicks × bookings × 6-mo client value</span>
-				</h2>
-				<LineChart
-					labels={weeks}
-					series={keywords.map((kw, i) => ({
-						name: kw.replace(' near me', ''),
-						color: SERIES[i % SERIES.length]!,
-						values: weeks.map(w => monthlyRevenue(kw, cell.get(`${w}|${kw}`))),
-					}))}
-					height={220}
-				/>
-			</section>
-
-			<section>
-				<h2>
-					Latest snapshot <span className="mini">{latestWeek}</span>
+					Reach by search{' '}
+					<span className="mini">
+						capture of {latestWeek}, change against{' '}
+						{priorWeek ?? 'the one before'}
+					</span>
 				</h2>
 				<div className="rtable-wrap">
 					<table className="rtable">
 						<thead>
 							<tr>
-								<th>Keyword</th>
-								<th className="num">Reach</th>
-								<th className="num">Households</th>
+								<th>Search</th>
+								<th className="num">Homes reached</th>
+								<th className="num">Change</th>
 								<th className="num">People</th>
-								<th className="num">Searches/mo</th>
-								<th className="num">New clients/mo</th>
-								<th className="num">6-mo value</th>
-								<th className="num">Revenue/mo</th>
+								<th className="num">Searches a month</th>
+								<th className="num">New clients a month</th>
+								<th className="num">Revenue a month</th>
 							</tr>
 						</thead>
 						<tbody>
 							{latest.map(l => (
 								<tr key={l.kw}>
 									<td>{l.kw}</td>
-									<td className="num">{l.reachPct != null ? `${l.reachPct}%` : '-'}</td>
-									<td className="num">{l.households != null ? people(l.households) : '-'}</td>
-									<td className="num">{l.people != null ? people(l.people) : '-'}</td>
+									<td className="num">
+										{l.reachPct != null ? `${l.reachPct}%` : '-'}
+									</td>
+									<td
+										className={`num ${l.change ? (l.change > 0 ? 'good' : 'bad') : ''}`}
+									>
+										{l.change == null
+											? '-'
+											: l.change === 0
+												? '='
+												: `${l.change > 0 ? '+' : '−'}${Math.abs(l.change).toFixed(1)} pts`}
+									</td>
+									<td className="num">
+										{l.people != null ? people(l.people) : '-'}
+									</td>
 									<td className="num">
 										{l.searches || '-'}
 										{l.estimated ? '*' : ''}
 									</td>
 									<td className="num">{l.clients.toFixed(1)}</td>
-									<td className="num">{usd(l.value)}</td>
-									<td className={`num ${l.revenue > 0 ? 'good' : ''}`}>{usd(l.revenue)}</td>
+									<td className={`num ${l.revenue > 0 ? 'good' : ''}`}>
+										{usd(l.revenue)}
+									</td>
 								</tr>
 							))}
 							<tr>
-								<td>
-									<strong>Total</strong>
+								<td colSpan={5} style={{ fontWeight: 600 }}>
+									Total
 								</td>
-								<td className="num" />
-								<td className="num" />
-								<td className="num" />
-								<td className="num" />
 								<td className="num">
 									<strong>{totals.clients.toFixed(1)}</strong>
 								</td>
-								<td className="num" />
 								<td className="num">
 									<strong>{usd(totals.revenue)}</strong>
 								</td>
@@ -417,179 +448,414 @@ export default function ReachReport() {
 						</tbody>
 					</table>
 				</div>
-				<p className="note">
-					Reach = share of metro households (weighted by census homes per grid cell) where at
-					least one of our listings ranks top-3. Searches/mo = Google Ads volume for the
-					Knoxville DMA; * = Google hides volume for drug terms, estimated from Google Trends
-					(botox gets 2.19× med spa's searches). New clients/mo = searches × reach ×{' '}
-					{Math.round(PACK_CLICK_SHARE * 100)}% pack click share ×{' '}
-					{Math.round(CLICK_TO_CLIENT * 100)}% click-to-booking. 6-mo value = expected revenue
-					per new client from our own Boulevard cohorts (client_value). These six terms are
-					proxies, total demand across all related searches ("botox knoxville", "lip filler",
-					…) is several times larger, so treat revenue as a floor that scales with reach.
-				</p>
+				<details className="how">
+					<summary>How these numbers are worked out</summary>
+					<p>
+						Homes reached: the share of metro homes (weighted by census homes
+						per grid point) where at least one of our listings is in the top 3
+						of the map box. People = homes × {PERSONS_PER_HOUSEHOLD}.
+					</p>
+					<p>
+						Searches a month: Google Ads volume for the Knoxville market. * =
+						Google hides the volume for drug terms, so it is estimated from
+						Google Trends (botox gets 2.19× the searches of med spa).
+					</p>
+					<p>
+						New clients a month = searches × homes reached ×{' '}
+						{Math.round(PACK_CLICK_SHARE * 100)}% who click our listing ×{' '}
+						{Math.round(CLICK_TO_CLIENT * 100)}% who book. Revenue = new clients
+						× the 6-month value of a new client in that service, from our own
+						Boulevard history.
+					</p>
+					<p>
+						These six searches stand in for the whole market. All the related
+						searches together ("botox knoxville", "lip filler" and more) are
+						several times bigger, so read the revenue as a floor that grows with
+						reach.
+					</p>
+				</details>
 			</section>
 
-			<PackRivalSections rows={packRivals} />
-			<OrganicRankSections ranks={serpRanks} rivals={serpRivals} />
-			<BacklinkSections rows={backlinks} />
-			<RivalAuthoritySections ours={backlinks} rivals={rivalAuthority} />
-			<LinkCrawlSection rows={linkPages} />
-			<LinkVelocitySections gains={linkGains} newest={newLinks} losses={linkLosses} lost={lostLinks} />
-		</ReportPage>
+			<section>
+				<h2>
+					Over time <span className="mini">one line per search</span>
+				</h2>
+				<div className="choices">
+					<Choice
+						label="Measure"
+						small
+						value={metric}
+						onChange={setMetric}
+						options={[
+							{ value: 'people', label: 'People reached' },
+							{ value: 'revenue', label: 'Revenue a month' },
+						]}
+					/>
+				</div>
+				<LineChart
+					labels={weeks}
+					series={keywords.map((kw, i) => ({
+						name: kw.replace(' near me', ''),
+						color: SERIES[i % SERIES.length]!,
+						values: weeks.map(w =>
+							metric === 'people'
+								? peopleReached(cell.get(`${w}|${kw}`))
+								: monthlyRevenue(kw, cell.get(`${w}|${kw}`)),
+						),
+					}))}
+					height={230}
+					format={metric === 'people' ? people : n => usd(n)}
+				/>
+			</section>
+
+			<PackRivals rows={packRivals} />
+		</>
 	)
 }
 
-const site = (d: string | null) => (d ?? '').replace(/^www\./, '')
-
 /**
- * Organic Google rank, the "blue links" below the map pack. Captured Mondays
- * by sha-reports (src/serp.ts) for the Knoxville metro; every top-100 result
- * is stored, so a drop can name who took the slot.
+ * Who else is in the map box for one search at a time: every business with
+ * top-3 presence in the latest grid capture, homes-weighted with the same
+ * math as our own reach. Our row is highlighted.
  */
-function OrganicRankSections({
-	ranks,
-	rivals,
-}: {
-	ranks: SerpRankRow[]
-	rivals: Array<{ domain: string; keywords: string; best: string; avg_rank: string }>
-}) {
-	if (!ranks.length) return null
+function PackRivals({ rows }: { rows: Data['packRivals'] }) {
+	const keywords = [...new Set(rows.map(r => r.keyword))]
+	const [kw, setKw] = useChoice('kw', keywords, keywords[0] ?? '')
+	if (!rows.length) return null
+	const shown = rows.filter(r => r.keyword === kw)
+	const ours = shown.filter(r => r.is_mine)
+	return (
+		<section>
+			<h2>
+				Who else is in the map box{' '}
+				<span className="mini">latest grid capture, one search at a time</span>
+			</h2>
+			<div className="choices">
+				<Choice
+					label="Search"
+					variant="pills"
+					value={kw}
+					onChange={setKw}
+					options={keywords.map(k => ({ value: k, label: k }))}
+				/>
+			</div>
+			<div className="rtable-wrap">
+				<table className="rtable">
+					<thead>
+						<tr>
+							<th>Business</th>
+							<th>Website</th>
+							<th className="num">Homes reached</th>
+							<th className="num">Average position</th>
+							<th className="num">Rating</th>
+							<th className="num">Reviews</th>
+						</tr>
+					</thead>
+					<tbody>
+						{shown.map(r => (
+							<tr
+								key={`${kw}|${r.title}`}
+								className={r.is_mine ? 'ours' : undefined}
+							>
+								<td>
+									{r.title}
+									{r.is_mine ? <strong> (us)</strong> : null}
+								</td>
+								<td className="mini">{site(r.domain)}</td>
+								<td className="num">
+									{r.reach_pct != null ? `${r.reach_pct}%` : '-'}
+								</td>
+								<td className="num">{r.avg_rank}</td>
+								<td className="num">{r.rating ?? '-'}</td>
+								<td className="num">{r.reviews ?? '-'}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<p className="note">
+				{ours.length
+					? null
+					: 'None of our listings is in the top 10 for this search. '}
+				Homes reached = the share of metro homes where the business is in the
+				top 3 of the map box. Average position is across the grid points where
+				it shows at all. Listings on one website count as one business, so our
+				two offices show as one row.
+			</p>
+		</section>
+	)
+}
+
+/* ------------------------------------------------------------------------ */
+/* Organic results                                                          */
+/* ------------------------------------------------------------------------ */
+
+type Reading = { week: string; rank: number | null; checked: boolean }
+
+function OrganicView({ data }: { data: Data }) {
+	const { serpRanks: ranks, serpDepth, serpRivals: rivals } = data
+	const [siteKey, setSite] = useChoice('site', SITE_CHOICE_VALUES, 'all')
+	if (!ranks.length)
+		return (
+			<p className="note">
+				No organic captures yet. The rank tracker captures every Monday.
+			</p>
+		)
+
 	const weeks = [...new Set(ranks.map(r => r.week))].sort()
-	const latestWeek = weeks[weeks.length - 1]
-	const priorWeek = weeks[weeks.length - 2]
+	const latestWeek = weeks[weeks.length - 1]!
 	const cell = new Map(ranks.map(r => [`${r.week}|${r.keyword}`, r]))
-	const rankAt = (week: string | undefined, kw: string) => {
-		const v = week ? cell.get(`${week}|${kw}`)?.rank_group : null
-		return v == null ? null : Number(v)
+	const depth = new Map(serpDepth.map(d => [`${d.week}|${d.keyword}`, d.depth]))
+	// One reading per week: the rank, "not found" (checked far enough), or
+	// "not checked" (the capture was cut short and we were not in what it read).
+	const readingAt = (week: string, kw: string): Reading => {
+		const row = cell.get(`${week}|${kw}`)
+		const rank = row?.rank_group != null ? Number(row.rank_group) : null
+		const read = depth.get(`${week}|${kw}`) ?? 0
+		return { week, rank, checked: rank != null || read >= SHORT_CAPTURE }
 	}
 
-	const BRANDS = ['Sarah Hitchcox Aesthetics', 'Botox Knox', 'Weight Loss Knox']
+	const targets = OUR_SITES.filter(s => siteKey === 'all' || s.key === siteKey)
 	const latestRows = ranks.filter(r => r.week === latestWeek)
-	const groups = BRANDS.map(brand => ({
-		brand,
-		keywords: latestRows
-			.filter(r => (r.target ?? BRANDS[0]) === brand)
-			.map(r => r.keyword)
-			.sort(
-				(a, b) => (rankAt(latestWeek, a) ?? 999) - (rankAt(latestWeek, b) ?? 999),
-			),
-	})).filter(g => g.keywords.length)
+	const groups = targets
+		.map(s => ({
+			site: s,
+			keywords: latestRows
+				.filter(r => (r.target ?? OUR_SITES[0].rankTarget) === s.rankTarget)
+				.map(r => r.keyword)
+				.sort(
+					(a, b) =>
+						sortRank(readingAt(latestWeek, a)) -
+						sortRank(readingAt(latestWeek, b)),
+				),
+		}))
+		.filter(g => g.keywords.length)
+
+	const rows = groups.flatMap(g =>
+		g.keywords.map(kw => {
+			const history = weeks.map(w => readingAt(w, kw))
+			const now = history[history.length - 1]!
+			const earlier =
+				history
+					.slice(0, -1)
+					.reverse()
+					.find(r => r.checked) ?? null
+			const lastRank = [...history].reverse().find(r => r.rank != null) ?? null
+			return {
+				kw,
+				site: g.site,
+				history,
+				now,
+				earlier,
+				lastRank,
+				row: cell.get(`${latestWeek}|${kw}`),
+				read: depth.get(`${latestWeek}|${kw}`) ?? 0,
+			}
+		}),
+	)
+	const total = rows.length
+	const firsts = rows.filter(r => r.now.rank === 1).length
+	const top10 = rows.filter(r => r.now.rank != null && r.now.rank <= 10).length
+	const cutShort = rows.filter(r => !r.now.checked).length
 
 	// Plot FLOOR+1-rank so better ranks sit higher; labels translate back.
-	const plot = (n: number | null) =>
-		n == null ? null : Math.max(1, RANK_FLOOR + 1 - n)
+	const plot = (r: Reading) =>
+		r.rank == null
+			? null
+			: Math.max(1, RANK_FLOOR + 1 - Math.min(r.rank, RANK_FLOOR))
 	const asRank = (v: number) => `#${Math.round(RANK_FLOOR + 1 - v)}`
+	const oneSite = siteKey !== 'all' ? groups[0] : null
 
 	return (
 		<>
-			{groups.map(g => (
-				<section key={g.brand}>
+			<p className="lede">
+				The blue links under the map box, checked every Monday for the Knoxville
+				metro. Each search belongs to the site we want to win it; when another
+				of our sites ranks higher, that page is shown instead.
+			</p>
+			<div className="choices">
+				<Choice
+					label="Site"
+					variant="pills"
+					value={siteKey}
+					onChange={setSite}
+					options={SITE_CHOICES}
+				/>
+			</div>
+			<div className="tiles">
+				<StatTile
+					label="#1 spots"
+					value={String(firsts)}
+					whisper={`of ${total} searches, ${latestWeek}`}
+				/>
+				<StatTile
+					label="In the top 10"
+					value={`${top10} of ${total}`}
+					whisper="first page of Google"
+				/>
+				<StatTile
+					label="Read in full"
+					value={`${total - cutShort} of ${total}`}
+					whisper={
+						cutShort
+							? `${cutShort} cut short this week; their last full reading is shown`
+							: 'every search read about 100 results deep'
+					}
+					tone={cutShort ? 'bad' : undefined}
+				/>
+			</div>
+
+			<section>
+				<h2>
+					Rank by search{' '}
+					<span className="mini">
+						capture of {latestWeek}; change against the last full reading
+					</span>
+				</h2>
+				<div className="rtable-wrap">
+					<table className="rtable">
+						<thead>
+							<tr>
+								<th>Search</th>
+								{siteKey === 'all' ? <th>Site we want to win</th> : null}
+								<th className="num">Rank</th>
+								<th className="num">Change</th>
+								<th>Last {weeks.length} weeks</th>
+								<th>Our page that ranks</th>
+								<th>Who is #1</th>
+							</tr>
+						</thead>
+						<tbody>
+							{rows.map(r => {
+								const delta = changeLabel(r.now, r.earlier)
+								const weAreFirst =
+									r.row?.top_domain != null &&
+									site(r.row.top_domain) === site(r.row.my_domain)
+								return (
+									<tr key={r.kw}>
+										<td>{r.kw}</td>
+										{siteKey === 'all' ? (
+											<td className="mini">{r.site.label}</td>
+										) : null}
+										<td
+											className={`num ${
+												!r.now.checked
+													? 'dim'
+													: r.now.rank != null && r.now.rank <= 3
+														? 'good'
+														: r.now.rank == null || r.now.rank > 20
+															? 'bad'
+															: ''
+											}`}
+										>
+											{r.now.rank != null ? (
+												`#${r.now.rank}`
+											) : r.now.checked ? (
+												`not in top ${r.read}`
+											) : (
+												<>
+													not checked
+													<span className="sub-line">
+														{r.lastRank
+															? `#${r.lastRank.rank} on ${r.lastRank.week.slice(5)}`
+															: `read ${r.read} results`}
+													</span>
+												</>
+											)}
+										</td>
+										<td className={`num ${delta.tone}`}>{delta.text}</td>
+										<td>
+											<RankSparkline weeks={r.history} floor={RANK_FLOOR} />
+										</td>
+										<td className="mini">
+											{r.row?.my_url ? (
+												<a href={r.row.my_url} target="_blank" rel="noreferrer">
+													{site(r.row.my_domain)}
+													{new URL(r.row.my_url).pathname}
+												</a>
+											) : (
+												'-'
+											)}
+										</td>
+										<td className="mini">
+											{weAreFirst ? (
+												<strong>us</strong>
+											) : (
+												site(r.row?.top_domain ?? null) || '-'
+											)}
+										</td>
+									</tr>
+								)
+							})}
+						</tbody>
+					</table>
+				</div>
+				<details className="how">
+					<summary>How to read this</summary>
+					<p>
+						Rank is our position among the blue links only: the map box and ads
+						are not counted. Change compares with the last week that was read in
+						full; a plus means we climbed. The small line shows each week,
+						higher is better, a red dot means not found, and a gap means that
+						week was cut short.
+					</p>
+					<p>
+						A capture normally reads about 100 results. When one reads fewer
+						than {SHORT_CAPTURE} and we are not in them, the row says "not
+						checked" and shows our last known rank, because we cannot tell from
+						that week where we were.
+					</p>
+				</details>
+			</section>
+
+			{oneSite ? (
+				<section>
 					<h2>
-						Organic Google rank: {g.brand}{' '}
-						<span className="mini">higher is better, captured Mondays</span>
+						{oneSite.site.label} over time{' '}
+						<span className="mini">
+							higher is better; a gap means not found or not checked
+						</span>
 					</h2>
 					<LineChart
 						labels={weeks}
-						series={g.keywords.map((kw, i) => ({
+						series={oneSite.keywords.map((kw, i) => ({
 							name: kw,
 							color: SERIES[i % SERIES.length]!,
-							values: weeks.map(w => plot(rankAt(w, kw))),
+							values: weeks.map(w => plot(readingAt(w, kw))),
 						}))}
-						height={220}
+						height={230}
 						yMax={RANK_FLOOR}
 						format={asRank}
 					/>
 				</section>
-			))}
-
-			<section>
-				<h2>
-					Organic rank snapshot <span className="mini">{latestWeek}</span>
-				</h2>
-				<div className="rtable-wrap">
-					<table className="rtable">
-						<thead>
-							<tr>
-								<th>Keyword</th>
-								<th>Target site</th>
-								<th className="num">Rank</th>
-								<th className="num">Change</th>
-								<th>Ranking page</th>
-								<th>Who holds #1</th>
-							</tr>
-						</thead>
-						<tbody>
-							{groups.flatMap(g =>
-								g.keywords.map(kw => {
-									const row = cell.get(`${latestWeek}|${kw}`)
-									const now = rankAt(latestWeek, kw)
-									const was = rankAt(priorWeek, kw)
-									// A rank going DOWN in number is an improvement.
-									const delta = now != null && was != null ? was - now : null
-									const weAreFirst =
-										row?.top_domain != null &&
-										site(row.top_domain) === site(row.my_domain)
-									return (
-										<tr key={kw}>
-											<td>{kw}</td>
-											<td className="mini">{g.brand}</td>
-											<td
-												className={`num ${now != null && now <= 3 ? 'good' : now == null || now > 20 ? 'bad' : ''}`}
-											>
-												{now != null ? `#${now}` : 'not in top 100'}
-											</td>
-											<td className={`num ${delta ? (delta > 0 ? 'good' : 'bad') : ''}`}>
-												{delta == null ? '-' : delta === 0 ? '=' : delta > 0 ? `+${delta}` : delta}
-											</td>
-											<td className="mini">
-												{row?.my_url ? (
-													<a href={row.my_url} target="_blank" rel="noreferrer">
-														{site(row.my_domain)}
-														{new URL(row.my_url).pathname}
-													</a>
-												) : (
-													'-'
-												)}
-											</td>
-											<td className="mini">
-												{weAreFirst ? <strong>us</strong> : site(row?.top_domain ?? null) || '-'}
-											</td>
-										</tr>
-									)
-								}),
-							)}
-						</tbody>
-					</table>
-				</div>
+			) : (
 				<p className="note">
-					Organic position only, the map pack (above) and ads are excluded. Change
-					compares to the prior capture, positive means we climbed. Target site is the
-					site we want winning that term, the main site outranking a microsite for the
-					microsite's own keyword is worth seeing rather than hiding.
+					Pick one site above to see its searches on one chart.
 				</p>
-			</section>
+			)}
 
 			<section>
 				<h2>
-					Who we are up against{' '}
-					<span className="mini">organic top-10 appearances this week</span>
+					Who beats us most often{' '}
+					<span className="mini">
+						sites in the top 10 across our searches, {latestWeek}
+					</span>
 				</h2>
 				<div className="rtable-wrap">
 					<table className="rtable">
 						<thead>
 							<tr>
-								<th>Domain</th>
-								<th className="num">Keywords in top 10</th>
+								<th>Website</th>
+								<th className="num">Searches where it is in the top 10</th>
 								<th className="num">Best rank</th>
-								<th className="num">Avg rank</th>
+								<th className="num">Average rank</th>
 							</tr>
 						</thead>
 						<tbody>
 							{rivals.map(r => {
-								const ours = ranks.some(x => site(x.my_domain) === site(r.domain))
+								const ours = OUR_SITES.some(s => s.site === site(r.domain))
 								return (
-									<tr key={r.domain}>
+									<tr key={r.domain} className={ours ? 'ours' : undefined}>
 										<td>
 											{site(r.domain)} {ours ? <strong>(us)</strong> : null}
 										</td>
@@ -603,458 +869,37 @@ function OrganicRankSections({
 					</table>
 				</div>
 				<p className="note">
-					A domain high on this list beats us broadly rather than on one term, which is
-					usually a content-depth or backlink gap rather than a single-page fix.
+					A site high on this list beats us across many searches, not on one.
+					That usually points to more content or more backlinks, not a fix to
+					one page.
+					{cutShort
+						? ' This week’s list is incomplete because some captures were cut short.'
+						: ''}
 				</p>
 			</section>
 		</>
 	)
 }
 
-/**
- * Authority + backlinks per site, captured every 3 days by sha-reports
- * (src/backlinks.ts). Clean = referring domains with spam score under 25;
- * that is the number link-building work should move.
- */
-function BacklinkSections({
-	rows,
-}: {
-	rows: Array<{
-		day: string
-		target: string
-		rank: string | null
-		backlinks: string | null
-		referring_domains: string | null
-		clean_referring_domains: string | null
-		spam_referring_domains: string | null
-	}>
-}) {
-	if (!rows.length) return null
-	const days = [...new Set(rows.map(r => r.day))].sort()
-	const targets = [...new Set(rows.map(r => r.target))]
-	const cell = new Map(rows.map(r => [`${r.day}|${r.target}`, r]))
-	const latest = days[days.length - 1]
-	const num = (v: string | null | undefined) => (v == null ? null : Number(v))
-
-	return (
-		<>
-			<section>
-				<h2>
-					Authority score <span className="mini">DataForSEO domain rank, every 3 days</span>
-				</h2>
-				<LineChart
-					labels={days}
-					series={targets.map((t, i) => ({
-						name: site(t),
-						color: SERIES[i % SERIES.length]!,
-						values: days.map(d => num(cell.get(`${d}|${t}`)?.rank)),
-					}))}
-					height={200}
-					format={n => String(Math.round(n))}
-				/>
-			</section>
-
-			<section>
-				<h2>
-					Clean referring domains{' '}
-					<span className="mini">spam score under 25, the number worth growing</span>
-				</h2>
-				<LineChart
-					labels={days}
-					series={targets.map((t, i) => ({
-						name: site(t),
-						color: SERIES[i % SERIES.length]!,
-						values: days.map(d => num(cell.get(`${d}|${t}`)?.clean_referring_domains)),
-					}))}
-					height={200}
-					format={n => String(Math.round(n))}
-				/>
-				<div className="rtable-wrap">
-					<table className="rtable">
-						<thead>
-							<tr>
-								<th>Site</th>
-								<th className="num">Authority</th>
-								<th className="num">Backlinks</th>
-								<th className="num">Referring domains</th>
-								<th className="num">Clean</th>
-								<th className="num">Spam</th>
-							</tr>
-						</thead>
-						<tbody>
-							{targets.map(t => {
-								const r = cell.get(`${latest}|${t}`)
-								return (
-									<tr key={t}>
-										<td>{site(t)}</td>
-										<td className="num">{r?.rank ?? '-'}</td>
-										<td className="num">{r?.backlinks ?? '-'}</td>
-										<td className="num">{r?.referring_domains ?? '-'}</td>
-										<td className="num good">{r?.clean_referring_domains ?? '-'}</td>
-										<td className="num bad">{r?.spam_referring_domains ?? '-'}</td>
-									</tr>
-								)
-							})}
-						</tbody>
-					</table>
-				</div>
-				<p className="note">
-					As of {latest}. Most historical links are junk directories, so total referring
-					domains overstates the profile, watch the clean count. Link targets and
-					submission status live in docs/listings/playbook.md and the per-location
-					records.
-				</p>
-			</section>
-		</>
-	)
+/** Sort order for the table: best rank first, then not found, then not checked. */
+function sortRank(r: Reading) {
+	if (r.rank != null) return r.rank
+	return r.checked ? 900 : 950
 }
 
-/**
- * Map-pack rivals per keyword: every business with top-3 presence in the
- * latest grid capture, homes-weighted with the same math as our own reach
- * number. Our row is highlighted.
- */
-function PackRivalSections({
-	rows,
-}: {
-	rows: Array<{
-		keyword: string
-		title: string
-		domain: string | null
-		is_mine: boolean
-		avg_rank: string
-		rating: string | null
-		reviews: string | null
-		reach_pct: string | null
-	}>
-}) {
-	if (!rows.length) return null
-	const keywords = [...new Set(rows.map(r => r.keyword))]
-	return (
-		<section>
-			<h2>
-				Map-pack rivals by keyword{' '}
-				<span className="mini">homes-weighted reach, latest grid capture, our row highlighted</span>
-			</h2>
-			{keywords.map(kw => (
-				<div key={kw}>
-					<h3>{kw}</h3>
-					<div className="rtable-wrap">
-						<table className="rtable">
-							<thead>
-								<tr>
-									<th>Business</th>
-									<th>Site</th>
-									<th className="num">Reach</th>
-									<th className="num">Avg rank</th>
-									<th className="num">Rating</th>
-									<th className="num">Reviews</th>
-								</tr>
-							</thead>
-							<tbody>
-								{rows
-									.filter(r => r.keyword === kw)
-									.map(r => (
-										<tr key={`${kw}|${r.title}`}>
-											<td className={r.is_mine ? 'good' : ''}>
-												{r.title}
-												{r.is_mine ? ' (us)' : ''}
-											</td>
-											<td className="mini">{site(r.domain)}</td>
-											<td className={`num ${r.is_mine ? 'good' : ''}`}>
-												{r.reach_pct != null ? `${r.reach_pct}%` : '-'}
-											</td>
-											<td className="num">{r.avg_rank}</td>
-											<td className="num">{r.rating ?? '-'}</td>
-											<td className="num">{r.reviews ?? '-'}</td>
-										</tr>
-									))}
-							</tbody>
-						</table>
-					</div>
-				</div>
-			))}
-			<p className="note">
-				Reach = share of metro homes inside a grid cell where the business ranks
-				top-3 in the local pack. Listings on one website count as one business, so
-				multi-location brands (including us) show combined reach.
-			</p>
-		</section>
-	)
-}
-
-/**
- * Authority and clean-link race: us against the tracked Knoxville
- * competitors, every 3 days (sha-reports src/backlinks.ts).
- */
-function RivalAuthoritySections({
-	ours,
-	rivals,
-}: {
-	ours: Array<{
-		day: string
-		target: string
-		rank: string | null
-		backlinks: string | null
-		referring_domains: string | null
-		clean_referring_domains: string | null
-		spam_referring_domains: string | null
-	}>
-	rivals: Array<{
-		day: string
-		domain: string
-		rank: string | null
-		backlinks: string | null
-		referring_domains: string | null
-		clean_referring_domains: string | null
-		spam_referring_domains: string | null
-	}>
-}) {
-	if (!rivals.length) return null
-	// One combined series set: our main site plus every tracked competitor.
-	const us = ours.filter(r => r.target === 'hitchcoxaesthetics.com')
-	const all = [
-		...us.map(r => ({ ...r, domain: 'hitchcoxaesthetics.com', mine: true })),
-		...rivals.map(r => ({ ...r, mine: false })),
-	]
-	const days = [...new Set(all.map(r => r.day))].sort()
-	const latest = days[days.length - 1]
-	const cell = new Map(all.map(r => [`${r.day}|${r.domain}`, r]))
-	// Us first, then competitors by latest authority, descending. Rows are
-	// day-ordered, so the last write per domain is its newest rank.
-	const newestRank = new Map<string, number>()
-	for (const r of rivals) newestRank.set(r.domain, Number(r.rank ?? 0))
-	const domains = [
-		'hitchcoxaesthetics.com',
-		...[...new Set(rivals.map(r => r.domain))].sort(
-			(a, b) => (newestRank.get(b) ?? 0) - (newestRank.get(a) ?? 0),
-		),
-	]
-	const num = (v: string | null | undefined) => (v == null ? null : Number(v))
-	const latestRow = (d: string) =>
-		cell.get(`${latest}|${d}`) ??
-		[...all].reverse().find(r => r.domain === d)
-
-	return (
-		<section>
-			<h2>
-				Authority race: us vs competitors{' '}
-				<span className="mini">DataForSEO domain rank (Ahrefs DR × ~10), every 3 days</span>
-			</h2>
-			<LineChart
-				labels={days}
-				series={domains.map((d, i) => ({
-					name: d === 'hitchcoxaesthetics.com' ? 'us' : site(d),
-					color: SERIES[i % SERIES.length]!,
-					values: days.map(day => num(cell.get(`${day}|${d}`)?.rank)),
-				}))}
-				height={240}
-				format={n => String(Math.round(n))}
-			/>
-			<div className="rtable-wrap">
-				<table className="rtable">
-					<thead>
-						<tr>
-							<th>Site</th>
-							<th className="num">Authority</th>
-							<th className="num">Backlinks</th>
-							<th className="num">Referring domains</th>
-							<th className="num">Clean</th>
-							<th className="num">Spam</th>
-						</tr>
-					</thead>
-					<tbody>
-						{domains.map(d => {
-							const r = latestRow(d)
-							const mine = d === 'hitchcoxaesthetics.com'
-							return (
-								<tr key={d}>
-									<td className={mine ? 'good' : ''}>
-										{site(d)}
-										{mine ? ' (us)' : ''}
-									</td>
-									<td className={`num ${mine ? 'good' : ''}`}>{r?.rank ?? '-'}</td>
-									<td className="num">{r?.backlinks ?? '-'}</td>
-									<td className="num">{r?.referring_domains ?? '-'}</td>
-									<td className="num">{r?.clean_referring_domains ?? '-'}</td>
-									<td className="num">{r?.spam_referring_domains ?? '-'}</td>
-								</tr>
-							)
-						})}
-					</tbody>
-				</table>
-			</div>
-			<p className="note">
-				As of {latest}. Clean = referring domains with spam score under 25, the
-				number our link work should move. Competitor tracking started 2026-07-31.
-			</p>
-		</section>
-	)
-}
-
-/**
- * Which clean linking pages Google has crawled. Confirmed = the first day a
- * site: query proved the page is in Google's index; expect rank effects 2-6
- * weeks after that date, not immediately. Unconfirmed pages recheck every
- * 3 days.
- */
-function LinkCrawlSection({
-	rows,
-}: {
-	rows: Array<{
-		target: string
-		domain: string
-		url_from: string
-		dofollow: boolean | null
-		first_seen: string
-		google_indexed_confirmed: string | null
-	}>
-}) {
-	if (!rows.length) return null
-	const waiting = rows.filter(r => !r.google_indexed_confirmed).length
-	return (
-		<section>
-			<h2>
-				Google crawl status per link{' '}
-				<span className="mini">
-					{waiting} of {rows.length} clean links not yet confirmed in the index
-				</span>
-			</h2>
-			<div className="rtable-wrap">
-				<table className="rtable">
-					<thead>
-						<tr>
-							<th>Linking site</th>
-							<th>Our site</th>
-							<th className="num">Dofollow</th>
-							<th className="num">Link first seen</th>
-							<th className="num">Google confirmed</th>
-						</tr>
-					</thead>
-					<tbody>
-						{rows.map(r => (
-							<tr key={`${r.target}|${r.url_from}`}>
-								<td>
-									<a href={r.url_from} target="_blank" rel="noreferrer">
-										{r.domain}
-									</a>
-								</td>
-								<td className="mini">{site(r.target)}</td>
-								<td className="num">{r.dofollow == null ? '-' : r.dofollow ? 'yes' : 'no'}</td>
-								<td className="num">{r.first_seen}</td>
-								<td className={`num ${r.google_indexed_confirmed ? 'good' : 'bad'}`}>
-									{r.google_indexed_confirmed ?? 'not yet'}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
-			<p className="note">
-				Confirmed = a site: query returned the page, so Google crawled it on or
-				before that day (checks started 2026-08-01; links confirmed on the first
-				check were crawled earlier). Rankings absorb a new link gradually; look
-				for movement in the rank charts 2 to 6 weeks after confirmation.
-			</p>
-		</section>
-	)
-}
-
-/**
- * Links gained per week (clean referring domains only), with the actual
- * domains listed so the number is auditable. first_seen tracking started
- * 2026-07-30; that seed week counts the whole backlog as new.
- */
-function LinkVelocitySections({
-	gains,
-	newest,
-	losses,
-	lost,
-}: {
-	gains: Array<{ week: string; target: string; gained: string }>
-	newest: Array<{ domain: string; target: string; rank: string | null; first_seen: string }>
-	losses: Array<{ week: string; target: string; lost: string }>
-	lost: Array<{ domain: string; target: string; rank: string | null; last_seen: string }>
-}) {
-	if (!gains.length) return null
-	const weeks = [...new Set([...gains.map(g => g.week), ...losses.map(l => l.week)])].sort()
-	const targets = [...new Set(gains.map(g => g.target))]
-	const cell = new Map(gains.map(g => [`${g.week}|${g.target}`, Number(g.gained)]))
-	const lossCell = new Map(losses.map(l => [`${l.week}|${l.target}`, Number(l.lost)]))
-	const totalLost = losses.reduce((n, l) => n + Number(l.lost), 0)
-	return (
-		<section>
-			<h2>
-				New links per week <span className="mini">clean referring domains gained, all sources</span>
-			</h2>
-			<BarChart
-				labels={weeks}
-				series={targets.map((t, i) => ({
-					name: site(t),
-					color: SERIES[i % SERIES.length]!,
-					values: weeks.map(w =>
-						(cell.get(`${w}|${t}`) ?? 0) - (lossCell.get(`${w}|${t}`) ?? 0),
-					),
-				}))}
-				height={180}
-				tickEvery={1}
-				format={n => String(Math.round(n))}
-			/>
-			<div className="rtable-wrap">
-				<table className="rtable">
-					<thead>
-						<tr>
-							<th>Newest links</th>
-							<th>Points at</th>
-							<th className="num">Source authority</th>
-							<th className="num">First seen</th>
-						</tr>
-					</thead>
-					<tbody>
-						{newest.map(l => (
-							<tr key={`${l.target}|${l.domain}`}>
-								<td>{l.domain}</td>
-								<td className="mini">{site(l.target)}</td>
-								<td className="num">{l.rank ?? '-'}</td>
-								<td className="num">{l.first_seen}</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
-			{totalLost > 0 ? (
-				<div className="rtable-wrap">
-					<table className="rtable">
-						<thead>
-							<tr>
-								<th>Lost links</th>
-								<th>Pointed at</th>
-								<th className="num">Source authority</th>
-								<th className="num">Last seen</th>
-							</tr>
-						</thead>
-						<tbody>
-							{lost.map(l => (
-								<tr key={`${l.target}|${l.domain}`}>
-									<td className="bad">{l.domain}</td>
-									<td className="mini">{site(l.target)}</td>
-									<td className="num">{l.rank ?? '-'}</td>
-									<td className="num">{l.last_seen}</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			) : (
-				<p className="note">No links lost since tracking began.</p>
-			)}
-			<p className="note">
-				Bars are NET (gained minus lost) per week. Tracking began 2026-07-30,
-				so that week's bar includes the entire pre-existing backlog. Captures
-				run every 3 days; a link appears once DataForSEO's crawler sees it,
-				typically 1-3 weeks after it goes live, and shows as lost when it
-				stops appearing in a capture.
-			</p>
-		</section>
-	)
+/** "+3", "−2", "=", "new", "out", or "-" when either reading is unknown. */
+function changeLabel(
+	now: Reading,
+	earlier: Reading | null,
+): { text: string; tone: string } {
+	if (!now.checked || !earlier) return { text: '-', tone: '' }
+	if (now.rank != null && earlier.rank != null) {
+		const d = earlier.rank - now.rank
+		return d === 0
+			? { text: '=', tone: '' }
+			: { text: d > 0 ? `+${d}` : `−${-d}`, tone: d > 0 ? 'good' : 'bad' }
+	}
+	if (now.rank != null) return { text: 'new', tone: 'good' }
+	if (earlier.rank != null) return { text: 'out', tone: 'bad' }
+	return { text: '-', tone: '' }
 }

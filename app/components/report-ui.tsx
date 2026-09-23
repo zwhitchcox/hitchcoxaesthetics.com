@@ -5,7 +5,7 @@
  * slots in fixed order, diverging blue↔red, status colors reserved.
  */
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useSearchParams } from '@remix-run/react'
+import { useSearchParams, type ShouldRevalidateFunction } from '@remix-run/react'
 
 /** Categorical slots, fixed order, never cycled. */
 export const SERIES = [
@@ -82,6 +82,26 @@ table.rtable { width: 100%; border-collapse: collapse; font-variant-numeric: tab
 	border: 1px solid var(--axis); background: var(--surface-1); color: var(--ink); cursor: pointer; }
 .controls button:hover { background: var(--surface-2, #f3f2ef); }
 .controls button:disabled { opacity: 0.6; cursor: default; }
+.choices { display: flex; gap: 10px 16px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 9px; background: var(--grid); }
+.seg button { font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 13px; border-radius: 7px; border: 0;
+	background: transparent; color: var(--ink-2); cursor: pointer; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-selected="true"] { background: var(--surface-1); color: var(--ink); box-shadow: 0 1px 2px var(--ring); }
+.seg.small button { font-size: 11.5px; padding: 3px 10px; }
+.pills { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.pills button { font: inherit; font-size: 12px; padding: 3px 11px; border-radius: 999px; border: 1px solid var(--axis);
+	background: var(--surface-1); color: var(--ink-2); cursor: pointer; }
+.pills button:hover { color: var(--ink); }
+.pills button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.lede { font-size: 12.5px; color: var(--ink-2); margin: -4px 0 12px; max-width: 760px; }
+.rtable tr.ours td { background: color-mix(in srgb, var(--series-2) 10%, transparent); }
+.rtable td.dim, .dim { color: var(--muted); }
+.rtable .sub-line { display: block; font-size: 11px; color: var(--muted); }
+.spark { display: block; }
+details.how { font-size: 12px; color: var(--ink-2); margin-top: 10px; }
+details.how summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+details.how p { margin: 6px 0 0; }
 `
 
 export function ReportPage({
@@ -598,5 +618,162 @@ export function LineChart({
 				</div>
 			) : null}
 		</div>
+	)
+}
+
+/**
+ * One choice kept in the URL (?view=organic, ?site=bk): links and the back
+ * button keep it, and usePersistedSearch() brings it back after a hub
+ * refresh. The fallback is not written to the URL.
+ */
+export function useChoice<T extends string>(
+	param: string,
+	allowed: readonly T[],
+	fallback: T,
+): [T, (next: T) => void] {
+	const [searchParams, setSearchParams] = useSearchParams()
+	const raw = searchParams.get(param)
+	const value = allowed.find(a => a === raw) ?? fallback
+	const set = (next: T) =>
+		setSearchParams(
+			prev => {
+				const p = new URLSearchParams(prev)
+				if (next === fallback) p.delete(param)
+				else p.set(param, next)
+				return p
+			},
+			{ replace: true, preventScrollReset: true },
+		)
+	return [value, set]
+}
+
+/**
+ * For a route whose tabs and filters live in the URL: a change to those
+ * params only re-renders, it does not run the loader again.
+ */
+export function revalidateUnlessOnly(uiParams: string[]): ShouldRevalidateFunction {
+	return ({ currentUrl, nextUrl, formMethod, defaultShouldRevalidate }) => {
+		if (formMethod && formMethod.toUpperCase() !== 'GET') return defaultShouldRevalidate
+		if (currentUrl.pathname !== nextUrl.pathname) return defaultShouldRevalidate
+		const rest = (u: URL) => {
+			const p = new URLSearchParams(u.search)
+			for (const k of uiParams) p.delete(k)
+			p.sort()
+			return p.toString()
+		}
+		return rest(currentUrl) === rest(nextUrl) ? false : defaultShouldRevalidate
+	}
+}
+
+/** Tabs (the default) or pill buttons for one choice. */
+export function Choice<T extends string>({
+	label,
+	value,
+	options,
+	onChange,
+	variant = 'tabs',
+	small = false,
+}: {
+	label: string
+	value: T
+	options: ReadonlyArray<{ value: T; label: string }>
+	onChange: (next: T) => void
+	variant?: 'tabs' | 'pills'
+	small?: boolean
+}) {
+	if (variant === 'pills')
+		return (
+			<div className="pills" role="group" aria-label={label}>
+				{options.map(o => (
+					<button
+						key={o.value}
+						type="button"
+						aria-pressed={o.value === value}
+						onClick={() => onChange(o.value)}
+					>
+						{o.label}
+					</button>
+				))}
+			</div>
+		)
+	return (
+		<div className={`seg${small ? ' small' : ''}`} role="tablist" aria-label={label}>
+			{options.map(o => (
+				<button
+					key={o.value}
+					type="button"
+					role="tab"
+					aria-selected={o.value === value}
+					onClick={() => onChange(o.value)}
+				>
+					{o.label}
+				</button>
+			))}
+		</div>
+	)
+}
+
+/**
+ * A search rank over the weeks, in a table cell. Higher on the line is a
+ * better rank. `rank` null means checked and not found (drawn at the
+ * floor); `checked` false means that week was not read far enough to tell
+ * (a gap).
+ */
+export function RankSparkline({
+	weeks,
+	floor = 50,
+}: {
+	weeks: Array<{ week: string; rank: number | null; checked: boolean }>
+	floor?: number
+}) {
+	const w = 104
+	const h = 24
+	const pad = 3
+	const n = weeks.length
+	if (!n) return null
+	const x = (i: number) => pad + (n === 1 ? (w - 2 * pad) / 2 : (i * (w - 2 * pad)) / (n - 1))
+	const y = (rank: number) =>
+		pad + ((Math.min(rank, floor) - 1) / (floor - 1)) * (h - 2 * pad)
+	const points = weeks.map((wk, i) =>
+		wk.checked ? { i, x: x(i), y: y(wk.rank ?? floor), found: wk.rank != null } : null,
+	)
+	// One path per run of checked weeks; an unchecked week breaks the line.
+	const runs: Array<Array<{ x: number; y: number }>> = []
+	let run: Array<{ x: number; y: number }> = []
+	for (const p of points) {
+		if (p) run.push(p)
+		else if (run.length) {
+			runs.push(run)
+			run = []
+		}
+	}
+	if (run.length) runs.push(run)
+	const last = [...points].reverse().find(Boolean)
+	const title = weeks
+		.map(wk => `${wk.week.slice(5)} ${!wk.checked ? 'not read' : wk.rank == null ? 'not found' : `#${wk.rank}`}`)
+		.join(', ')
+	return (
+		<svg className="spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={title}>
+			<title>{title}</title>
+			<line x1={pad} x2={w - pad} y1={y(10)} y2={y(10)} stroke="var(--grid)" strokeDasharray="2 2" />
+			{runs.map((r, k) =>
+				r.length > 1 ? (
+					<polyline
+						key={k}
+						points={r.map(p => `${p.x},${p.y}`).join(' ')}
+						fill="none"
+						stroke="var(--series-1)"
+						strokeWidth={1.5}
+						strokeLinejoin="round"
+					/>
+				) : null,
+			)}
+			{points.map(p =>
+				p && !p.found ? <circle key={p.i} cx={p.x} cy={p.y} r={1.8} fill="var(--bad-text)" /> : null,
+			)}
+			{last ? (
+				<circle cx={last.x} cy={last.y} r={2.6} fill={last.found ? 'var(--series-1)' : 'var(--bad-text)'} />
+			) : null}
+		</svg>
 	)
 }
