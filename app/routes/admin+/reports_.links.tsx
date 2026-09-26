@@ -11,15 +11,20 @@
  *   crawl              whether Google has each linking page in its index.
  *   competitors        our main site's authority against Knoxville rivals.
  *
- * Two sources, never mixed in one number:
+ * Three sources, never mixed in one number:
  *   - Google's links report. The Search Console API has no links report, so
  *     ~/outreach/gsc-links.py on the Mac mini reads it in a signed-in browser
  *     every morning and pushes each snapshot to /resources/gsc-links-sync.
  *     Google refreshes that report in batches, weeks apart.
  *   - The DataForSEO link crawler, every 3 days (sha-reports src/backlinks.ts,
- *     reports Postgres): authority, linking sites, first and last seen, and a
- *     site: check per linking page. The crawler also tracks other domains
- *     (the network sites); this page reads only our three.
+ *     reports Postgres): authority, linking sites, first and last seen. The
+ *     crawler also tracks other domains (the network sites); this page reads
+ *     only our three.
+ *   - The outreach ledger's live pages. ~/outreach/ledger-links-sync.py on the
+ *     mini pushes them every morning to /resources/ledger-links-sync
+ *     (ledger_link_pages, reports Postgres).
+ * A daily site: check (sha-reports src/link-index.ts) asks Google about every
+ * crawler and ledger page it has not yet returned.
  */
 import {
 	json,
@@ -219,7 +224,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 /** The DataForSEO crawler's view of our three sites, or null without the reports database. */
 async function loadCrawler() {
 	if (!hasReportsDb()) return null
-	const [summary, recent, gains, losses, newest, lost, pages, rivals] =
+	const [summary, recent, gains, losses, newest, lost, pages, rivals, placed] =
 		await Promise.all([
 			// Authority and linking-site counts per site, every 3 days.
 			reportsQuery<{
@@ -292,21 +297,26 @@ async function loadCrawler() {
 			 ORDER BY last_seen DESC, rank DESC NULLS LAST LIMIT 40`,
 				[OUR_DOMAINS],
 			),
-			// Each linking page and the first day a site: query proved it is in
-			// Google's index (the crawler re-checks unconfirmed pages every 3 days).
+			// Each linking page the crawler still sees, and the first day the
+			// daily site: check found it in Google's index. "Still sees" is the
+			// same 14 days past the newest capture the check itself uses.
 			reportsQuery<{
 				target: string
 				domain: string
 				url_from: string
 				dofollow: boolean | null
 				first_seen: string
-				google_indexed_confirmed: string | null
+				indexed_since: string | null
+				index_checked: string | null
 			}>(
 				`SELECT target, domain, url_from, dofollow,
 			   to_char(first_seen, 'YYYY-MM-DD') AS first_seen,
-			   to_char(google_indexed_confirmed, 'YYYY-MM-DD') AS google_indexed_confirmed
-			 FROM backlink_pages WHERE spam < 25 AND target = ANY($1)
-			 ORDER BY google_indexed_confirmed NULLS FIRST, first_seen DESC
+			   to_char(google_indexed_since, 'YYYY-MM-DD') AS indexed_since,
+			   to_char(google_index_checked, 'YYYY-MM-DD') AS index_checked
+			 FROM backlink_pages
+			 WHERE spam < 25 AND target = ANY($1)
+			   AND last_seen >= (SELECT max(last_seen) FROM backlink_pages) - 14
+			 ORDER BY google_indexed_since NULLS FIRST, first_seen DESC
 			 LIMIT 400`,
 				[OUR_DOMAINS],
 			),
@@ -325,8 +335,66 @@ async function loadCrawler() {
 			   referring_domains, clean_referring_domains, spam_referring_domains
 			 FROM raw_competitor_authority ORDER BY day, domain`,
 			),
+			loadPlacements(),
 		])
-	return { summary, recent, gains, losses, newest, lost, pages, rivals }
+	return {
+		summary,
+		recent,
+		gains,
+		losses,
+		newest,
+		lost,
+		pages,
+		rivals,
+		...placed,
+	}
+}
+
+/** The pages our outreach ledger calls live, as of its newest push, and what
+ *  the daily site: checks cost. */
+async function loadPlacements() {
+	const [ledger, crawlerDomains, checks] = await Promise.all([
+		// The pages the outreach ledger calls live, as of its newest push.
+		reportsQuery<{
+			ledger_id: number
+			url: string
+			domain: string
+			ledger_domain: string | null
+			targets: string[]
+			live_since: string | null
+			indexed_since: string | null
+			index_checked: string | null
+		}>(
+			`SELECT ledger_id, url, domain, ledger_domain, targets,
+			   to_char(live_since, 'YYYY-MM-DD') AS live_since,
+			   to_char(google_indexed_since, 'YYYY-MM-DD') AS indexed_since,
+			   to_char(google_index_checked, 'YYYY-MM-DD') AS index_checked
+			 FROM ledger_link_pages
+			 WHERE last_seen = (SELECT max(last_seen) FROM ledger_link_pages)
+			 ORDER BY google_indexed_since NULLS FIRST, live_since DESC NULLS LAST, ledger_id DESC`,
+		),
+		// Every site the crawler has ever seen linking to us, spam included,
+		// to show which ledger pages the crawler has not found.
+		reportsQuery<{ domain: string }>(
+			`SELECT DISTINCT domain FROM backlink_domains WHERE target = ANY($1)`,
+			[OUR_DOMAINS],
+		),
+		// What the daily site: checks cost over the last 30 days.
+		reportsQuery<{ checks: number; cost: number; last_day: string | null }>(
+			`SELECT count(*)::int AS checks, coalesce(sum(cost), 0)::float AS cost,
+			   to_char(max(day), 'YYYY-MM-DD') AS last_day
+			 FROM link_index_checks WHERE day > current_date - 30`,
+		),
+	])
+	// The crawler knows a page's site when it has seen the host, or a domain
+	// the host sits under, linking to us.
+	const known = new Set(crawlerDomains.map(d => d.domain))
+	const crawlerKnows = (host: string) =>
+		host.split('.').some((_, i, parts) => known.has(parts.slice(i).join('.')))
+	return {
+		ledger: ledger.map(l => ({ ...l, crawler_knows: crawlerKnows(l.domain) })),
+		checks: checks[0] ?? { checks: 0, cost: 0, last_day: null },
+	}
 }
 
 // Switching tabs or sites only re-renders; the data stays.
@@ -1076,10 +1144,15 @@ function GoogleReport({ brands }: { brands: Data['brands'] }) {
 /* Google crawl status                                                      */
 /* ------------------------------------------------------------------------ */
 
+/** The outreach dashboard on the Mac mini (tailnet only), one page per ledger row. */
+const LEDGER_ROW_URL = 'http://zanes-mac-mini:8788/outreach/'
+
 /**
- * Which linking pages Google has in its index. Confirmed = the first day a
- * site: query returned the page; expect rank effects 2 to 6 weeks after that
- * date, not at once. Unconfirmed pages are re-checked every 3 days.
+ * Which linking pages Google has in its index, for two lists kept apart:
+ * the pages our outreach ledger calls live, and the pages the link crawler
+ * found. Every page Google has not yet returned gets one site: search a day;
+ * a page counts only when Google returns that page itself. Expect rank
+ * effects 2 to 6 weeks after the date, not at once.
  */
 function CrawlStatus({
 	crawler,
@@ -1088,74 +1161,180 @@ function CrawlStatus({
 	crawler: Crawler
 	chosen: Set<string>
 }) {
-	const rows = crawler.pages.filter(p => chosen.has(p.target))
-	const confirmed = rows.filter(r => r.google_indexed_confirmed).length
+	const placed = crawler.ledger.filter(l => l.targets.some(t => chosen.has(t)))
+	const crawled = crawler.pages.filter(p => chosen.has(p.target))
+	const indexed = (rows: Array<{ indexed_since: string | null }>) =>
+		rows.filter(r => r.indexed_since).length
+	const { checks } = crawler
 	return (
-		<section>
-			<h2>
-				Is each linking page in Google's index?{' '}
-				<span className="mini">
-					{confirmed} of {rows.length} confirmed
-				</span>
-			</h2>
-			<div className="tiles">
-				<StatTile
-					label="In Google's index"
-					value={String(confirmed)}
-					tone="good"
-					whisper="linking pages confirmed"
-				/>
-				<StatTile
-					label="Not yet"
-					value={String(rows.length - confirmed)}
-					tone={rows.length - confirmed ? 'bad' : undefined}
-					whisper="re-checked every 3 days"
-				/>
-			</div>
-			<div className="rtable-wrap">
-				<table className="rtable">
-					<thead>
-						<tr>
-							<th>Linking page</th>
-							<th>Links to</th>
-							<th className="num">Followed link</th>
-							<th className="num">Link found</th>
-							<th className="num">In Google's index since</th>
-						</tr>
-					</thead>
-					<tbody>
-						{rows.map(r => (
-							<tr key={`${r.target}|${r.url_from}`}>
-								<td>
-									<a href={r.url_from} target="_blank" rel="noreferrer">
-										{r.domain}
-									</a>
-								</td>
-								<td className="mini">{labelOf(r.target)}</td>
-								<td className="num">
-									{r.dofollow == null ? '-' : r.dofollow ? 'yes' : 'no'}
-								</td>
-								<td className="num">{r.first_seen}</td>
-								<td
-									className={`num ${r.google_indexed_confirmed ? 'good' : 'bad'}`}
-								>
-									{r.google_indexed_confirmed ?? 'not yet'}
-								</td>
+		<>
+			<section>
+				<h2>Is each linking page in Google's index?</h2>
+				<div className="tiles">
+					<StatTile
+						label="Our placements in the index"
+						value={`${indexed(placed)} of ${placed.length}`}
+						whisper="pages the outreach ledger calls live"
+					/>
+					<StatTile
+						label="Crawler pages in the index"
+						value={`${indexed(crawled)} of ${crawled.length}`}
+						whisper="pages the link crawler found"
+					/>
+					<StatTile
+						label="Searches, last 30 days"
+						value={String(checks.checks)}
+						whisper={`$${checks.cost.toFixed(2)} at DataForSEO${checks.last_day ? `, last ${checks.last_day}` : ''}`}
+					/>
+				</div>
+			</section>
+
+			<section>
+				<h2>
+					Our placements{' '}
+					<span className="mini">outreach ledger, newest push</span>
+				</h2>
+				{crawler.ledger.length ? (
+					<div className="rtable-wrap">
+						<table className="rtable">
+							<thead>
+								<tr>
+									<th>Linking page</th>
+									<th>Ledger row</th>
+									<th>Links to</th>
+									<th className="num">Live since</th>
+									<th className="num">Crawler has the site</th>
+									<th className="num">In Google's index since</th>
+								</tr>
+							</thead>
+							<tbody>
+								{placed.map(r => (
+									<tr key={`${r.ledger_id}|${r.url}`}>
+										<td>
+											<a href={r.url} target="_blank" rel="noreferrer">
+												{r.domain}
+											</a>
+											{r.ledger_domain &&
+											r.ledger_domain.replace(/^www\./, '') !== r.domain ? (
+												<span className="sub-line">for {r.ledger_domain}</span>
+											) : null}
+										</td>
+										<td>
+											<a
+												href={`${LEDGER_ROW_URL}${r.ledger_id}`}
+												target="_blank"
+												rel="noreferrer"
+											>
+												#{r.ledger_id}
+											</a>
+										</td>
+										<td className="mini">
+											{r.targets.map(labelOf).join(', ')}
+										</td>
+										<td className="num">{r.live_since ?? '-'}</td>
+										<td className="num">{r.crawler_knows ? 'yes' : 'no'}</td>
+										<IndexCell
+											since={r.indexed_since}
+											checked={r.index_checked}
+										/>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				) : (
+					<p className="note">
+						No pages from the ledger yet. The Mac mini sends them every morning
+						at 05:30 from <code>~/outreach/ledger-links-sync.py</code>.
+					</p>
+				)}
+				<p className="note">
+					Every page the outreach ledger marks live for one of our sites. Live
+					since is the day the ledger first verified the link. Crawler has the
+					site means the DataForSEO link crawler has seen that website link to
+					us; the crawler finds most new placements weeks late, or never, which
+					is why the ledger's pages are checked too.
+				</p>
+			</section>
+
+			<section>
+				<h2>
+					Pages the link crawler found{' '}
+					<span className="mini">DataForSEO, spam left out</span>
+				</h2>
+				<div className="rtable-wrap">
+					<table className="rtable">
+						<thead>
+							<tr>
+								<th>Linking page</th>
+								<th>Links to</th>
+								<th className="num">Followed link</th>
+								<th className="num">Link found</th>
+								<th className="num">In Google's index since</th>
 							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
+						</thead>
+						<tbody>
+							{crawled.map(r => (
+								<tr key={`${r.target}|${r.url_from}`}>
+									<td>
+										<a href={r.url_from} target="_blank" rel="noreferrer">
+											{r.domain}
+										</a>
+									</td>
+									<td className="mini">{labelOf(r.target)}</td>
+									<td className="num">
+										{r.dofollow == null ? '-' : r.dofollow ? 'yes' : 'no'}
+									</td>
+									<td className="num">{r.first_seen}</td>
+									<IndexCell
+										since={r.indexed_since}
+										checked={r.index_checked}
+									/>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+				<p className="note">
+					One page per linking site, for the sites the crawler still sees. A
+					followed link is one without a nofollow mark; both kinds count as a
+					mention.
+				</p>
+			</section>
+
 			<p className="note">
-				A page counts as confirmed on the first day a site: search on Google
-				returned it, so Google had crawled it by then (checks began 2026-08-01;
-				pages confirmed on the first check were crawled earlier). A link on a
-				page Google has not indexed does little. Rankings take in a new link
-				slowly: look for movement on the Rankings page 2 to 6 weeks after the
-				confirmation date. A followed link is one without a nofollow mark; both
-				kinds count as a mention.
+				A page counts as in Google's index on the first day a site: search on
+				Google returned that page itself. Google can list it with http or https,
+				with or without www or a trailing slash, but a different page under the
+				same address does not count. The old check, every 3 days, counted any
+				result, even the Search Console notice Google adds to every site:
+				search, so its dates are not shown. Each morning, every page not yet in
+				the index is searched again; a page in the index is not searched again.
+				One search costs $0.003. A link on a page Google has not indexed does
+				little. Rankings take in a new link slowly: look for movement on the
+				Rankings page 2 to 6 weeks after the date.
 			</p>
-		</section>
+		</>
+	)
+}
+
+/** The first day Google returned the page, or when it was last asked. */
+function IndexCell({
+	since,
+	checked,
+}: {
+	since: string | null
+	checked: string | null
+}) {
+	return (
+		<td className={`num ${since ? 'good' : 'bad'}`}>
+			{since ?? 'not yet'}
+			{since ? null : (
+				<span className="sub-line">
+					{checked ? `checked ${checked}` : 'not checked yet'}
+				</span>
+			)}
+		</td>
 	)
 }
 
