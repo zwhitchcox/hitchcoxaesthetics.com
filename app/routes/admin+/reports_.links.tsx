@@ -1305,14 +1305,14 @@ function CrawlStatus({
 			<p className="note">
 				A page counts as in Google's index on the first day a site: search on
 				Google returned that page itself. Google can list it with http or https,
-				with or without www or a trailing slash, but a different page under the
-				same address does not count. The old check, every 3 days, counted any
-				result, even the Search Console notice Google adds to every site:
-				search, so its dates are not shown. Each morning, every page not yet in
-				the index is searched again; a page in the index is not searched again.
-				One search costs $0.003. A link on a page Google has not indexed does
-				little. Rankings take in a new link slowly: look for movement on the
-				Rankings page 2 to 6 weeks after the date.
+				with or without www, a trailing slash or a tracking tag, but a different
+				page under the same address does not count. The old check, every 3 days,
+				counted any result, even the Search Console notice Google adds to every
+				site: search, so its dates are not shown. Each morning, every page not
+				yet in the index is searched again; a page in the index is not searched
+				again. One search costs $0.003. A link on a page Google has not indexed
+				does little. Rankings take in a new link slowly: look for movement on
+				the Rankings page 2 to 6 weeks after the date.
 			</p>
 		</>
 	)
