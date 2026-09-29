@@ -27,11 +27,11 @@ export const meta: MetaFunction = ({ location }) =>
 	getSocialMetas({
 		title: 'Careers | Sarah Hitchcox Aesthetics | Knoxville, TN',
 		description:
-			'Open positions at Sarah Hitchcox Aesthetics, a nurse-owned medical aesthetics practice with two West Knoxville offices: Licensed Medical Aesthetician and part-time Marketing and Patient Experience Assistant.',
+			'Open position at Sarah Hitchcox Aesthetics, a nurse-owned medical aesthetics practice with offices in Bearden and Farragut: part-time Licensed Medical Aesthetician with flexible daytime and evening hours.',
 		pathname: location.pathname,
 	})
 
-const POSTED = '2026-09-06'
+const POSTED = '2026-09-29'
 const ORG = {
 	'@type': 'Organization',
 	name: 'Sarah Hitchcox Aesthetics',
@@ -50,76 +50,42 @@ const BEARDEN = {
 }
 const jobs = [
 	{
-		slug: 'marketing-and-patient-experience-assistant',
-		title: 'Marketing and Patient Experience Assistant',
-		type: 'Part-time',
-		pay: '$18 per hour, W-2',
-		hours: '15 to 20 hours per week, weekdays, set around your schedule. No weekends.',
-		where: 'Bearden (5113 Kingston Pike, Suite 15) and Farragut (102 S Campbell Station Rd, Suite 8)',
-		summary:
-			'You will split your time between the front desk and our marketing. You will work directly with the owner and see how a small medical practice runs.',
-		duties: [
-			'Greet patients and make sure intake and consent forms are complete before they see Sarah.',
-			'Ask happy patients for Google reviews at checkout and keep our review requests moving.',
-			'Take photos and short videos of patients (always with written consent), treatments, the offices, and the team, and post them to our Instagram, Facebook, and website.',
-			'Keep our online listings accurate (Google Business Profile, directories, review sites).',
-			'Light office support between patients: phones, scheduling questions, supplies.',
-		],
-		you: [
-			'A current student or recent graduate in marketing, communications, nursing, health sciences, or a related field, or equivalent experience.',
-			'Comfortable talking to people face to face and asking for a review.',
-			'Basic phone photo and video skills. Canva or CapCut is a plus.',
-			'Organized and reliable. You follow through on small tasks without reminders.',
-			'Discreet with patient information. You will complete HIPAA training and sign a confidentiality agreement before your first shift.',
-		],
-		schema: {
-			'@context': 'https://schema.org',
-			'@type': 'JobPosting',
-			title: 'Marketing and Patient Experience Assistant',
-			description:
-				'Part-time front desk and marketing role at a nurse-owned medical aesthetics practice in Knoxville, TN: patient intake, Google reviews, photos and social media, online listings.',
-			datePosted: POSTED,
-			employmentType: 'PART_TIME',
-			hiringOrganization: ORG,
-			jobLocation: BEARDEN,
-			baseSalary: {
-				'@type': 'MonetaryAmount',
-				currency: 'USD',
-				value: { '@type': 'QuantitativeValue', value: 18, unitText: 'HOUR' },
-			},
-			directApply: true,
-		},
-	},
-	{
 		slug: 'licensed-medical-aesthetician',
 		title: 'Licensed Medical Aesthetician (LMA)',
-		type: 'Full-time or part-time',
+		type: 'Part-time, flexible hours',
 		pay: 'Hourly, based on experience, plus commission on services and retail',
-		hours: 'Full-time or part-time, weekdays',
-		where: 'West Knoxville, with days at both of our offices',
+		hours:
+			'Daytime and evening shifts, set around your availability and our patients\' appointments. We post your schedule at least one week ahead.',
+		where: 'Bearden (5113 Kingston Pike, Suite 15) and Farragut (102 S Campbell Station Rd, Suite 8)',
 		summary:
-			'You will deliver medical-grade skincare services under the same roof as our nurse injector and help patients before and after their aesthetic treatments. We hire Licensed Medical Aestheticians only: a Tennessee esthetician license plus medical aesthetics training or certification and experience in a medical setting. An esthetician license on its own does not meet the requirement.',
+			'You will give medical-grade skincare treatments and help run the patient side of the practice: forms, good faith exams, before-and-after photos, Google reviews, and some marketing. The job starts with a few hours a week. As we book more patients, your hours grow. It fits someone who wants to build a book of patients with us, not someone who needs full-time hours on day one. We hire Licensed Medical Aestheticians only: a Tennessee esthetician license plus medical aesthetics training or certification. An esthetician license on its own does not meet the requirement.',
 		duties: [
 			'Facials, chemical peels, dermaplaning, and skincare consultations.',
 			'Prepare patients for treatment and give after-care instructions.',
-			'Recommend and sell the skincare lines we carry.',
-			'Keep treatment rooms stocked and clean.',
-			'If you enjoy it, help with patient photos (with consent), social media posts, and reviews. That is a plus, not a requirement.',
+			'Help patients complete their intake and consent forms and their good faith exam with our medical provider.',
+			'Take before-and-after photos, always with the patient\'s written consent.',
+			'Ask happy patients for Google reviews at checkout and keep our review requests moving.',
+			'Take photos and short videos of treatments, the offices, and the team (with written consent) for our Instagram, Facebook, and website.',
+			'Keep our online listings accurate.',
+			'Recommend the skincare lines we carry, rebook your patients, and help fill your own schedule.',
+			'Office work between patients: phones, scheduling questions, supplies, and treatment room upkeep.',
 		],
 		you: [
-			'Licensed Medical Aesthetician: Tennessee esthetician license in good standing plus medical aesthetics certification or documented medical-setting training. Esthetician license alone does not qualify.',
-			'Warm with patients, precise with protocols.',
+			'Licensed Medical Aesthetician: Tennessee esthetician license in good standing plus medical aesthetics certification or documented medical-setting training. An esthetician license alone does not qualify.',
+			'Part-time availability that includes some evenings. Your hours start low and grow as we book more patients.',
+			'Comfortable asking patients for a review, and able to take good photos and short videos on a phone.',
+			'Discreet with patient information. You will complete HIPAA training and sign a confidentiality agreement before your first shift.',
 			'Comfortable in a medical setting alongside a registered nurse.',
-			'Reliable and organized.',
+			'Warm with patients, precise with protocols, organized, and reliable.',
 		],
 		schema: {
 			'@context': 'https://schema.org',
 			'@type': 'JobPosting',
 			title: 'Licensed Medical Aesthetician (LMA)',
 			description:
-				'Licensed Medical Aesthetician at a nurse-owned medical aesthetics practice with two West Knoxville offices: facials, chemical peels, dermaplaning, skincare consultations, pre- and post-treatment care. Licensed Medical Aesthetician required: Tennessee esthetician license plus medical aesthetics certification or medical-setting experience; an esthetician license alone does not qualify.',
+				'Part-time Licensed Medical Aesthetician with flexible daytime and evening hours at a nurse-owned medical aesthetics practice with offices in Bearden and Farragut, Knoxville, TN: facials, chemical peels, dermaplaning, skincare consultations, patient forms and good faith exams, before-and-after photos, Google reviews, and some marketing. Hours start low and grow with bookings. Tennessee esthetician license plus medical aesthetics certification or medical-setting training required; an esthetician license alone does not qualify.',
 			datePosted: POSTED,
-			employmentType: ['FULL_TIME', 'PART_TIME'],
+			employmentType: 'PART_TIME',
 			hiringOrganization: ORG,
 			jobLocation: BEARDEN,
 			directApply: true,
@@ -128,10 +94,7 @@ const jobs = [
 ]
 
 const APPLY_TO = 'sarah@hitchcoxaesthetics.com'
-const ROLE_SLUGS = [
-	'marketing-and-patient-experience-assistant',
-	'licensed-medical-aesthetician',
-] as const
+const ROLE_SLUGS = ['licensed-medical-aesthetician'] as const
 const RESUME_TYPES = new Set([
 	'application/pdf',
 	'application/msword',
@@ -266,12 +229,12 @@ export default function Careers() {
 				</h1>
 				<p className="mt-6 text-lg leading-relaxed text-gray-600">
 					Sarah Hitchcox Aesthetics is a nurse-owned medical aesthetics
-					practice with two West Knoxville offices: Bearden and Farragut. The owner, Sarah Hitchcox, RN, works in the
+					practice with two West Knoxville offices: Bearden and Farragut. The owner, Sarah Hitchcox, RN, BSN, works in the
 					offices every day. We offer Botox and dermal fillers, laser hair
 					removal, microneedling, skincare, and a medical weight loss program.
 				</p>
 				<p className="mt-4 text-lg leading-relaxed text-gray-600">
-					To apply for either role, use the{' '}
+					To apply, use the{' '}
 					<a className="font-medium text-primary underline" href="#apply">
 						application form
 					</a>{' '}
@@ -337,11 +300,11 @@ export default function Careers() {
 						Apply
 					</h2>
 					<p className="mt-4 text-lg leading-relaxed text-gray-600">
-						Tell us why this fits you and your availability. For the assistant
-						role, add any photo, video, or social work you are proud of (links
-						are fine). For the medical aesthetician role, include your license
-						number, your medical aesthetics certification, and where you have
-						worked in a medical setting.
+						Tell us which days and times you can work, including evenings. Include
+						your Tennessee esthetician license number, your medical aesthetics
+						certification, and where you have worked in a medical setting. Photo,
+						video, or social media work you are proud of is welcome too (links are
+						fine).
 					</p>
 					{actionData?.sent ? (
 						<p className="mt-6 rounded-md bg-green-50 p-4 text-green-900">
