@@ -485,7 +485,7 @@ export async function runPlaidSyncJob(): Promise<void> {
 	try {
 		const result = await syncPlaidTransactions()
 		console.log(
-			`Plaid sync: ${result.upserted} txns upserted from ${result.items} connection(s), ${result.replacedPending} pending replaced`,
+			`Plaid sync: ${result.upserted} txns upserted from ${result.items} connection(s), ${result.balances} balance(s), ${result.replacedPending} pending replaced`,
 		)
 		job.status = 'completed'
 		job.lastError = null

@@ -6,13 +6,16 @@
  */
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
+import { Fragment } from 'react'
 import {
 	BarChart,
 	ReportPage,
 	StatTile,
 	usd,
 } from '#app/components/report-ui'
+import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
+import { groupBalances, isOwed } from '#app/utils/plaid-balances.ts'
 import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
 
 interface Row {
@@ -43,6 +46,38 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			(out as any)[k] = k === 'month' ? v : Number(v)
 		return out
 	})
+	// Latest balance per linked account, written by the plaid-sync job. The
+	// page reads the mirror only; it never calls Plaid.
+	const [balanceRows, latestBalance] = await Promise.all([
+		prisma.plaidAccountBalance.findMany({
+			select: {
+				accountId: true,
+				owner: true,
+				institution: true,
+				name: true,
+				mask: true,
+				type: true,
+				subtype: true,
+				current: true,
+				available: true,
+				creditLimit: true,
+			},
+			orderBy: [{ owner: 'asc' }, { institution: 'asc' }, { name: 'asc' }],
+		}),
+		prisma.plaidAccountBalance.findFirst({
+			orderBy: { fetchedAt: 'desc' },
+			select: { fetchedAt: true },
+		}),
+	])
+	const balancesAsOf = latestBalance
+		? latestBalance.fetchedAt.toLocaleString('en-US', {
+				timeZone: 'America/New_York',
+				month: 'short',
+				day: 'numeric',
+				hour: 'numeric',
+				minute: '2-digit',
+			})
+		: null
 	const now = new Date()
 	const curMonth = now.toISOString().slice(0, 7)
 	const lastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1))
@@ -54,6 +89,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return json({
 		configured: true as const,
 		rows,
+		balances: groupBalances(balanceRows),
+		balancesAsOf,
 		last: lastRow?.net_household_profit ?? null,
 		lastCash: lastRow
 			? lastRow.net_household_profit + lastRow.est_tax_accrual
@@ -75,7 +112,8 @@ export default function HouseholdProfit() {
 	const data = useLoaderData<typeof loader>()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { rows, last, lastCash, lastMonth, avg12, ytd, ytdCash } = data
+	const { rows, balances, balancesAsOf, last, lastCash, lastMonth, avg12, ytd, ytdCash } =
+		data
 	return (
 		<ReportPage
 			title="Household profit"
@@ -207,6 +245,85 @@ export default function HouseholdProfit() {
 					current month also includes Boulevard money collected after the last
 					banked payout (payouts lag 2-3 business days), so a busy day shows up
 					the same day instead of when the deposit lands.
+				</p>
+			</section>
+
+			<section>
+				<h2>
+					Account balances{' '}
+					<span className="mini">
+						every linked account as the bank last reported it
+						{balancesAsOf ? ` · synced ${balancesAsOf} ET` : ''}
+					</span>
+				</h2>
+				{balances.groups.length === 0 ? (
+					<p className="note">
+						No balances yet. The Plaid sync writes them on its next run (daily, or
+						Run Now on the <a href="/admin/bg">background jobs</a> page).
+					</p>
+				) : (
+					<div className="rtable-wrap">
+						<table className="rtable">
+							<thead>
+								<tr>
+									<th>Account</th>
+									<th>Type</th>
+									<th className="num">Balance</th>
+									<th className="num">Available</th>
+									<th className="num">Limit</th>
+								</tr>
+							</thead>
+							<tbody>
+								{balances.groups.map(g => (
+									<Fragment key={g.owner}>
+										<tr>
+											<td colSpan={2}>
+												<strong>{g.label}</strong>
+											</td>
+											<td className={`num ${g.net < 0 ? 'bad' : 'good'}`}>
+												<strong>{usd(g.net)}</strong> net
+											</td>
+											<td className="num dim" colSpan={2}>
+												{usd(g.cash)} cash − {usd(g.owed)} owed
+											</td>
+										</tr>
+										{g.rows.map(r => (
+											<tr key={r.accountId}>
+												<td>
+													{r.institution} · {r.name}
+													{r.mask ? ` ····${r.mask}` : ''}
+												</td>
+												<td>{r.subtype ?? r.type}</td>
+												<td className="num">
+													{isOwed(r.type) ? `− ${usd(r.current)}` : usd(r.current)}
+												</td>
+												<td className="num">{usd(r.available)}</td>
+												<td className="num">{r.creditLimit ? usd(r.creditLimit) : '-'}</td>
+											</tr>
+										))}
+									</Fragment>
+								))}
+								<tr>
+									<td colSpan={2}>
+										<strong>All accounts</strong>
+									</td>
+									<td className={`num ${balances.net < 0 ? 'bad' : 'good'}`}>
+										<strong>{usd(balances.net)}</strong> net
+									</td>
+									<td className="num dim" colSpan={2}>
+										{usd(balances.cash)} cash − {usd(balances.owed)} owed
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				)}
+				<p className="note">
+					Business is Sarah's logins, Personal is Zane's. A bank balance is cash
+					held. A card or line-of-credit balance is money owed, shown with a
+					minus. Net is cash minus owed. Plaid reports each balance as of its
+					last pull, which can lag the bank by a day, and the sync runs once a
+					day.
 				</p>
 			</section>
 		</ReportPage>

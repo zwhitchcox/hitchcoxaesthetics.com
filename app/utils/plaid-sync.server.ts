@@ -1,5 +1,6 @@
 /**
- * Pulls transactions from Plaid into the PlaidTransaction table.
+ * Pulls transactions from Plaid into the PlaidTransaction table, and the
+ * latest balance of every linked account into PlaidAccountBalance.
  *
  * Runs as the plaid-sync background job (Temporal schedule / legacy interval).
  * The table is a permanent archive: institutions cap how far back Plaid can
@@ -50,6 +51,7 @@ export async function syncPlaidTransactions(): Promise<{
 	items: number
 	upserted: number
 	replacedPending: number
+	balances: number
 }> {
 	const clientId = process.env.PLAID_CLIENT_ID?.trim()
 	const secret = process.env.PLAID_SECRET?.trim()
@@ -75,6 +77,8 @@ export async function syncPlaidTransactions(): Promise<{
 
 	let upserted = 0
 	let replacedPending = 0
+	let balances = 0
+	const fetchedAt = new Date()
 	for (const item of items) {
 		let offset = 0
 		let accounts = new Map<string, { mask: string | null; type: string }>()
@@ -89,6 +93,32 @@ export async function syncPlaidTransactions(): Promise<{
 				accounts = new Map(
 					res.data.accounts.map(a => [a.account_id, { mask: a.mask, type: a.type }]),
 				)
+				// The same response carries each account's balance as of Plaid's
+				// last pull (the Balance product is not enabled, so this is the
+				// only balance we get). One row per account, always the latest.
+				for (const a of res.data.accounts) {
+					const data = {
+						itemId: item.itemId,
+						owner: item.owner ?? null,
+						institution: item.institutionName,
+						name: a.name,
+						officialName: a.official_name ?? null,
+						mask: a.mask ?? null,
+						type: a.type,
+						subtype: a.subtype ?? null,
+						current: a.balances.current ?? null,
+						available: a.balances.available ?? null,
+						creditLimit: a.balances.limit ?? null,
+						currency: a.balances.iso_currency_code ?? null,
+						fetchedAt,
+					}
+					await prisma.plaidAccountBalance.upsert({
+						where: { accountId: a.account_id },
+						create: { accountId: a.account_id, ...data },
+						update: data,
+					})
+					balances++
+				}
 			}
 			for (const t of res.data.transactions) {
 				// A posted transaction gets a new id and references the pending row
@@ -131,5 +161,5 @@ export async function syncPlaidTransactions(): Promise<{
 				break
 		}
 	}
-	return { items: items.length, upserted, replacedPending }
+	return { items: items.length, upserted, replacedPending, balances }
 }

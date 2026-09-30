@@ -19,6 +19,7 @@ import {
 	runFinanceReportsJob,
 	runPodcastTopicsJob,
 	runReviewerDaysJob,
+	runPlaidSyncJob,
 	runBlvdAppointmentSyncJob,
 	runBlvdAppointmentBackfillJob,
 	getJobStatuses,
@@ -131,6 +132,11 @@ export async function action({ request }: Route['ActionArgs']) {
 	if (intent === 'run-blvdAppointmentBackfill') {
 		runBlvdAppointmentBackfillJob().catch(console.error)
 		return json({ success: true, message: 'Boulevard appointment mirror (full backfill) started' })
+	}
+
+	if (intent === 'run-plaidSync') {
+		runPlaidSyncJob().catch(console.error)
+		return json({ success: true, message: 'Plaid sync (transactions and balances) started' })
 	}
 
 	if (intent === 'run-reviewerDays') {

@@ -850,6 +850,31 @@ model PlaidTransaction {
   @@index([accountOwner])
 }
 
+/// The latest balance Plaid reported for each linked account. One row per
+/// account, overwritten on every plaid-sync run. The household profit page
+/// reads this table; report loaders never call Plaid.
+model PlaidAccountBalance {
+  accountId    String  @id // Plaid account_id
+  itemId       String
+  owner        String? // zane = personal, sarah = business (same as PlaidTransaction)
+  institution  String
+  name         String
+  officialName String?
+  mask         String?
+  type         String // depository | credit | loan | investment | other
+  subtype      String?
+  current      Float? // cash held in a bank account; money owed on a card or loan
+  available    Float?
+  creditLimit  Float?
+  currency     String?
+  fetchedAt    DateTime // when the sync read it from Plaid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([owner])
+}
+
 // Business fees paid once a year (memberships, the state annual report).
 // The P&L spreads the sum of amountUsd over 12 months. A business charge
 // whose vendor contains chargeMatch is a payment of this fee, so the smoothed
