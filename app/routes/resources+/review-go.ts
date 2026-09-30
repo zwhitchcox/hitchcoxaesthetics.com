@@ -2,6 +2,7 @@ import { redirect, type LoaderFunctionArgs } from '@remix-run/node'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
 	findReviewPlatformUrl,
+	getBotoxKnoxReviewLocations,
 	getReviewLocations,
 	matchLocationToAppointment,
 	readAppointmentSnapshot,
@@ -26,7 +27,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const viaParam = url.searchParams.get('via')?.toLowerCase()
 	const via = viaParam === 'nfc' || viaParam === 'link' ? viaParam : 'qr'
 
-	const locations = await getReviewLocations()
+	// The Botox Knox listings first: they are what the review page offers
+	// (Zane, 2026-09-30) and they are not in GoogleLocation.
+	const locations = [
+		...getBotoxKnoxReviewLocations(),
+		...(await getReviewLocations()),
+	]
 	// Only redirect to a place we actually own (no open redirect).
 	const chosen = locations.find(l => l.placeId === placeId)
 	if (!chosen) {
