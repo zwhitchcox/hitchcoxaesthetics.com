@@ -15,16 +15,12 @@ export const meta: MetaFunction = () => [
 	{ name: 'robots', content: 'noindex' },
 ]
 
-/**
- * The printed QR points straight at the Botox Knox review page (Zane,
- * 2026-09-30: every review goes to Botox Knox, whatever the client came in
- * for). via=qr keeps the scan-vs-tap attribution on that page.
- */
-const REVIEW_QR_BASE = 'https://botoxknoxvilletn.com/r'
-
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
 	const providerId = params.providerId!
-	const reviewUrl = `${REVIEW_QR_BASE}/${providerId}?via=qr`
+	const base = (
+		process.env.REVIEW_SITE_URL || new URL(request.url).origin
+	).replace(/\/$/, '')
+	const reviewUrl = `${base}/r/${providerId}`
 	const [qrDataUrl, providerName] = await Promise.all([
 		generateReviewQrDataUrl(reviewUrl),
 		getProviderName(providerId),

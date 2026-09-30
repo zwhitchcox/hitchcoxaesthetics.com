@@ -1,6 +1,5 @@
 import {
 	json,
-	redirect,
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
 	type MetaFunction,
@@ -15,7 +14,6 @@ import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
 	takeUniqueSamplesPerDestination,
 	getReviewLocations,
-	getReviewPlatforms,
 	getServiceProfile,
 	matchLocationToAppointment,
 	readAppointmentSnapshot,
@@ -43,10 +41,14 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	const providerId = params.providerId!
 	const via = readVia(request)
 	const staffUrn = toStaffUrn(providerId)
-	const [snapshot, locations] = await Promise.all([
+	const [snapshot, allLocations] = await Promise.all([
 		readAppointmentSnapshot(),
 		getReviewLocations(),
 	])
+	// Zane, 2026-09-30: the page offers only the Botox Knox listings, whatever
+	// the client came in for. No redirect to the microsite any more; the
+	// sample text still names the real service.
+	const locations = allLocations.filter(l => l.business === 'Botox Knox')
 	const appt = resolveCurrentAppointment(snapshot, staffUrn)
 
 	// Provider name from any recent appointment, even outside the live window.
@@ -59,41 +61,6 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	const serviceName = appt?.serviceName ?? 'your visit'
 	const profile = getServiceProfile(serviceName)
 
-	// Every review goes to Botox Knox, whatever the client came in for (Zane,
-	// 2026-09-30, restating the 2026-08-05 rule: botox is the review-hungry
-	// battlefield, KWLC already owns its keywords, and laser or skin reviews on
-	// the SHA listing were the last exception). The weight-loss microsite's own
-	// review page redirects here too, so every QR at the desk ends at Botox Knox.
-	// Off switch without a deploy: fly secrets set REVIEW_MICROSITE_REDIRECTS=0.
-	// The svc hint keeps the sample text honest about what the client had.
-	const redirectsOff =
-		process.env.REVIEW_MICROSITE_REDIRECTS === '0' ||
-		process.env.REVIEW_MICROSITE_REDIRECTS === 'false'
-	const micrositeHost = redirectsOff ? undefined : 'https://botoxknoxvilletn.com'
-	if (micrositeHost) {
-		// The microsite fires its own review_link_scanned on landing, so this
-		// hop must NOT use the scanned event or every redirected scan counts
-		// twice (once as sha, once as the brand).
-		await captureServerPostHogEvent({
-			distinctId: reviewDistinctId(appt?.id ?? null, providerId),
-			event: 'review_link_redirected',
-			insertId: `review-redirected:${appt?.id ?? providerId}:${Date.now()}`,
-			properties: {
-				appointment_id: appt?.id ?? null,
-				provider_id: providerId,
-				provider_name: providerName,
-				service_name: serviceName,
-				service_category: profile.category,
-				has_appointment: Boolean(appt),
-				redirected_to: micrositeHost,
-				via,
-			},
-		})
-		// Carry the QR-vs-NFC marker across the hop so the brand page's own
-		// scanned event keeps the attribution.
-		const svcSlug = profile.category.toLowerCase().replace(/[^a-z]+/g, '-')
-		throw redirect(`${micrositeHost}/r/${providerId}?via=${via}&svc=${svcSlug}`)
-	}
 
 	// Every sample goes through the served-hash ledger so no two customers can
 	// ever copy identical text (duplicate reviews get listings flagged), and
@@ -158,17 +125,9 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			// Each destination carries its own text, so posting to a second
 			// place never reuses the first one's words.
 			sample: samplesByPlace.get(`Google - ${l.label}`) ?? genericFallback,
-			// Yelp first (owner priority 2026-07-31), then Google, then anything
-			// else we've claimed for this location that actually accepts reviews.
-			platforms: [
-				...getReviewPlatforms(l.label)
-					.filter(p => p.id === 'yelp')
-					.map(p => ({ id: p.id, label: p.label })),
-				{ id: 'google', label: 'Google' },
-				...getReviewPlatforms(l.label)
-					.filter(p => p.id !== 'yelp')
-					.map(p => ({ id: p.id, label: p.label })),
-			],
+			// Google only: the Yelp and Nextdoor pages we have claimed belong to
+			// the SHA listings, and this page shows Botox Knox alone.
+			platforms: [{ id: 'google', label: 'Google' }],
 		})),
 		matchedPlaceId,
 	})
