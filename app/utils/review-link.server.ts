@@ -319,6 +319,38 @@ export async function getReviewLocations(): Promise<ReviewLocation[]> {
 	return locations.sort((a, b) => a.label.localeCompare(b.label))
 }
 
+/**
+ * The Botox Knox listings, which the review page offers to every client
+ * (Zane, 2026-09-30). GoogleLocation holds only the SHA listings (the
+ * reviews fetch reads one GBP account), so these two are written down here.
+ * Place ids match the admin review-links page and the Botox Knox site.
+ */
+const BOTOX_KNOX_LISTINGS: Array<
+	Omit<ReviewLocation, 'writeReviewUrl'>
+> = [
+	{
+		placeId: 'ChIJd1SN2ZQ9XIgRB5F_naTr2pM',
+		label: 'Bearden',
+		address: '5113 Kingston Pike, Suite 15b, Knoxville, TN 37919',
+		business: 'Botox Knox',
+		blvdMatch: /knox|bearden/i,
+	},
+	{
+		placeId: 'ChIJ6_7_utMvXIgRpP1LXfKVvn4',
+		label: 'Farragut',
+		address: '102 S Campbell Station Rd, Suite 8b, Knoxville, TN 37934',
+		business: 'Botox Knox',
+		blvdMatch: /farragut/i,
+	},
+]
+
+export function getBotoxKnoxReviewLocations(): ReviewLocation[] {
+	return BOTOX_KNOX_LISTINGS.map(l => ({
+		...l,
+		writeReviewUrl: writeReviewUrl(l.placeId),
+	}))
+}
+
 export function matchLocationToAppointment(
 	locations: ReviewLocation[],
 	appointmentLocationName: string | null | undefined,

@@ -13,7 +13,7 @@ import { cn } from '#app/utils/misc.tsx'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
 	takeUniqueSamplesPerDestination,
-	getReviewLocations,
+	getBotoxKnoxReviewLocations,
 	getServiceProfile,
 	matchLocationToAppointment,
 	readAppointmentSnapshot,
@@ -41,14 +41,11 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	const providerId = params.providerId!
 	const via = readVia(request)
 	const staffUrn = toStaffUrn(providerId)
-	const [snapshot, allLocations] = await Promise.all([
-		readAppointmentSnapshot(),
-		getReviewLocations(),
-	])
+	const snapshot = await readAppointmentSnapshot()
 	// Zane, 2026-09-30: the page offers only the Botox Knox listings, whatever
 	// the client came in for. No redirect to the microsite any more; the
 	// sample text still names the real service.
-	const locations = allLocations.filter(l => l.business === 'Botox Knox')
+	const locations = getBotoxKnoxReviewLocations()
 	const appt = resolveCurrentAppointment(snapshot, staffUrn)
 
 	// Provider name from any recent appointment, even outside the live window.
