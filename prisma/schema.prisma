@@ -850,6 +850,20 @@ model PlaidTransaction {
   @@index([accountOwner])
 }
 
+// Business fees paid once a year (memberships, the state annual report).
+// The P&L spreads the sum of amountUsd over 12 months. A business charge
+// whose vendor contains chargeMatch is a payment of this fee, so the smoothed
+// view takes it out of its month. Edited at /admin/reports/annual-fees.
+model AnnualFee {
+  id          String  @id @default(cuid())
+  name        String
+  amountUsd   Float
+  chargeMatch String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // Articles written under the practice's name, for Sarah to approve, deny or edit
 // in /admin/outreach before they go anywhere. kind "guest" = written for another
 // publication (pushed here by the outreach system on the Mac mini, which polls

@@ -639,6 +639,29 @@ export async function runFinanceReportsJob(): Promise<void> {
 	}
 }
 
+let financeReportsQueue: Promise<void> | null = null
+let financeReportsAgain = false
+
+/**
+ * Run the finance reports job now, and once more when a change lands while
+ * it runs. The annual fee editor saves in bursts, and a plain run call
+ * returns at once while a run is going, which would drop the later change.
+ */
+export function queueFinanceReportsRun() {
+	if (financeReportsQueue) {
+		financeReportsAgain = true
+		return
+	}
+	financeReportsQueue = (async () => {
+		do {
+			financeReportsAgain = false
+			await runFinanceReportsJob()
+		} while (financeReportsAgain)
+	})().finally(() => {
+		financeReportsQueue = null
+	})
+}
+
 export async function runPodcastTopicsJob(): Promise<void> {
 	const job = jobStatuses['podcastTopics']
 	if (!job) return

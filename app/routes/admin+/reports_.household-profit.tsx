@@ -194,9 +194,10 @@ export default function HouseholdProfit() {
 					Reading a row left to right is the equation: revenue minus expenses is business
 					net; plus take-home, minus household spending, equals <strong>cash kept</strong> -
 					the money that actually moved. The last column re-states net with
-					once-a-year business fees (.pharmacy domain, IAPAM, TNSOS report)
-					spread ÷12 - the trend view; every other column stays cash-true so
-					FCF is always visible. The tax column is an <strong>accrual</strong>, not a
+					the once-a-year business fees on the{' '}
+					<a href="/admin/reports/annual-fees">Annual fees</a> page spread ÷12 -
+					the trend view; every other column stays cash-true so FCF is always
+					visible. The tax column is an <strong>accrual</strong>, not a
 					payment: no quarterlies have been paid, so "net after taxes" is what's left once
 					the April bill is honestly set aside. Cash kept ≈ $0 is why the cards can be paid
 					in full each month while nothing accumulates. For the current partial

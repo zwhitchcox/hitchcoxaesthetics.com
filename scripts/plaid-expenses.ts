@@ -217,17 +217,10 @@ const KNOWN_VENDORS: Array<{
 // revenue; monthly overhead is the routine bill stack; ANNUAL fees would
 // make one month look bad, so reports amortize them over 12; the rest are
 // one-time lumps shown on their real dates. Cash totals are never touched -
-// FCF stays visible.
+// FCF stays visible. The annual fees are the AnnualFee rows edited at
+// /admin/reports/annual-fees (Zane 2026-09-30). Nothing is detected on its
+// own, so a deleted fee stays deleted.
 export type ExpenseClass = 'cogs' | 'monthly' | 'annual' | 'irregular'
-
-/** Known once-a-year fees, matched as lowercase substrings. */
-const ANNUAL_VENDOR_MATCH = [
-	'encirca', // .pharmacy domain registrar, ~$1,125/yr each August
-	'iapam', // membership/training, ~$597/yr
-	'tnsos', // TN Secretary of State annual report, ~$307/yr
-	'legitscript', // pharmacy-ads certification (not yet seen in linked accounts)
-	'.pharmacy',
-]
 
 const MONTHLY_OVERHEAD_CATEGORIES = new Set<Category>([
 	'Marketing',
@@ -240,15 +233,16 @@ const MONTHLY_OVERHEAD_CATEGORIES = new Set<Category>([
 
 /**
  * Classify each vendor's cadence. Priority: COGS by category, then the
- * explicit/detected annual fees, then monthly (routine category OR seen in
- * six of the last eight full months - catches equipment financing and the
- * medical-director checks), else a one-time lump.
+ * annual fees (the vendor contains a fee's charge text), then monthly
+ * (routine category OR seen in six of the last eight full months - catches
+ * equipment financing and the medical-director checks), else a one-time lump.
  */
 function classifyCadence(opts: {
 	vendors: string[]
 	effCategoryOf: (vendor: string) => Category
 	monthsWithCharges: (vendor: string) => string[]
-	chargeDates: (vendor: string) => string[]
+	/** Lowercase charge texts from the annual fee list. */
+	annualMatches: string[]
 	nowMonth: string
 }): Map<string, ExpenseClass> {
 	const out = new Map<string, ExpenseClass>()
@@ -260,25 +254,7 @@ function classifyCadence(opts: {
 			out.set(vendor, 'cogs')
 			continue
 		}
-		if (ANNUAL_VENDOR_MATCH.some(m => lower.includes(m))) {
-			out.set(vendor, 'annual')
-			continue
-		}
-		// Year-over-year detector: charges ~12 months apart (300-430d), and
-		// rare otherwise. Needs the second year to exist, so it only starts
-		// firing as history accumulates.
-		const dates = opts.chargeDates(vendor).sort()
-		const yoy =
-			fullMonths.length <= 3 &&
-			dates.some((d, i) =>
-				dates
-					.slice(i + 1)
-					.some(later => {
-						const gap = (Date.parse(later) - Date.parse(d)) / 86400_000
-						return gap >= 300 && gap <= 430
-					}),
-			)
-		if (yoy) {
+		if (opts.annualMatches.some(m => lower.includes(m))) {
 			out.set(vendor, 'annual')
 			continue
 		}
@@ -689,13 +665,11 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 	// stack and amortize the annual fees.
 	const nowMonthKey = new Date().toISOString().slice(0, 7)
 	const vendorMonths = new Map<string, Set<string>>()
-	const vendorDates = new Map<string, string[]>()
 	for (const t of businessExpenses) {
 		if (!vendorMonths.has(t.key)) vendorMonths.set(t.key, new Set())
 		vendorMonths.get(t.key)!.add(t.date.slice(0, 7))
-		if (!vendorDates.has(t.key)) vendorDates.set(t.key, [])
-		vendorDates.get(t.key)!.push(t.date)
 	}
+	const annualFees = await prisma.annualFee.findMany()
 	const cadence = classifyCadence({
 		vendors: [...vendorMonths.keys()],
 		effCategoryOf: vendor => {
@@ -703,7 +677,9 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 			return c === 'Unknown' ? 'Other' : c
 		},
 		monthsWithCharges: vendor => [...(vendorMonths.get(vendor) ?? [])].sort(),
-		chargeDates: vendor => vendorDates.get(vendor) ?? [],
+		annualMatches: annualFees
+			.map(f => f.chargeMatch?.trim().toLowerCase() ?? '')
+			.filter(Boolean),
 		nowMonth: nowMonthKey,
 	})
 	const classOf = (t: Txn): ExpenseClass => cadence.get(t.key) ?? 'irregular'
@@ -717,8 +693,8 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 		overheadMonthly: number
 		annualCash: number
 		irregular: number
-		/** Trailing-12-month annual-fee total spread evenly: what the annual
-		 * class costs per month when it stops ambushing single months. */
+		/** The annual fee list's yearly total ÷ 12: what the annual class
+		 * costs per month when it stops ambushing single months. */
 		annualAmortized: number
 		expensesSmoothed: number
 		netSmoothed: number
@@ -741,17 +717,13 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 			overheadMonthly: byClass('monthly'),
 			annualCash: byClass('annual'),
 			irregular: byClass('irregular'),
-			annualAmortized: 0, // filled below once the 12-month total is known
+			annualAmortized: 0, // filled below from the fee list
 			expensesSmoothed: 0,
 			netSmoothed: 0,
 		}
 	})
 	{
-		const full12 = months.filter(m => m < nowMonthKey).slice(-12)
-		const annualTotal = businessExpenses
-			.filter(t => full12.includes(t.date.slice(0, 7)) && classOf(t) === 'annual')
-			.reduce((s, t) => s + t.amount, 0)
-		const perMonth = full12.length ? annualTotal / full12.length : 0
+		const perMonth = annualFees.reduce((s, f) => s + f.amountUsd, 0) / 12
 		for (const row of monthly) {
 			row.annualAmortized = perMonth
 			row.expensesSmoothed =
