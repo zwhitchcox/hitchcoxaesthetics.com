@@ -5,7 +5,11 @@
  */
 import { redirect } from '@remix-run/node'
 import { hashBody, normalizeWhitespace } from '#app/utils/articles.server.ts'
-import { missingLinks, parseLinks } from '#app/utils/articles.ts'
+import {
+	missingLinks,
+	parseLinks,
+	waitsOnPictures,
+} from '#app/utils/articles.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { combineHeaders } from '#app/utils/misc.tsx'
 import {
@@ -39,6 +43,7 @@ export const LATER_MS = 3 * 24 * 60 * 60 * 1000
 /** The columns every /review list reads. Never the body. */
 export const QUEUE_SELECT = {
 	id: true,
+	sourceKey: true,
 	kind: true,
 	title: true,
 	slug: true,
@@ -72,7 +77,6 @@ export type QueueRow = QueueArticle & {
 	publication: string | null
 	editedBy: string | null
 	reviewedAt: Date | string | null
-	outreachStatus: string | null
 	liveUrl: string | null
 	question: string | null
 	answer: string | null
@@ -248,6 +252,10 @@ export function buildArticleView(article: ViewRow) {
 			rewriteRequested: article.rewriteRequested,
 			revisionBaseBody: revisionNote ? article.revisionBaseBody : null,
 			publisherWaiting: article.publisherWaiting,
+			picturesComing: waitsOnPictures(
+				{ ...article, imageCount: article.images.length },
+				new Date(),
+			),
 		},
 		images: article.images,
 		aid: {

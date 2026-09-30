@@ -156,23 +156,25 @@ Text with an inline ![icon](images/image-2.png) picture does not count.
 })
 
 describe('picturesNote', () => {
-	test('the five copy cases', () => {
-		expect(picturesNote(0, 0)).toBe(
+	test('the six copy cases', () => {
+		expect(picturesNote(0, 0, true)).toBe(
 			'No pictures yet. They are being made and will show up in the text on their own.',
 		)
-		expect(picturesNote(2, 0)).toBe(
+		expect(picturesNote(2, 0, true)).toBe(
 			'No pictures yet. They are being made and will show up in the text on their own.',
 		)
-		expect(picturesNote(1, 1)).toBe(
+		// a Codex draft, or a Claude draft a day old with none: none are coming
+		expect(picturesNote(0, 0, false)).toBe('This article has no pictures.')
+		expect(picturesNote(1, 1, false)).toBe(
 			'1 picture, shown in place. Tap it to see it larger.',
 		)
-		expect(picturesNote(3, 3)).toBe(
+		expect(picturesNote(3, 3, false)).toBe(
 			'3 pictures, shown in place. Tap one to see it larger.',
 		)
-		expect(picturesNote(0, 1)).toBe(
+		expect(picturesNote(0, 1, false)).toBe(
 			'1 picture. The writer has not placed it in the text yet, so it shows here.',
 		)
-		expect(picturesNote(0, 2)).toBe(
+		expect(picturesNote(0, 2, false)).toBe(
 			'2 pictures. The writer has not placed them in the text yet, so they show here.',
 		)
 	})

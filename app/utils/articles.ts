@@ -20,6 +20,74 @@ export type ArticleGroupKey =
 	| 'approved'
 	| 'denied'
 	| 'sent'
+	| 'withdrawn'
+
+/**
+ * Articles taken out of Sarah's review, by sync key, with the reason. They
+ * never reach her phone, and /admin/outreach lists them in their own group.
+ * Nothing the mini sends changes this list, so a metadata push never brings
+ * one back. To bring one back, delete its line.
+ *
+ * Not a denial (2026-09-30): review_sync pull turns a denial into a ledger
+ * change (needs_human).
+ */
+export const WITHDRAWN_ARTICLES: Readonly<Record<string, string>> = {
+	'outreach:18':
+		'Ledger row 1394. The newer article for this publisher, outreach:82, is approved.',
+	'outreach:20':
+		'Ledger row 1501 is on hold. The publisher cannot be reached.',
+	'outreach:22':
+		'Ledger row 1525 is bot_blocked. The publisher site does not load.',
+	'outreach:36':
+		'Ledger row 1523. The newer article for this publisher, outreach:94, is approved.',
+	'outreach:39':
+		'Ledger row 689. The newer article for this publisher, outreach:68, is approved.',
+	'outreach:55':
+		'Ledger row 1298. The text is the writer brief (brief.json), not an article. The article is outreach:78.',
+	'outreach:56':
+		'Ledger row 506. The text is the writer brief (brief.json), not an article. The article is outreach:76, approved.',
+	'outreach:57':
+		'Ledger row 658. The text is the writer brief (brief.json), not an article. No article was written.',
+	'outreach:58':
+		'Ledger row 730. The text is the writer brief (brief.json), not an article. No article was written.',
+	'outreach:59':
+		'Ledger row 583. The text is the writer brief (brief.json), not an article. No article was written.',
+	'outreach:61':
+		'Ledger row 729. The text is a 138-word placeholder. The article is outreach:86, approved.',
+	'outreach:95':
+		'Ledger row 1523. A second draft. Sarah approved outreach:94, and that text went to the publisher on 2026-09-30.',
+}
+
+/** Why an article is out of Sarah's review, or null when it is not. */
+export function withdrawnReason(sourceKey: string): string | null {
+	return WITHDRAWN_ARTICLES[sourceKey] ?? null
+}
+
+/** How long a Claude draft with no pictures waits for them. */
+export const PICTURES_WAIT_MS = 24 * 60 * 60 * 1000
+
+/**
+ * A guest article whose pictures can still come. The mini makes pictures
+ * only for the Claude-written (fable) drafts, a few runs after the text
+ * arrives. After a day with none, none are coming (the draft has no picture
+ * prompts, or the publisher takes no pictures), so it is ready as it is.
+ */
+export function waitsOnPictures(
+	a: {
+		kind: string
+		imageCount: number
+		writer: string | null
+		receivedAt: Date | string
+	},
+	now: Date,
+): boolean {
+	return (
+		a.kind === 'guest' &&
+		a.imageCount === 0 &&
+		(a.writer ?? '').startsWith('fable') &&
+		now.getTime() - new Date(a.receivedAt).getTime() < PICTURES_WAIT_MS
+	)
+}
 
 export const ARTICLE_GROUPS: Array<{
 	key: ArticleGroupKey
@@ -64,28 +132,39 @@ export const ARTICLE_GROUPS: Array<{
 		blurb:
 			'These were sent to publishers earlier. They are here for the record. Changes on this page do not reach the publisher.',
 	},
+	{
+		key: 'withdrawn',
+		title: 'Withdrawn from review',
+		blurb:
+			'Not for Sarah. The text is a writer brief or a placeholder, a newer article replaced it, or the work with the publisher stopped. The article page gives the reason. Sarah does not see these on her phone.',
+	},
 ]
 
-export function articleGroup(a: {
-	kind: string
-	status: string
-	isReference: boolean
-	imageCount: number
-	outreachStatus: string | null
-	writer: string | null
-	/** "Ask Zane" from the phone. An open question moves the row to Questions. */
-	question?: string | null
-	answer?: string | null
-}): ArticleGroupKey {
+export function articleGroup(
+	a: {
+		sourceKey: string
+		kind: string
+		status: string
+		isReference: boolean
+		imageCount: number
+		outreachStatus: string | null
+		writer: string | null
+		receivedAt: Date | string
+		/** "Ask Zane" from the phone. An open question moves the row to Questions. */
+		question?: string | null
+		answer?: string | null
+	},
+	now: Date,
+): ArticleGroupKey {
 	if (a.status === 'approved') return 'approved'
 	if (a.status === 'denied') return 'denied'
 	if (a.status === 'changes_requested') return 'writer'
+	if (withdrawnReason(a.sourceKey)) return 'withdrawn'
 	if (a.question && !a.answer) return 'questions'
 	if (a.kind === 'guest' && ['submitted', 'live'].includes(a.outreachStatus ?? ''))
 		return 'sent'
 	if (a.isReference) return 'reference'
-	// pictures are only planned for the Claude-written articles
-	if (a.imageCount === 0 && (a.writer ?? '').startsWith('fable')) return 'images'
+	if (waitsOnPictures(a, now)) return 'images'
 	return 'review'
 }
 

@@ -62,7 +62,13 @@ describe('loadWaiting', () => {
 			skippedUntil: new Date(NOW.getTime() + 60 * 60 * 1000),
 		})
 		await article('editing', { editedAt: new Date(NOW.getTime() - 60 * 1000) })
-		await article('pictures', { writer: 'fable-5.1' })
+		await article('pictures', {
+			writer: 'fable-5.1',
+			receivedAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+		})
+		// a day with no pictures: none are coming, so it waits on her
+		const noPictures = await article('no-pictures', { writer: 'fable-5.1' })
+		await article('withdrawn', { sourceKey: 'outreach:57' })
 		await article('sent', { outreachStatus: 'submitted' })
 		await article('asked', { question: 'Is this right?' })
 
@@ -76,7 +82,7 @@ describe('loadWaiting', () => {
 
 		const waiting = await loadWaiting(NOW)
 		expect(waiting.articles.map(a => a.id).sort()).toEqual(
-			[ready.id, blog.id, answered.id].sort(),
+			[ready.id, blog.id, answered.id, noPictures.id].sort(),
 		)
 		expect(waiting.articles.find(a => a.id === ready.id)).toEqual({
 			id: ready.id,
@@ -88,15 +94,15 @@ describe('loadWaiting', () => {
 		])
 
 		expect(waitingCounts(waiting)).toEqual({
-			articles: 3,
+			articles: 4,
 			questions: 1,
 			onlyTitle: null,
 		})
 		expect(waitingSentenceFor(waiting)).toBe(
-			'3 articles and 1 question are waiting.',
+			'4 articles and 1 question are waiting.',
 		)
 		expect(waitingTextFor(waiting)).toBe(
-			'3 articles and 1 question are waiting. hitchcoxaesthetics.com/review',
+			'4 articles and 1 question are waiting. hitchcoxaesthetics.com/review',
 		)
 	})
 

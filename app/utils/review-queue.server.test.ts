@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import {
+	PICTURES_WAIT_MS,
+	WITHDRAWN_ARTICLES,
+	waitsOnPictures,
+} from './articles.ts'
+import {
 	afterDecision,
 	cardReadSeconds,
 	clearReviewSitting,
@@ -10,6 +15,7 @@ import {
 	holdReason,
 	laneSeconds,
 	orderCards,
+	paidSpotWaiting,
 	parseLane,
 	parseSitting,
 	remainingSeconds,
@@ -17,19 +23,22 @@ import {
 	setReviewLane,
 	setReviewSitting,
 	startSitting,
-	waitsOnPictures,
 	type QueueArticle,
 } from './review-queue.server.ts'
 
 const NOW = new Date('2026-09-15T12:00:00.000Z')
+/** Text that arrived an hour ago: its pictures can still come. */
+const HOUR_AGO = new Date(NOW.getTime() - 60 * 60 * 1000)
 
 function article(id: string, over: Partial<QueueArticle> = {}): QueueArticle {
 	return {
 		id,
+		sourceKey: `test:${id}`,
 		kind: 'guest',
 		status: 'pending',
+		outreachStatus: 'in_progress',
 		isReference: false,
-			wordCount: 400,
+		wordCount: 400,
 		imageCount: 2,
 		writer: 'fable-5.1',
 		publisherWaiting: false,
@@ -128,27 +137,64 @@ describe('holdReason', () => {
 		expect(holdReason(article('a', { editedAt: tenMin }), NOW)).toBeNull()
 	})
 
-	test('holds a fable guest article with no pictures, not a blog post', () => {
-		expect(holdReason(article('a', { imageCount: 0 }), NOW)).toBe('pictures')
+	test('holds a new fable guest article with no pictures, not a blog post', () => {
 		expect(
-			holdReason(article('a', { kind: 'blog', imageCount: 0 }), NOW),
+			holdReason(article('a', { imageCount: 0, receivedAt: HOUR_AGO }), NOW),
+		).toBe('pictures')
+		expect(
+			holdReason(
+				article('a', { kind: 'blog', imageCount: 0, receivedAt: HOUR_AGO }),
+				NOW,
+			),
+		).toBeNull()
+	})
+
+	test('serves a fable draft with no pictures a day after its text arrived: none are coming', () => {
+		const justUnder = new Date(NOW.getTime() - PICTURES_WAIT_MS + 1000)
+		const aDay = new Date(NOW.getTime() - PICTURES_WAIT_MS)
+		expect(
+			holdReason(article('a', { imageCount: 0, receivedAt: justUnder }), NOW),
+		).toBe('pictures')
+		expect(
+			holdReason(article('a', { imageCount: 0, receivedAt: aDay }), NOW),
+		).toBeNull()
+		// The Cosmetic Blog (row 1298): the text came on Sep 9, the publisher takes no pictures
+		expect(
+			holdReason(
+				article('cosmetic', {
+					imageCount: 0,
+					receivedAt: '2026-09-09T15:12:33.000Z',
+				}),
+				new Date('2026-09-30T21:00:00.000Z'),
+			),
 		).toBeNull()
 	})
 
 	test('serves a Codex or Zane guest article with no pictures: none are coming', () => {
+		const fresh = { imageCount: 0, receivedAt: HOUR_AGO }
 		expect(
-			holdReason(article('a', { imageCount: 0, writer: 'codex' }), NOW),
+			holdReason(article('a', { ...fresh, writer: 'codex' }), NOW),
 		).toBeNull()
+		expect(holdReason(article('a', { ...fresh, writer: 'zane' }), NOW)).toBeNull()
+		expect(holdReason(article('a', { ...fresh, writer: null }), NOW)).toBeNull()
+		expect(waitsOnPictures(article('a', fresh), NOW)).toBe(true)
 		expect(
-			holdReason(article('a', { imageCount: 0, writer: 'zane' }), NOW),
-		).toBeNull()
-		expect(
-			holdReason(article('a', { imageCount: 0, writer: null }), NOW),
-		).toBeNull()
-		expect(waitsOnPictures(article('a', { imageCount: 0 }))).toBe(true)
-		expect(
-			waitsOnPictures(article('a', { imageCount: 0, writer: 'codex' })),
+			waitsOnPictures(article('a', { ...fresh, writer: 'codex' }), NOW),
 		).toBe(false)
+	})
+
+	test('holds a withdrawn article, whatever else is true of it', () => {
+		expect(WITHDRAWN_ARTICLES['outreach:55']).toMatch(/brief/)
+		expect(holdReason(article('a', { sourceKey: 'outreach:55' }), NOW)).toBe(
+			'withdrawn',
+		)
+		expect(
+			holdReason(
+				article('a', { sourceKey: 'outreach:20', writer: 'codex', imageCount: 0 }),
+				NOW,
+			),
+		).toBe('withdrawn')
+		expect(holdReason(article('a', { sourceKey: 'outreach:78' }), NOW)).toBeNull()
 	})
 })
 
@@ -247,19 +293,37 @@ describe('orderCards', () => {
 		expect(ids(orderCards(list, 5, NOW))).toEqual(['old-long', 'new-short'])
 	})
 
-	test('a paid spot without a waiting publisher is an ordinary guest article', () => {
+	test('a paid spot whose in_progress row waits on something else is an ordinary guest article', () => {
+		// row 813: $100 approved, the ledger waits on the seller's quote
 		const cards = orderCards([article('a', { placementUsd: 200 })], 5, NOW)
 		expect(cards[0]!.rank).toBe(6)
+	})
+
+	test('a paid spot on a needs_human row ranks with the paid spots', () => {
+		// row 1298: $250 approved, needs_human for a PayPal task, the article waits on her
+		const paid = article('paid', {
+			placementUsd: 250,
+			outreachStatus: 'needs_human',
+		})
+		const unpaid = article('unpaid', { outreachStatus: 'needs_human' })
+		const cards = orderCards([unpaid, paid], 5, NOW)
+		expect(ids(cards)).toEqual(['paid', 'unpaid'])
+		expect(cards.map(c => c.rank)).toEqual([3, 6])
+		expect(paidSpotWaiting(paid)).toBe(true)
+		expect(paidSpotWaiting(unpaid)).toBe(false)
+		expect(paidSpotWaiting({ ...paid, kind: 'blog' })).toBe(false)
+		expect(paidSpotWaiting({ ...paid, placementUsd: 0 })).toBe(false)
 	})
 
 	test('leaves out every hold-out', () => {
 		const list = [
 			article('later', { skippedUntil: new Date(NOW.getTime() + 60_000) }),
 			article('editing', { editedAt: NOW }),
-			article('pictures', { imageCount: 0 }),
+			article('pictures', { imageCount: 0, receivedAt: HOUR_AGO }),
 			article('own-words', { isReference: true }),
 			article('approved', { status: 'approved' }),
 			article('sent-back', { status: 'changes_requested' }),
+			article('withdrawn', { sourceKey: 'outreach:61' }),
 			article('ok'),
 		]
 		expect(ids(orderCards(list, 10, NOW))).toEqual(['ok'])

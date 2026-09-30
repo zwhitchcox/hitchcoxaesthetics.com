@@ -1,4 +1,5 @@
 import * as cookie from 'cookie'
+import { waitsOnPictures, withdrawnReason } from './articles.ts'
 import { estimateReadSeconds } from './review-aid.ts'
 
 /**
@@ -55,8 +56,12 @@ export function fitsLane(readSeconds: number, lane: ReviewLane): boolean {
 /** The Article columns the queue reads. Pass a Prisma row with `imageCount` added. */
 export type QueueArticle = {
 	id: string
+	/** The sync key (outreach:<registry id>). WITHDRAWN_ARTICLES is keyed on it. */
+	sourceKey: string
 	kind: string
 	status: string
+	/** The ledger row's status (in_progress, needs_human, ...). */
+	outreachStatus: string | null
 	isReference: boolean
 	wordCount: number | null
 	estimatedReadSeconds?: number | null
@@ -74,8 +79,8 @@ export type QueueArticle = {
 }
 
 /**
- * 1 started, 2 your change is in, 3 held spot with money, 4 held spot,
- * 5 blog post, 6 other guest article.
+ * 1 started, 2 your change is in, 3 paid spot (paidSpotWaiting), 4 held
+ * spot, 5 blog post, 6 other guest article.
  */
 export type QueueRank = 1 | 2 | 3 | 4 | 5 | 6
 
@@ -93,6 +98,7 @@ export type HoldReason =
 	| 'pictures'
 	| 'own-words'
 	| 'decided'
+	| 'withdrawn'
 
 export const DECIDED_STATUSES = [
 	'approved',
@@ -131,27 +137,17 @@ export function isDecided(status: string): boolean {
 }
 
 /**
- * A guest article whose pictures are still to come. Pictures are only made
- * for the Claude-written (fable) drafts, so a Codex draft with no pictures is
- * ready as it is. Same rule as articleGroup on the desktop page.
+ * Why an article is out of every lane, or null when it can be served. The
+ * pictures rule (waitsOnPictures) and the withdrawn list are in articles.ts,
+ * shared with articleGroup on the desktop page.
  */
-export function waitsOnPictures(
-	a: Pick<QueueArticle, 'kind' | 'imageCount' | 'writer'>,
-): boolean {
-	return (
-		a.kind === 'guest' &&
-		a.imageCount === 0 &&
-		(a.writer ?? '').startsWith('fable')
-	)
-}
-
-/** Why an article is out of every lane, or null when it can be served. */
 export function holdReason(
 	a: QueueArticle,
 	now: Date,
 	options: OrderOptions = {},
 ): HoldReason | null {
 	const nowMs = now.getTime()
+	if (withdrawnReason(a.sourceKey)) return 'withdrawn'
 	if (a.isReference) return 'own-words'
 	if (isDecided(a.status)) {
 		const hasIncoming =
@@ -165,17 +161,35 @@ export function holdReason(
 	const edited = toTime(a.editedAt)
 	if (!Number.isNaN(edited) && nowMs - edited < EDITING_HOLD_MS)
 		return 'editing'
-	if (waitsOnPictures(a)) return 'pictures'
+	if (waitsOnPictures(a, now)) return 'pictures'
 	return null
+}
+
+/**
+ * A paid spot that waits on her approval. The ledger keeps waiting_on only
+ * on an in_progress row, and publisherWaiting is waiting_on "review". A row
+ * in any other status has no waiting_on, for example needs_human when Zane
+ * has a task on the row (row 1298, 2026-09-30). There the money decides.
+ */
+export function paidSpotWaiting(
+	a: Pick<
+		QueueArticle,
+		'kind' | 'placementUsd' | 'publisherWaiting' | 'outreachStatus'
+	>,
+): boolean {
+	return (
+		a.kind === 'guest' &&
+		(a.placementUsd ?? 0) > 0 &&
+		(a.publisherWaiting || a.outreachStatus !== 'in_progress')
+	)
 }
 
 export function cardRank(a: QueueArticle): QueueRank {
 	if ((a.readToParagraph ?? 0) > 0 && !isDecided(a.status)) return 1
 	if (isDecided(a.status)) return 2
 	if (a.revisionNote) return 2
-	if (a.kind === 'guest' && a.publisherWaiting) {
-		return (a.placementUsd ?? 0) > 0 ? 3 : 4
-	}
+	if (paidSpotWaiting(a)) return 3
+	if (a.kind === 'guest' && a.publisherWaiting) return 4
 	if (a.kind === 'blog') return 5
 	return 6
 }

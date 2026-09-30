@@ -18,10 +18,12 @@ export const handle: SEOHandle = {
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
+	const now = new Date()
 	const rows = await prisma.article.findMany({
 		orderBy: [{ receivedAt: 'desc' }],
 		select: {
 			id: true,
+			sourceKey: true,
 			kind: true,
 			title: true,
 			publication: true,
@@ -53,16 +55,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			imageCount: _count.images,
 			// Only the fact that new text is held. The text itself stays on the server.
 			incoming: incomingBody != null,
-			group: articleGroup({
-				kind: r.kind,
-				status: r.status,
-				isReference: r.isReference,
-				imageCount: _count.images,
-				outreachStatus: r.outreachStatus,
-				writer: r.writer,
-				question: r.question,
-				answer: r.answer,
-			}),
+			group: articleGroup(
+				{
+					sourceKey: r.sourceKey,
+					kind: r.kind,
+					status: r.status,
+					isReference: r.isReference,
+					imageCount: _count.images,
+					outreachStatus: r.outreachStatus,
+					writer: r.writer,
+					receivedAt: r.receivedAt,
+					question: r.question,
+					answer: r.answer,
+				},
+				now,
+			),
 		})),
 	})
 }
@@ -271,6 +278,8 @@ export default function OutreachAdmin() {
 											<span className="text-muted-foreground">
 												{a.outreachStatus === 'live' ? 'Live' : 'Sent'}
 											</span>
+										) : a.group === 'withdrawn' ? (
+											<span className="text-muted-foreground">Withdrawn</span>
 										) : (
 											<Link
 												to={`/admin/outreach/${a.id}`}

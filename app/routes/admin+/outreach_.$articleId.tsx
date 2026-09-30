@@ -29,6 +29,8 @@ import {
 	formatDate,
 	parseLinks,
 	statusLabel,
+	waitsOnPictures,
+	withdrawnReason,
 } from '#app/utils/articles.ts'
 import { useSubmitAfterSave } from '#app/utils/auto-save.ts'
 import { prisma } from '#app/utils/db.server.ts'
@@ -87,6 +89,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 		},
 	})
 	if (!article) throw new Response('Not found', { status: 404 })
+	const now = new Date()
 	// The "things to check" list, verified against the text she will see.
 	// The editor highlights each quote in the article as plain reference.
 	const aid = loadReviewAid(article.reviewAidJson, article.body)
@@ -108,16 +111,26 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 				article.estimatedReadSeconds ??
 					estimateReadSeconds(article.wordCount ?? countWords(article.body)),
 			),
-			group: articleGroup({
-				kind: article.kind,
-				status: article.status,
-				isReference: article.isReference,
-				imageCount: article.images.length,
-				outreachStatus: article.outreachStatus,
-				writer: article.writer,
-				question: article.question,
-				answer: article.answer,
-			}),
+			picturesComing: waitsOnPictures(
+				{ ...article, imageCount: article.images.length },
+				now,
+			),
+			group: articleGroup(
+				{
+					sourceKey: article.sourceKey,
+					kind: article.kind,
+					status: article.status,
+					isReference: article.isReference,
+					imageCount: article.images.length,
+					outreachStatus: article.outreachStatus,
+					writer: article.writer,
+					receivedAt: article.receivedAt,
+					question: article.question,
+					answer: article.answer,
+				},
+				now,
+			),
+			withdrawnReason: withdrawnReason(article.sourceKey),
 		},
 		claims,
 		aidNote: reviewAidNote(aid),
@@ -478,13 +491,24 @@ export default function ArticleReview() {
 				</div>
 			) : null}
 
+			{article.withdrawnReason ? (
+				<div className={AMBER_BOX}>
+					Withdrawn from Sarah's review. {article.withdrawnReason} She does not
+					see it on her phone.
+				</div>
+			) : null}
+
 			{article.kind === 'guest' &&
 			article.group === 'sent' &&
 			article.images.length === 0 ? null : (
 				<section>
 					<h3 className="text-lg font-semibold">Pictures</h3>
 					<p className="text-sm text-muted-foreground">
-						{picturesNote(article.pictureLineCount, article.images.length)}
+						{picturesNote(
+							article.pictureLineCount,
+							article.images.length,
+							article.picturesComing,
+						)}
 					</p>
 					{showThumbnails ? (
 						<div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

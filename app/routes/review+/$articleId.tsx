@@ -1373,7 +1373,7 @@ const ArticleCard = forwardRef<CardHandle, CardProps>(function ArticleCard(
 
 						<PanelSection number={4} title="Pictures">
 							<p className="text-sm text-muted-foreground">
-								{picturesNote(pictureLines, images.length)}
+								{picturesNote(pictureLines, images.length, article.picturesComing)}
 							</p>
 							{pictureLines === 0 && images.length > 0 ? (
 								<ul className="-mx-4 mt-2 flex gap-3 overflow-x-auto px-4 pb-1">

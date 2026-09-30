@@ -196,10 +196,19 @@ export function countPictureLines(body: string): number {
 	return body.match(PICTURE_LINE_RE)?.length ?? 0
 }
 
-/** The one-line "Pictures" note for the "things to check" panel. */
-export function picturesNote(pictureLines: number, imageCount: number): string {
+/**
+ * The one-line "Pictures" note for the "things to check" panel. `coming`:
+ * the pictures can still come (waitsOnPictures in articles.ts).
+ */
+export function picturesNote(
+	pictureLines: number,
+	imageCount: number,
+	coming: boolean,
+): string {
 	if (imageCount === 0) {
-		return 'No pictures yet. They are being made and will show up in the text on their own.'
+		return coming
+			? 'No pictures yet. They are being made and will show up in the text on their own.'
+			: 'This article has no pictures.'
 	}
 	if (pictureLines >= 1) {
 		return imageCount === 1

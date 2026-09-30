@@ -2,13 +2,13 @@ import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { json, type LoaderFunctionArgs } from '@remix-run/node'
 import { Link, useLoaderData } from '@remix-run/react'
 import { reviewerName } from '#app/utils/articles.server.ts'
+import { waitsOnPictures, withdrawnReason } from '#app/utils/articles.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import { aboutMinutes } from '#app/utils/review-aid.ts'
 import {
 	cardReadSeconds,
 	EDITING_HOLD_MS,
 	getReviewLane,
-	waitsOnPictures,
 } from '#app/utils/review-queue.server.ts'
 import {
 	hasOpenQuestion,
@@ -58,7 +58,10 @@ function toTime(value: Date | string | null | undefined): number {
 	return new Date(value).getTime()
 }
 
-/** Which group a row belongs to. Decisions first, then her own asks, then the lane. */
+/**
+ * Which group a row belongs to. Decisions first, then her own asks, then the
+ * lane. A withdrawn article (WITHDRAWN_ARTICLES) is in no group.
+ */
 function groupOf(
 	a: QueueRow,
 	fits: ReadonlySet<string>,
@@ -68,6 +71,7 @@ function groupOf(
 	if (a.status === 'denied') return 'denied'
 	if (a.status === 'approved') return 'approved'
 	if (a.status !== 'pending') return null
+	if (withdrawnReason(a.sourceKey)) return null
 	if (hasOpenQuestion(a)) return 'questions'
 	// Own words before "change is in": an own-words row stays at the desk lane.
 	if (a.isReference) return 'own-words'
@@ -102,7 +106,7 @@ function stateOf(
 		case 'rest': {
 			const skipped = toTime(a.skippedUntil)
 			if (!Number.isNaN(skipped) && skipped > now.getTime()) return 'Set aside'
-			if (waitsOnPictures(a)) return 'Waiting on pictures'
+			if (waitsOnPictures(a, now)) return 'Waiting on pictures'
 			const edited = toTime(a.editedAt)
 			if (!Number.isNaN(edited) && now.getTime() - edited < EDITING_HOLD_MS)
 				return 'Zane is editing it'
