@@ -59,24 +59,17 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	const serviceName = appt?.serviceName ?? 'your visit'
 	const profile = getServiceProfile(serviceName)
 
-	// Temporary review routing while seeding the microsite listings
-	// (2026-07-21: ALL reviews leave SHA, weight loss goes to Weight Loss
-	// Knox and EVERYTHING else, laser included, seeds Botox Knox; both
-	// microsites currently point every button at their Farragut listing).
-	// Toggle without a deploy: fly secrets set REVIEW_MICROSITE_REDIRECTS=1
-	// (on) / unset (off).
-	// Category names come from getServiceProfile in review-link.server.ts.
-	// 2026-08-05 (Zane): weight loss now ALSO seeds Botox Knox. KWLC owns its
-	// keywords with ~12 reviews (name+thin field; reviews are ~weightless on
-	// WL terms), while botox is the review-hungry battlefield — so the whole
-	// review firehose feeds BK until its listings are seasoned. The svc hint
-	// keeps the sample text honest about what the customer actually had.
-	const micrositeHostFor = (_category: string) => 'https://botoxknoxvilletn.com'
-	const micrositeHost =
-		process.env.REVIEW_MICROSITE_REDIRECTS === '1' ||
-		process.env.REVIEW_MICROSITE_REDIRECTS === 'true'
-			? micrositeHostFor(profile.category)
-			: undefined
+	// Every review goes to Botox Knox, whatever the client came in for (Zane,
+	// 2026-09-30, restating the 2026-08-05 rule: botox is the review-hungry
+	// battlefield, KWLC already owns its keywords, and laser or skin reviews on
+	// the SHA listing were the last exception). The weight-loss microsite's own
+	// review page redirects here too, so every QR at the desk ends at Botox Knox.
+	// Off switch without a deploy: fly secrets set REVIEW_MICROSITE_REDIRECTS=0.
+	// The svc hint keeps the sample text honest about what the client had.
+	const redirectsOff =
+		process.env.REVIEW_MICROSITE_REDIRECTS === '0' ||
+		process.env.REVIEW_MICROSITE_REDIRECTS === 'false'
+	const micrositeHost = redirectsOff ? undefined : 'https://botoxknoxvilletn.com'
 	if (micrositeHost) {
 		// The microsite fires its own review_link_scanned on landing, so this
 		// hop must NOT use the scanned event or every redirected scan counts

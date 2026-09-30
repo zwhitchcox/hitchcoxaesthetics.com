@@ -33,12 +33,13 @@ const LISTING_LINKS = [
 }))
 
 // QR landing pages per brand: /r/<provider> shows a fresh sample review and
-// the right listing buttons. The SHA link auto-routes tox and weight-loss
-// appointments to the brand sites.
+// the listing buttons. Since 2026-09-30 (Zane) every review goes to Botox
+// Knox: the SHA and Knoxville Weight Loss landings redirect to the Botox Knox
+// page, whatever the client came in for.
 const BRAND_LANDINGS = [
-	{ brand: 'Sarah Hitchcox Aesthetics (auto-routes by service)', base: 'https://hitchcoxaesthetics.com/r' },
+	{ brand: 'Sarah Hitchcox Aesthetics (redirects to Botox Knox)', base: 'https://hitchcoxaesthetics.com/r' },
 	{ brand: 'Botox Knox Med Spa', base: 'https://botoxknoxvilletn.com/r' },
-	{ brand: 'Knoxville Weight Loss Clinic', base: 'https://weightlossknoxvilletn.com/r' },
+	{ brand: 'Knoxville Weight Loss Clinic (redirects to Botox Knox)', base: 'https://weightlossknoxvilletn.com/r' },
 ]
 
 export async function loader({ request }: { request: Request }) {
