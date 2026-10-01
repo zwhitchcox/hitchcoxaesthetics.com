@@ -26,15 +26,23 @@ export function hasFinanceReportsConfig() {
 
 const PROJECTION_MONTHS = 6
 
-function projectionWindow(now = new Date()) {
-	// Whole months, Eastern-ish: first of the current month → first of +6 months.
-	const y = now.getFullYear()
-	const m = now.getMonth()
-	const fmt = (yy: number, mm: number) =>
-		`${yy}-${String(mm + 1).padStart(2, '0')}-01`
+/**
+ * First of the current month → first of +6 months, in business time. When
+ * the current week began last month, the window starts on that Monday
+ * instead: the revenue page's week tiles read Monday to yesterday from this
+ * table, and on 2026-10-01 (a Thursday) "Expected by now" showed $196
+ * because Sep 28-30 had dropped out.
+ */
+export function projectionWindow(now = new Date()) {
+	const todayEt = now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+	const monthStart = `${todayEt.slice(0, 7)}-01`
+	const dow = (new Date(`${todayEt}T12:00:00Z`).getUTCDay() + 6) % 7 // Mon=0
+	const monday = shiftDay(todayEt, -dow)
+	const endMonth = Number(todayEt.slice(5, 7)) - 1 + PROJECTION_MONTHS // 0-based
+	const endYear = Number(todayEt.slice(0, 4)) + Math.floor(endMonth / 12)
 	return {
-		fromDate: fmt(y, m),
-		toDate: fmt(m + PROJECTION_MONTHS > 11 ? y + 1 : y, (m + PROJECTION_MONTHS) % 12),
+		fromDate: monday < monthStart ? monday : monthStart,
+		toDate: `${endYear}-${String((endMonth % 12) + 1).padStart(2, '0')}-01`,
 	}
 }
 
