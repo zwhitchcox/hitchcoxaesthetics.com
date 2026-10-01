@@ -218,7 +218,7 @@ const KNOWN_VENDORS: Array<{
 // make one month look bad, so reports amortize them over 12; the rest are
 // one-time lumps shown on their real dates. Cash totals are never touched -
 // FCF stays visible. The annual fees are the AnnualFee rows edited at
-// /admin/reports/annual-fees (Zane 2026-09-30). Nothing is detected on its
+// /admin/reports/settings (Zane 2026-09-30). Nothing is detected on its
 // own, so a deleted fee stays deleted.
 export type ExpenseClass = 'cogs' | 'monthly' | 'annual' | 'irregular'
 

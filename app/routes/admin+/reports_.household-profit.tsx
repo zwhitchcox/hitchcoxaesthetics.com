@@ -233,7 +233,7 @@ export default function HouseholdProfit() {
 					net; plus take-home, minus household spending, equals <strong>cash kept</strong> -
 					the money that actually moved. The last column re-states net with
 					the once-a-year business fees on the{' '}
-					<a href="/admin/reports/annual-fees">Annual fees</a> page spread ÷12 -
+					<a href="/admin/reports/settings">Report settings</a> page spread ÷12 -
 					the trend view; every other column stays cash-true so FCF is always
 					visible. The tax column is an <strong>accrual</strong>, not a
 					payment: no quarterlies have been paid, so "net after taxes" is what's left once

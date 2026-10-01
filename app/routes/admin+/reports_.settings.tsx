@@ -1,9 +1,10 @@
 /**
- * Annual fees: the once-a-year business fees (memberships, the state annual
- * report) that the P&L spreads over 12 months. Zane adds, changes and
- * deletes them here (2026-09-30); scripts/plaid-expenses.ts reads the same
- * rows. Each change re-runs the finance reports job, so the revenue and
- * household pages show it about a minute later.
+ * Report settings, at the bottom of the report hub's sidebar (Zane
+ * 2026-10-01: a settings page, not a report of its own). Today it holds the
+ * annual fees: the once-a-year business fees (memberships, the state annual
+ * report) that the P&L spreads over 12 months. scripts/plaid-expenses.ts
+ * reads the same rows. Each change re-runs the finance reports job, so the
+ * revenue and household pages show it about a minute later.
  */
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import {
@@ -13,7 +14,7 @@ import {
 	type MetaFunction,
 } from '@remix-run/node'
 import { useFetcher, useLoaderData } from '@remix-run/react'
-import { ReportPage, StatTile, usd } from '#app/components/report-ui'
+import { ReportPage, usd } from '#app/components/report-ui'
 import { queueFinanceReportsRun } from '#app/utils/background-jobs.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
@@ -23,7 +24,7 @@ export const handle: SEOHandle = {
 }
 
 export const meta: MetaFunction = () => [
-	{ title: 'Annual fees' },
+	{ title: 'Report settings' },
 	{ name: 'robots', content: 'noindex, nofollow' },
 ]
 
@@ -222,21 +223,18 @@ function AddFeeRow() {
 	)
 }
 
-export default function AnnualFees() {
+export default function ReportSettings() {
 	const { fees } = useLoaderData<typeof loader>()
 	const total = fees.reduce((sum, fee) => sum + fee.amountUsd, 0)
 	return (
-		<ReportPage
-			title="Annual fees"
-			subtitle="Business fees paid once a year. The reports spread these amounts over 12 months."
-		>
+		<ReportPage title="Report settings">
 			<style dangerouslySetInnerHTML={{ __html: CSS }} />
-			<div className="tiles">
-				<StatTile label="Per year" value={usd(total, 2)} />
-				<StatTile label="Per month in the reports" value={usd(total / 12, 2)} />
-			</div>
 			<section>
-				<h2>Fees</h2>
+				<h2>Annual fees</h2>
+				<p className="lede">
+					Business fees paid once a year: {usd(total, 2)} a year in total. The
+					reports spread it over 12 months, {usd(total / 12, 2)} a month.
+				</p>
 				<div className="rtable-wrap">
 					<table className="rtable fees">
 						<thead>

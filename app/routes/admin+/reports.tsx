@@ -30,7 +30,6 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 		entries: [
 			{ title: 'Revenue', desc: 'Actuals, this week, projections + P&L profitability, revenue by type/source/day with drill-down', path: '/admin/reports/revenue' },
 			{ title: 'Daily profit', desc: 'Was each day profitable: revenue − est. COGS − ads − overhead per workday (Mon–Sat)', path: '/admin/reports/daily-profit' },
-			{ title: 'Annual fees', desc: 'Once-a-year business fees that the reports spread over 12 months. Add, change or delete them', path: '/admin/reports/annual-fees' },
 		{ title: 'Bookings funnel', desc: 'Bookings made by day × source, expected value, ads cost per booking', path: '/admin/reports/bookings' },
 			{ title: 'Retention: lapsed patients', desc: 'Who stopped coming: overdue vs their usual visit rhythm, win-back list by value', path: '/admin/reports/retention' },
 			{ title: 'Service trends', desc: 'Demand per category since 2024, seasonality, peak booking times', path: '/admin/reports/service-trends' },
@@ -70,6 +69,12 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 		heading: 'Operations',
 		entries: [
 			{ title: 'Reviews & scans', desc: 'Review counts + trends per listing, QR scan funnel by brand', path: '/admin/reports/reviews' },
+		],
+	},
+	{
+		heading: 'Settings',
+		entries: [
+			{ title: 'Report settings', desc: 'Annual fees that the reports spread over 12 months', path: '/admin/reports/settings' },
 		],
 	},
 ]

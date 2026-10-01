@@ -410,7 +410,7 @@ export async function syncFinanceReports(): Promise<{
 		// expenses = true cash out (FCF stays visible); the class columns
 		// split it into COGS / monthly overhead / annual fees / one-time, and
 		// the *_smoothed pair spreads the annual fee list (AnnualFee rows,
-		// /admin/reports/annual-fees) over 12 months so a renewal doesn't
+		// /admin/reports/settings) over 12 months so a renewal doesn't
 		// crater its month.
 		await q(`drop table if exists business_pnl_monthly`)
 		await q(`create table business_pnl_monthly (
