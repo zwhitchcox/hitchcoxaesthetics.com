@@ -1381,8 +1381,8 @@ export default function Revenue() {
 							<>
 								{' '}
 								COGS in the stack is ESTIMATED from each service's revenue at its fitted ratio (true profitability - a restock month is not a bad month); Free cash flow in the tooltip uses purchase-timed spend instead. The expense stack shows annual fees AMORTIZED (÷12) so a
-								once-a-year renewal doesn't crater its month (the list is on
-								the <a href="/admin/reports/settings">Report settings</a> page); cash out (FCF)
+								once-a-year renewal doesn't crater its month (edit the list in Settings on
+								the <a href="/admin/reports/household-profit">Household profit</a> page); cash out (FCF)
 								is the P&L "expenses" column on the household-profit report,
 								which stays cash-true.
 							</>

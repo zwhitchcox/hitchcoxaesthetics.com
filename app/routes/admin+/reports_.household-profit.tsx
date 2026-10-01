@@ -4,7 +4,11 @@
  * estimated taxes = what we kept, per month. Reads household_profit_monthly in
  * the reports Postgres (written by finance-reports sync).
  */
-import { json, type LoaderFunctionArgs } from '@remix-run/node'
+import {
+	json,
+	type ActionFunctionArgs,
+	type LoaderFunctionArgs,
+} from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
 import { Fragment } from 'react'
 import {
@@ -13,6 +17,8 @@ import {
 	StatTile,
 	usd,
 } from '#app/components/report-ui'
+import { SettingsDialog } from '#app/components/settings-dialog.tsx'
+import { handleAnnualFeeForm, loadAnnualFees } from '#app/utils/annual-fees.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import { groupBalances, isOwed } from '#app/utils/plaid-balances.ts'
@@ -48,7 +54,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	})
 	// Latest balance per linked account, written by the plaid-sync job. The
 	// page reads the mirror only; it never calls Plaid.
-	const [balanceRows, latestBalance] = await Promise.all([
+	const [balanceRows, latestBalance, fees] = await Promise.all([
 		prisma.plaidAccountBalance.findMany({
 			select: {
 				accountId: true,
@@ -68,6 +74,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			orderBy: { fetchedAt: 'desc' },
 			select: { fetchedAt: true },
 		}),
+		loadAnnualFees(),
 	])
 	const balancesAsOf = latestBalance
 		? latestBalance.fetchedAt.toLocaleString('en-US', {
@@ -89,6 +96,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return json({
 		configured: true as const,
 		rows,
+		fees,
 		balances: groupBalances(balanceRows),
 		balancesAsOf,
 		last: lastRow?.net_household_profit ?? null,
@@ -108,15 +116,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	})
 }
 
+// The Settings dialog's annual fee forms post here.
+export async function action({ request }: ActionFunctionArgs) {
+	await requireUserWithRole(request, 'admin')
+	const result = await handleAnnualFeeForm(await request.formData())
+	return json(result, { status: result.ok ? 200 : 400 })
+}
+
 export default function HouseholdProfit() {
 	const data = useLoaderData<typeof loader>()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { rows, balances, balancesAsOf, last, lastCash, lastMonth, avg12, ytd, ytdCash } =
+	const { rows, fees, balances, balancesAsOf, last, lastCash, lastMonth, avg12, ytd, ytdCash } =
 		data
 	return (
 		<ReportPage
 			title="Household profit"
+			actions={<SettingsDialog fees={fees} />}
 			subtitle="Business revenue − business expenses + Zane take-home − household spending − estimated taxes (30% of business net)"
 		>
 			<div className="tiles">
@@ -232,8 +248,7 @@ export default function HouseholdProfit() {
 					Reading a row left to right is the equation: revenue minus expenses is business
 					net; plus take-home, minus household spending, equals <strong>cash kept</strong> -
 					the money that actually moved. The last column re-states net with
-					the once-a-year business fees on the{' '}
-					<a href="/admin/reports/settings">Report settings</a> page spread ÷12 -
+					the once-a-year business fees from Settings (top right) spread ÷12 -
 					the trend view; every other column stays cash-true so FCF is always
 					visible. The tax column is an <strong>accrual</strong>, not a
 					payment: no quarterlies have been paid, so "net after taxes" is what's left once

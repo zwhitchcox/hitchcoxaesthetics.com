@@ -217,9 +217,9 @@ const KNOWN_VENDORS: Array<{
 // revenue; monthly overhead is the routine bill stack; ANNUAL fees would
 // make one month look bad, so reports amortize them over 12; the rest are
 // one-time lumps shown on their real dates. Cash totals are never touched -
-// FCF stays visible. The annual fees are the AnnualFee rows edited at
-// /admin/reports/settings (Zane 2026-09-30). Nothing is detected on its
-// own, so a deleted fee stays deleted.
+// FCF stays visible. The annual fees are the AnnualFee rows edited in
+// Settings on the household profit page (Zane 2026-09-30). Nothing is
+// detected on its own, so a deleted fee stays deleted.
 export type ExpenseClass = 'cogs' | 'monthly' | 'annual' | 'irregular'
 
 const MONTHLY_OVERHEAD_CATEGORIES = new Set<Category>([

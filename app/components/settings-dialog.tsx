@@ -1,100 +1,36 @@
 /**
- * Report settings, at the bottom of the report hub's sidebar (Zane
- * 2026-10-01: a settings page, not a report of its own). Today it holds the
- * annual fees: the once-a-year business fees (memberships, the state annual
- * report) that the P&L spreads over 12 months. scripts/plaid-expenses.ts
- * reads the same rows. Each change re-runs the finance reports job, so the
- * revenue and household pages show it about a minute later.
+ * Settings for the household profit page: a button that opens a dialog
+ * (Zane 2026-10-01: settings sit behind a button on the household page, not
+ * on a page of their own). Today the dialog holds the annual fee list that
+ * the P&L spreads over 12 months. The forms post to the page's own action,
+ * which calls handleAnnualFeeForm.
  */
-import { type SEOHandle } from '@nasa-gcn/remix-seo'
-import {
-	json,
-	type ActionFunctionArgs,
-	type LoaderFunctionArgs,
-	type MetaFunction,
-} from '@remix-run/node'
-import { useFetcher, useLoaderData } from '@remix-run/react'
-import { ReportPage, usd } from '#app/components/report-ui'
-import { queueFinanceReportsRun } from '#app/utils/background-jobs.server.ts'
-import { prisma } from '#app/utils/db.server.ts'
-import { requireUserWithRole } from '#app/utils/permissions.server'
+import { useFetcher } from '@remix-run/react'
+import { useRef } from 'react'
+import { usd } from '#app/components/report-ui'
 
-export const handle: SEOHandle = {
-	getSitemapEntries: () => null,
+export interface AnnualFee {
+	id: string
+	name: string
+	amountUsd: number
+	chargeMatch: string
+	lastCharge: { date: string; amount: number } | null
 }
 
-export const meta: MetaFunction = () => [
-	{ title: 'Report settings' },
-	{ name: 'robots', content: 'noindex, nofollow' },
-]
-
-export async function loader({ request }: LoaderFunctionArgs) {
-	await requireUserWithRole(request, 'admin')
-	const fees = await prisma.annualFee.findMany({ orderBy: { createdAt: 'asc' } })
-	// The newest business charge that each fee's text finds, so a wrong or
-	// missing text shows on the page.
-	const lastCharges = await Promise.all(
-		fees.map(fee => {
-			const text = fee.chargeMatch?.trim()
-			if (!text) return null
-			return prisma.plaidTransaction.findFirst({
-				where: {
-					owner: 'sarah',
-					amount: { gt: 0 },
-					OR: [{ name: { contains: text } }, { merchant: { contains: text } }],
-				},
-				orderBy: { date: 'desc' },
-				select: { date: true, amount: true },
-			})
-		}),
-	)
-	return json({
-		fees: fees.map((fee, i) => ({
-			id: fee.id,
-			name: fee.name,
-			amountUsd: fee.amountUsd,
-			chargeMatch: fee.chargeMatch ?? '',
-			lastCharge: lastCharges[i] ?? null,
-		})),
-	})
-}
-
-export async function action({ request }: ActionFunctionArgs) {
-	await requireUserWithRole(request, 'admin')
-	const form = await request.formData()
-	const intent = form.get('intent')?.toString()
-	const id = form.get('id')?.toString()
-
-	if (intent === 'delete' && id) {
-		await prisma.annualFee.delete({ where: { id } })
-	} else if (intent === 'add' || (intent === 'save' && id)) {
-		const name = form.get('name')?.toString().trim() ?? ''
-		const amountText = form.get('amountUsd')?.toString().trim() ?? ''
-		const amountUsd = amountText ? Number(amountText) : NaN
-		if (!name || !Number.isFinite(amountUsd) || amountUsd < 0) {
-			return json(
-				{ ok: false, error: 'Type a name and an amount of 0 or more.' },
-				{ status: 400 },
-			)
-		}
-		const data = {
-			name,
-			amountUsd,
-			chargeMatch: form.get('chargeMatch')?.toString().trim() || null,
-		}
-		if (intent === 'add') await prisma.annualFee.create({ data })
-		else await prisma.annualFee.update({ where: { id }, data })
-	} else {
-		return json({ ok: false, error: 'Unknown request.' }, { status: 400 })
-	}
-
-	queueFinanceReportsRun()
-	return json({ ok: true, error: null })
-}
-
-type Fee = ReturnType<typeof useLoaderData<typeof loader>>['fees'][number]
+type FeeFormResult = { ok: boolean; error: string | null }
 
 const CSS = `
+.settings-open, .settings-head button { font: inherit; font-weight: 600; padding: 5px 14px;
+	border-radius: 7px; border: 1px solid var(--axis); background: var(--surface-1);
+	color: var(--ink); cursor: pointer; }
+dialog.settings { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
+	padding: 14px 16px 16px; border: 1px solid var(--ring); border-radius: 12px;
+	background: var(--surface-1); color: var(--ink); }
+dialog.settings::backdrop { background: rgba(0, 0, 0, 0.4); }
+.settings-head { display: flex; align-items: center; justify-content: space-between;
+	margin-bottom: 12px; }
+.settings-head h2 { font-size: 15px; margin: 0; }
+.settings h3 { font-size: 13.5px; margin: 0 0 4px; }
 .fees td { vertical-align: middle; }
 .fees input { font: inherit; width: 100%; padding: 4px 8px; border-radius: 7px;
 	border: 1px solid var(--axis); background: var(--surface-1); color: var(--ink); }
@@ -123,8 +59,8 @@ function chargeDate(day: string) {
 	})
 }
 
-function FeeRow({ fee }: { fee: Fee }) {
-	const fetcher = useFetcher<typeof action>()
+function FeeRow({ fee }: { fee: AnnualFee }) {
+	const fetcher = useFetcher<FeeFormResult>()
 	const formId = `fee-${fee.id}`
 	const busy = fetcher.state !== 'idle'
 	return (
@@ -165,10 +101,10 @@ function FeeRow({ fee }: { fee: Fee }) {
 					<input type="hidden" name="id" value={fee.id} />
 				</fetcher.Form>
 				<div className="actions">
-					<button form={formId} name="intent" value="save" disabled={busy}>
+					<button form={formId} name="intent" value="save-fee" disabled={busy}>
 						Save
 					</button>
-					<button form={formId} name="intent" value="delete" disabled={busy}>
+					<button form={formId} name="intent" value="delete-fee" disabled={busy}>
 						Delete
 					</button>
 					{fetcher.state === 'idle' && fetcher.data?.ok ? (
@@ -182,7 +118,7 @@ function FeeRow({ fee }: { fee: Fee }) {
 }
 
 function AddFeeRow() {
-	const fetcher = useFetcher<typeof action>()
+	const fetcher = useFetcher<FeeFormResult>()
 	return (
 		<tr>
 			<td data-label="New fee">
@@ -213,7 +149,7 @@ function AddFeeRow() {
 			<td>
 				<fetcher.Form id="fee-new" method="post" />
 				<div className="actions">
-					<button form="fee-new" name="intent" value="add" disabled={fetcher.state !== 'idle'}>
+					<button form="fee-new" name="intent" value="add-fee" disabled={fetcher.state !== 'idle'}>
 						Add
 					</button>
 					{fetcher.data?.error ? <span className="error">{fetcher.data.error}</span> : null}
@@ -223,14 +159,23 @@ function AddFeeRow() {
 	)
 }
 
-export default function ReportSettings() {
-	const { fees } = useLoaderData<typeof loader>()
+export function SettingsDialog({ fees }: { fees: AnnualFee[] }) {
+	const dialog = useRef<HTMLDialogElement>(null)
 	const total = fees.reduce((sum, fee) => sum + fee.amountUsd, 0)
 	return (
-		<ReportPage title="Report settings">
+		<>
 			<style dangerouslySetInnerHTML={{ __html: CSS }} />
-			<section>
-				<h2>Annual fees</h2>
+			<button type="button" className="settings-open" onClick={() => dialog.current?.showModal()}>
+				Settings
+			</button>
+			<dialog ref={dialog} className="settings" aria-labelledby="settings-title">
+				<div className="settings-head">
+					<h2 id="settings-title">Settings</h2>
+					<button type="button" onClick={() => dialog.current?.close()}>
+						Close
+					</button>
+				</div>
+				<h3>Annual fees</h3>
 				<p className="lede">
 					Business fees paid once a year: {usd(total, 2)} a year in total. The
 					reports spread it over 12 months, {usd(total / 12, 2)} a month.
@@ -267,7 +212,7 @@ export default function ReportSettings() {
 					After a change, the revenue and household pages update in about a
 					minute.
 				</p>
-			</section>
-		</ReportPage>
+			</dialog>
+		</>
 	)
 }

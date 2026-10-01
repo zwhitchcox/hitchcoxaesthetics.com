@@ -648,6 +648,14 @@ let financeReportsAgain = false
  * returns at once while a run is going, which would drop the later change.
  */
 export function queueFinanceReportsRun() {
+	// A dev server can point REPORTS_DATABASE_URL at the prod reports DB
+	// (launch.json sha-dev), and a run there would rebuild the prod tables
+	// from local data. Same gate as the scheduled jobs.
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		process.env.ENABLE_DEV_BACKGROUND_JOBS !== '1'
+	)
+		return
 	if (financeReportsQueue) {
 		financeReportsAgain = true
 		return

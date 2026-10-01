@@ -71,12 +71,6 @@ const SECTIONS: Array<{ heading: string; entries: HubEntry[] }> = [
 			{ title: 'Reviews & scans', desc: 'Review counts + trends per listing, QR scan funnel by brand', path: '/admin/reports/reviews' },
 		],
 	},
-	{
-		heading: 'Settings',
-		entries: [
-			{ title: 'Report settings', desc: 'Annual fees that the reports spread over 12 months', path: '/admin/reports/settings' },
-		],
-	},
 ]
 
 const esc = (s: string) =>

@@ -45,6 +45,7 @@ const CSS = `
 }
 .report-root * { box-sizing: border-box; }
 .report-root h1 { font-size: 17px; margin: 0 0 2px; }
+.report-root .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .report-root .sub { color: var(--ink-2); font-size: 12.5px; margin: 0 0 14px; }
 .report-root section { background: var(--surface-1); border: 1px solid var(--ring);
 	border-radius: 10px; padding: 14px 16px 16px; margin: 0 0 14px; }
@@ -107,16 +108,26 @@ details.how p { margin: 6px 0 0; }
 export function ReportPage({
 	title,
 	subtitle,
+	actions,
 	children,
 }: {
 	title: string
 	subtitle?: string
+	/** Buttons at the right of the title, e.g. a page's Settings. */
+	actions?: ReactNode
 	children: ReactNode
 }) {
 	return (
 		<div className="report-root">
 			<style dangerouslySetInnerHTML={{ __html: CSS }} />
-			<h1>{title}</h1>
+			{actions ? (
+				<div className="page-head">
+					<h1>{title}</h1>
+					{actions}
+				</div>
+			) : (
+				<h1>{title}</h1>
+			)}
 			{subtitle ? <p className="sub">{subtitle}</p> : null}
 			{children}
 		</div>
