@@ -16,6 +16,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		// A closed office's page redirects to Bearden and stays out.
 		...openLocations.map(location => location.id),
 		'book',
+		'gift-cards',
 		'support',
 		'careers',
 		'privacy',
