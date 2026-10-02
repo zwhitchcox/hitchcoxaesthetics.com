@@ -58,6 +58,11 @@ export const menuLinks: MenuLink[] = [
 		hint: 'schedule your personalized treatment plan',
 	},
 	{
+		to: '/gift-cards',
+		label: 'Gift Cards',
+		hint: 'give a gift card online',
+	},
+	{
 		label: 'Locations',
 		subLinks: [
 			{

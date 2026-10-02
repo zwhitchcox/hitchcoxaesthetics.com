@@ -58,6 +58,7 @@ ${locationLines}
 ## Booking
 
 - [Book Online](${siteUrl}/book): Real-time scheduling at either location
+- [Gift Cards](${siteUrl}/gift-cards): Buy a gift card online
 - [About Sarah](${siteUrl}/about): Credentials and approach
 - [Contact & Support](${siteUrl}/support): Email, phone, and directions
 `

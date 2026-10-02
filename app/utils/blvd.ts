@@ -1,6 +1,8 @@
 export const BLVD_WIDGET_BASE_URL = '/book'
 export const BLVD_DEFAULT_HASH = ''
 export const DEFAULT_BLVD_BOOKING_URL = '/book'
+/** Boulevard's hosted gift card shop (Sarah, 2026-10-01). */
+export const BLVD_GIFT_CARDS_URL = 'https://blvd.me/sarahhitchcox/gift-cards'
 
 const BLVD_BOOKING_URL_PATTERN =
 	/https:\/\/www\.joinblvd\.com\/b\/sarahhitchcox\/widget(?:\?[^"'`\s>]*)?(?:#\/locations)?/g
