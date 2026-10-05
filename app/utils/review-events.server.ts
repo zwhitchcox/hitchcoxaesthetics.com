@@ -21,6 +21,7 @@ export const REVIEW_EVENT_KINDS = [
 	'saved',
 	'picture_uploaded',
 	'keep_approval',
+	'new_text_used',
 	'sent',
 	'live',
 	'digest_sent',

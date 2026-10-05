@@ -290,20 +290,64 @@ async function syncImages(articleId: string, a: SyncArticle): Promise<void> {
 }
 
 /**
+ * Her text, when new text is about to replace it, goes to `previousBody`.
+ * Text that is still the writer's own (body = bodyOriginal) is not hers, so
+ * an older copy of hers stays: a second push never wipes the first copy.
+ */
+function keepHerText(existing: { body: string; bodyOriginal: string }) {
+	return existing.body !== existing.bodyOriginal
+		? { previousBody: existing.body }
+		: {}
+}
+
+/**
+ * The writer's new text in front of her: a `text` push, and "Use the new
+ * text" on /admin/outreach/<id> (applyIncomingText).
+ */
+function newTextFields(
+	existing: { body: string; bodyOriginal: string },
+	text: { body: string; hash: string },
+	now: Date,
+	readSeconds: number,
+): Prisma.ArticleUncheckedUpdateInput {
+	return {
+		body: text.body,
+		bodyOriginal: text.body,
+		bodyHash: text.hash,
+		...keepHerText(existing),
+		reviewNote: `The writer sent new text on ${now.toISOString().slice(0, 10)}.`,
+		receivedAt: now,
+		editedAt: null,
+		editedBy: null,
+		// new text: her read marker points into text she has not seen
+		readToParagraph: null,
+		readReachedEndAt: null,
+		incomingBody: null,
+		incomingBodyHash: null,
+		incomingAt: null,
+		estimatedReadSeconds: readSeconds,
+	}
+}
+
+/**
  * Create or update one article from the writer's side.
  *
  * Results:
  * - `created`: new sourceKey (a body is required).
  * - `meta`: no body, or the same text (her own edit echoed back counts as the
  *   same text). Metadata only. Her edits and her decision are untouched.
- * - `text`: different text for a pending article. Body replaced, review note
- *   set, her edit cleared.
+ * - `text`: different text for a pending article with no edit on the site.
+ *   Body replaced, review note set. Her text, when it is not the writer's,
+ *   goes to `previousBody`.
  * - `revision`: different text with `revision: true` for a changes_requested
  *   article. Body replaced, her note kept in `revisionNote`, status pending.
  * - `kept`: different text for an approved, denied, or changes_requested
  *   article (no flag). Held in `incomingBody`. The decision stands. Also for
- *   a pending article she has edited (auto-save):
- *   her saved edit stays and the mini sends the text again on a later run.
+ *   a pending article with an edit on the site (`editedAt`, no time limit):
+ *   the edit stays and the mini sends the text again on each run. The text
+ *   goes in when Zane uses it on /admin/outreach/<id> (applyIncomingText), or
+ *   with the next push after his Reopen there, which clears `editedAt`. Her
+ *   own Undo on the phone keeps `editedAt`.
  *   Also for `revision: true` on a pending article: she kept this one after
  *   the writer started a new draft, so the new draft waits as incoming text.
  *   The pictures in a `kept` push are not written either.
@@ -349,6 +393,7 @@ export async function upsertSyncedArticle(
 			id: true,
 			bodyHash: true,
 			body: true,
+			bodyOriginal: true,
 			status: true,
 			reviewNote: true,
 			editedAt: true,
@@ -396,10 +441,10 @@ export async function upsertSyncedArticle(
 		incoming !== null &&
 		(incoming.hash === existing.bodyHash ||
 			incoming.hash === hashBody(existing.body))
-	// She has edited this text: hold the writer's text instead of replacing
-	// hers (Zane sees "New text arrived" on the desktop list).
-	const editingNow = existing.editedAt !== null
-	const when = now.toISOString().slice(0, 10)
+	// The text was edited on the site, at any time: hold the writer's text
+	// instead of replacing the edit. Zane sees "New text arrived" on
+	// /admin/outreach/<id> and uses it there; his Reopen clears editedAt.
+	const edited = existing.editedAt !== null
 	let changed: UpsertChange
 	let status = existing.status
 	let data: Prisma.ArticleUncheckedUpdateInput = { ...meta }
@@ -409,25 +454,16 @@ export async function upsertSyncedArticle(
 		if (incoming !== null) {
 			data.estimatedReadSeconds = readSecondsFor(a, incoming.body)
 		}
-	} else if (existing.status === 'pending' && !editingNow && a.revision !== true) {
+	} else if (existing.status === 'pending' && !edited && a.revision !== true) {
 		changed = 'text'
 		data = {
 			...data,
-			body: incoming.body,
-			bodyOriginal: incoming.body,
-			bodyHash: incoming.hash,
-			previousBody: existing.editedAt ? existing.body : null,
-			reviewNote: `The writer sent new text on ${when}.`,
-			receivedAt: now,
-			editedAt: null,
-			editedBy: null,
-			// new text: her read marker points into text she has not seen
-			readToParagraph: null,
-			readReachedEndAt: null,
-			incomingBody: null,
-			incomingBodyHash: null,
-			incomingAt: null,
-			estimatedReadSeconds: readSecondsFor(a, incoming.body),
+			...newTextFields(
+				existing,
+				incoming,
+				now,
+				readSecondsFor(a, incoming.body),
+			),
 		}
 	} else if (existing.status === 'changes_requested' && a.revision === true) {
 		changed = 'revision'
@@ -439,7 +475,7 @@ export async function upsertSyncedArticle(
 			body: incoming.body,
 			bodyOriginal: incoming.body,
 			bodyHash: incoming.hash,
-			previousBody: existing.editedAt ? existing.body : null,
+			...keepHerText(existing),
 			status: 'pending',
 			reviewNote: null,
 			reviewedAt: null,
@@ -458,7 +494,7 @@ export async function upsertSyncedArticle(
 		}
 	} else {
 		// approved, denied, changes_requested without the revision flag,
-		// pending while she is editing it, or a revision for a pending row
+		// pending with an edit on the site, or a revision for a pending row
 		// (she kept this one after asking for a different article)
 		changed = 'kept'
 		data = {
@@ -507,6 +543,54 @@ export async function upsertSyncedArticle(
 		changed,
 		...(aid ? { reviewAidDropped: aid.dropped } : {}),
 	}
+}
+
+export type ApplyIncomingOutcome =
+	/** The held text replaced the text she sees. */
+	| 'applied'
+	/** No text is held. */
+	| 'none'
+	/** Approved, denied or changes_requested. Reopen first. */
+	| 'decided'
+
+/**
+ * "Use the new text" on /admin/outreach/<id>: the writer's text held in
+ * `incomingBody` replaces the text she sees, with the same fields as a
+ * `text` push (her text goes to `previousBody`). A decided article keeps
+ * the exact text of the decision, so it must be reopened first. Writes one
+ * `new_text_used` event. The pictures stay as they are: a held push never
+ * stores its pictures.
+ */
+export async function applyIncomingText(
+	id: string,
+	opts: { userId: string; now?: Date },
+): Promise<ApplyIncomingOutcome> {
+	const now = opts.now ?? new Date()
+	const article = await prisma.article.findUnique({
+		where: { id },
+		select: {
+			status: true,
+			body: true,
+			bodyOriginal: true,
+			wordCount: true,
+			incomingBody: true,
+			incomingBodyHash: true,
+		},
+	})
+	if (article?.incomingBody == null || article.incomingBodyHash == null) {
+		return 'none'
+	}
+	if (article.status !== 'pending') return 'decided'
+	const text = { body: article.incomingBody, hash: article.incomingBodyHash }
+	const readSeconds = estimateReadSeconds(
+		article.wordCount ?? countWords(text.body),
+	)
+	await prisma.article.update({
+		where: { id },
+		data: newTextFields(article, text, now, readSeconds),
+	})
+	await recordReviewEvent(id, 'new_text_used', { userId: opts.userId, at: now })
+	return 'applied'
 }
 
 // ---------------------------------------------------------------------------

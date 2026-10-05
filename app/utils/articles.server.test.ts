@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { action as outreachAction } from '#app/routes/admin+/outreach_.$articleId.tsx'
 import { action, loader } from '#app/routes/resources+/article-sync.ts'
+import { reopenArticle } from '#app/routes/review+/_shared.server.ts'
 import {
 	SyncArticleSchema,
+	applyIncomingText,
 	estimateReadSeconds,
 	hashBody,
 	hashReviewAid,
@@ -12,6 +15,7 @@ import {
 	type SyncArticle,
 } from '#app/utils/articles.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
+import { getSessionCookieHeader } from '#tests/utils.ts'
 
 /**
  * The approval-reset bug fix (spec section 6): a text push never changes a
@@ -408,6 +412,207 @@ describe('upsertSyncedArticle', () => {
 		expect(
 			await prisma.article.count({ where: { sourceKey: 't:unknown' } }),
 		).toBe(0)
+	})
+})
+
+/**
+ * Writer text held after her edit or decision (2026-10-05): she edited and
+ * approved the Knoxville Marathon article, Zane reopened it for a revised
+ * text, and every push came back `kept`.
+ */
+describe('held text', () => {
+	const THIRD_TEXT = NEW_TEXT.replace('jaw pain', 'jaw pain and headaches')
+
+	/** Her edit, then a writer push that waits as new text. Returns the id. */
+	async function heldOverHerEdit(sourceKey: string) {
+		await upsertSyncedArticle(draft(sourceKey))
+		await prisma.article.update({
+			where: { sourceKey },
+			data: {
+				body: HER_EDIT,
+				editedAt: NOW,
+				editedBy: 'Sarah Hitchcox',
+				readToParagraph: 2,
+				readReachedEndAt: NOW,
+			},
+		})
+		const res = await upsertSyncedArticle(
+			draft(sourceKey, { body: NEW_TEXT, wordCount: 460 }),
+			{ now: NOW },
+		)
+		expect(res.changed).toBe('kept')
+		return (await row(sourceKey)).id
+	}
+
+	/** An admin's form post to /admin/outreach/<id>, as the page sends it. */
+	async function adminPost(id: string, fields: Record<string, string>) {
+		const user = await prisma.user.upsert({
+			where: { phone: '+18655550199' },
+			create: {
+				phone: '+18655550199',
+				name: 'Zane Hitchcox',
+				roles: {
+					connectOrCreate: {
+						where: { name: 'admin' },
+						create: { name: 'admin' },
+					},
+				},
+			},
+			update: {},
+			select: { id: true },
+		})
+		const session = await prisma.session.create({
+			data: {
+				userId: user.id,
+				expirationDate: new Date(Date.now() + 60 * 60 * 1000),
+			},
+			select: { id: true },
+		})
+		return outreachAction({
+			request: new Request(`http://localhost/admin/outreach/${id}`, {
+				method: 'POST',
+				headers: { cookie: await getSessionCookieHeader(session) },
+				body: new URLSearchParams(fields),
+			}),
+			params: { articleId: id },
+			context: {},
+		})
+	}
+
+	test('applyIncomingText: the held text goes in like a text push, hers to previousBody', async () => {
+		const id = await heldOverHerEdit('t:use')
+		const later = new Date('2026-10-05T19:10:00.000Z')
+		expect(
+			await applyIncomingText(id, { userId: 'user_zane', now: later }),
+		).toBe('applied')
+		const a = await row('t:use')
+		expect(a).toMatchObject({
+			status: 'pending',
+			body: NEW_TEXT,
+			bodyOriginal: NEW_TEXT,
+			bodyHash: hashBody(NEW_TEXT),
+			previousBody: HER_EDIT,
+			reviewNote: 'The writer sent new text on 2026-10-05.',
+			receivedAt: later,
+			editedAt: null,
+			editedBy: null,
+			readToParagraph: null,
+			readReachedEndAt: null,
+			incomingBody: null,
+			incomingBodyHash: null,
+			incomingAt: null,
+			estimatedReadSeconds: 120,
+		})
+		expect(a.events).toMatchObject([{ kind: 'new_text_used', at: later }])
+		const ev = await prisma.articleReviewEvent.findFirstOrThrow({
+			where: { articleId: id },
+			select: { userId: true },
+		})
+		expect(ev.userId).toBe('user_zane')
+
+		// the mini sends the same text again: the site has it now
+		const again = await upsertSyncedArticle(draft('t:use', { body: NEW_TEXT }))
+		expect(again.changed).toBe('meta')
+		expect((await row('t:use')).incomingBody).toBeNull()
+	})
+
+	test('a later writer text keeps her copy in previousBody', async () => {
+		// 2026-10-05 21:29Z: the next push replaced the writer's text and set previousBody to null
+		const id = await heldOverHerEdit('t:second')
+		await applyIncomingText(id, { userId: 'user_zane' })
+		const res = await upsertSyncedArticle(
+			draft('t:second', { body: THIRD_TEXT }),
+		)
+		expect(res.changed).toBe('text')
+		const a = await row('t:second')
+		expect(a.body).toBe(THIRD_TEXT)
+		expect(a.previousBody).toBe(HER_EDIT)
+	})
+
+	test('applyIncomingText: nothing written for a decided article or with nothing held', async () => {
+		const id = await heldOverHerEdit('t:use-decided')
+		await decide('t:use-decided', 'approved', { body: HER_EDIT })
+		const before = await row('t:use-decided')
+		expect(await applyIncomingText(id, { userId: 'user_zane' })).toBe('decided')
+		expect(await row('t:use-decided')).toEqual(before)
+
+		await upsertSyncedArticle(draft('t:use-none'))
+		const none = await row('t:use-none')
+		expect(await applyIncomingText(none.id, { userId: 'user_zane' })).toBe(
+			'none',
+		)
+		expect(await row('t:use-none')).toEqual(none)
+	})
+
+	test('her Undo on the phone keeps her edit: the next push waits', async () => {
+		await upsertSyncedArticle(draft('t:undo'))
+		await decide('t:undo', 'approved', { body: HER_EDIT })
+		const { id, editedAt } = await row('t:undo')
+		await reopenArticle(id, { userId: 'user_sarah', kind: 'reopened' })
+		const res = await upsertSyncedArticle(draft('t:undo', { body: NEW_TEXT }))
+		expect(res).toMatchObject({ changed: 'kept', status: 'pending' })
+		const a = await row('t:undo')
+		expect(a.body).toBe(HER_EDIT)
+		expect(a.editedAt).toEqual(editedAt)
+		expect(a.incomingBody).toBe(NEW_TEXT)
+	})
+
+	test('Reopen on /admin/outreach: the next push replaces her text, hers goes to previousBody', async () => {
+		await upsertSyncedArticle(draft('t:reopen'))
+		await decide('t:reopen', 'approved', { body: HER_EDIT })
+		const { id } = await row('t:reopen')
+		const res = await adminPost(id, { intent: 'reopen' })
+		expect(res.status).toBe(200)
+		let a = await row('t:reopen')
+		expect(a).toMatchObject({
+			status: 'pending',
+			body: HER_EDIT,
+			editedAt: null,
+			editedBy: null,
+			approvedBodyHash: null,
+		})
+		expect(a.events.map(e => e.kind)).toEqual(['reopened'])
+
+		const push = await upsertSyncedArticle(
+			draft('t:reopen', { body: NEW_TEXT }),
+		)
+		expect(push).toMatchObject({ changed: 'text', status: 'pending' })
+		a = await row('t:reopen')
+		expect(a.body).toBe(NEW_TEXT)
+		expect(a.previousBody).toBe(HER_EDIT)
+		expect(a.incomingBody).toBeNull()
+	})
+
+	test('Use the new text on /admin/outreach: in on a pending article, refused on a decided one', async () => {
+		const id = await heldOverHerEdit('t:use-route')
+		let res = await adminPost(id, { intent: 'use-new-text' })
+		expect(res.status).toBe(200)
+		const a = await row('t:use-route')
+		expect(a.body).toBe(NEW_TEXT)
+		expect(a.previousBody).toBe(HER_EDIT)
+		expect(a.events.map(e => e.kind)).toEqual(['new_text_used'])
+
+		const decidedId = await heldOverHerEdit('t:use-route-decided')
+		await decide('t:use-route-decided', 'approved', { body: HER_EDIT })
+		res = await adminPost(decidedId, { intent: 'use-new-text' })
+		expect(res.status).toBe(400)
+		expect(await res.json()).toEqual({
+			error: 'Reopen the article before you use the new text.',
+		})
+		expect((await row('t:use-route-decided')).body).toBe(HER_EDIT)
+	})
+
+	test('a revision over her edited text keeps hers in previousBody', async () => {
+		await upsertSyncedArticle(draft('t:rev-hers'))
+		await decide('t:rev-hers', 'changes_requested', {
+			body: HER_EDIT,
+			reviewNote: 'Shorter.',
+		})
+		const res = await upsertSyncedArticle(
+			draft('t:rev-hers', { body: NEW_TEXT, revision: true }),
+		)
+		expect(res.changed).toBe('revision')
+		expect((await row('t:rev-hers')).previousBody).toBe(HER_EDIT)
 	})
 })
 

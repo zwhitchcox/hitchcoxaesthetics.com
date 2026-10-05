@@ -396,7 +396,9 @@ export async function approveArticle(
 /**
  * Undo (reopened), "Take it down" (takedown) and "Keep this one" after a
  * rewrite request: back to pending, the decision record cleared. A note
- * from a denial or a rewrite request goes with it.
+ * from a denial or a rewrite request goes with it. Her edit mark (editedAt)
+ * stays, so a writer push waits as new text and does not replace her text.
+ * The Reopen on /admin/outreach/<id> clears it.
  */
 export async function reopenArticle(
 	id: string,

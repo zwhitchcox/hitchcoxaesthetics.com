@@ -21,7 +21,11 @@ import { bylineText, whereLabel } from '#app/routes/review+/_shared.server.ts'
 import { loadChatHistory } from '#app/utils/article-chat.server.ts'
 import { type ChatMessageJson } from '#app/utils/article-chat.ts'
 import { countPictureLines, picturesNote } from '#app/utils/article-images.ts'
-import { hashBody, reviewerName } from '#app/utils/articles.server.ts'
+import {
+	applyIncomingText,
+	hashBody,
+	reviewerName,
+} from '#app/utils/articles.server.ts'
 import {
 	articleGroup,
 	countWords,
@@ -258,12 +262,30 @@ export async function action({ params, request }: ActionFunctionArgs) {
 					rewriteRequested: false,
 					// a rewrite request's note is not a note for this text
 					...(article.rewriteRequested ? { reviewNote: null } : {}),
+					// The writer's next text replaces hers instead of waiting as
+					// new text; hers goes to previousBody then (upsertSyncedArticle).
+					// Her own Undo on the phone (reopenArticle) keeps the edit mark.
+					editedAt: null,
+					editedBy: null,
 				},
 			})
 			await recordReviewEvent(id, 'reopened', { userId })
 			return json({
 				ok: 'Reopened. Decide again when you are ready.',
 			})
+		}
+		case 'use-new-text': {
+			const outcome = await applyIncomingText(id, { userId, now })
+			if (outcome === 'decided') {
+				return json(
+					{ error: 'Reopen the article before you use the new text.' },
+					{ status: 400 },
+				)
+			}
+			if (outcome === 'none') {
+				return json({ error: 'No new text is waiting.' }, { status: 400 })
+			}
+			return json({ ok: 'The new text is in. She reviews it again.' })
 		}
 		case 'answer': {
 			const answer = String(form.get('answer') ?? '').trim()
@@ -423,12 +445,15 @@ export default function ArticleReview() {
 							New text arrived
 						</span>
 						The writer sent new text
-						{article.incomingAt ? ` on ${formatDate(article.incomingAt)}` : ''},
-						after this was {statusLabel(article.status).toLowerCase()}.
+						{article.incomingAt ? ` on ${formatDate(article.incomingAt)}` : ''}
+						{decided
+							? `, after this was ${statusLabel(article.status).toLowerCase()}.`
+							: '.'}
 					</p>
 					<p className="mt-1">
-						The decision stands and the text below is what goes out. The new
-						text is held here. Nothing changes until it is reviewed again.
+						{decided
+							? 'The decision stands and the text below is what goes out. The new text is held here. To use it, reopen the article first.'
+							: 'It waits here, and the text below stays. Use the new text to replace the text below. Then she reviews the new text.'}
 					</p>
 					<details className="mt-2">
 						<summary className="cursor-pointer text-xs font-medium">
@@ -438,6 +463,14 @@ export default function ArticleReview() {
 							{article.incomingBody}
 						</pre>
 					</details>
+					{decided ? null : (
+						<Form method="post" className="mt-2">
+							<input type="hidden" name="intent" value="use-new-text" />
+							<Button type="submit" variant="outline" size="sm" disabled={busy}>
+								Use the new text
+							</Button>
+						</Form>
+					)}
 				</div>
 			) : null}
 
