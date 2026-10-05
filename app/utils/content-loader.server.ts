@@ -32,6 +32,8 @@ type Frontmatter = {
 	faq?: { question: string; answer: string }[]
 	sections?: ServicePageSection[]
 	heroImages?: { before: string; after: string; caption?: string }[]
+	/** A single picture for pages with no before/after photos (a product shot). Used as the card picture. */
+	image?: string
 }
 
 type LocationFrontmatter = {
@@ -298,7 +300,7 @@ export function loadAllServicePages(): Record<string, SitePage> {
 
 		// Hero images from frontmatter (public paths)
 		const heroImages = fm.heroImages
-		const heroImage = heroImages?.[0]?.after
+		const heroImage = heroImages?.[0]?.after ?? fm.image
 
 		pages[urlPath] = {
 			path: urlPath,

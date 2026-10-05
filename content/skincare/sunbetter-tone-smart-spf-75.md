@@ -16,6 +16,7 @@ whyChoose: >-
   It is also gentle enough for sensitive skin and for skin that is healing after
   a treatment.
 ctaText: Book a Free Skin Consultation
+image: /img/skincare/sunbetter-tone-smart-spf-75.webp
 faq:
   - question: Is it a mineral sunscreen?
     answer: >-
@@ -97,6 +98,8 @@ sections:
           consultation and we will make sure it is the right fit for your skin.
 ---
 
+![sunbetter TONE SMART SPF 75 Sunscreen Lotion pump bottle beside a swatch of the tinted lotion](/img/skincare/sunbetter-tone-smart-spf-75.webp)
+
 ## A tinted mineral sunscreen for every day
 
 sunbetter TONE SMART SPF 75 is a creamy lotion that protects with mineral
@@ -112,6 +115,8 @@ towel drying, and at least every 2 hours. If you run or train outdoors, put it
 on before you get dressed, and carry the
 [sunbetter SHEER SPF 56 Mineral Sunscreen Stick](/skincare/sunbetter-sheer-spf-56-stick)
 for touch-ups.
+
+![The sunbetter TONE SMART SPF 75 box, front and back with the Drug Facts label](/img/skincare/sunbetter-tone-smart-spf-75-packaging.webp)
 
 ## Find the right fit for your skin
 

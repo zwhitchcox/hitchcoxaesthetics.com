@@ -14,6 +14,7 @@ whyChoose: >-
   pocket, goes on clear, and does not leave your hands slippery at a water
   stop, which makes reapplying in ten seconds realistic.
 ctaText: Book a Free Skin Consultation
+image: /img/skincare/sunbetter-sheer-spf-56-stick.webp
 faq:
   - question: Is it a mineral sunscreen?
     answer: >-
@@ -82,6 +83,8 @@ sections:
           consultation and we will make sure it is the right fit for your skin.
 ---
 
+![sunbetter SHEER SPF 56 Mineral Sunscreen Stick beside a swatch of the sheer formula](/img/skincare/sunbetter-sheer-spf-56-stick.webp)
+
 ## A sunscreen stick for touch-ups
 
 sunbetter SHEER SPF 56 is a solid mineral sunscreen in a stick. It goes on
@@ -97,6 +100,8 @@ drying, and at least every 2 hours. For your first coat of the day, we
 recommend a lotion such as
 [sunbetter TONE SMART SPF 75](/skincare/sunbetter-tone-smart-spf-75), then
 the stick for touch-ups.
+
+![The sunbetter SHEER SPF 56 stick, front and back with the Drug Facts label](/img/skincare/sunbetter-sheer-spf-56-stick-packaging.webp)
 
 ## Find the right fit for your skin
 

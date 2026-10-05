@@ -16,6 +16,7 @@ whyChoose: >-
   team look at your skin, talk through your routine and recommend the
   medical-grade products that fit it.
 ctaText: Book a Free Skin Consultation
+image: /img/skincare/sunbetter-tone-smart-spf-75.webp
 faq:
   - question: Is the skin consultation free?
     answer: >-
