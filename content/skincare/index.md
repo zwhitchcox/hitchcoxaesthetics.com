@@ -104,7 +104,11 @@ Every regimen we build starts with sunscreen. Years of sun show up as brown
 spots, uneven texture and fine lines that arrive earlier than they had to, and
 daily sunscreen is the simplest way to prevent them. We recommend a broad
 spectrum mineral sunscreen with zinc oxide, SPF 30 or higher, and water
-resistance for 80 minutes if you sweat or spend long stretches outside.
+resistance for 80 minutes if you sweat or spend long stretches outside. Sarah
+wears [sunbetter TONE SMART SPF 75](/skincare/sunbetter-tone-smart-spf-75)
+and carries the
+[sunbetter SHEER SPF 56 stick](/skincare/sunbetter-sheer-spf-56-stick) on long
+runs.
 
 If you run or train outdoors, put sunscreen on 15 minutes before you leave and
 carry a mineral stick for your ears, nose, cheekbones, the back of your neck

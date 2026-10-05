@@ -333,7 +333,25 @@ export default function DynamicPage() {
 			<MarkdownContent content={markdown} />
 
 			{/* Ancestor Links (keyword-rich, in content body) */}
-			{(ancestors ?? []).length > 0 && (
+			{(ancestors ?? []).length > 0 && page.path.startsWith('skincare/') ? (
+				// A product page: skincare is recommended at a consultation, not a treatment.
+				<div className="mt-8 rounded-lg border border-border bg-card p-6">
+					<h3 className="mb-4 text-lg font-semibold text-foreground">
+						More Skincare We Recommend
+					</h3>
+					<p className="text-muted-foreground">
+						{page.name} is one of the{' '}
+						<Link
+							to="/skincare"
+							className="font-medium text-primary hover:underline"
+						>
+							skincare products we recommend in Knoxville
+						</Link>{' '}
+						at Sarah Hitchcox Aesthetics. Book a free skin consultation and we
+						will match a regimen to your skin.
+					</p>
+				</div>
+			) : (ancestors ?? []).length > 0 ? (
 				<div className="mt-8 rounded-lg border border-border bg-card p-6">
 					<h3 className="mb-4 text-lg font-semibold text-foreground">
 						Explore More {page.name} Treatments
@@ -358,7 +376,7 @@ export default function DynamicPage() {
 							: 'at Sarah Hitchcox Aesthetics in Knoxville, TN. Browse our full range of services to find the right treatment for your goals.'}
 					</p>
 				</div>
-			)}
+			) : null}
 
 			{/* Dynamic Sections */}
 			{page.sections?.map((section, index) => renderSection(section, index))}
