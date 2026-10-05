@@ -74,6 +74,8 @@ function getTreatmentLabel(pageName: string) {
 			return 'Laser treatment'
 		case 'Weight Loss':
 			return 'Medical weight loss'
+		case 'Skincare':
+			return 'Skincare product'
 		default:
 			return `${pageName} treatment`
 	}
