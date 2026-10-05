@@ -397,9 +397,11 @@ export default function DynamicPage() {
 			{childCards.length > 0 && (
 				<div className="mt-12">
 					<ServiceHeader>
-						{isStatewide
-							? `${page.name} Program Options in Tennessee`
-							: `${page.name} Treatments in Knoxville`}
+						{page.path === 'skincare'
+							? 'Skincare Products We Recommend'
+							: isStatewide
+								? `${page.name} Program Options in Tennessee`
+								: `${page.name} Treatments in Knoxville`}
 					</ServiceHeader>
 					<div className="mt-6">
 						<ServiceCardGrid services={childCards} variant="thumbnail" />
