@@ -5,7 +5,11 @@
  * from this config. Client-safe: no server imports, scope patterns are plain
  * strings so they survive the loader JSON boundary.
  */
-export type BrandId = 'sha' | 'weight-loss-knox' | 'botox-knox'
+export type BrandId =
+	| 'sha'
+	| 'weight-loss-knox'
+	| 'botox-knox'
+	| 'knoxville-laser-clinic'
 
 export type BrandConfig = {
 	id: BrandId
@@ -65,6 +69,21 @@ export const BRANDS: Record<BrandId, BrandConfig> = {
 			'Book your tox or filler appointment online. Real-time availability at our Bearden and Farragut Knoxville locations.',
 		serviceScopePattern:
 			'\\b(tox|botox|dysport|jeuveau|xeomin|lip flip|filler|skinvive|hylenex)\\b',
+	},
+	'knoxville-laser-clinic': {
+		id: 'knoxville-laser-clinic',
+		businessName: 'Knoxville Laser Clinic',
+		shortName: 'Knoxville Laser',
+		domain: 'knoxvillelaserclinic.com',
+		homeUrl: 'https://knoxvillelaserclinic.com',
+		bookTitle: 'Book Online | Knoxville Laser Clinic',
+		bookDescription:
+			'Book laser hair removal, sun spot, spider vein, or skin revitalization treatments online. Real-time availability at our Bearden and Farragut Knoxville locations.',
+		// The Boulevard "Laser Treatments" category, plus the free consult for
+		// Everesse and anyone unsure. "skin tightening" alone also matches a
+		// VI Peel description, so Everesse is matched by name.
+		serviceScopePattern:
+			'\\b(laser treatments?|everesse|consultation skincare)\\b',
 	},
 }
 
