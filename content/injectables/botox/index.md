@@ -246,6 +246,11 @@ treated areas are [forehead lines](/botox/forehead-lines),
 ["11s" between the brows](/botox/frown-lines) — often the first step toward a
 smoother, more youthful complexion with no downtime.
 
+How much product an area needs depends on your own muscle strength, not on a
+number you read online. Our explainer on
+[how many units of Botox are used for forehead lines](/blog/botox-forehead-units)
+walks through what the FDA-approved label actually specifies.
+
 ## Botox vs. Dysport
 
 While Botox is the most recognized name in wrinkle relaxers, we also offer

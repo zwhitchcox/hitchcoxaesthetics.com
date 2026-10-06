@@ -733,6 +733,9 @@ function Footer() {
 				</div>
 				<div className="flex flex-col space-y-4 text-lg">
 					<h2 className="text-2xl font-semibold">Policies & Legal</h2>
+					{/* /blog and the guides linked only to each other, so sitemap.xml was
+					    the only way in and the section went uncrawled. */}
+					<Link to="/blog">Skincare Guides</Link>
 					<Link to="/support">Contact & Support</Link>
 					<Link to="/gift-cards">Gift Cards</Link>
 					<Link to="/careers">Careers</Link>

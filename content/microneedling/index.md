@@ -116,3 +116,8 @@ polishing or [Botox treatments in Knoxville](/botox) for volume and wrinkle
 reduction. Additionally, if you are focusing on whole-body wellness, our
 [GLP-1 weight loss programs in Knoxville](/weight-loss) can complement your
 renewed confidence.
+
+Collagen takes time to rebuild, which is why results build over a series rather
+than overnight. Our guide to
+[what actually rebuilds collagen](/blog/what-rebuilds-collagen) covers what the
+biopsy studies measured, and what they cannot promise.

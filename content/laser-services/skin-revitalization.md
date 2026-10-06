@@ -73,3 +73,8 @@ skin laxity is a concern, [Everesse skin tightening](/everesse) works
 synergistically to firm contours while we revitalize the surface. Discover all
 our [Knoxville laser services](/laser-services) to build your ultimate skin care
 plan.
+
+The reason a series works better than a single visit comes down to how fast your
+skin replaces its own cells. Our explainer on
+[how long skin cell turnover takes](/blog/skin-cell-turnover) lays out that
+timeline and how it changes with age.

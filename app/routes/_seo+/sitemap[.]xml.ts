@@ -31,11 +31,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	// Skincare guides that Sarah approved in /admin/outreach
 	const guides = await prisma.article.findMany({
 		where: { kind: 'blog', status: 'approved', slug: { not: null } },
-		select: { slug: true },
+		select: { slug: true, publishedAt: true, updatedAt: true },
 	})
 	const guidePaths = guides.length
 		? ['blog', ...guides.map(g => `blog/${g.slug}`)]
 		: []
+
+	// lastmod only where a real date exists: a guide's own publish date, and the
+	// newest one for /blog, since approving a guide is what changes that page.
+	// Static and service pages get none; omitting it is valid, inventing it is a
+	// false freshness signal.
+	const day = (d: Date) => d.toISOString().slice(0, 10)
+	const lastmod = new Map<string, string>()
+	for (const guide of guides) {
+		lastmod.set(`blog/${guide.slug}`, day(guide.publishedAt ?? guide.updatedAt))
+	}
+	const newest = guides
+		.map(g => g.publishedAt ?? g.updatedAt)
+		.sort((a, b) => b.getTime() - a.getTime())[0]
+	if (newest) lastmod.set('blog', day(newest))
 
 	const allPaths = [
 		...new Set([...staticPaths, ...servicePagePaths, ...guidePaths]),
@@ -46,7 +60,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			// trailing slash on the root so the sitemap URL matches internal links
 			const loc = p ? `${siteUrl}/${p}` : `${siteUrl}/`
 			const priority = p === '' ? '1.0' : !p.includes('/') ? '0.9' : '0.7'
-			return `  <url>\n    <loc>${loc}</loc>\n    <priority>${priority}</priority>\n  </url>`
+			const modified = lastmod.get(p)
+			return (
+				`  <url>\n    <loc>${loc}</loc>\n` +
+				(modified ? `    <lastmod>${modified}</lastmod>\n` : '') +
+				`    <priority>${priority}</priority>\n  </url>`
+			)
 		})
 		.join('\n')
 
