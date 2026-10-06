@@ -37,7 +37,7 @@ const PageSchema = z.object({
 				.refine(d => OUR_DOMAINS.some(o => o === d), 'one of our sites'),
 		)
 		.min(1)
-		.max(3),
+		.max(4),
 	/** The day the ledger first verified the link live. */
 	liveSince: z
 		.string()

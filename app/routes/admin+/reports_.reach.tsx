@@ -1,5 +1,5 @@
 /**
- * Rankings: where our three sites show up on Google for the searches we
+ * Rankings: where our sites show up on Google for the searches we
  * track, week by week. Two views, chosen with ?view=:
  *
  *   map (default)  the map pack: the share of metro homes that see one of
@@ -8,7 +8,7 @@
  *                  holds the pack for each search (?kw=).
  *   organic        the blue links under the map: our rank for each tracked
  *                  search, its history, and who beats us most often
- *                  (?site=sha|bk|kwlc filters to one site).
+ *                  (?site=sha|bk|kwlc|klc filters to one site).
  *
  * Backlinks (authority, linking sites, new and lost links, crawl status,
  * competitors' authority) live on /admin/reports/links.

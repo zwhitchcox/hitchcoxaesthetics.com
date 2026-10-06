@@ -1,6 +1,6 @@
 /**
- * Backlinks: the websites that link to our three sites. Tabs (?view=) and a
- * site filter (?site=sha|bk|kwlc):
+ * Backlinks: the websites that link to our sites. Tabs (?view=) and a
+ * site filter (?site=sha|bk|kwlc|klc):
  *
  *   summary (default)  Sarah's reviews per day (the articles behind the
  *                      links are hers to approve, so her pace is the pace of
@@ -19,7 +19,7 @@
  *   - The DataForSEO link crawler, every 3 days (sha-reports src/backlinks.ts,
  *     reports Postgres): authority, linking sites, first and last seen. The
  *     crawler also tracks other domains (the network sites); this page reads
- *     only our three.
+ *     only ours.
  *   - The outreach ledger's live pages. ~/outreach/ledger-links-sync.py on the
  *     mini pushes them every morning to /resources/ledger-links-sync
  *     (ledger_link_pages, reports Postgres).
@@ -221,7 +221,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return json({ brands, reviews, crawler: await loadCrawler() })
 }
 
-/** The DataForSEO crawler's view of our three sites, or null without the reports database. */
+/** The DataForSEO crawler's view of our sites, or null without the reports database. */
 async function loadCrawler() {
 	if (!hasReportsDb()) return null
 	const [summary, recent, gains, losses, newest, lost, pages, rivals, placed] =
@@ -444,7 +444,7 @@ export default function LinksReport() {
 	return (
 		<ReportPage
 			title="Backlinks"
-			subtitle="The websites that link to our three sites: how many, which are new or gone, and which ones Google has seen."
+			subtitle="The websites that link to our sites: how many, which are new or gone, and which ones Google has seen."
 		>
 			<div className="choices">
 				<Choice
