@@ -392,11 +392,19 @@ export function getMissingBlvdBookingPriceServiceNames(serviceNames: string[]) {
 	].sort((a, b) => a.localeCompare(b))
 }
 
+// Spoken laser prices beyond hair removal, for the Knoxville Laser Clinic agent.
+// Sarah confirmed the sun spot package ($650 for 3) on 2026-10-06.
+const LASER_TREATMENT_PRICING_SPOKEN =
+	'Sun spot and age spot treatment is $250 per treatment or $650 for a package of 3. Spider vein and facial redness treatment on the face is $300 per treatment or $800 for a package of 3. Skin revitalization is $400 per treatment or $1,000 for a package of 3. Everesse skin tightening starts with a free consultation; the face is $2,200 per treatment.'
+
 export function getRetellPricingSummary({
 	serviceFocus = 'all',
 }: {
-	serviceFocus?: 'all' | 'botox' | 'weight-loss'
+	serviceFocus?: 'all' | 'botox' | 'weight-loss' | 'laser'
 } = {}) {
+	if (serviceFocus === 'laser') {
+		return `${PUBLIC_SERVICE_PRICING.laserHairRemoval.spoken} ${LASER_TREATMENT_PRICING_SPOKEN}`
+	}
 	const core =
 		serviceFocus === 'botox'
 			? [PUBLIC_SERVICE_PRICING.botox, PUBLIC_SERVICE_PRICING.lipFlip]

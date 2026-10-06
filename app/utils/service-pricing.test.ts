@@ -18,3 +18,12 @@ test('uses public small-area laser pricing for Boulevard booking display', () =>
 		display: 'Free Consultation · $599/6 sessions',
 	})
 })
+
+test('laser agents quote only laser prices, with the $650 sun spot package', () => {
+	const pricingSummary = getRetellPricingSummary({ serviceFocus: 'laser' })
+
+	expect(pricingSummary).toContain('$599')
+	expect(pricingSummary).toContain('$650 for a package of 3')
+	expect(pricingSummary).not.toContain('semaglutide')
+	expect(pricingSummary).not.toContain('Botox')
+})

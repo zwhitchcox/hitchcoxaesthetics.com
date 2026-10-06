@@ -3,7 +3,11 @@ import {
 	DEFAULT_RETELL_BOOKING_BRAND,
 } from './retell-booking-agent-config.ts'
 
-export type RetellBookingBrandKey = 'botox-knox' | 'sarah' | 'weight-loss-knox'
+export type RetellBookingBrandKey =
+	| 'botox-knox'
+	| 'knoxville-laser-clinic'
+	| 'sarah'
+	| 'weight-loss-knox'
 
 export type RetellBookingAgentBrand = RetellBookingBrandConfig & {
 	agentId?: string
@@ -54,6 +58,19 @@ export const RETELL_BOOKING_AGENT_BRANDS: Record<
 		phoneNumber: '+18653904907',
 		phoneNumberEnv: 'RETELL_WEIGHT_LOSS_KNOX_PHONE_NUMBER',
 		serviceFocus: 'weight-loss',
+	},
+	// Added 2026-10-06. The first deploy creates the agent and LLM; pin their
+	// ids here afterwards like the brands above. (865) 606-8139 was a spare
+	// number on the test agent; Zane chose to reuse it for this brand.
+	'knoxville-laser-clinic': {
+		agentDisplayName: 'Adrian',
+		agentIdEnv: 'RETELL_KNOXVILLE_LASER_CLINIC_AGENT_ID',
+		agentName: 'Knoxville Laser Clinic',
+		businessName: 'Knoxville Laser Clinic',
+		llmIdEnv: 'RETELL_KNOXVILLE_LASER_CLINIC_LLM_ID',
+		phoneNumber: '+18656068139',
+		phoneNumberEnv: 'RETELL_KNOXVILLE_LASER_CLINIC_PHONE_NUMBER',
+		serviceFocus: 'laser',
 	},
 }
 

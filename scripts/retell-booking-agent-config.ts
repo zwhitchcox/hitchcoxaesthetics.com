@@ -16,7 +16,7 @@ type ToolHeaders = Record<string, string> | undefined
 
 export type RetellBookingBrandConfig = {
 	businessName: string
-	serviceFocus?: 'all' | 'botox' | 'weight-loss'
+	serviceFocus?: 'all' | 'botox' | 'weight-loss' | 'laser'
 }
 
 export const DEFAULT_RETELL_BOOKING_BRAND: RetellBookingBrandConfig = {
@@ -411,7 +411,9 @@ function buildBrandInstruction(brand: RetellBookingBrandConfig) {
 			? 'This brand focuses on Botox and other neurotoxin appointment requests. If callers ask for Botox, Tox, Dysport, Jeuveau, or Xeomin, treat it as a Botox appointment.'
 			: brand.serviceFocus === 'weight-loss'
 				? 'This brand focuses on medical weight loss appointments, including semaglutide, tirzepatide, Lipo B12 injections, and weight loss consultations.'
-				: 'This brand can help with aesthetics, injectable, laser, skincare, and weight loss appointment requests.'
+				: brand.serviceFocus === 'laser'
+					? 'This brand focuses on laser appointments: laser hair removal (small, medium, or large area packages), sun spot and age spot treatment (pigmented lesion reduction), spider vein and facial redness treatment (vascular lesion reduction), laser skin revitalization, and Everesse skin tightening. If callers ask for hair removal or laser hair removal, ask which area so you can pick the small, medium, or large area service. Everesse is not booked as its own service: book the free skincare consultation for Everesse questions.'
+					: 'This brand can help with aesthetics, injectable, laser, skincare, and weight loss appointment requests.'
 
 	return `Brand identity: You answer for ${brand.businessName}. ${identityBoundary} ${focus}`
 }
