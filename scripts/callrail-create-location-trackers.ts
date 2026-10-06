@@ -24,7 +24,7 @@ import {
 } from '#app/utils/callrail-booking.server.ts'
 
 // --- Config via CLI flags / env (see scripts/new-location-spoke.md) ---
-//   --location="West Hills"  --area=865  --pool=4
+//   --location="West Hills"  --area=865  --pool=4  --brand="Knoxville Laser Clinic"
 //   --destination=+1865XXXXXXX   (or CALLRAIL_DESTINATION env)
 //   --swap=+1865XXXXXXX,...      (or CALLRAIL_SWAP_TARGETS; defaults to destination)
 function flag(name: string) {
@@ -33,7 +33,9 @@ function flag(name: string) {
 }
 
 const COMPANY_ID = 'COM019c5d1e95027f46b36899d32ec44eec' // Sarah Hitchcox Aesthetics
-const BRAND = 'Sarah Hitchcox Aesthetics'
+// Tracker names start with the brand: "Botox Knox - Bearden - Pool". The
+// sister brands share the one CallRail company.
+const BRAND = flag('brand') ?? 'Sarah Hitchcox Aesthetics'
 const LOCATION = flag('location') ?? '' // required, e.g. --location="West Hills"
 const AREA_CODE = flag('area') ?? '865'
 const POOL_SIZE = Number(flag('pool') ?? '4')

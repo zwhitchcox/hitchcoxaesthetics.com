@@ -50,6 +50,11 @@ const PRODUCTION_AGENTS = [
 		defaultId: 'agent_ba54c0b712bf2771c8d4209c7b',
 		name: 'Weight Loss Knox',
 	},
+	{
+		envVar: 'RETELL_KNOXVILLE_LASER_CLINIC_AGENT_ID',
+		defaultId: 'agent_c1cca9cc6388b2b19c227a9757',
+		name: 'Knoxville Laser Clinic',
+	},
 ] as const
 
 type DbLike = typeof prisma

@@ -59,14 +59,15 @@ export const RETELL_BOOKING_AGENT_BRANDS: Record<
 		phoneNumberEnv: 'RETELL_WEIGHT_LOSS_KNOX_PHONE_NUMBER',
 		serviceFocus: 'weight-loss',
 	},
-	// Added 2026-10-06. The first deploy creates the agent and LLM; pin their
-	// ids here afterwards like the brands above. (865) 606-8139 was a spare
-	// number on the test agent; Zane chose to reuse it for this brand.
+	// Added 2026-10-06. (865) 606-8139 was a spare number on the test agent;
+	// Zane chose to reuse it for this brand.
 	'knoxville-laser-clinic': {
 		agentDisplayName: 'Adrian',
+		agentId: 'agent_c1cca9cc6388b2b19c227a9757',
 		agentIdEnv: 'RETELL_KNOXVILLE_LASER_CLINIC_AGENT_ID',
 		agentName: 'Knoxville Laser Clinic',
 		businessName: 'Knoxville Laser Clinic',
+		llmId: 'llm_31135535003de9c23395ae446536',
 		llmIdEnv: 'RETELL_KNOXVILLE_LASER_CLINIC_LLM_ID',
 		phoneNumber: '+18656068139',
 		phoneNumberEnv: 'RETELL_KNOXVILLE_LASER_CLINIC_PHONE_NUMBER',
