@@ -272,7 +272,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			items: [
 				{
 					name: 'Face or Hands (smaller areas)',
-					price: '$250/treatment or $600 for package of 3',
+					price: '$250/treatment or $650 for package of 3',
 				},
 				{
 					name: 'Chest or Back (larger areas)',
@@ -384,7 +384,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 			items: [
 				{
 					name: 'Face or Hands (smaller areas)',
-					price: '$250/treatment or $600 for package of 3',
+					price: '$250/treatment or $650 for package of 3',
 				},
 				{
 					name: 'Chest or Back (larger areas)',
