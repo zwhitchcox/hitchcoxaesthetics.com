@@ -13,7 +13,7 @@ import { cn } from '#app/utils/misc.tsx'
 import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
 	takeUniqueSamplesPerDestination,
-	getBotoxKnoxReviewLocations,
+	getLaserClinicReviewLocations,
 	getServiceProfile,
 	matchLocationToAppointment,
 	readAppointmentSnapshot,
@@ -42,10 +42,10 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 	const via = readVia(request)
 	const staffUrn = toStaffUrn(providerId)
 	const snapshot = await readAppointmentSnapshot()
-	// Zane, 2026-09-30: the page offers only the Botox Knox listings, whatever
-	// the client came in for. No redirect to the microsite any more; the
-	// sample text still names the real service.
-	const locations = getBotoxKnoxReviewLocations()
+	// Zane, 2026-10-06: the page offers only the Knoxville Laser Clinic
+	// listings, whatever the client came in for (Botox Knox from 2026-09-30).
+	// No redirect to the microsite; the sample text still names the real service.
+	const locations = getLaserClinicReviewLocations()
 	const appt = resolveCurrentAppointment(snapshot, staffUrn)
 
 	// Provider name from any recent appointment, even outside the live window.
@@ -75,6 +75,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			serviceName: appt ? serviceName : 'visit',
 			providerFirstName,
 			keywords: profile.keywords,
+			businessName: locations[0]?.business,
 		},
 	)
 	const genericFallback = `${providerFirstName} and the team took wonderful care of me, sharing a couple of details about your visit helps others in Knoxville find us.`
@@ -123,7 +124,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			// place never reuses the first one's words.
 			sample: samplesByPlace.get(`Google - ${l.label}`) ?? genericFallback,
 			// Google only: the Yelp and Nextdoor pages we have claimed belong to
-			// the SHA listings, and this page shows Botox Knox alone.
+			// the SHA listings, and this page shows Knoxville Laser Clinic alone.
 			platforms: [{ id: 'google', label: 'Google' }],
 		})),
 		matchedPlaceId,

@@ -351,6 +351,38 @@ export function getBotoxKnoxReviewLocations(): ReviewLocation[] {
 	}))
 }
 
+/**
+ * The Knoxville Laser Clinic listings, which the review page offers to every
+ * client since 2026-10-10 (Zane, 2026-10-06: "send all reviews to those
+ * locations now, for everything, doesn't matter if it's laser related").
+ * Place ids read from the Business Profile API on 2026-10-10.
+ */
+const LASER_CLINIC_LISTINGS: Array<
+	Omit<ReviewLocation, 'writeReviewUrl'>
+> = [
+	{
+		placeId: 'ChIJP5h9UqE9XIgR7KDu1kjD6o8',
+		label: 'Bearden',
+		address: '5113 Kingston Pike, Suite 15D, Knoxville, TN 37919',
+		business: 'Knoxville Laser Clinic',
+		blvdMatch: /knox|bearden/i,
+	},
+	{
+		placeId: 'ChIJ-7v71HwvXIgR2jOi4VJfx9I',
+		label: 'Farragut',
+		address: '102 S Campbell Station Rd, Suite 8D, Knoxville, TN 37934',
+		business: 'Knoxville Laser Clinic',
+		blvdMatch: /farragut/i,
+	},
+]
+
+export function getLaserClinicReviewLocations(): ReviewLocation[] {
+	return LASER_CLINIC_LISTINGS.map(l => ({
+		...l,
+		writeReviewUrl: writeReviewUrl(l.placeId),
+	}))
+}
+
 export function matchLocationToAppointment(
 	locations: ReviewLocation[],
 	appointmentLocationName: string | null | undefined,
@@ -379,7 +411,12 @@ export type GenerateReviewInput = {
 	/** Where this sample is headed, e.g. "Google - Bearden". Two destinations
 	 * must never get the same text, so the angle/tone are picked per call. */
 	destinationLabel?: string
+	/** The business whose listing gets the review. A review posted on the
+	 * Knoxville Laser Clinic listing must not praise another business. */
+	businessName?: string
 }
+
+const SHA_NAME = 'Sarah Hitchcox Aesthetics'
 
 /**
  * Superlative phrasings, used on roughly half of samples so the review corpus
@@ -412,6 +449,7 @@ export async function generateSampleReview({
 	providerFirstName,
 	keywords,
 	destinationLabel,
+	businessName = SHA_NAME,
 }: GenerateReviewInput): Promise<string | null> {
 	const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim()
 	if (!apiKey) return null
@@ -419,7 +457,7 @@ export async function generateSampleReview({
 	const angle = SAMPLE_ANGLES[Math.floor(Math.random() * SAMPLE_ANGLES.length)]!
 	const tone = SAMPLE_TONES[Math.floor(Math.random() * SAMPLE_TONES.length)]!
 	const prompt = `You are writing a sample 5-star review that a happy med-spa client can use as a starting point and edit before posting.
-Business: Sarah Hitchcox Aesthetics, a med spa in Knoxville, TN.
+Business: ${businessName === SHA_NAME ? `${SHA_NAME}, a med spa` : businessName} in Knoxville, TN.
 Provider the client just saw: ${providerFirstName}.
 Service the client received: ${serviceName}.${destinationLabel ? `\nThis particular sample is for: ${destinationLabel}. It must read differently from samples written for any other destination.` : ''}
 Angle to build it around: ${angle}.
@@ -446,9 +484,14 @@ Write it in FIRST PERSON as the client, warm and specific, 2-4 sentences, soundi
 }
 
 /** Deterministic fallback when the model is unavailable. */
-export function fallbackReview(serviceName: string, providerFirstName: string, keywords: string[]) {
+export function fallbackReview(
+	serviceName: string,
+	providerFirstName: string,
+	keywords: string[],
+	businessName = SHA_NAME,
+) {
 	const kw = keywords[0] ?? 'Knoxville med spa'
-	return `${providerFirstName} at Sarah Hitchcox Aesthetics took such great care of me for my ${serviceName.toLowerCase()}. Natural results and a wonderful experience. Highly recommend if you're looking for ${kw}.`
+	return `${providerFirstName} at ${businessName} took such great care of me for my ${serviceName.toLowerCase()}. Natural results and a wonderful experience. Highly recommend if you're looking for ${kw}.`
 }
 
 // ---------------------------------------------------------------------------
@@ -538,7 +581,7 @@ export async function takeUniqueSamplesPerDestination(
 	for (const destination of destinations) {
 		if (byDestination.has(destination)) continue
 		const [unique] = await takeUniqueSamples([
-			`${fallbackReview(input.serviceName, input.providerFirstName, input.keywords)} (${destination})`,
+			`${fallbackReview(input.serviceName, input.providerFirstName, input.keywords, input.businessName)} (${destination})`,
 		])
 		if (unique) byDestination.set(destination, unique)
 	}

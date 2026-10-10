@@ -3,6 +3,7 @@ import { captureServerPostHogEvent } from '#app/utils/posthog.server.ts'
 import {
 	findReviewPlatformUrl,
 	getBotoxKnoxReviewLocations,
+	getLaserClinicReviewLocations,
 	getReviewLocations,
 	matchLocationToAppointment,
 	readAppointmentSnapshot,
@@ -27,9 +28,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const viaParam = url.searchParams.get('via')?.toLowerCase()
 	const via = viaParam === 'nfc' || viaParam === 'link' ? viaParam : 'qr'
 
-	// The Botox Knox listings first: they are what the review page offers
-	// (Zane, 2026-09-30) and they are not in GoogleLocation.
+	// The Knoxville Laser Clinic listings first: they are what the review page
+	// offers (Zane, 2026-10-06). Botox Knox stays allowed so a page opened
+	// before the switch still works. Neither is in GoogleLocation.
 	const locations = [
+		...getLaserClinicReviewLocations(),
 		...getBotoxKnoxReviewLocations(),
 		...(await getReviewLocations()),
 	]
