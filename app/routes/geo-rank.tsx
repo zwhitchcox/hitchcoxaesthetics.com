@@ -29,10 +29,12 @@ const BRANDS = [
 	'Sarah Hitchcox Aesthetics',
 	'Botox Knox',
 	'Weight Loss Knox',
+	'Knoxville Laser Clinic',
 ] as const
 const BRAND_CASE = `CASE WHEN m.listing LIKE 'SHA%' THEN 'Sarah Hitchcox Aesthetics'
 	WHEN m.listing LIKE 'Botox Knox%' THEN 'Botox Knox'
-	WHEN m.listing LIKE 'KWLC%' THEN 'Weight Loss Knox' END`
+	WHEN m.listing LIKE 'KWLC%' THEN 'Weight Loss Knox'
+	WHEN m.listing LIKE 'KLC%' THEN 'Knoxville Laser Clinic' END`
 
 /**
  * Manual "Refresh reach", starts a forced geoRankCapture on the sha-reports
@@ -142,7 +144,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				? 'hit_sha'
 				: brand === 'Botox Knox'
 					? 'hit_bk'
-					: 'hit_wlk'
+					: brand === 'Knoxville Laser Clinic'
+						? 'hit_klc'
+						: 'hit_wlk'
 
 		// Viewing a competitor: the map shows THEIR best rank per grid point
 		// instead of ours. Chosen by clicking a row in the leaderboard.

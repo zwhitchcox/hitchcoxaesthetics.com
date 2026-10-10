@@ -19,6 +19,9 @@ const LOCATIONS: Array<{ id: string; label: string }> = [
 	// Re-created & verified 2026-07-13 with its own placeId; the old
 	// resource 11750979648218741829 is dead and always returns zero reviews.
 	{ id: 'locations/5772695199180090933', label: 'KWLC (Farragut)' },
+	// Knoxville Laser Clinic, verified 2026-10-10 (Suite 15D / 8D).
+	{ id: 'locations/11737030755730050907', label: 'KLC (Bearden)' },
+	{ id: 'locations/11515525288162488122', label: 'KLC (Farragut)' },
 ]
 const STARS: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 }
 

@@ -48,7 +48,9 @@ const brandOf = (listing: string) =>
 		? 'SHA'
 		: listing.startsWith('Botox Knox')
 			? 'Botox Knox'
-			: 'Weight Loss Knox'
+			: listing.startsWith('KLC')
+				? 'Knoxville Laser Clinic'
+				: 'Weight Loss Knox'
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')

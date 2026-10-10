@@ -22,8 +22,8 @@ export const OUR_SITES = [
 		site: 'weightlossknoxvilletn.com',
 		rankTarget: 'Weight Loss Knox',
 	},
-	// Added 2026-10-06. No Search Console property or rank target yet, so its
-	// rows stay empty until those exist.
+	// Added 2026-10-06. The rank tracker has three Knoxville Laser Clinic
+	// searches since 2026-10-10 (sha-reports src/serp.ts).
 	{
 		key: 'klc',
 		label: 'Knoxville Laser Clinic',
