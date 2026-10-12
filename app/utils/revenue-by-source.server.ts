@@ -977,7 +977,13 @@ export type FunnelRow = {
 	 * null = no client history to judge by */
 	newClient: boolean | null
 	boulevardAppointmentId: string | null
-	/** Collected revenue for the booked appointment; null until it happens. */
+	/** urn:blvd:Client:... */
+	clientId: string | null
+	/** The booked appointment was later cancelled or no-showed. */
+	cancelled: boolean
+	/** Collected revenue; null until the appointment happens. A new client's
+	 * booking counts their first 6 months from their first completed visit,
+	 * any other booking counts what that appointment collected. */
 	actualUsd: number | null
 }
 
@@ -1194,6 +1200,8 @@ export async function loadBookingFunnel(request: Request) {
 			blvdUrl: blvdClientUrl(t.blvdClient?.boulevardClientId),
 			posthogUrl: posthogSessionUrl(t),
 			boulevardAppointmentId: t.appointments[0]?.boulevardAppointmentId ?? null,
+			clientId: normalizeBlvdEntityId('Client', t.blvdClient?.boulevardClientId),
+			cancelled: false,
 			actualUsd: null as number | null,
 			// Boulevard history first; what the client told the booking form
 			// about themselves only fills in when the appointment isn't linked
@@ -1226,6 +1234,8 @@ export async function loadBookingFunnel(request: Request) {
 			posthogUrl: null,
 			newClient: isNew,
 			boulevardAppointmentId: a.id,
+			clientId: a.clientId,
+			cancelled: false,
 			actualUsd: null as number | null,
 		}
 		}),
@@ -1259,6 +1269,99 @@ export async function loadBookingFunnel(request: Request) {
 						: r.apptAt && r.apptAt < nowIso
 							? 0
 							: null
+			}
+		}
+	}
+
+	// A tracked booking stays here after a cancel or no-show (its touch is
+	// recorded at booking time), so flag it for the page's filter. Staff
+	// bookings never arrive cancelled: rowToMeta drops those.
+	{
+		const ids = [
+			...new Set(
+				rows
+					.map(r => normalizeBlvdEntityId('Appointment', r.boulevardAppointmentId))
+					.filter((v): v is string => Boolean(v)),
+			),
+		]
+		if (ids.length) {
+			const cancelled = await prisma.blvdAppointment.findMany({
+				where: {
+					id: { in: ids },
+					OR: [{ cancelled: true }, { state: 'NO_SHOW' }],
+				},
+				select: { id: true },
+			})
+			const cancelledIds = new Set(cancelled.map(a => a.id))
+			for (const r of rows) {
+				const id = normalizeBlvdEntityId('Appointment', r.boulevardAppointmentId)
+				if (id && cancelledIds.has(id)) r.cancelled = true
+			}
+		}
+	}
+
+	// A new client's booking counts what the client spent in their first 6
+	// months, from their first completed visit on or after the booking: the
+	// same horizon as its expected value (Zane 2026-10-12). Only the client's
+	// oldest new-client booking that was not cancelled carries it, so nothing
+	// counts twice and it never sits on a booking the page hides.
+	{
+		const DAY_MS = 24 * 3600 * 1000
+		const firstNewRow = new Map<string, FunnelRow>()
+		for (const r of [...rows].reverse()) {
+			if (r.newClient === true && !r.cancelled && r.clientId && !firstNewRow.has(r.clientId)) {
+				firstNewRow.set(r.clientId, r)
+			}
+		}
+		if (firstNewRow.size) {
+			const earliest =
+				Math.min(...[...firstNewRow.values()].map(r => Date.parse(r.bookedAt))) - DAY_MS
+			const visits = await prisma.blvdAppointment.findMany({
+				where: {
+					clientId: { in: [...firstNewRow.keys()] },
+					state: 'FINAL',
+					cancelled: false,
+					startAt: { gte: new Date(earliest) },
+				},
+				select: { clientId: true, startAt: true },
+				orderBy: { startAt: 'asc' },
+			})
+			const firstVisit = new Map<string, Date>()
+			for (const v of visits) {
+				const row = v.clientId ? firstNewRow.get(v.clientId) : undefined
+				if (!row || firstVisit.has(v.clientId!)) continue
+				if (v.startAt.getTime() >= Date.parse(row.bookedAt) - DAY_MS) {
+					firstVisit.set(v.clientId!, v.startAt)
+				}
+			}
+			if (firstVisit.size) {
+				const minStart = Math.min(...[...firstVisit.values()].map(d => d.getTime()))
+				const items = await prisma.blvdRevenueItem.findMany({
+					where: {
+						boulevardClientId: { in: [...firstVisit.keys()] },
+						occurredAt: { gte: new Date(minStart - DAY_MS) },
+					},
+					select: { boulevardClientId: true, occurredAt: true, grossAmountUsd: true },
+				})
+				const spent = new Map<string, number>()
+				for (const item of items) {
+					const start = item.boulevardClientId
+						? firstVisit.get(item.boulevardClientId)
+						: undefined
+					if (!start) continue
+					const end = new Date(start)
+					end.setUTCMonth(end.getUTCMonth() + 6)
+					const at = item.occurredAt.getTime()
+					if (at >= start.getTime() - DAY_MS && at < end.getTime()) {
+						spent.set(
+							item.boulevardClientId!,
+							(spent.get(item.boulevardClientId!) ?? 0) + item.grossAmountUsd,
+						)
+					}
+				}
+				for (const clientId of firstVisit.keys()) {
+					firstNewRow.get(clientId)!.actualUsd = Math.round(spent.get(clientId) ?? 0)
+				}
 			}
 		}
 	}

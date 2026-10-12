@@ -31,15 +31,19 @@ export default function BookingsFunnel() {
 	const { rows: allRows, windowKey, granularity, from, to, adsSpendUsd } =
 		useLoaderData<typeof loader>()
 	const [who, setWho] = useState<WhoFilter>('all')
-	const newCount = allRows.filter(r => r.newClient === true).length
-	const newValue = allRows
+	// On by default (Zane 2026-10-12): a booking that never happened is not a booking.
+	const [hideCancelled, setHideCancelled] = useState(true)
+	const cancelledCount = allRows.filter(r => r.cancelled).length
+	const keptRows = hideCancelled ? allRows.filter(r => !r.cancelled) : allRows
+	const newCount = keptRows.filter(r => r.newClient === true).length
+	const newValue = keptRows
 		.filter(r => r.newClient === true)
 		.reduce((s, r) => s + r.expectedUsd, 0)
-	const unknownCount = allRows.filter(r => r.newClient === null).length
+	const unknownCount = keptRows.filter(r => r.newClient === null).length
 	const rows =
 		who === 'all'
-			? allRows
-			: allRows.filter(r => r.newClient === (who === 'new'))
+			? keptRows
+			: keptRows.filter(r => r.newClient === (who === 'new'))
 
 	const bySource = new Map<string, Agg & { n: number; act: number }>()
 	const byBucketSource = new Map<string, { n: number; usd: number }>()
@@ -91,9 +95,20 @@ export default function BookingsFunnel() {
 				</select>
 				{who !== 'all' && unknownCount > 0 ? (
 					<span style={{ color: 'var(--muted)' }}>
-						{unknownCount} of {allRows.length} bookings have unknown client type and
+						{unknownCount} of {keptRows.length} bookings have unknown client type and
 						are hidden by this filter
 					</span>
+				) : null}
+				<input
+					id="hide-cancelled"
+					type="checkbox"
+					aria-label="Hide canceled and no-show bookings"
+					checked={hideCancelled}
+					onChange={e => setHideCancelled(e.currentTarget.checked)}
+				/>
+				<label htmlFor="hide-cancelled">Hide canceled and no-show bookings</label>
+				{hideCancelled && cancelledCount > 0 ? (
+					<span style={{ color: 'var(--muted)' }}>{cancelledCount} hidden</span>
 				) : null}
 			</div>
 
@@ -108,7 +123,7 @@ export default function BookingsFunnel() {
 				<StatTile
 					label="New clients"
 					value={String(newCount)}
-					whisper={`${usd(newValue)} expected value · first-ever bookings, of ${allRows.length} in window`}
+					whisper={`${usd(newValue)} expected value · first-ever bookings, of ${keptRows.length} in window`}
 				/>
 				<StatTile
 					label="Google Ads spend"
@@ -130,7 +145,12 @@ export default function BookingsFunnel() {
 								<th>Source</th>
 								<th className="num">Bookings</th>
 								<th className="num">Expected value</th>
-								<th className="num">Actual so far</th>
+								<th
+									className="num"
+									title="New client: what they spent in their first 6 months, from their first completed visit. Returning client: what that visit collected."
+								>
+									Actual so far
+								</th>
 								<th className="num">Share</th>
 							</tr>
 						</thead>
@@ -149,6 +169,11 @@ export default function BookingsFunnel() {
 						</tbody>
 					</table>
 				</div>
+				<p style={{ color: 'var(--muted)', marginTop: 8 }}>
+					Actual so far: for a new client, what they spent in their first 6 months,
+					from their first completed visit. For a returning client, what that visit
+					collected.
+				</p>
 			</section>
 
 			<section>
