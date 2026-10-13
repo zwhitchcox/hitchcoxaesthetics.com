@@ -11,6 +11,7 @@ import { Icon } from '#app/components/ui/icon.tsx'
 import {
 	BreadcrumbJsonLd,
 	FAQJsonLd,
+	ServiceFAQ,
 	ServiceJsonLd,
 } from '#app/routes/_services+/__service-layout.tsx'
 import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
@@ -697,23 +698,6 @@ export default function MasseterBotoxPage() {
 								</figure>
 							))}
 						</div>
-						<p className="mx-auto mt-10 max-w-3xl text-center text-xs leading-5 text-muted-foreground">
-							Photos: Sun et al.,{' '}
-							<a
-								href="https://doi.org/10.1093/asj/sjaf204"
-								className="underline hover:text-foreground"
-							>
-								Aesthetic Surgery Journal, 2026
-							</a>
-							, used under{' '}
-							<a
-								href="https://creativecommons.org/licenses/by/4.0/"
-								className="underline hover:text-foreground"
-							>
-								CC BY 4.0
-							</a>
-							. Backgrounds removed.
-						</p>
 					</div>
 				</section>
 			) : null}
@@ -878,21 +862,7 @@ export default function MasseterBotoxPage() {
 								<PhoneLink className="hover:underline" />
 							</p>
 						</div>
-						<div className="divide-y divide-border border-y border-border">
-							{faq.map(item => (
-								<details key={item.question} className="group py-6">
-									<summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-lg font-semibold text-foreground [&::-webkit-details-marker]:hidden">
-										{item.question}
-										<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border transition group-open:rotate-45">
-											<Icon name="plus" className="h-4 w-4" />
-										</span>
-									</summary>
-									<p className="mt-4 pr-14 leading-7 text-muted-foreground">
-										{item.answer}
-									</p>
-								</details>
-							))}
-						</div>
+						<ServiceFAQ faq={faq} />
 					</div>
 				</section>
 			) : null}

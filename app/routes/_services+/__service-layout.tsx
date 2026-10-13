@@ -147,19 +147,18 @@ export function ServiceFAQ({
 	faq: { question: string; answer: string }[]
 }) {
 	return (
-		<div className="w-full divide-y divide-border rounded-xl border border-border bg-card">
+		<div className="w-full divide-y divide-border border-y border-border">
 			{faq.map(item => (
-				<details
-					key={item.question}
-					className="group p-6 [&_summary::-webkit-details-marker]:hidden"
-				>
-					<summary className="flex cursor-pointer list-none items-center justify-between font-medium text-foreground">
-						<span className="text-lg font-semibold">{item.question}</span>
-						<span className="transition group-open:rotate-90">
-							<Icon name="chevron-right" className="h-5 w-5" />
+				<details key={item.question} className="group py-6">
+					<summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-lg font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+						{item.question}
+						<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border transition group-open:rotate-45">
+							<Icon name="plus" className="h-4 w-4" />
 						</span>
 					</summary>
-					<p className="mt-4 leading-relaxed text-muted-foreground">{item.answer}</p>
+					<p className="mt-4 pr-14 leading-7 text-muted-foreground">
+						{item.answer}
+					</p>
 				</details>
 			))}
 		</div>

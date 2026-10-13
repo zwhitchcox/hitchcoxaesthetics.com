@@ -3,7 +3,9 @@ import { cn } from '#app/utils/misc.tsx'
 
 /**
  * Drag to compare two aligned photos of the same size: the before shows left
- * of the handle, the after right of it. Touch drags sideways move the handle
+ * of the handle, the after right of it. Each photo is cut at the handle, so a
+ * cutout with a see-through background never shows the other photo behind
+ * it. Touch drags sideways move the handle
  * and vertical swipes still scroll the page; the hidden range input gives
  * keyboard and screen reader users the same control. `hint` nudges the
  * handle once after load, so people see that it moves.
@@ -87,6 +89,10 @@ export function BeforeAfterSlider({
 				draggable={false}
 				loading={eager ? 'eager' : 'lazy'}
 				className="absolute inset-0 h-full w-full object-cover"
+				style={{
+					clipPath: `inset(0 ${100 - position}% 0 0)`,
+					transition: transition && `clip-path ${transition}`,
+				}}
 			/>
 			<img
 				src={after}
