@@ -24,6 +24,9 @@ export type BlvdPriceRange = {
 	variable: boolean
 }
 
+/** The new-client Botox offer shown next to the unit price. */
+export const FIRST_VISIT_OFFER = '20% off your first visit'
+
 export const PUBLIC_SERVICE_PRICING: Record<
 	PublicPricingKey,
 	PublicPricingEntry
