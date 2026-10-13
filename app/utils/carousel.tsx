@@ -107,9 +107,9 @@ const ImageCarousel = ({
 				)
 			})}
 
-			{/* Caption, subtle white text, bottom left */}
+			{/* Caption, subtle white text, bottom left, above the controls so they never cover it */}
 			{currentCaption && (
-				<div className="absolute bottom-4 left-4 z-20">
+				<div className="absolute bottom-16 left-4 right-4 z-20">
 					<span className="rounded-full bg-black/50 px-3 py-1 text-xs font-medium tracking-wide text-white/90 drop-shadow-md backdrop-blur-sm">
 						{currentCaption}
 					</span>

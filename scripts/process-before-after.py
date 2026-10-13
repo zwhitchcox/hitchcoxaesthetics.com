@@ -6,11 +6,15 @@ Implements the pipeline documented in docs/before-after-images.md: trim
 letterbox padding, cut out the background, validate that the cutout did not
 eat the subject, crop to the subject, save WebP with alpha.
 
-    python3 scripts/process-before-after.py <src-dir> <prefix> [--start 1]
+    python3 scripts/process-before-after.py <src-dir> <prefix> [--start 1] [--model NAME]
 
 <src-dir> holds the raw pairs named so they sort in before,after,before,after
 order (01.jpg, 02.jpg, ...). Output lands in public/img/before-after/ as
 <prefix>-NNN-before.webp / <prefix>-NNN-after.webp.
+
+--model picks one rembg model instead of the default two. Use
+birefnet-portrait for faces on a black backdrop: the default models cut away
+black headbands and shirts, or leave grey ghosts of them.
 
 Requires: pillow, rembg. Both already installed locally.
 
@@ -89,6 +93,8 @@ def main():
         sys.exit(1)
     src, prefix = sys.argv[1], sys.argv[2]
     start = int(sys.argv[sys.argv.index('--start') + 1]) if '--start' in sys.argv else 1
+    models = ([sys.argv[sys.argv.index('--model') + 1]] if '--model' in sys.argv
+              else ['isnet-general-use', 'u2net_human_seg'])
 
     from rembg import remove, new_session
     sessions = {}
@@ -116,7 +122,7 @@ def main():
         for role, f in pair:
             im = trim(Image.open(f))
             chosen = None
-            for model in ('isnet-general-use', 'u2net_human_seg'):
+            for model in models:
                 try:
                     out = remove(im, session=sess(model))
                 except Exception:

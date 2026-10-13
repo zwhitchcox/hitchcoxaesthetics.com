@@ -57,6 +57,10 @@ already installed locally:
    standard deviation is under ~6 and whose mean is above ~225 (i.e. uniform
    and near-white). Cartessa's set had 50px side bars and 23px bottom strips.
 2. **Remove the background** with `rembg`, `isnet-general-use` first.
+   For faces on a black backdrop, pass `--model birefnet-portrait`. The
+   default models cut away black headbands and shirts, or leave grey ghosts
+   of them, and still pass the step 3 checks. BiRefNet keeps them. It takes
+   about 30 seconds an image.
 3. **Validate the cutout — this step is not optional.** Segmentation fails
    badly and silently on tight skin crops, because a close-up of a neck has no
    "salient object" to find; the model dissolves the subject into a translucent
@@ -160,6 +164,13 @@ should replace the manufacturer sets outright rather than sit beside them.
 If a middle ground is ever wanted, a non-naming line such as "Manufacturer
 clinical photo" discloses the source without crediting a competitor.
 
+Photos from an open-access paper are a different case. A CC BY license lets
+us use them on a business site, but only with a credit. The masseter page
+does it this way: each caption says "Allergan trial patient", and
+one line under the page copy credits the paper, links the license and says
+that the backgrounds were removed. Do not use CC BY-NC or CC BY-ND figures.
+NC forbids business use, and ND forbids the background removal.
+
 ## Current Everesse set
 
 | Prefix | Pairs | Source |
@@ -173,6 +184,7 @@ clinical photo" discloses the source without crediting a competitor.
 | `jeuveau` | 3 | Evolus, Day 0 vs Day 30 |
 | `filler-nasolabial-folds` | 2 | Restylane Lyft |
 | `filler-under-eye-filler` | 3 | Restylane Eyelight |
+| `botox-masseter` | 3 | Allergan phase 3 trial, 72 U, day 90. Figure 3 of Sun et al., Aesthet Surg J 2026, doi:10.1093/asj/sjaf204, CC BY 4.0. Full size from the PMC zoom viewer (PMC13064654). Pair E/F rejected: the study's own cutout left a misshapen head top. |
 
 The two neck images are deliberately **not** background-removed — they are
 tight skin crops where segmentation destroyed the subject, so the guard in

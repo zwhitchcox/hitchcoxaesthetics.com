@@ -89,6 +89,7 @@ const SLUG_TO_PREFIX: Record<string, string | PrefixMapping> = {
 	'botox/gummy-smile': 'botox-gummy-smile',
 	'botox/chin-dimpling': 'botox-chin-dimpling',
 	'botox/brow-lift': 'botox-brow-lift',
+	'botox/masseter': 'botox-masseter',
 
 	// Filler sub-services
 	'filler/lip-filler': 'filler-lip-filler',

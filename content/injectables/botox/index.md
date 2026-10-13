@@ -244,7 +244,9 @@ wrinkles and stops them from etching further into the skin. The most commonly
 treated areas are [forehead lines](/botox/forehead-lines),
 [crow's feet around the eyes](/botox/crows-feet), and the
 ["11s" between the brows](/botox/frown-lines) — often the first step toward a
-smoother, more youthful complexion with no downtime.
+smoother, more youthful complexion with no downtime. In the jaw,
+[masseter Botox](/botox/masseter) slims a square jawline and eases teeth
+clenching and grinding.
 
 How much product an area needs depends on your own muscle strength, not on a
 number you read online. Our explainer on
