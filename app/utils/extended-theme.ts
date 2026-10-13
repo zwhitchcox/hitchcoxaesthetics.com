@@ -12,6 +12,8 @@ export const extendedTheme = {
 			invalid: 'hsl(var(--foreground-destructive))',
 		},
 		background: 'hsl(var(--background))',
+		cream: 'hsl(var(--cream))',
+		gold: 'hsl(var(--gold))',
 		foreground: {
 			DEFAULT: 'hsl(var(--foreground))',
 			destructive: 'hsl(var(--foreground-destructive))',
@@ -47,6 +49,10 @@ export const extendedTheme = {
 	},
 	borderColor: {
 		DEFAULT: 'hsl(var(--border))',
+	},
+	fontFamily: {
+		/** Loaded by the pages that use it (a route `links` export). */
+		display: ['"DM Serif Display"', 'Georgia', 'serif'],
 	},
 	borderRadius: {
 		lg: 'var(--radius)',

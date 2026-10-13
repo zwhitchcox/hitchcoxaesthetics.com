@@ -79,3 +79,21 @@ export async function getReviewHighlights(count = 3): Promise<{
 		summary: cache.summary,
 	}
 }
+
+/** Five-star reviews whose text matches `pattern`, newest first. */
+export async function getReviewsMatching(
+	pattern: RegExp,
+	count: number,
+): Promise<FeaturedReview[]> {
+	const rows = await prisma.googleReview.findMany({
+		where: { starRating: 'FIVE', comment: { not: null } },
+		orderBy: { createTime: 'desc' },
+		select: { comment: true, id: true, reviewerName: true },
+	})
+	return rows
+		.filter(
+			(row): row is FeaturedReview =>
+				typeof row.comment === 'string' && pattern.test(row.comment),
+		)
+		.slice(0, count)
+}

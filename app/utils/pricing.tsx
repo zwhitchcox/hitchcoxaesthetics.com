@@ -10,13 +10,16 @@
 
 import React from 'react'
 
-import { PUBLIC_SERVICE_PRICING } from '#app/utils/service-pricing.ts'
+import {
+	FIRST_VISIT_OFFER,
+	PUBLIC_SERVICE_PRICING,
+} from '#app/utils/service-pricing.ts'
 
 const FirstVisitSpecialPrice = () => (
 	<div className="flex flex-col items-end justify-end gap-1 sm:flex-row sm:items-center">
 		<span>{PUBLIC_SERVICE_PRICING.botox.display}</span>
 		<span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-			20% off your first visit
+			{FIRST_VISIT_OFFER}
 		</span>
 	</div>
 )

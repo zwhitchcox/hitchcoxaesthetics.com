@@ -135,13 +135,22 @@ def main():
         both_cut = all(c is not None for _, c in cut.values())
         how = 'cutout' if both_cut else 'kept-original (pair)'
 
+        picked = {role: out if both_cut else im.convert('RGBA')
+                  for role, (im, out) in cut.items()}
+        boxes = {}
+        for role, im in picked.items():
+            ys, xs = np.where(np.asarray(im)[:, :, 3] > 12)
+            boxes[role] = ((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
+                           if len(ys) else (0, 0, *im.size))
+        # Same-size halves share one box, the union of both subjects, so the
+        # pair stays aligned for a before/after slider.
+        if picked['before'].size == picked['after'].size:
+            b, a = boxes['before'], boxes['after']
+            union = (min(b[0], a[0]), min(b[1], a[1]), max(b[2], a[2]), max(b[3], a[3]))
+            boxes = {'before': union, 'after': union}
+
         for role, f in pair:
-            im, out = cut[role]
-            chosen = out if both_cut else im.convert('RGBA')
-            a = np.asarray(chosen)
-            ys, xs = np.where(a[:, :, 3] > 12)
-            if len(ys):
-                chosen = chosen.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+            chosen = picked[role].crop(boxes[role])
             dest = os.path.abspath(os.path.join(DEST, f"{prefix}-{num}-{role}.webp"))
             chosen.save(dest, 'WEBP', quality=88, method=4)
             report.append({'src': os.path.basename(f), 'out': os.path.basename(dest),

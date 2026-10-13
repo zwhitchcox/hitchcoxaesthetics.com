@@ -93,7 +93,9 @@ already installed locally:
    the "DAY 0"/"DAY 30" labels behind. Cropping to the bright-pixel bounding
    box first (threshold luminance >150, which ignores the dim grey label) made
    the cutout succeed and the label vanish with the background.
-6. **Crop to the subject's alpha bounding box** so framing is tight.
+6. **Crop to the subject's alpha bounding box** so framing is tight. Both
+   halves of a same-size pair share one box, the union of their subjects, so
+   the pair stays aligned for a before/after slider.
 7. **Save WebP**, quality 88.
 
 A useful post-check when a pair looks off: measure the fraction of visible
