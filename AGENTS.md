@@ -4,9 +4,9 @@ when committing/pushing, make sure to check the linter/tsc
 
 ## Dev Server Rule
 
-- Never start, restart, stop, or detach the dev server unless the user
-  explicitly asks for it first. If work requires the dev server to be started or
-  restarted, ask the user to do it or ask for permission before taking action.
+- Run your own dev server on port 4100 or higher, and stop it when you are
+  done. Zane's dev server runs on 4000/4001: never start, stop or bind those
+  ports.
 
 ## UI Colors
 
@@ -62,8 +62,7 @@ Strict hierarchy rules to prevent circular logic and maintain silo structure:
 - Use descriptive, keyword-rich anchor text.
 - **Bad:** "Click here", "Learn more"
 - **Good:** "Learn more about [Knoxville Botox treatments](/botox)", "Explore
-  our [dermal filler options in Knoxville](/filler)" o npm install
-  @typescript/native-preview
+  our [dermal filler options in Knoxville](/filler)"
 
 ## Email Access (Gmail API, no browser needed)
 
@@ -78,10 +77,11 @@ inboxes. Use these instead of driving Gmail through a browser:
   `zwhitchcox@gmail.com`.
 - `--refresh-token` on either prints the refresh token. Secrets live in
   the macOS Keychain; nothing to source or copy into .env.
-- The separate `GOOGLE_REFRESH_TOKEN` in this repo's `.env` is
-  `zwhitchcox@gmail.com` with GBP/Ads/Search Console scopes only, no
-  Gmail. It is also `siteOwner` on all three Search Console properties,
-  so Search Analytics API calls need no new consent.
+- The separate `GOOGLE_REFRESH_TOKEN` in this repo's `.env` and the Fly
+  secrets is the gitmo app's token for `zwhitchcox@gmail.com` (since
+  2026-10-10). It has Business Profile and Ads scopes only: no Gmail and
+  no Search Console. Search Console API calls return 403 until the
+  `webmasters.readonly` scope is added to it.
 
 Log every outreach email in `docs/marketing/organic-backlinks.md` or
 the Knoxville ledger, and check those ledgers before emailing anyone.
