@@ -18,11 +18,13 @@ export interface Route {
 }
 
 // Google write-review links per listing (place IDs from the GBP account).
+// Knoxville Laser Clinic is first: every review goes there for now (Zane,
+// 2026-10-06). West Hills and Cedar Bluff closed on 2026-09-20.
 const LISTING_LINKS = [
+	{ brand: 'Knoxville Laser Clinic', label: 'Bearden (Suite 15d)', placeId: 'ChIJP5h9UqE9XIgR7KDu1kjD6o8' },
+	{ brand: 'Knoxville Laser Clinic', label: 'Farragut (Suite 8d)', placeId: 'ChIJ-7v71HwvXIgR2jOi4VJfx9I' },
 	{ brand: 'Sarah Hitchcox Aesthetics', label: 'Bearden (Suite 15)', placeId: 'ChIJT25n7649XIgRyzkQqbTa0DY' },
 	{ brand: 'Sarah Hitchcox Aesthetics', label: 'Farragut (Suite 8)', placeId: 'ChIJnRT1vOsvXIgRBKvfYNUGpUI' },
-	{ brand: 'Sarah Hitchcox Aesthetics', label: 'West Hills', placeId: 'ChIJM5BJLf8lXIgRMi0A2rFo_UM' },
-	{ brand: 'Sarah Hitchcox Aesthetics', label: 'Cedar Bluff', placeId: 'ChIJUf4iYQ4lXIgRgbDLZ6xVz98' },
 	{ brand: 'Botox Knox Med Spa', label: 'Bearden (Suite 15b)', placeId: 'ChIJd1SN2ZQ9XIgRB5F_naTr2pM' },
 	{ brand: 'Botox Knox Med Spa', label: 'Farragut (Suite 8b)', placeId: 'ChIJ6_7_utMvXIgRpP1LXfKVvn4' },
 	{ brand: 'Knoxville Weight Loss Clinic', label: 'Bearden (Suite 15c)', placeId: 'ChIJkWEu2yk9XIgR0d0tkwaQ2ac' },
@@ -33,10 +35,11 @@ const LISTING_LINKS = [
 }))
 
 // QR landing pages per brand: /r/<provider> shows a fresh sample review and
-// the listing buttons. The SHA landing offers only the Botox Knox listings,
-// whatever the client came in for (Zane, 2026-09-30).
+// the listing buttons. The SHA landing offers only the Knoxville Laser Clinic
+// listings, whatever the client came in for (Zane, 2026-10-06). The laser
+// clinic site has no landing of its own.
 const BRAND_LANDINGS = [
-	{ brand: 'Sarah Hitchcox Aesthetics (shows the Botox Knox listings)', base: 'https://hitchcoxaesthetics.com/r' },
+	{ brand: 'Sarah Hitchcox Aesthetics (shows the Knoxville Laser Clinic listings)', base: 'https://hitchcoxaesthetics.com/r' },
 	{ brand: 'Botox Knox Med Spa', base: 'https://botoxknoxvilletn.com/r' },
 	{ brand: 'Knoxville Weight Loss Clinic', base: 'https://weightlossknoxvilletn.com/r' },
 ]
@@ -125,9 +128,8 @@ export default function ReviewLinks() {
 				<h2 className="mb-1 text-2xl font-bold">Provider QR links</h2>
 				<p className="mb-4 text-muted-foreground">
 					The links behind the printed QR codes. Each shows the client a fresh,
-					never-repeated sample review, then routes them to the right listing.
-					The SHA link automatically sends tox clients to Botox Knox and
-					weight-loss clients to the weight loss clinic pages.
+					never-repeated sample review, then the listing buttons. The SHA link
+					shows the Knoxville Laser Clinic listings to every client.
 				</p>
 				<div className="flex flex-col gap-6">
 					{providerLinks.map(provider => (
