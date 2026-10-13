@@ -90,4 +90,29 @@ export const extendedTheme = {
 		/** 12px size / 16px high / bold */
 		button: ['0.75rem', { lineHeight: '1rem', fontWeight: '700' }],
 	},
+	/**
+	 * `prose-theme`: prose colours from the theme tokens, so markdown reads in
+	 * dark mode too (prose-gray has light-mode colours only). Headings and body
+	 * match ServiceHeader and ServiceParagraph.
+	 */
+	typography: {
+		theme: {
+			css: {
+				'--tw-prose-body': 'hsl(var(--muted-foreground))',
+				'--tw-prose-headings': 'hsl(var(--foreground) / 0.8)',
+				'--tw-prose-lead': 'hsl(var(--muted-foreground))',
+				'--tw-prose-links': 'hsl(var(--foreground))',
+				'--tw-prose-bold': 'hsl(var(--foreground))',
+				'--tw-prose-counters': 'hsl(var(--muted-foreground))',
+				'--tw-prose-bullets': 'hsl(var(--muted-foreground))',
+				'--tw-prose-hr': 'hsl(var(--border))',
+				'--tw-prose-quotes': 'hsl(var(--foreground) / 0.8)',
+				'--tw-prose-quote-borders': 'hsl(var(--border))',
+				'--tw-prose-captions': 'hsl(var(--muted-foreground))',
+				'--tw-prose-code': 'hsl(var(--foreground))',
+				'--tw-prose-th-borders': 'hsl(var(--border))',
+				'--tw-prose-td-borders': 'hsl(var(--border))',
+			},
+		},
+	},
 } satisfies Config['theme']

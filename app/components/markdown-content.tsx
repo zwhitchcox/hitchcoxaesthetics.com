@@ -117,7 +117,7 @@ function makeMarkdownImage(
  */
 export function MarkdownContent({
 	content,
-	className = 'prose prose-lg prose-gray max-w-none',
+	className = 'prose prose-lg prose-theme max-w-none',
 	remarkPlugins,
 	unresolvedPicture = 'placeholder',
 	resolveImageSrc,

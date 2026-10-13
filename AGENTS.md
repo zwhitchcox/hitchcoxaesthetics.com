@@ -8,6 +8,17 @@ when committing/pushing, make sure to check the linter/tsc
   explicitly asks for it first. If work requires the dev server to be started or
   restarted, ask the user to do it or ask for permission before taking action.
 
+## UI Colors
+
+- Use the theme tokens for text and backgrounds, in pairs: `bg-background`
+  with `text-foreground`, `bg-card` with `text-card-foreground`, and
+  `text-muted-foreground` for quiet text. The tokens change in dark mode.
+- Do not put fixed grays (`text-gray-900`, `bg-white`, `prose-gray`) next to
+  tokens. They have light-mode values only, so in dark mode the text can
+  disappear.
+- Markdown uses `prose prose-theme` (defined in `app/utils/extended-theme.ts`).
+- Text on a photo is the only exception.
+
 ## Content Strategy
 
 - **Keywords:** Integrate "Knoxville" keywords naturally. Do not stuff.
