@@ -75,16 +75,18 @@ large, your lower face looks wide and square. When you clench or grind your
 teeth, this muscle does the work. Masseter Botox relaxes the muscle. Over a few
 weeks the muscle gets smaller, so your jawline looks slimmer, and clenching and
 grinding often ease. Sarah Hitchcox, RN, BSN, gives this treatment for both
-reasons at our Bearden and Farragut offices.
+reasons. It is one of our [Botox treatments in Knoxville](/botox).
 
-## Jaw Slimming with Botox
+## Jaw Slimming Botox in Knoxville, TN
 
 A square or wide jaw is often muscle, not fat or bone. Botox in the masseter
 softens the angle of the jaw and gives your lower face a more tapered, V-shaped
 look, without surgery. The change is slow and natural. Most people see a
 difference at four to eight weeks and the full result at about three months.
+You can also smooth a dimpled chin with
+[chin dimpling Botox](/botox/chin-dimpling) in the same visit.
 
-## Botox for Teeth Clenching and Grinding
+## Knoxville Botox for Teeth Grinding
 
 Clenching and grinding can make your jaw sore, cause tension headaches and wear
 down your teeth. Botox weakens the strongest contractions of the masseter, so
@@ -92,21 +94,19 @@ you clench with less force. You can still talk, chew and smile normally. Many
 people feel relief in one to two weeks. Botox does not replace a night guard or
 care from your dentist, and many patients use both.
 
-## What to Expect at Your Visit
+## Your Masseter Botox Visit in Knoxville
 
-At your free consultation, Sarah checks your jaw muscle and talks with you
-about your goals. The treatment takes about 15 minutes, with a few small
-injections on each side. You can go back to work right away. Results usually
-last four to six months.
+At your free consultation at our Bearden or Farragut office, Sarah checks your
+jaw muscle and talks with you about your goals. The treatment takes about 15
+minutes, with a few small injections on each side. You can go back to work
+right away. Results usually last four to six months.
 
-## Pair It with Other Treatments
+## More Botox Areas in Knoxville
 
-Many patients combine masseter Botox with
-[jawline filler](/filler/jawline-filler) for a sharper jaw angle,
-[chin filler](/filler/chin-filler) for better balance, or [Kybella](/kybella)
-for fat under the chin. You can also treat
-[forehead lines](/botox/forehead-lines) or
-[frown lines](/botox/frown-lines) in the same visit.
+You can treat other areas in the same visit, such as
+[Botox for forehead lines](/botox/forehead-lines) or
+[frown line Botox](/botox/frown-lines). For a sharper jaw angle, ask Sarah about
+jawline filler at your consultation.
 
 _Before and after photos: patients in Allergan's phase 3 masseter trial,
 treated with 72 units of Botox and photographed at day 90. From
