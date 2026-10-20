@@ -90,9 +90,11 @@ const ORGANIC_CTR = [0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018
 // The map box sits above the blue links on these searches and takes clicks.
 const AFTER_MAP_BOX = 0.7
 // Of visitors from Google's blue links, the share who book online as a new
-// client in the same visit: 54 of 2,105 visits, PostHog, 2026-07-22 to
-// 2026-10-20. Phone bookings are not in it, so the organic values are low.
-const ORGANIC_VISIT_TO_CLIENT = 0.026
+// client in the same visit: 10 of 909 visits, PostHog, 2026-07-22 to
+// 2026-10-20. Visits from our Maps listings (their links carry
+// utm_campaign=gmb) are not blue-link visits: 56 of 1,598 booked (3.5%).
+// Phone bookings are in neither, so the organic values are low.
+const ORGANIC_VISIT_TO_CLIENT = 0.011
 
 // Which client-value cohort each keyword's searchers convert into.
 const KEYWORD_CATEGORY: Record<string, string> = {
