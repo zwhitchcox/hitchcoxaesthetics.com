@@ -19,10 +19,12 @@
  *   × search → new client (PACK_VIEW_TO_CLIENT, measured on our own listings)
  *   × 6-month expected value per new client (client_value, real Boulevard cohorts)
  *
- * Organic value of a rank (the organic view's "#1 is worth"):
- *   monthly searches × click share at that rank (ORGANIC_CTR, less the map box)
- *   × organic visit → new client (measured in PostHog, online bookings only)
- *   × 6-month expected value per new client for the search's service
+ * Organic value of #1 (the organic view's "What #1 is worth, by service"):
+ *   every search for the service in the Knoxville market (service_search_volume)
+ *   × click share of the first blue link (ORGANIC_CTR, less the map box)
+ *   × visit → new client for searches of the service (SEARCH_VISIT_TO_CLIENT)
+ *   × phone bookings on top (PHONE_FACTOR)
+ *   × 6-month expected value per new client for the service
  */
 import {
 	json,
@@ -91,12 +93,15 @@ const PACK_VIEW_TO_CLIENT = 0.0023
 const ORGANIC_CTR = [0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018]
 // The map box sits above the blue links on these searches and takes clicks.
 const AFTER_MAP_BOX = 0.7
-// Of visitors from Google's blue links, the share who book online as a new
-// client in the same visit: 10 of 909 visits, PostHog, 2026-07-22 to
-// 2026-10-20. Visits from our Maps listings (their links carry
-// utm_campaign=gmb) are not blue-link visits: 56 of 1,598 booked (3.5%).
-// Phone bookings are in neither, so the organic values are low.
-const ORGANIC_VISIT_TO_CLIENT = 0.011
+// Of visitors who searched for the service itself, the share who book online
+// as a new client in the same visit. Measured on our Google Ads clicks, which
+// came from those searches: 30 of 999 visits, PostHog, 2026-07-22 to
+// 2026-10-20. Today's blue-link visitors book at 1.1% (10 of 909): most come
+// from our name, job and page-2 searches, not from a top rank for a service.
+const SEARCH_VISIT_TO_CLIENT = 0.03
+// New clients who book by phone, on top of those who book online: 12 booked by
+// staff to 74 online, Boulevard, 2026-07-22 to 2026-10-20.
+const PHONE_FACTOR = 86 / 74
 
 // Which client-value cohort each keyword's searchers convert into.
 const KEYWORD_CATEGORY: Record<string, string> = {
@@ -108,14 +113,14 @@ const KEYWORD_CATEGORY: Record<string, string> = {
 	'semaglutide near me': 'Weight Loss',
 }
 
-/** Which client-value cohort an organic search's visitors convert into. */
-function organicCategory(kw: string) {
-	if (/botox|dysport|masseter/.test(kw)) return 'Tox'
-	if (/filler/.test(kw)) return 'Filler'
-	if (/laser hair/.test(kw)) return 'Laser Hair'
-	if (/laser|sun spot|skin tightening|microneedling/.test(kw)) return 'Laser & Skin'
-	if (/weight loss|semaglutide|tirzepatide/.test(kw)) return 'Weight Loss'
-	return 'ALL'
+// Which client-value cohort each service's searchers convert into.
+const SERVICE_CATEGORY: Record<string, string> = {
+	'weight loss': 'Weight Loss',
+	botox: 'Tox',
+	'laser hair removal': 'Laser Hair',
+	filler: 'Filler',
+	'med spa': 'ALL',
+	skin: 'Laser & Skin',
 }
 
 // Stale-while-revalidate for the two map-pack views (report_reach_weekly and
@@ -156,7 +161,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	if (!hasReportsDb()) return json({ configured: false as const })
 	maybeRefreshReachView()
 
-	const [reach, volumes, values, serpRanks, serpDepth, serpRivals, packRivals] =
+	const [reach, volumes, values, serpRanks, serpDepth, serpRivals, packRivals, services] =
 		await Promise.all([
 			// Homes-weighted combined reach (any of our listings top-3) per
 			// keyword per capture date, read from the report_reach_weekly
@@ -248,6 +253,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			 FROM ranked WHERE rn <= 10 OR is_mine
 			 ORDER BY keyword, homes_reached DESC`,
 			),
+			// Every search for each service in the Knoxville market (all variants).
+			reportsQuery<{
+				service: string
+				monthly_searches: string
+				estimated: boolean
+				main_search: string
+			}>(
+				`SELECT service, monthly_searches, estimated, main_search
+			 FROM service_search_volume ORDER BY monthly_searches DESC`,
+			),
 		])
 	return json({
 		configured: true as const,
@@ -258,6 +273,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		serpDepth,
 		serpRivals,
 		packRivals,
+		services,
 	})
 }
 
@@ -632,7 +648,7 @@ function PackRivals({ rows }: { rows: Data['packRivals'] }) {
 type Reading = { week: string; rank: number | null; checked: boolean }
 
 function OrganicView({ data }: { data: Data }) {
-	const { serpRanks: ranks, serpDepth, serpRivals: rivals, volumes, values } = data
+	const { serpRanks: ranks, serpDepth, serpRivals: rivals, volumes, values, services } = data
 	const [siteKey, setSite] = useChoice('site', SITE_CHOICE_VALUES, 'all')
 	if (!ranks.length)
 		return (
@@ -685,29 +701,11 @@ function OrganicView({ data }: { data: Data }) {
 					.find(r => r.checked) ?? null
 			const lastRank = [...history].reverse().find(r => r.rank != null) ?? null
 			const vol = volumeByKw.get(kw)
-			const searches =
-				vol?.monthly_searches != null ? Number(vol.monthly_searches) : null
-			const perClient =
-				valueByCat.get(organicCategory(kw)) ?? valueByCat.get('ALL') ?? 0
-			// Revenue a month at a rank; a cut-short week uses our last known rank.
-			const worthAt = (rank: number | null | undefined) =>
-				searches == null
-					? null
-					: searches *
-						(rank ? (ORGANIC_CTR[rank - 1] ?? 0) : 0) *
-						AFTER_MAP_BOX *
-						ORGANIC_VISIT_TO_CLIENT *
-						perClient
-			const worthFirst = worthAt(1)
-			const worthNow = worthAt(now.checked ? now.rank : lastRank?.rank)
 			return {
 				kw,
-				searches,
+				searches:
+					vol?.monthly_searches != null ? Number(vol.monthly_searches) : null,
 				estimated: vol?.estimated ?? false,
-				perClient,
-				worthFirst,
-				gain:
-					worthFirst != null && worthNow != null ? worthFirst - worthNow : null,
 				site: g.site,
 				history,
 				now,
@@ -722,12 +720,43 @@ function OrganicView({ data }: { data: Data }) {
 	const firsts = rows.filter(r => r.now.rank === 1).length
 	const top10 = rows.filter(r => r.now.rank != null && r.now.rank <= 10).length
 	const cutShort = rows.filter(r => !r.now.checked).length
-	// An estimated volume is one Google shares with a close variant we also
-	// track ("botox knoxville" is counted in "botox knoxville tn"); leave it
-	// out of the total so those searchers count once.
-	const totalGain = rows
-		.filter(r => !r.estimated)
-		.reduce((sum, r) => sum + (r.gain ?? 0), 0)
+	// Our rank on a search this week; a cut-short week uses the last known rank.
+	const rankOf = (kw: string) => {
+		const now = readingAt(latestWeek, kw)
+		if (now.checked) return now.rank
+		const known = weeks.map(w => readingAt(w, kw)).filter(r => r.rank != null)
+		return known.at(-1)?.rank ?? null
+	}
+	// What #1 brings for each service: all its searches, the first blue link's
+	// click share less the map box, the booking rate of people who searched for
+	// the service, phone bookings on top, and a new client's 6-month value.
+	const serviceRows = services.map(s => {
+		const searches = Number(s.monthly_searches)
+		const perClient =
+			valueByCat.get(SERVICE_CATEGORY[s.service] ?? 'ALL') ??
+			valueByCat.get('ALL') ??
+			0
+		const clientsAt = (rank: number | null) =>
+			searches *
+			(rank ? (ORGANIC_CTR[rank - 1] ?? 0) : 0) *
+			AFTER_MAP_BOX *
+			SEARCH_VISIT_TO_CLIENT *
+			PHONE_FACTOR
+		const rank = rankOf(s.main_search)
+		return {
+			...s,
+			searches,
+			perClient,
+			rank,
+			clientsFirst: clientsAt(1),
+			worthFirst: clientsAt(1) * perClient,
+			worthNow: clientsAt(rank) * perClient,
+		}
+	})
+	const totalGain = serviceRows.reduce(
+		(sum, s) => sum + s.worthFirst - s.worthNow,
+		0,
+	)
 
 	// Plot FLOOR+1-rank so better ranks sit higher; labels translate back.
 	const plot = (r: Reading) =>
@@ -775,11 +804,88 @@ function OrganicView({ data }: { data: Data }) {
 					tone={cutShort ? 'bad' : undefined}
 				/>
 				<StatTile
-					label="#1 on every search adds"
+					label="#1 for every service adds"
 					value={`${usd(totalGain)} a month`}
-					whisper="estimated revenue over our ranks today; how to read this, below"
+					whisper="estimated revenue over our ranks today; see What #1 is worth"
 				/>
 			</div>
+
+			{serviceRows.length ? (
+				<section>
+					<h2>
+						What #1 is worth, by service{' '}
+						<span className="mini">
+							every way people search for it in the Knoxville market
+						</span>
+					</h2>
+					<div className="rtable-wrap">
+						<table className="rtable">
+							<thead>
+								<tr>
+									<th>Service</th>
+									<th className="num">Searches a month</th>
+									<th>Main search</th>
+									<th className="num">Our rank</th>
+									<th className="num">New clients a month at #1</th>
+									<th className="num">#1 is worth a month</th>
+									<th className="num">Per new client</th>
+								</tr>
+							</thead>
+							<tbody>
+								{serviceRows.map(s => (
+									<tr key={s.service}>
+										<td>{s.service}</td>
+										<td className="num">
+											{s.searches.toLocaleString()}
+											{s.estimated ? '*' : ''}
+										</td>
+										<td className="mini">{s.main_search}</td>
+										<td className="num">{s.rank != null ? `#${s.rank}` : '-'}</td>
+										<td className="num">{s.clientsFirst.toFixed(1)}</td>
+										<td className="num">
+											{usd(s.worthFirst)}
+											{s.worthNow > 0 ? (
+												<span className="sub-line">
+													+{usd(s.worthFirst - s.worthNow)} over now
+												</span>
+											) : null}
+										</td>
+										<td className="num">{usd(s.perClient)}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+					<details className="how">
+						<summary>How to read this</summary>
+						<p>
+							Searches a month: every search in the Knoxville market that names
+							the service with a place or a buying word ("laser hair removal near
+							me", "lip filler cost"), from Google Ads keyword ideas. Variants
+							that Google counts as one are counted once, and searches for a
+							competitor's name are left out. * = Google hides most Botox
+							numbers, so this adds "botox knoxville tn", our estimate for "botox
+							near me" and the price searches.
+						</p>
+						<p>
+							#1 is worth a month = searches × 28% who click the first blue link,
+							less 30% for the map box × {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}%
+							who book as a new client × {PHONE_FACTOR.toFixed(2)} for phone
+							bookings × what a new client spends in their first 6 months (Per new
+							client, from our Boulevard data). The {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}% is measured on
+							our Google Ads visitors, who came from these same searches. "Over
+							now" uses our rank today on the main search; past #10 we count no
+							clicks.
+						</p>
+						<p>
+							Read these as the upper end. A page that is first for the main search
+							ranks near the top for most variants, not all, and Search Console
+							shows that where we sit near the top today, 4 to 10% of searchers
+							click us, less than the 28% that published click curves give #1.
+						</p>
+					</details>
+				</section>
+			) : null}
 
 			<section>
 				<h2>
@@ -797,8 +903,6 @@ function OrganicView({ data }: { data: Data }) {
 								<th className="num">Searches a month</th>
 								<th className="num">Rank</th>
 								<th className="num">Change</th>
-								<th className="num">#1 is worth a month</th>
-								<th className="num">Per new client</th>
 								<th>Last {weeks.length} weeks</th>
 								<th>Our page that ranks</th>
 								<th>Who is #1</th>
@@ -848,13 +952,6 @@ function OrganicView({ data }: { data: Data }) {
 											)}
 										</td>
 										<td className={`num ${delta.tone}`}>{delta.text}</td>
-										<td className="num">
-											{r.worthFirst != null ? usd(r.worthFirst) : '-'}
-											{r.gain ? (
-												<span className="sub-line">+{usd(r.gain)} over now</span>
-											) : null}
-										</td>
-										<td className="num">{usd(r.perClient)}</td>
 										<td>
 											<RankSparkline weeks={r.history} floor={RANK_FLOOR} />
 										</td>
@@ -900,19 +997,7 @@ function OrganicView({ data }: { data: Data }) {
 						Searches a month: Google Ads volume for the Knoxville market. "&lt;10"
 						means Google gives no number, which it does below 10 a month. * =
 						Google counts this search together with a close variant we also
-						track, so it shows that number and stays out of the total.
-					</p>
-					<p>
-						#1 is worth a month: an estimate of the revenue that the first blue
-						link brings. It is the searches a month, times the share who click
-						the first link (28%, less 30% for the map box above it), times the
-						share of those visitors who book as a new client (
-						{Math.round(ORGANIC_VISIT_TO_CLIENT * 1000) / 10}%, measured in
-						PostHog), times what a new client spends in their first 6 months
-						(Per new client, from our Boulevard data for that service). "Over
-						now" is what #1 adds to our rank today; past #10 we count no clicks.
-						Phone bookings are not in the {Math.round(ORGANIC_VISIT_TO_CLIENT * 1000) / 10}
-						%, so the real values are higher.
+						track, so it shows that number.
 					</p>
 				</details>
 			</section>
