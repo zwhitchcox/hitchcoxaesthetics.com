@@ -16,8 +16,7 @@
  * Revenue model, every factor from real data where we have it:
  *   monthly searches (Google Ads, Knoxville DMA, keyword_search_volume)
  *   × reach share (share of metro households where we rank top-3)
- *   × pack click share (assumed: of searchers who see us top-3, 15% click us)
- *   × click → new client (assumed 20%)
+ *   × search → new client (PACK_VIEW_TO_CLIENT, measured on our own listings)
  *   × 6-month expected value per new client (client_value, real Boulevard cohorts)
  *
  * Organic value of a rank (the organic view's "#1 is worth"):
@@ -80,10 +79,13 @@ type SerpRankRow = {
 
 // Knox County average household size (US Census).
 const PERSONS_PER_HOUSEHOLD = 2.4
-// Of searchers whose local pack shows us top-3, the share who click our listing.
-const PACK_CLICK_SHARE = 0.15
-// Of those clicks, the share who become a booked new client.
-const CLICK_TO_CLIENT = 0.2
+// Of the times Google shows our listing, the share that become a new client
+// who books online from the listing's link: 29 of 12,626 views of the SHA
+// Bearden and Farragut listings, 2026-07-22 to 2026-10-19 (Business Profile
+// views; PostHog bookings from utm_campaign=gmb visits). It replaced an
+// assumed 15% click x 20% book (3%), which ran about 13 times too high. Calls
+// from the listing are not counted, so this is a floor.
+const PACK_VIEW_TO_CLIENT = 0.0023
 // Organic: the share of searchers who click the blue link at ranks 1 to 10
 // (published click curves). Past #10 we count no clicks.
 const ORGANIC_CTR = [0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018]
@@ -350,7 +352,7 @@ function MapPackView({ data }: { data: Data }) {
 		const value = valueFor(kw)
 		if (!r || !vol || !value) return null
 		const share = Number(r.homes_reached) / Math.max(1, Number(r.total_homes))
-		return vol * share * PACK_CLICK_SHARE * CLICK_TO_CLIENT * value
+		return vol * share * PACK_VIEW_TO_CLIENT * value
 	}
 
 	const latest = keywords.map(kw => {
@@ -362,7 +364,7 @@ function MapPackView({ data }: { data: Data }) {
 		const share = r
 			? Number(r.homes_reached) / Math.max(1, Number(r.total_homes))
 			: 0
-		const clients = searches * share * PACK_CLICK_SHARE * CLICK_TO_CLIENT
+		const clients = searches * share * PACK_VIEW_TO_CLIENT
 		const reachPct = r?.reach_pct != null ? Number(r.reach_pct) : null
 		const prevPct = prev?.reach_pct != null ? Number(prev.reach_pct) : null
 		return {
@@ -495,10 +497,12 @@ function MapPackView({ data }: { data: Data }) {
 					</p>
 					<p>
 						New clients a month = searches × homes reached ×{' '}
-						{Math.round(PACK_CLICK_SHARE * 100)}% who click our listing ×{' '}
-						{Math.round(CLICK_TO_CLIENT * 100)}% who book. Revenue = new clients
-						× the 6-month value of a new client in that service, from our own
-						Boulevard history.
+						{Math.round(PACK_VIEW_TO_CLIENT * 10000) / 100}%, the share of the
+						times Google showed our listing that became a new client booking
+						online (measured on our Bearden and Farragut listings, 2026-07-22 to
+						2026-10-19). Calls from the listing are not counted, so this is a
+						floor. Revenue = new clients × the 6-month value of a new client in
+						that service, from our own Boulevard history.
 					</p>
 					<p>
 						These six searches stand in for the whole market. All the related
