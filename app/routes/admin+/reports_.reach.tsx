@@ -21,7 +21,7 @@
  *
  * Organic value of #1 (the organic view's "What #1 is worth, by service"):
  *   every search for the service in the Knoxville market (service_search_volume)
- *   × click share of the first blue link (ORGANIC_CTR, less the map box)
+ *   × click share of the first blue link (ORGANIC_CTR × SEARCH_CONSOLE_SCALE)
  *   × visit → new client for searches of the service (SEARCH_VISIT_TO_CLIENT)
  *   × phone bookings on top (PHONE_FACTOR)
  *   × 6-month expected value per new client for the service
@@ -91,8 +91,14 @@ const PACK_VIEW_TO_CLIENT = 0.0023
 // Organic: the share of searchers who click the blue link at ranks 1 to 10
 // (published click curves). Past #10 we count no clicks.
 const ORGANIC_CTR = [0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018]
-// The map box sits above the blue links on these searches and takes clicks.
-const AFTER_MAP_BOX = 0.7
+// The published curve is for all searches. On ours the map box and the ads
+// sit above the blue links and take most clicks: Search Console shows 4.0% of
+// searchers click us where we rank in the top 3 on non-brand searches (25 clicks
+// from 624 times shown, 2026-07-20 to 2026-10-18). Scale the curve so ranks 1
+// to 3 average that, which puts #1 near 6%. The assumed 0.7 before this made
+// #1 for weight loss worth more new clients than all our weight-loss sources
+// bring today.
+const SEARCH_CONSOLE_SCALE = 0.04 / ((0.28 + 0.15 + 0.1) / 3)
 // Of visitors who searched for the service itself, the share who book online
 // as a new client in the same visit. Measured on our Google Ads clicks, which
 // came from those searches: 30 of 999 visits, PostHog, 2026-07-22 to
@@ -739,7 +745,7 @@ function OrganicView({ data }: { data: Data }) {
 		const clientsAt = (rank: number | null) =>
 			searches *
 			(rank ? (ORGANIC_CTR[rank - 1] ?? 0) : 0) *
-			AFTER_MAP_BOX *
+			SEARCH_CONSOLE_SCALE *
 			SEARCH_VISIT_TO_CLIENT *
 			PHONE_FACTOR
 		const rank = rankOf(s.main_search)
@@ -868,8 +874,9 @@ function OrganicView({ data }: { data: Data }) {
 							near me" and the price searches.
 						</p>
 						<p>
-							#1 is worth a month = searches × 28% who click the first blue link,
-							less 30% for the map box × {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}%
+							#1 is worth a month = searches ×{' '}
+							{Math.round(ORGANIC_CTR[0]! * SEARCH_CONSOLE_SCALE * 1000) / 10}% who
+							click the first blue link × {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}%
 							who book as a new client × {PHONE_FACTOR.toFixed(2)} for phone
 							bookings × what a new client spends in their first 6 months (Per new
 							client, from our Boulevard data). The {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}% is measured on
@@ -878,10 +885,10 @@ function OrganicView({ data }: { data: Data }) {
 							clicks.
 						</p>
 						<p>
-							Read these as the upper end. A page that is first for the main search
-							ranks near the top for most variants, not all, and Search Console
-							shows that where we sit near the top today, 4 to 10% of searchers
-							click us, less than the 28% that published click curves give #1.
+							The click share is measured on our own blue links: where we rank in
+							the top 3 on searches that do not name us, Search Console shows 4.0%
+							of searchers click us, because the map box and the ads sit above. The
+							published curve (28% for #1) is scaled to that.
 						</p>
 					</details>
 				</section>
