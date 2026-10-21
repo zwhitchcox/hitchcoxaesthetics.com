@@ -77,6 +77,12 @@ type SerpRankRow = {
 	my_domain: string | null
 	my_url: string | null
 	top_domain: string | null
+	// From the week of 2026-10-19, every search is read from five points; rank_group
+	// is the middle reading. Older weeks have one point.
+	best_rank: number | null
+	worst_rank: number | null
+	points: number | null
+	points_found: number | null
 }
 
 // Knox County average household size (US Census).
@@ -90,7 +96,9 @@ const PERSONS_PER_HOUSEHOLD = 2.4
 const PACK_VIEW_TO_CLIENT = 0.0023
 // Organic: the share of searchers who click the blue link at ranks 1 to 10
 // (published click curves). Past #10 we count no clicks.
-const ORGANIC_CTR = [0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018]
+const ORGANIC_CTR = [
+	0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018,
+]
 // The published curve is for all searches. On ours the map box and the ads
 // sit above the blue links and take most clicks: Search Console shows 4.0% of
 // searchers click us where we rank in the top 3 on non-brand searches (25 clicks
@@ -167,89 +175,102 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	if (!hasReportsDb()) return json({ configured: false as const })
 	maybeRefreshReachView()
 
-	const [reach, volumes, values, serpRanks, serpDepth, serpRivals, packRivals, services] =
-		await Promise.all([
-			// Homes-weighted combined reach (any of our listings top-3) per
-			// keyword per capture date, read from the report_reach_weekly
-			// materialized view. The underlying aggregate scans every grid
-			// capture and took 18s live (measured 2026-08-03); the view reads in
-			// ~80ms and maybeRefreshReachView() above re-aggregates it in the
-			// background when captures land.
-			reportsQuery<{
-				week: string
-				keyword: string
-				homes_reached: string
-				total_homes: string
-				reach_pct: string | null
-			}>(
-				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
+	const [
+		reach,
+		volumes,
+		values,
+		serpRanks,
+		serpDepth,
+		serpRivals,
+		packRivals,
+		services,
+	] = await Promise.all([
+		// Homes-weighted combined reach (any of our listings top-3) per
+		// keyword per capture date, read from the report_reach_weekly
+		// materialized view. The underlying aggregate scans every grid
+		// capture and took 18s live (measured 2026-08-03); the view reads in
+		// ~80ms and maybeRefreshReachView() above re-aggregates it in the
+		// background when captures land.
+		reportsQuery<{
+			week: string
+			keyword: string
+			homes_reached: string
+			total_homes: string
+			reach_pct: string | null
+		}>(
+			`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
 			   homes_reached, total_homes, reach_pct
 			 FROM report_reach_weekly ORDER BY 1, 2`,
-			),
-			reportsQuery<{
-				keyword: string
-				location: string
-				monthly_searches: string | null
-				estimated: boolean
-				fetched_at: string
-			}>(
-				`SELECT keyword, location, monthly_searches, estimated, to_char(fetched_at, 'YYYY-MM-DD') AS fetched_at FROM keyword_search_volume`,
-			),
-			reportsQuery<{
-				category: string
-				expected_value: string
-				cohort_n: string
-			}>(
-				`SELECT category, expected_value_per_conversion AS expected_value, cohort_n
+		),
+		reportsQuery<{
+			keyword: string
+			location: string
+			monthly_searches: string | null
+			estimated: boolean
+			fetched_at: string
+		}>(
+			`SELECT keyword, location, monthly_searches, estimated, to_char(fetched_at, 'YYYY-MM-DD') AS fetched_at FROM keyword_search_volume`,
+		),
+		reportsQuery<{
+			category: string
+			expected_value: string
+			cohort_n: string
+		}>(
+			`SELECT category, expected_value_per_conversion AS expected_value, cohort_n
 			 FROM client_value WHERE horizon_months = 6`,
-			),
-			// Organic ("blue link") Google rank per keyword per week, from
-			// sha-reports src/serp.ts. Metro-wide, unlike the grid.
-			reportsQuery<SerpRankRow>(
-				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, target,
-			   rank_group, my_domain, my_url, top_domain
+		),
+		// Organic ("blue link") Google rank per keyword per week, from
+		// sha-reports src/serp.ts, read from five points around Knoxville.
+		reportsQuery<SerpRankRow>(
+			`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, target,
+			   rank_group, my_domain, my_url, top_domain,
+			   best_rank, worst_rank, points, points_found
 			 FROM report_serp_rank ORDER BY week, keyword`,
-			),
-			// How many results each weekly capture read, so a capture that was cut
-			// short reads as "not checked", not "not in the top 100".
-			reportsQuery<{ week: string; keyword: string; depth: number }>(
-				`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword, count(*)::int AS depth
-			 FROM raw_serp_organic GROUP BY 1, 2`,
-			),
-			// Who else keeps landing in the organic top 10 this week.
-			reportsQuery<{
-				domain: string
-				keywords: number
-				best: number
-				avg_rank: string
-			}>(
-				`WITH latest AS (SELECT max(week) AS week FROM raw_serp_organic)
+		),
+		// How many results each weekly capture read (the middle of its points),
+		// so a capture that was cut short reads as "not checked", not "not in
+		// the top 100".
+		reportsQuery<{ week: string; keyword: string; depth: number }>(
+			`SELECT to_char(week, 'YYYY-MM-DD') AS week, keyword,
+			   percentile_disc(0.5) WITHIN GROUP (ORDER BY n)::int AS depth
+			 FROM (SELECT week, keyword, point, count(*) AS n
+			       FROM raw_serp_organic GROUP BY 1, 2, 3) per_point
+			 GROUP BY 1, 2`,
+		),
+		// Who else keeps landing in the organic top 10 this week.
+		reportsQuery<{
+			domain: string
+			keywords: number
+			best: number
+			avg_rank: string
+		}>(
+			`WITH latest AS (SELECT max(week) AS week FROM raw_serp_organic)
 			 SELECT domain, count(DISTINCT keyword)::int AS keywords,
 			   min(rank_group)::int AS best, round(avg(rank_group), 1) AS avg_rank
 			 FROM raw_serp_organic, latest
 			 WHERE raw_serp_organic.week = latest.week
 			   AND rank_group <= 10 AND domain <> ''
 			 GROUP BY domain ORDER BY keywords DESC, avg_rank ASC LIMIT 15`,
-			),
-			// Map-pack rivals per keyword (latest capture), from mv_pack_rivals —
-			// the live five-CTE aggregate cost ~1.6s per view; the worker refreshes
-			// the MV post-capture and maybeRefreshReachView() above is the
-			// fallback. Listings sharing a domain count as one business, except
-			// ours: each of our offices has its own row.
-			reportsQuery<{
-				week: string
-				keyword: string
-				title: string
-				domain: string | null
-				is_mine: boolean
-				avg_rank: string
-				rating: string | null
-				reviews: string | null
-				homes_reached: string
-				total_homes: string
-				reach_pct: string | null
-			}>(
-				`WITH ranked AS (
+		),
+		// Map-pack rivals per keyword (latest capture), from mv_pack_rivals —
+		// the live five-CTE aggregate cost ~1.6s per view; the worker refreshes
+		// the MV post-capture and maybeRefreshReachView() above is the
+		// fallback. Listings sharing a domain count as one business, except
+		// ours: each of our offices has its own row.
+		reportsQuery<{
+			week: string
+			keyword: string
+			title: string
+			domain: string | null
+			is_mine: boolean
+			avg_rank: string
+			rating: string | null
+			reviews: string | null
+			homes_reached: string
+			total_homes: string
+			reach_pct: string | null
+		}>(
+			`WITH ranked AS (
 			   SELECT *, row_number() OVER (
 			     PARTITION BY keyword ORDER BY homes_reached DESC) AS rn
 			   FROM mv_pack_rivals WHERE homes_reached > 0)
@@ -258,18 +279,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			   reach_pct
 			 FROM ranked WHERE rn <= 10 OR is_mine
 			 ORDER BY keyword, homes_reached DESC`,
-			),
-			// Every search for each service in the Knoxville market (all variants).
-			reportsQuery<{
-				service: string
-				monthly_searches: string
-				estimated: boolean
-				main_search: string
-			}>(
-				`SELECT service, monthly_searches, estimated, main_search
+		),
+		// Every search for each service in the Knoxville market (all variants).
+		reportsQuery<{
+			service: string
+			monthly_searches: string
+			estimated: boolean
+			main_search: string
+		}>(
+			`SELECT service, monthly_searches, estimated, main_search
 			 FROM service_search_volume ORDER BY monthly_searches DESC`,
-			),
-		])
+		),
+	])
 	return json({
 		configured: true as const,
 		reach,
@@ -654,7 +675,14 @@ function PackRivals({ rows }: { rows: Data['packRivals'] }) {
 type Reading = { week: string; rank: number | null; checked: boolean }
 
 function OrganicView({ data }: { data: Data }) {
-	const { serpRanks: ranks, serpDepth, serpRivals: rivals, volumes, values, services } = data
+	const {
+		serpRanks: ranks,
+		serpDepth,
+		serpRivals: rivals,
+		volumes,
+		values,
+		services,
+	} = data
 	const [siteKey, setSite] = useChoice('site', SITE_CHOICE_VALUES, 'all')
 	if (!ranks.length)
 		return (
@@ -722,6 +750,23 @@ function OrganicView({ data }: { data: Data }) {
 			}
 		}),
 	)
+	// Best and worst point, when the readings differ.
+	const byArea = (row: SerpRankRow | undefined) => {
+		if (!row?.points || row.points < 2 || !row.points_found) return null
+		if (row.points_found < row.points)
+			return (
+				<span className="sub-line">
+					best #{row.best_rank}, found in {row.points_found} of {row.points}{' '}
+					areas
+				</span>
+			)
+		if (row.best_rank === row.worst_rank) return null
+		return (
+			<span className="sub-line">
+				#{row.best_rank} to #{row.worst_rank} by area
+			</span>
+		)
+	}
 	const total = rows.length
 	const firsts = rows.filter(r => r.now.rank === 1).length
 	const top10 = rows.filter(r => r.now.rank != null && r.now.rank <= 10).length
@@ -775,9 +820,10 @@ function OrganicView({ data }: { data: Data }) {
 	return (
 		<>
 			<p className="lede">
-				The blue links under the map box, checked every Monday for the Knoxville
-				metro. Each search belongs to the site we want to win it; when another
-				of our sites ranks higher, that page is shown instead.
+				The blue links under the map box, checked every Monday from five points
+				around Knoxville; the rank is the middle reading. Each search belongs to
+				the site we want to win it; when another of our sites ranks higher, that
+				page is shown instead.
 			</p>
 			<div className="choices">
 				<Choice
@@ -846,7 +892,9 @@ function OrganicView({ data }: { data: Data }) {
 											{s.estimated ? '*' : ''}
 										</td>
 										<td className="mini">{s.main_search}</td>
-										<td className="num">{s.rank != null ? `#${s.rank}` : '-'}</td>
+										<td className="num">
+											{s.rank != null ? `#${s.rank}` : '-'}
+										</td>
 										<td className="num">{s.clientsFirst.toFixed(1)}</td>
 										<td className="num">
 											{usd(s.worthFirst)}
@@ -866,29 +914,30 @@ function OrganicView({ data }: { data: Data }) {
 						<summary>How to read this</summary>
 						<p>
 							Searches a month: every search in the Knoxville market that names
-							the service with a place or a buying word ("laser hair removal near
-							me", "lip filler cost"), from Google Ads keyword ideas. Variants
-							that Google counts as one are counted once, and searches for a
-							competitor's name are left out. * = Google hides most Botox
-							numbers, so this adds "botox knoxville tn", our estimate for "botox
-							near me" and the price searches.
+							the service with a place or a buying word ("laser hair removal
+							near me", "lip filler cost"), from Google Ads keyword ideas.
+							Variants that Google counts as one are counted once, and searches
+							for a competitor's name are left out. * = Google hides most Botox
+							numbers, so this adds "botox knoxville tn", our estimate for
+							"botox near me" and the price searches.
 						</p>
 						<p>
 							#1 is worth a month = searches ×{' '}
-							{Math.round(ORGANIC_CTR[0]! * SEARCH_CONSOLE_SCALE * 1000) / 10}% who
-							click the first blue link × {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}%
-							who book as a new client × {PHONE_FACTOR.toFixed(2)} for phone
-							bookings × what a new client spends in their first 6 months (Per new
-							client, from our Boulevard data). The {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}% is measured on
-							our Google Ads visitors, who came from these same searches. "Over
-							now" uses our rank today on the main search; past #10 we count no
-							clicks.
+							{Math.round(ORGANIC_CTR[0]! * SEARCH_CONSOLE_SCALE * 1000) / 10}%
+							who click the first blue link ×{' '}
+							{Math.round(SEARCH_VISIT_TO_CLIENT * 100)}% who book as a new
+							client × {PHONE_FACTOR.toFixed(2)} for phone bookings × what a new
+							client spends in their first 6 months (Per new client, from our
+							Boulevard data). The {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}%
+							is measured on our Google Ads visitors, who came from these same
+							searches. "Over now" uses our rank today on the main search; past
+							#10 we count no clicks.
 						</p>
 						<p>
-							The click share is measured on our own blue links: where we rank in
-							the top 3 on searches that do not name us, Search Console shows 4.0%
-							of searchers click us, because the map box and the ads sit above. The
-							published curve (28% for #1) is scaled to that.
+							The click share is measured on our own blue links: where we rank
+							in the top 3 on searches that do not name us, Search Console shows
+							4.0% of searchers click us, because the map box and the ads sit
+							above. The published curve (28% for #1) is scaled to that.
 						</p>
 					</details>
 				</section>
@@ -944,9 +993,15 @@ function OrganicView({ data }: { data: Data }) {
 											}`}
 										>
 											{r.now.rank != null ? (
-												`#${r.now.rank}`
+												<>
+													#{r.now.rank}
+													{byArea(r.row)}
+												</>
 											) : r.now.checked ? (
-												`not in top ${r.read}`
+												<>
+													not in top {r.read}
+													{byArea(r.row)}
+												</>
 											) : (
 												<>
 													not checked
@@ -989,10 +1044,15 @@ function OrganicView({ data }: { data: Data }) {
 					<summary>How to read this</summary>
 					<p>
 						Rank is our position among the blue links only: the map box and ads
-						are not counted. Change compares with the last week that was read in
-						full; a plus means we climbed. The small line shows each week,
-						higher is better, a red dot means not found, and a gap means that
-						week was cut short.
+						are not counted. From the week of 2026-10-19, every search is read
+						from five points (Farragut, Bearden, Downtown, North Knoxville and
+						Maryville), because Google ranks the blue links differently across
+						town; Rank is the middle reading, and the line under it gives the
+						best and worst point. Earlier weeks have one reading from central
+						Knoxville. Change compares with the last week that was read in full;
+						a plus means we climbed. The small line shows each week, higher is
+						better, a red dot means not found, and a gap means that week was cut
+						short.
 					</p>
 					<p>
 						A capture normally reads about 100 results. When one reads fewer
@@ -1001,10 +1061,10 @@ function OrganicView({ data }: { data: Data }) {
 						that week where we were.
 					</p>
 					<p>
-						Searches a month: Google Ads volume for the Knoxville market. "&lt;10"
-						means Google gives no number, which it does below 10 a month. * =
-						Google counts this search together with a close variant we also
-						track, so it shows that number.
+						Searches a month: Google Ads volume for the Knoxville market.
+						"&lt;10" means Google gives no number, which it does below 10 a
+						month. * = Google counts this search together with a close variant
+						we also track, so it shows that number.
 					</p>
 				</details>
 			</section>
