@@ -20,7 +20,8 @@
  *   × 6-month expected value per new client (client_value, real Boulevard cohorts)
  *
  * Organic value of #1 (the organic view's "What #1 is worth, by service"):
- *   every search for the service in the Knoxville market (service_search_volume)
+ *   searches for the service in the Knoxville market that we can show for
+ *   (service_search_volume: all that name Knoxville, NEAR_ME_SEEN of the rest)
  *   × click share of the first blue link (ORGANIC_CTR × SEARCH_CONSOLE_SCALE)
  *   × visit → new client for searches of the service (SEARCH_VISIT_TO_CLIENT)
  *   × phone bookings on top (PHONE_FACTOR)
@@ -107,6 +108,12 @@ const ORGANIC_CTR = [
 // #1 for weight loss worth more new clients than all our weight-loss sources
 // bring today.
 const SEARCH_CONSOLE_SCALE = 0.04 / ((0.28 + 0.15 + 0.1) / 3)
+// Searches that do not name Knoxville ("weight loss clinic near me", "weight
+// loss clinic") come from the whole TV market, and Google answers each with
+// results near the searcher. Search Console shows our blue link on 15% of them
+// where we sit on page one (216 times a month for 1,480 weight-loss searches,
+// 2026-07-20 to 2026-10-18), and on 96% of "weight loss clinic knoxville tn".
+const NEAR_ME_SEEN = 0.15
 // Of visitors who searched for the service itself, the share who book online
 // as a new client in the same visit. Measured on our Google Ads clicks, which
 // came from those searches: 30 of 999 visits, PostHog, 2026-07-22 to
@@ -284,10 +291,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		reportsQuery<{
 			service: string
 			monthly_searches: string
+			named_searches: string | null
 			estimated: boolean
 			main_search: string
 		}>(
-			`SELECT service, monthly_searches, estimated, main_search
+			`SELECT service, monthly_searches, named_searches, estimated, main_search
 			 FROM service_search_volume ORDER BY monthly_searches DESC`,
 		),
 	])
@@ -778,17 +786,20 @@ function OrganicView({ data }: { data: Data }) {
 		const known = weeks.map(w => readingAt(w, kw)).filter(r => r.rank != null)
 		return known.at(-1)?.rank ?? null
 	}
-	// What #1 brings for each service: all its searches, the first blue link's
-	// click share less the map box, the booking rate of people who searched for
-	// the service, phone bookings on top, and a new client's 6-month value.
+	// What #1 brings for each service: the searches we can show for, the first
+	// blue link's click share less the map box, the booking rate of people who
+	// searched for the service, phone bookings on top, and a new client's
+	// 6-month value.
 	const serviceRows = services.map(s => {
 		const searches = Number(s.monthly_searches)
+		const named = Number(s.named_searches ?? s.monthly_searches)
+		const seen = named + NEAR_ME_SEEN * (searches - named)
 		const perClient =
 			valueByCat.get(SERVICE_CATEGORY[s.service] ?? 'ALL') ??
 			valueByCat.get('ALL') ??
 			0
 		const clientsAt = (rank: number | null) =>
-			searches *
+			seen *
 			(rank ? (ORGANIC_CTR[rank - 1] ?? 0) : 0) *
 			SEARCH_CONSOLE_SCALE *
 			SEARCH_VISIT_TO_CLIENT *
@@ -797,6 +808,7 @@ function OrganicView({ data }: { data: Data }) {
 		return {
 			...s,
 			searches,
+			named,
 			perClient,
 			rank,
 			clientsFirst: clientsAt(1),
@@ -890,6 +902,9 @@ function OrganicView({ data }: { data: Data }) {
 										<td className="num">
 											{s.searches.toLocaleString()}
 											{s.estimated ? '*' : ''}
+											<span className="sub-line">
+												{s.named.toLocaleString()} name Knoxville
+											</span>
 										</td>
 										<td className="mini">{s.main_search}</td>
 										<td className="num">
@@ -922,7 +937,8 @@ function OrganicView({ data }: { data: Data }) {
 							"botox near me" and the price searches.
 						</p>
 						<p>
-							#1 is worth a month = searches ×{' '}
+							#1 is worth a month = (the searches that name Knoxville or
+							Farragut + {Math.round(NEAR_ME_SEEN * 100)}% of the others) ×{' '}
 							{Math.round(ORGANIC_CTR[0]! * SEARCH_CONSOLE_SCALE * 1000) / 10}%
 							who click the first blue link ×{' '}
 							{Math.round(SEARCH_VISIT_TO_CLIENT * 100)}% who book as a new
@@ -938,6 +954,14 @@ function OrganicView({ data }: { data: Data }) {
 							in the top 3 on searches that do not name us, Search Console shows
 							4.0% of searchers click us, because the map box and the ads sit
 							above. The published curve (28% for #1) is scaled to that.
+						</p>
+						<p>
+							Searches that do not name a place ("near me", "weight loss
+							clinic") come from the whole Knoxville TV market, and Google shows
+							each searcher results near them. Search Console shows our blue
+							link on {Math.round(NEAR_ME_SEEN * 100)}% of those searches where
+							we are on page one, and on 96% of "weight loss clinic knoxville
+							tn". The map box, not the blue links, wins the near me searches.
 						</p>
 					</details>
 				</section>
