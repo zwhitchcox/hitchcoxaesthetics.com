@@ -8,6 +8,9 @@ test('a postcard code sends the visitor to its page with the postcard tags', () 
 		'/weight-loss?utm_source=postcard&utm_medium=mail&utm_campaign=eddm-weight-loss-2026-11&utm_content=jeans',
 	)
 	expect(postcardRedirectUrl('wl-noise')).toContain('utm_content=food-noise')
+	expect(postcardRedirectUrl('wl-news')).toBe(
+		'/weight-loss?utm_source=postcard&utm_medium=mail&utm_campaign=eddm-weight-loss-2026-11&utm_content=newspaper',
+	)
 	expect(postcardRedirectUrl('bx-relax')).toBe(
 		'/botox?utm_source=postcard&utm_medium=mail&utm_campaign=eddm-botox-2026-11&utm_content=relax-1950s',
 	)
