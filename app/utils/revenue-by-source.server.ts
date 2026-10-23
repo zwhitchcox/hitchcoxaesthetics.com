@@ -37,7 +37,12 @@ export function etMidnightUtc(day: string): Date {
 		const d = new Date(`${day}T00:00:00${offset}`)
 		if (
 			toEtDay(d) === day &&
-			d.toLocaleTimeString('en-GB', { timeZone: REPORT_TIME_ZONE, hour12: false }).startsWith('00')
+			d
+				.toLocaleTimeString('en-GB', {
+					timeZone: REPORT_TIME_ZONE,
+					hour12: false,
+				})
+				.startsWith('00')
 		) {
 			return d
 		}
@@ -56,6 +61,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 	gmb: 'Google Business Profile',
 	organic_search: 'Organic search',
 	ai_assistant: 'AI (ChatGPT etc.)',
+	direct_mail: 'Postcard',
 	referral: 'Referral',
 	direct: 'Direct',
 }
@@ -74,8 +80,13 @@ export function getSourceLabel(touch?: {
 	if (!touch) return 'Untracked (phone / walk-in)'
 	// Retell voice bookings carry booking_channel: 'retell...' and no web
 	// traffic channel, label them as what they are, not 'Website (other)'.
-	if (!touch.trafficChannel && touch.rawProperties?.includes('"booking_channel":"retell')) {
-		return touch.callrailSource ? `AI phone · ${touch.callrailSource}` : 'AI phone call'
+	if (
+		!touch.trafficChannel &&
+		touch.rawProperties?.includes('"booking_channel":"retell')
+	) {
+		return touch.callrailSource
+			? `AI phone · ${touch.callrailSource}`
+			: 'AI phone call'
 	}
 	// utm_content on GBP website links names the specific listing
 	// (bearden / farragut / botox-knox-bearden / kwlc-farragut / ...).
@@ -83,6 +94,10 @@ export function getSourceLabel(touch?: {
 		return touch.utmContent
 			? `GBP · ${touch.utmContent}`
 			: 'Google Business Profile'
+	}
+	// utm_content on postcard QR links names the postcard version.
+	if (touch.trafficChannel === 'direct_mail') {
+		return touch.utmContent ? `Postcard · ${touch.utmContent}` : 'Postcard'
 	}
 	if (
 		(touch.trafficChannel === 'referral' || !touch.trafficChannel) &&
@@ -153,13 +168,17 @@ export function getAggregatedSource(
 			return { label: getSourceLabel(touch), channel: 'phone' }
 		}
 		return {
-			label: touch.callrailSource ? `Phone · ${touch.callrailSource}` : 'Phone call',
+			label: touch.callrailSource
+				? `Phone · ${touch.callrailSource}`
+				: 'Phone call',
 			channel: 'phone',
 		}
 	}
 	if (touch.trafficChannel === 'gmb') {
 		return {
-			label: touch.utmContent ? `GBP · ${touch.utmContent}` : 'GBP (listing unknown)',
+			label: touch.utmContent
+				? `GBP · ${touch.utmContent}`
+				: 'GBP (listing unknown)',
 			channel: 'online',
 		}
 	}
@@ -236,7 +255,10 @@ function presetRange(
 		case 'thisWeek':
 			// Through Sunday, not today: Expected covers the whole week as a
 			// projection; actual/cancelled series simply stop at today.
-			return { fromDay: mondayOf(todayEt), toDay: shiftDay(mondayOf(todayEt), 6) }
+			return {
+				fromDay: mondayOf(todayEt),
+				toDay: shiftDay(mondayOf(todayEt), 6),
+			}
 		case 'lastWeek': {
 			const monday = shiftDay(mondayOf(todayEt), -7)
 			return { fromDay: monday, toDay: shiftDay(monday, 6) }
@@ -293,14 +315,17 @@ export function parseReportWindow(
 	let toDay: string
 	if (
 		windowKey === 'custom' &&
-		fromParam && DAY_RE.test(fromParam) &&
-		toParam && DAY_RE.test(toParam)
+		fromParam &&
+		DAY_RE.test(fromParam) &&
+		toParam &&
+		DAY_RE.test(toParam)
 	) {
 		fromDay = fromParam <= toParam ? fromParam : toParam
 		toDay = fromParam <= toParam ? toParam : fromParam
 	} else {
-		if (windowKey === 'custom') windowKey = defaultWindow
-		// custom was just reassigned away; TS can't see it through the `let`.
+		if (windowKey === 'custom')
+			windowKey = defaultWindow
+			// custom was just reassigned away; TS can't see it through the `let`.
 		;({ fromDay, toDay } = presetRange(
 			windowKey as Exclude<WindowKey, 'custom'>,
 			todayEt,
@@ -331,7 +356,11 @@ export type BlvdAppointmentMeta = {
 	manageUrl: string | null
 	/** Booked block length in minutes, the chair time the appointment holds. */
 	durationMinutes: number | null
-	services: Array<{ price: number | null; name: string; minutes: number | null }>
+	services: Array<{
+		price: number | null
+		name: string
+		minutes: number | null
+	}>
 }
 
 const APPOINTMENT_FIELDS = `id startAt createdAt state cancelled bookedByType manageUrl duration
@@ -353,7 +382,9 @@ function toAppointmentMeta(node: any): BlvdAppointmentMeta | null {
 			typeof node.client?.appointmentCount === 'number'
 				? node.client.appointmentCount
 				: null,
-		clientCreatedAt: node.client?.createdAt ? new Date(node.client.createdAt) : null,
+		clientCreatedAt: node.client?.createdAt
+			? new Date(node.client.createdAt)
+			: null,
 		locationName: node.location?.name ?? null,
 		manageUrl: node.manageUrl ?? null,
 		durationMinutes: typeof node.duration === 'number' ? node.duration : null,
@@ -509,7 +540,9 @@ export async function getBlvdAppointmentsInRange(
 	apptRangeCache.set(key, { at: Date.now(), rows })
 	// Keep the map from growing without bound across many window choices.
 	if (apptRangeCache.size > 40) {
-		const oldest = [...apptRangeCache.entries()].sort((a, b) => a[1].at - b[1].at)[0]
+		const oldest = [...apptRangeCache.entries()].sort(
+			(a, b) => a[1].at - b[1].at,
+		)[0]
 		if (oldest) apptRangeCache.delete(oldest[0])
 	}
 	return rows
@@ -531,7 +564,9 @@ export async function getBlvdAppointmentsCreatedInRange(
 		: await fetchAppointmentsLive(
 				`createdAt >= '${since.toISOString()}' AND createdAt <= '${until.toISOString()}'`,
 			)
-	return all.filter(a => a.createdAt && a.createdAt >= since && a.createdAt < until)
+	return all.filter(
+		a => a.createdAt && a.createdAt >= since && a.createdAt < until,
+	)
 }
 
 /** Recent average paid ticket per service name, values $0-at-booking services. */
@@ -652,7 +687,10 @@ async function resolveNewClientFlags(metas: BlvdAppointmentMeta[]) {
 		const bookedAt = (a.createdAt ?? a.startAt).getTime()
 		if (!a.clientId) {
 			flags.set(a.id, a.services.some(s => /new client/i.test(s.name)) || null)
-		} else if (a.clientAppointmentCount != null && a.clientAppointmentCount <= 1) {
+		} else if (
+			a.clientAppointmentCount != null &&
+			a.clientAppointmentCount <= 1
+		) {
 			flags.set(a.id, true)
 		} else if (
 			a.clientCreatedAt != null &&
@@ -713,7 +751,8 @@ async function rollUpByServiceCategory(
 	}
 	for (const a of appointments) {
 		const primary = a.services.reduce<(typeof a.services)[number] | null>(
-			(best, s) => (best == null || (s.minutes ?? 0) > (best.minutes ?? 0) ? s : best),
+			(best, s) =>
+				best == null || (s.minutes ?? 0) > (best.minutes ?? 0) ? s : best,
 			null,
 		)
 		const row = rowFor(
@@ -751,7 +790,9 @@ export type TodayProgress = {
  * once it has ENDED - a 3pm facial still on the table hasn't paid yet.
  * Falls back to elapsed business hours on a day with nothing booked.
  */
-export async function loadTodayProgress(todayEt: string): Promise<TodayProgress> {
+export async function loadTodayProgress(
+	todayEt: string,
+): Promise<TodayProgress> {
 	const appointments = await getBlvdAppointmentsInRange(todayEt, todayEt).catch(
 		error => {
 			console.error('Failed to load today for progress', error)
@@ -874,10 +915,20 @@ export async function loadRevenueChartCells(win: ReportWindow): Promise<{
 	// instead of $0. No attribution or appointment ids exist for that era.
 	const janeItems = await prisma.revenueItem
 		.findMany({
-			where: { source: { in: ['jane', 'jane-bank'] }, occurredAt: { gte: since, lt: until } },
+			where: {
+				source: { in: ['jane', 'jane-bank'] },
+				occurredAt: { gte: since, lt: until },
+			},
 			select: { occurredAt: true, serviceCategory: true, grossAmountUsd: true },
 		})
-		.catch(() => [] as Array<{ occurredAt: Date; serviceCategory: string | null; grossAmountUsd: number }>)
+		.catch(
+			() =>
+				[] as Array<{
+					occurredAt: Date
+					serviceCategory: string | null
+					grossAmountUsd: number
+				}>,
+		)
 	const touchIds = [
 		...new Set(items.map(i => i.attributionTouchId).filter(Boolean)),
 	] as string[]
@@ -923,7 +974,8 @@ export async function loadRevenueChartCells(win: ReportWindow): Promise<{
 		cell.usd += item.grossAmountUsd
 		if (item.boulevardAppointmentId) {
 			let perCell = apptUsdByCell.get(item.boulevardAppointmentId)
-			if (!perCell) apptUsdByCell.set(item.boulevardAppointmentId, (perCell = new Map()))
+			if (!perCell)
+				apptUsdByCell.set(item.boulevardAppointmentId, (perCell = new Map()))
 			perCell.set(key, (perCell.get(key) ?? 0) + item.grossAmountUsd)
 		}
 	}
@@ -944,12 +996,22 @@ export async function loadRevenueChartCells(win: ReportWindow): Promise<{
 		const key = `${day}|${cat}|Jane (pre-migration)|none`
 		let cell = cellByKey.get(key)
 		if (!cell) {
-			cell = { day, cat, source: 'Jane (pre-migration)', channel: 'none', usd: 0, appts: 0 }
+			cell = {
+				day,
+				cat,
+				source: 'Jane (pre-migration)',
+				channel: 'none',
+				usd: 0,
+				appts: 0,
+			}
 			cellByKey.set(key, cell)
 		}
 		cell.usd += item.grossAmountUsd
 	}
-	const cells = [...cellByKey.values()].map(c => ({ ...c, usd: Math.round(c.usd) }))
+	const cells = [...cellByKey.values()].map(c => ({
+		...c,
+		usd: Math.round(c.usd),
+	}))
 	const byCategory = await rollUpByServiceCategory(rangeAppointments, cells)
 	return {
 		cells,
@@ -1144,7 +1206,9 @@ export async function loadBookingFunnel(request: Request) {
 	})
 	const touchedIds = new Set(touched.map(t => t.boulevardAppointmentId))
 	// The web booking flow records new vs returning on the intent, keyed by cart.
-	const cartIds = touches.map(t => t.bookingCartId).filter((v): v is string => Boolean(v))
+	const cartIds = touches
+		.map(t => t.bookingCartId)
+		.filter((v): v is string => Boolean(v))
 	const intents = cartIds.length
 		? await prisma.blvdBookingIntent.findMany({
 				where: { bookingCartId: { in: cartIds } },
@@ -1172,7 +1236,11 @@ export async function loadBookingFunnel(request: Request) {
 	// Boulevard history so a client counts as new on one booking only.
 	const [avgByName, newClientFlags] = await Promise.all([
 		getAvgTicketByName([
-			...new Set(untracked.flatMap(a => a.services.filter(s => !s.price).map(s => s.name))),
+			...new Set(
+				untracked.flatMap(a =>
+					a.services.filter(s => !s.price).map(s => s.name),
+				),
+			),
 		]),
 		resolveNewClientFlags(createdAppointments),
 	])
@@ -1195,12 +1263,16 @@ export async function loadBookingFunnel(request: Request) {
 			source: getSourceLabel(t),
 			expectedUsd: t.bookingValueUsd ?? 0,
 			clientName:
-				[t.blvdClient?.firstName, t.blvdClient?.lastName].filter(Boolean).join(' ') ||
-				null,
+				[t.blvdClient?.firstName, t.blvdClient?.lastName]
+					.filter(Boolean)
+					.join(' ') || null,
 			blvdUrl: blvdClientUrl(t.blvdClient?.boulevardClientId),
 			posthogUrl: posthogSessionUrl(t),
 			boulevardAppointmentId: t.appointments[0]?.boulevardAppointmentId ?? null,
-			clientId: normalizeBlvdEntityId('Client', t.blvdClient?.boulevardClientId),
+			clientId: normalizeBlvdEntityId(
+				'Client',
+				t.blvdClient?.boulevardClientId,
+			),
 			cancelled: false,
 			actualUsd: null as number | null,
 			// Boulevard history first; what the client told the booking form
@@ -1217,27 +1289,29 @@ export async function loadBookingFunnel(request: Request) {
 		...untracked.map(a => {
 			const isNew = newClientFlags.get(a.id) ?? null
 			return {
-			bookedAt: (a.createdAt ?? a.startAt).toISOString(),
-			apptAt: a.startAt.toISOString(),
-			bucket: bucketFor(a.createdAt ?? a.startAt, granularity),
-			service: a.services.map(s => s.name).join('; ') || 'Unknown service',
-			location: a.locationName,
-			source:
-				staffNewSources.get(a.id) ??
-				getUnattributedLabel(a.bookedByType, isNew),
-			expectedUsd: a.services.reduce(
-				(sum, s) => sum + (s.price ? s.price / 100 : Math.round(avgByName.get(s.name) ?? 0)),
-				0,
-			),
-			clientName: a.clientName,
-			blvdUrl: a.manageUrl ?? blvdClientUrl(a.clientId),
-			posthogUrl: null,
-			newClient: isNew,
-			boulevardAppointmentId: a.id,
-			clientId: a.clientId,
-			cancelled: false,
-			actualUsd: null as number | null,
-		}
+				bookedAt: (a.createdAt ?? a.startAt).toISOString(),
+				apptAt: a.startAt.toISOString(),
+				bucket: bucketFor(a.createdAt ?? a.startAt, granularity),
+				service: a.services.map(s => s.name).join('; ') || 'Unknown service',
+				location: a.locationName,
+				source:
+					staffNewSources.get(a.id) ??
+					getUnattributedLabel(a.bookedByType, isNew),
+				expectedUsd: a.services.reduce(
+					(sum, s) =>
+						sum +
+						(s.price ? s.price / 100 : Math.round(avgByName.get(s.name) ?? 0)),
+					0,
+				),
+				clientName: a.clientName,
+				blvdUrl: a.manageUrl ?? blvdClientUrl(a.clientId),
+				posthogUrl: null,
+				newClient: isNew,
+				boulevardAppointmentId: a.id,
+				clientId: a.clientId,
+				cancelled: false,
+				actualUsd: null as number | null,
+			}
 		}),
 	].sort((a, b) => b.bookedAt.localeCompare(a.bookedAt))
 
@@ -1247,7 +1321,9 @@ export async function loadBookingFunnel(request: Request) {
 	{
 		const ids = [
 			...new Set(
-				rows.map(r => r.boulevardAppointmentId).filter((v): v is string => Boolean(v)),
+				rows
+					.map(r => r.boulevardAppointmentId)
+					.filter((v): v is string => Boolean(v)),
 			),
 		]
 		if (ids.length) {
@@ -1280,7 +1356,9 @@ export async function loadBookingFunnel(request: Request) {
 		const ids = [
 			...new Set(
 				rows
-					.map(r => normalizeBlvdEntityId('Appointment', r.boulevardAppointmentId))
+					.map(r =>
+						normalizeBlvdEntityId('Appointment', r.boulevardAppointmentId),
+					)
 					.filter((v): v is string => Boolean(v)),
 			),
 		]
@@ -1294,7 +1372,10 @@ export async function loadBookingFunnel(request: Request) {
 			})
 			const cancelledIds = new Set(cancelled.map(a => a.id))
 			for (const r of rows) {
-				const id = normalizeBlvdEntityId('Appointment', r.boulevardAppointmentId)
+				const id = normalizeBlvdEntityId(
+					'Appointment',
+					r.boulevardAppointmentId,
+				)
 				if (id && cancelledIds.has(id)) r.cancelled = true
 			}
 		}
@@ -1309,13 +1390,20 @@ export async function loadBookingFunnel(request: Request) {
 		const DAY_MS = 24 * 3600 * 1000
 		const firstNewRow = new Map<string, FunnelRow>()
 		for (const r of [...rows].reverse()) {
-			if (r.newClient === true && !r.cancelled && r.clientId && !firstNewRow.has(r.clientId)) {
+			if (
+				r.newClient === true &&
+				!r.cancelled &&
+				r.clientId &&
+				!firstNewRow.has(r.clientId)
+			) {
 				firstNewRow.set(r.clientId, r)
 			}
 		}
 		if (firstNewRow.size) {
 			const earliest =
-				Math.min(...[...firstNewRow.values()].map(r => Date.parse(r.bookedAt))) - DAY_MS
+				Math.min(
+					...[...firstNewRow.values()].map(r => Date.parse(r.bookedAt)),
+				) - DAY_MS
 			const visits = await prisma.blvdAppointment.findMany({
 				where: {
 					clientId: { in: [...firstNewRow.keys()] },
@@ -1335,13 +1423,19 @@ export async function loadBookingFunnel(request: Request) {
 				}
 			}
 			if (firstVisit.size) {
-				const minStart = Math.min(...[...firstVisit.values()].map(d => d.getTime()))
+				const minStart = Math.min(
+					...[...firstVisit.values()].map(d => d.getTime()),
+				)
 				const items = await prisma.blvdRevenueItem.findMany({
 					where: {
 						boulevardClientId: { in: [...firstVisit.keys()] },
 						occurredAt: { gte: new Date(minStart - DAY_MS) },
 					},
-					select: { boulevardClientId: true, occurredAt: true, grossAmountUsd: true },
+					select: {
+						boulevardClientId: true,
+						occurredAt: true,
+						grossAmountUsd: true,
+					},
 				})
 				const spent = new Map<string, number>()
 				for (const item of items) {
@@ -1360,7 +1454,9 @@ export async function loadBookingFunnel(request: Request) {
 					}
 				}
 				for (const clientId of firstVisit.keys()) {
-					firstNewRow.get(clientId)!.actualUsd = Math.round(spent.get(clientId) ?? 0)
+					firstNewRow.get(clientId)!.actualUsd = Math.round(
+						spent.get(clientId) ?? 0,
+					)
 				}
 			}
 		}
