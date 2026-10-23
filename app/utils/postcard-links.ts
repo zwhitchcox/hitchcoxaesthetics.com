@@ -23,6 +23,11 @@ export const POSTCARD_LINKS: Record<
 		campaign: 'eddm-weight-loss-2026-11',
 		content: 'sticky-note',
 	},
+	'bx-relax': {
+		path: '/botox',
+		campaign: 'eddm-botox-2026-11',
+		content: 'relax-1950s',
+	},
 }
 
 /** Where a postcard code sends the visitor, or null for an unknown code. */
