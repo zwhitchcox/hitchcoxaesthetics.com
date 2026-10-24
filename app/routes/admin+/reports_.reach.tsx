@@ -148,16 +148,14 @@ const SERVICE_CATEGORY: Record<string, string> = {
 	skin: 'Laser & Skin',
 }
 
-// Words that only say where. "botox knoxville", "botox knoxville tn" and
-// "botox near me" are one search, and one page can win all of them.
+// Words that only say where. "weight loss clinic knoxville" and "weight loss
+// clinic near me" are one search, and one page can win both.
 const PLACE_WORDS = /\b(knoxville|tn|farragut|near me|in)\b/g
 // Searches that name the same thing in other words, so one page can win them.
 const SAME_SEARCH: Record<string, string> = {
 	medspa: 'med spa',
 	aesthetics: 'med spa',
 	'dermal fillers': 'filler',
-	'jaw botox': 'masseter botox',
-	'botox 11 lines': 'frown lines botox',
 	'tear trough filler': 'under eye filler',
 	everesse: 'skin tightening',
 	'weight loss clinic': 'weight loss',
@@ -165,9 +163,13 @@ const SAME_SEARCH: Record<string, string> = {
 	'weight loss shots': 'weight loss',
 	'glp-1 weight loss': 'weight loss',
 }
+// Searches for the Botox page and its child pages (masseter, forehead lines,
+// lip flip and more) are one group (Zane, 2026-10-24).
+const BOTOX_SEARCH = /botox|lip flip/
 
 /** The group of a tracked search in the Rank by search table. */
 function searchGroup(kw: string) {
+	if (BOTOX_SEARCH.test(kw)) return 'botox'
 	const core = kw.replace(PLACE_WORDS, ' ').replace(/\s+/g, ' ').trim()
 	return SAME_SEARCH[core] ?? core
 }
@@ -1253,11 +1255,13 @@ function RankBySearch({
 			<details className="how">
 				<summary>How to read this</summary>
 				<p>
-					Searches that one page can win together are grouped: "botox
-					knoxville", "botox knoxville tn" and "botox near me" differ only in
-					the place. The groups are in order of what #1 on all their searches is
-					worth, the most first. Click a column title to sort by it; a group
-					sorts by its total, or by its top search for that column.
+					Searches that one page can win together are grouped: "weight loss
+					clinic knoxville" and "weight loss clinic near me" differ only in the
+					place. The botox group holds every search for the Botox page and its
+					child pages, such as masseter, forehead lines and lip flip. The groups
+					are in order of what #1 on all their searches is worth, the most
+					first. Click a column title to sort by it; a group sorts by its total,
+					or by its top search for that column.
 				</p>
 				<p>
 					#1 is worth a month = searches ×{' '}
