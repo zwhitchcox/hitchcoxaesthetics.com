@@ -33,6 +33,7 @@ import {
 	type SerializeFrom,
 } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
+import { Fragment } from 'react'
 import {
 	Choice,
 	LineChart,
@@ -40,10 +41,12 @@ import {
 	ReportPage,
 	revalidateUnlessOnly,
 	SERIES,
+	sortBy,
 	StatTile,
 	usd,
 	useChoice,
 	usePersistedSearch,
+	useSortable,
 } from '#app/components/report-ui'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import {
@@ -143,6 +146,48 @@ const SERVICE_CATEGORY: Record<string, string> = {
 	filler: 'Filler',
 	'med spa': 'ALL',
 	skin: 'Laser & Skin',
+}
+
+// Words that only say where. "botox knoxville", "botox knoxville tn" and
+// "botox near me" are one search: the page that ranks for one ranks for all.
+const PLACE_WORDS = /\b(knoxville|tn|farragut|near me|in)\b/g
+// Searches that name the same thing in other words, so one page wins them.
+const SAME_SEARCH: Record<string, string> = {
+	medspa: 'med spa',
+	aesthetics: 'med spa',
+	'dermal fillers': 'filler',
+	'jaw botox': 'masseter botox',
+	'botox 11 lines': 'frown lines botox',
+	'tear trough filler': 'under eye filler',
+	everesse: 'skin tightening',
+	'weight loss clinic': 'weight loss',
+	'medical weight loss': 'weight loss',
+	'weight loss shots': 'weight loss',
+	'glp-1 weight loss': 'weight loss',
+}
+
+/** The group of a tracked search in the Rank by search table. */
+function searchGroup(kw: string) {
+	const core = kw.replace(PLACE_WORDS, ' ').replace(/\s+/g, ' ').trim()
+	return SAME_SEARCH[core] ?? core
+}
+
+/**
+ * The client-value cohort a search's searchers convert into, with the
+ * service groups of sha-reports src/client-value.ts.
+ */
+function searchCategory(kw: string) {
+	if (/weight loss|semaglutide|tirzepatide|glp-1/.test(kw)) return 'Weight Loss'
+	if (/laser hair/.test(kw)) return 'Laser Hair'
+	if (/botox|dysport|jeuveau|lip flip/.test(kw)) return 'Tox'
+	if (/filler|skinvive/.test(kw)) return 'Filler'
+	if (
+		/laser|microneedling|tightening|everesse|photofacial|vein|sun spot|prp/.test(
+			kw,
+		)
+	)
+		return 'Laser & Skin'
+	return 'ALL'
 }
 
 // Stale-while-revalidate for the two map-pack views (report_reach_weekly and
@@ -732,7 +777,20 @@ function OrganicView({ data }: { data: Data }) {
 		}))
 		.filter(g => g.keywords.length)
 
-	const rows = groups.flatMap(g =>
+	// New clients a month from a rank on some searches: the first blue link's
+	// click share less the map box, the booking rate of people who searched
+	// for the service, and phone bookings on top.
+	const clientsAt = (searches: number, rank: number | null) =>
+		searches *
+		(rank ? (ORGANIC_CTR[rank - 1] ?? 0) : 0) *
+		SEARCH_CONSOLE_SCALE *
+		SEARCH_VISIT_TO_CLIENT *
+		PHONE_FACTOR
+	// What a new client spends in their first 6 months, by service.
+	const perClient = (category: string) =>
+		valueByCat.get(category) ?? valueByCat.get('ALL') ?? 0
+
+	const rows: SearchRow[] = groups.flatMap(g =>
 		g.keywords.map(kw => {
 			const history = weeks.map(w => readingAt(w, kw))
 			const now = history[history.length - 1]!
@@ -743,11 +801,16 @@ function OrganicView({ data }: { data: Data }) {
 					.find(r => r.checked) ?? null
 			const lastRank = [...history].reverse().find(r => r.rank != null) ?? null
 			const vol = volumeByKw.get(kw)
+			const searches =
+				vol?.monthly_searches != null ? Number(vol.monthly_searches) : null
 			return {
 				kw,
-				searches:
-					vol?.monthly_searches != null ? Number(vol.monthly_searches) : null,
+				searches,
 				estimated: vol?.estimated ?? false,
+				worth:
+					searches != null
+						? clientsAt(searches, 1) * perClient(searchCategory(kw))
+						: null,
 				site: g.site,
 				history,
 				now,
@@ -758,23 +821,6 @@ function OrganicView({ data }: { data: Data }) {
 			}
 		}),
 	)
-	// Best and worst point, when the readings differ.
-	const byArea = (row: SerpRankRow | undefined) => {
-		if (!row?.points || row.points < 2 || !row.points_found) return null
-		if (row.points_found < row.points)
-			return (
-				<span className="sub-line">
-					best #{row.best_rank}, found in {row.points_found} of {row.points}{' '}
-					areas
-				</span>
-			)
-		if (row.best_rank === row.worst_rank) return null
-		return (
-			<span className="sub-line">
-				#{row.best_rank} to #{row.worst_rank} by area
-			</span>
-		)
-	}
 	const total = rows.length
 	const firsts = rows.filter(r => r.now.rank === 1).length
 	const top10 = rows.filter(r => r.now.rank != null && r.now.rank <= 10).length
@@ -786,30 +832,19 @@ function OrganicView({ data }: { data: Data }) {
 		const known = weeks.map(w => readingAt(w, kw)).filter(r => r.rank != null)
 		return known.at(-1)?.rank ?? null
 	}
-	// What #1 brings for each service: all its searches, the first blue link's
-	// click share less the map box, the booking rate of people who searched for
-	// the service, phone bookings on top, and a new client's 6-month value.
+	// What #1 brings for each service, on all its searches.
 	const serviceRows = services.map(s => {
 		const searches = Number(s.monthly_searches)
-		const perClient =
-			valueByCat.get(SERVICE_CATEGORY[s.service] ?? 'ALL') ??
-			valueByCat.get('ALL') ??
-			0
-		const clientsAt = (rank: number | null) =>
-			searches *
-			(rank ? (ORGANIC_CTR[rank - 1] ?? 0) : 0) *
-			SEARCH_CONSOLE_SCALE *
-			SEARCH_VISIT_TO_CLIENT *
-			PHONE_FACTOR
+		const value = perClient(SERVICE_CATEGORY[s.service] ?? 'ALL')
 		const rank = rankOf(s.main_search)
 		return {
 			...s,
 			searches,
-			perClient,
+			perClient: value,
 			rank,
-			clientsFirst: clientsAt(1),
-			worthFirst: clientsAt(1) * perClient,
-			worthNow: clientsAt(rank) * perClient,
+			clientsFirst: clientsAt(searches, 1),
+			worthFirst: clientsAt(searches, 1) * value,
+			worthNow: clientsAt(searches, rank) * value,
 		}
 	})
 	const totalGain = serviceRows.reduce(
@@ -954,131 +989,12 @@ function OrganicView({ data }: { data: Data }) {
 				</section>
 			) : null}
 
-			<section>
-				<h2>
-					Rank by search{' '}
-					<span className="mini">
-						capture of {latestWeek}; change against the last full reading
-					</span>
-				</h2>
-				<div className="rtable-wrap">
-					<table className="rtable">
-						<thead>
-							<tr>
-								<th>Search</th>
-								{siteKey === 'all' ? <th>Site we want to win</th> : null}
-								<th className="num">Searches a month</th>
-								<th className="num">Rank</th>
-								<th className="num">Change</th>
-								<th>Last {weeks.length} weeks</th>
-								<th>Our page that ranks</th>
-								<th>Who is #1</th>
-							</tr>
-						</thead>
-						<tbody>
-							{rows.map(r => {
-								const delta = changeLabel(r.now, r.earlier)
-								const weAreFirst =
-									r.row?.top_domain != null &&
-									site(r.row.top_domain) === site(r.row.my_domain)
-								return (
-									<tr key={r.kw}>
-										<td>{r.kw}</td>
-										{siteKey === 'all' ? (
-											<td className="mini">{r.site.label}</td>
-										) : null}
-										<td className="num">
-											{r.searches != null
-												? `${r.searches.toLocaleString()}${r.estimated ? '*' : ''}`
-												: '<10'}
-										</td>
-										<td
-											className={`num ${
-												!r.now.checked
-													? 'dim'
-													: r.now.rank != null && r.now.rank <= 3
-														? 'good'
-														: r.now.rank == null || r.now.rank > 20
-															? 'bad'
-															: ''
-											}`}
-										>
-											{r.now.rank != null ? (
-												<>
-													#{r.now.rank}
-													{byArea(r.row)}
-												</>
-											) : r.now.checked ? (
-												<>
-													not in top {r.read}
-													{byArea(r.row)}
-												</>
-											) : (
-												<>
-													not checked
-													<span className="sub-line">
-														{r.lastRank
-															? `#${r.lastRank.rank} on ${r.lastRank.week.slice(5)}`
-															: `read ${r.read} results`}
-													</span>
-												</>
-											)}
-										</td>
-										<td className={`num ${delta.tone}`}>{delta.text}</td>
-										<td>
-											<RankSparkline weeks={r.history} floor={RANK_FLOOR} />
-										</td>
-										<td className="mini">
-											{r.row?.my_url ? (
-												<a href={r.row.my_url} target="_blank" rel="noreferrer">
-													{site(r.row.my_domain)}
-													{new URL(r.row.my_url).pathname}
-												</a>
-											) : (
-												'-'
-											)}
-										</td>
-										<td className="mini">
-											{weAreFirst ? (
-												<strong>us</strong>
-											) : (
-												site(r.row?.top_domain ?? null) || '-'
-											)}
-										</td>
-									</tr>
-								)
-							})}
-						</tbody>
-					</table>
-				</div>
-				<details className="how">
-					<summary>How to read this</summary>
-					<p>
-						Rank is our position among the blue links only: the map box and ads
-						are not counted. From the week of 2026-10-19, every search is read
-						from five points (Farragut, Bearden, Downtown, North Knoxville and
-						Maryville), because Google ranks the blue links differently across
-						town; Rank is the middle reading, and the line under it gives the
-						best and worst point. Earlier weeks have one reading from central
-						Knoxville. Change compares with the last week that was read in full;
-						a plus means we climbed. The small line shows each week, higher is
-						better, a red dot means not found, and a gap means that week was cut
-						short.
-					</p>
-					<p>
-						A capture normally reads about 100 results. When one reads fewer
-						than {SHORT_CAPTURE} and we are not in them, the row says "not
-						checked" and shows our last known rank, because we cannot tell from
-						that week where we were.
-					</p>
-					<p>
-						Searches a month: Google Ads volume for the Knoxville market.
-						"&lt;10" means Google gives no number, which it does below 10 a
-						month. * = Google counts this search together with a close variant
-						we also track, so it shows that number.
-					</p>
-				</details>
-			</section>
+			<RankBySearch
+				rows={rows}
+				showSite={siteKey === 'all'}
+				weekCount={weeks.length}
+				latestWeek={latestWeek}
+			/>
 
 			{oneSite ? (
 				<section>
@@ -1153,25 +1069,363 @@ function OrganicView({ data }: { data: Data }) {
 	)
 }
 
+type SearchRow = {
+	kw: string
+	searches: number | null
+	estimated: boolean
+	/** What #1 on this search is worth a month; null when Google gives no number. */
+	worth: number | null
+	site: (typeof OUR_SITES)[number]
+	history: Reading[]
+	now: Reading
+	earlier: Reading | null
+	lastRank: Reading | null
+	row: SerpRankRow | undefined
+	read: number
+}
+
+// What each column of the Rank by search table sorts on. Rank is negated, so
+// the first click (largest first) puts #1 on top.
+const ROW_SORT = {
+	search: (r: SearchRow) => r.kw,
+	site: (r: SearchRow) => r.site.label,
+	searches: (r: SearchRow) => r.searches,
+	worth: (r: SearchRow) => r.worth,
+	rank: (r: SearchRow) => -sortRank(r.now),
+	change: (r: SearchRow) => changeLabel(r.now, r.earlier).value,
+	page: (r: SearchRow) => r.row?.my_url ?? null,
+	top: (r: SearchRow) => site(r.row?.top_domain ?? null) || null,
+}
+
+type SearchGroup = {
+	name: string
+	rows: SearchRow[]
+	searches: number | null
+	worth: number | null
+}
+
+/**
+ * The searches grouped with searchGroup(), with their searches and what #1
+ * on all of them is worth. Google gives "botox knoxville" the number of
+ * "botox knoxville tn", so searches that differ only by "tn" or "in" and
+ * have the same number count once.
+ */
+function groupSearches(rows: SearchRow[]): SearchGroup[] {
+	const byName = new Map<string, SearchRow[]>()
+	for (const r of rows) {
+		const name = searchGroup(r.kw)
+		byName.set(name, [...(byName.get(name) ?? []), r])
+	}
+	return [...byName].map(([name, inGroup]) => {
+		const once = [
+			...new Map(
+				inGroup
+					.filter(r => r.searches != null)
+					.map(r => [
+						`${r.kw.replace(/\b(tn|in)\b|\s/g, '')}|${r.searches}`,
+						r,
+					]),
+			).values(),
+		]
+		return {
+			name,
+			rows: inGroup,
+			searches: once.length ? once.reduce((n, r) => n + r.searches!, 0) : null,
+			worth: once.length ? once.reduce((n, r) => n + r.worth!, 0) : null,
+		}
+	})
+}
+
+/**
+ * Rank by search: every tracked search, grouped with the searches that one
+ * page wins together, the most valuable group first. Every column sorts;
+ * a group sorts by its total, or by its top search for that column.
+ */
+function RankBySearch({
+	rows,
+	showSite,
+	weekCount,
+	latestWeek,
+}: {
+	rows: SearchRow[]
+	showSite: boolean
+	weekCount: number
+	latestWeek: string
+}) {
+	const topRow = (get: (r: SearchRow) => unknown) => (g: SearchGroup) =>
+		get(sortBy(g.rows, get, -1)[0]!)
+	const {
+		rows: groups,
+		Th,
+		sort,
+	} = useSortable(
+		groupSearches(rows),
+		{
+			search: g => g.name,
+			site: topRow(ROW_SORT.site),
+			searches: g => g.searches,
+			worth: g => g.worth,
+			rank: topRow(ROW_SORT.rank),
+			change: topRow(ROW_SORT.change),
+			page: topRow(ROW_SORT.page),
+			top: topRow(ROW_SORT.top),
+		},
+		{ key: 'worth', dir: -1 },
+	)
+	const order = (inGroup: SearchRow[]) =>
+		sort
+			? sortBy(inGroup, ROW_SORT[sort.key as keyof typeof ROW_SORT], sort.dir)
+			: inGroup
+	return (
+		<section>
+			<h2>
+				Rank by search{' '}
+				<span className="mini">
+					capture of {latestWeek}; change against the last full reading; click a
+					column title to sort
+				</span>
+			</h2>
+			<div className="rtable-wrap">
+				<table className="rtable">
+					<thead>
+						<tr>
+							<Th k="search">Search</Th>
+							{showSite ? <Th k="site">Site we want to win</Th> : null}
+							<Th k="searches" num>
+								Searches a month
+							</Th>
+							<Th k="worth" num>
+								#1 is worth a month
+							</Th>
+							<Th k="rank" num>
+								Rank
+							</Th>
+							<Th k="change" num>
+								Change
+							</Th>
+							<th>Last {weekCount} weeks</th>
+							<Th k="page">Our page that ranks</Th>
+							<Th k="top">Who is #1</Th>
+						</tr>
+					</thead>
+					<tbody>
+						{groups.map(g => {
+							const inGroup = order(g.rows)
+							if (inGroup.length === 1)
+								return (
+									<SearchTr key={g.name} r={inGroup[0]!} showSite={showSite} />
+								)
+							const sites = [...new Set(inGroup.map(r => r.site.label))]
+							const top10 = inGroup.filter(
+								r => r.now.rank != null && r.now.rank <= 10,
+							).length
+							return (
+								<Fragment key={g.name}>
+									<tr className="group">
+										<td>
+											{g.name}{' '}
+											<span className="dim">{inGroup.length} searches</span>
+										</td>
+										{showSite ? (
+											<td className="mini">
+												{sites.length === 1
+													? sites[0]
+													: `${sites.length} sites`}
+											</td>
+										) : null}
+										<td className="num">
+											{g.searches != null ? g.searches.toLocaleString() : '-'}
+										</td>
+										<td className="num">{usd(g.worth)}</td>
+										<td colSpan={5} className="dim">
+											in the top 10 on {top10} of {inGroup.length}
+										</td>
+									</tr>
+									{inGroup.map(r => (
+										<SearchTr key={r.kw} r={r} showSite={showSite} indent />
+									))}
+								</Fragment>
+							)
+						})}
+					</tbody>
+				</table>
+			</div>
+			<details className="how">
+				<summary>How to read this</summary>
+				<p>
+					Searches that one page wins together are grouped: "botox knoxville",
+					"botox knoxville tn" and "botox near me" differ only in the place, so
+					the page that ranks for one ranks for all. The groups are in order of
+					what #1 on all their searches is worth, the most first. Click a column
+					title to sort by it; a group sorts by its total, or by its top search
+					for that column.
+				</p>
+				<p>
+					#1 is worth a month = searches ×{' '}
+					{Math.round(ORGANIC_CTR[0]! * SEARCH_CONSOLE_SCALE * 1000) / 10}% who
+					click the first blue link × {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}
+					% who book as a new client × {PHONE_FACTOR.toFixed(2)} for phone
+					bookings × what a new client spends in their first 6 months, the same
+					math as What #1 is worth above. A group counts a search once when
+					Google gives two of its searches one number.
+				</p>
+				<p>
+					Rank is our position among the blue links only: the map box and ads
+					are not counted. From the week of 2026-10-19, every search is read
+					from five points (Farragut, Bearden, Downtown, North Knoxville and
+					Maryville), because Google ranks the blue links differently across
+					town; Rank is the middle reading, and the line under it gives the best
+					and worst point. Earlier weeks have one reading from central
+					Knoxville. Change compares with the last week that was read in full; a
+					plus means we climbed. The small line shows each week, higher is
+					better, a red dot means not found, and a gap means that week was cut
+					short.
+				</p>
+				<p>
+					A capture normally reads about 100 results. When one reads fewer than{' '}
+					{SHORT_CAPTURE} and we are not in them, the row says "not checked" and
+					shows our last known rank, because we cannot tell from that week where
+					we were.
+				</p>
+				<p>
+					Searches a month: Google Ads volume for the Knoxville market. "&lt;10"
+					means Google gives no number, which it does below 10 a month. * = an
+					estimate: Google gives this search the number of a close variant we
+					also track, or hides it ("botox near me").
+				</p>
+			</details>
+		</section>
+	)
+}
+
+/** One search's row in the Rank by search table. */
+function SearchTr({
+	r,
+	showSite,
+	indent,
+}: {
+	r: SearchRow
+	showSite: boolean
+	indent?: boolean
+}) {
+	const delta = changeLabel(r.now, r.earlier)
+	const weAreFirst =
+		r.row?.top_domain != null &&
+		site(r.row.top_domain) === site(r.row.my_domain)
+	return (
+		<tr>
+			<td className={indent ? 'indent' : undefined}>{r.kw}</td>
+			{showSite ? <td className="mini">{r.site.label}</td> : null}
+			<td className="num">
+				{r.searches != null
+					? `${r.searches.toLocaleString()}${r.estimated ? '*' : ''}`
+					: '<10'}
+			</td>
+			<td className="num">{usd(r.worth)}</td>
+			<td
+				className={`num ${
+					!r.now.checked
+						? 'dim'
+						: r.now.rank != null && r.now.rank <= 3
+							? 'good'
+							: r.now.rank == null || r.now.rank > 20
+								? 'bad'
+								: ''
+				}`}
+			>
+				{r.now.rank != null ? (
+					<>
+						#{r.now.rank}
+						{byArea(r.row)}
+					</>
+				) : r.now.checked ? (
+					<>
+						not in top {r.read}
+						{byArea(r.row)}
+					</>
+				) : (
+					<>
+						not checked
+						<span className="sub-line">
+							{r.lastRank
+								? `#${r.lastRank.rank} on ${r.lastRank.week.slice(5)}`
+								: `read ${r.read} results`}
+						</span>
+					</>
+				)}
+			</td>
+			<td className={`num ${delta.tone}`}>{delta.text}</td>
+			<td>
+				<RankSparkline weeks={r.history} floor={RANK_FLOOR} />
+			</td>
+			<td className="mini">
+				{r.row?.my_url ? (
+					<a href={r.row.my_url} target="_blank" rel="noreferrer">
+						{site(r.row.my_domain)}
+						<wbr />
+						{new URL(r.row.my_url).pathname}
+					</a>
+				) : (
+					'-'
+				)}
+			</td>
+			<td className="mini">
+				{weAreFirst ? (
+					<strong>us</strong>
+				) : (
+					site(r.row?.top_domain ?? null) || '-'
+				)}
+			</td>
+		</tr>
+	)
+}
+
+/** Best and worst point, when the readings differ. */
+function byArea(row: SerpRankRow | undefined) {
+	if (!row?.points || row.points < 2 || !row.points_found) return null
+	if (row.points_found < row.points)
+		return (
+			<span className="sub-line">
+				best #{row.best_rank}, found in {row.points_found} of {row.points} areas
+			</span>
+		)
+	if (row.best_rank === row.worst_rank) return null
+	return (
+		<span className="sub-line">
+			#{row.best_rank} to #{row.worst_rank} by area
+		</span>
+	)
+}
+
 /** Sort order for the table: best rank first, then not found, then not checked. */
 function sortRank(r: Reading) {
 	if (r.rank != null) return r.rank
 	return r.checked ? 900 : 950
 }
 
-/** "+3", "−2", "=", "new", "out", or "-" when either reading is unknown. */
+/**
+ * "+3", "−2", "=", "new", "out", or "-" when either reading is unknown, with
+ * the climb as a number for sorting. Not found counts as #101 there, because
+ * a capture reads about 100 results.
+ */
 function changeLabel(
 	now: Reading,
 	earlier: Reading | null,
-): { text: string; tone: string } {
-	if (!now.checked || !earlier) return { text: '-', tone: '' }
+): { text: string; tone: string; value: number | null } {
+	if (!now.checked || !earlier) return { text: '-', tone: '', value: null }
 	if (now.rank != null && earlier.rank != null) {
 		const d = earlier.rank - now.rank
 		return d === 0
-			? { text: '=', tone: '' }
-			: { text: d > 0 ? `+${d}` : `−${-d}`, tone: d > 0 ? 'good' : 'bad' }
+			? { text: '=', tone: '', value: 0 }
+			: {
+					text: d > 0 ? `+${d}` : `−${-d}`,
+					tone: d > 0 ? 'good' : 'bad',
+					value: d,
+				}
 	}
-	if (now.rank != null) return { text: 'new', tone: 'good' }
-	if (earlier.rank != null) return { text: 'out', tone: 'bad' }
-	return { text: '-', tone: '' }
+	if (now.rank != null)
+		return { text: 'new', tone: 'good', value: 101 - now.rank }
+	if (earlier.rank != null)
+		return { text: 'out', tone: 'bad', value: earlier.rank - 101 }
+	return { text: '-', tone: '', value: null }
 }
