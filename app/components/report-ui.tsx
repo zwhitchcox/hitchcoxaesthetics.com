@@ -98,9 +98,6 @@ table.rtable { width: 100%; border-collapse: collapse; font-variant-numeric: tab
 .lede { font-size: 12.5px; color: var(--ink-2); margin: -4px 0 12px; max-width: 760px; }
 .rtable tr.ours td { background: color-mix(in srgb, var(--series-2) 10%, transparent); }
 .rtable td.dim, .dim { color: var(--muted); }
-.rtable tr.group td { font-weight: 600; background: var(--row-hover); }
-.rtable tr.group .dim { font-weight: 400; }
-.rtable td.indent { padding-left: 20px; }
 .rtable td.mini { overflow-wrap: anywhere; }
 .rtable .sub-line { display: block; font-size: 11px; color: var(--muted); }
 .spark { display: block; }
@@ -227,7 +224,7 @@ function useTip() {
  * Click-to-sort for report tables. Returns sorted rows plus a Th component
  * that renders a sortable header cell; first click sorts descending, second
  * flips. Optional accessors compute the sort value for non-scalar fields.
- * `initial` sets the sort before any click; `sort` is the current sort.
+ * `initial` sets the sort before any click.
  */
 export function useSortable<T extends Record<string, any>>(
 	rows: T[],
@@ -264,11 +261,11 @@ export function useSortable<T extends Record<string, any>>(
 			{sort?.key === k ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}
 		</th>
 	)
-	return { rows: sorted, Th, sort }
+	return { rows: sorted, Th }
 }
 
 /** Rows sorted by get(row): dir 1 is ascending, -1 descending; empty values go last. */
-export function sortBy<T>(rows: T[], get: (row: T) => unknown, dir: 1 | -1) {
+function sortBy<T>(rows: T[], get: (row: T) => unknown, dir: 1 | -1) {
 	return [...rows].sort((a, b) => {
 		const av = get(a)
 		const bv = get(b)

@@ -33,7 +33,6 @@ import {
 	type SerializeFrom,
 } from '@remix-run/node'
 import { useLoaderData } from '@remix-run/react'
-import { Fragment } from 'react'
 import {
 	Choice,
 	LineChart,
@@ -41,7 +40,6 @@ import {
 	ReportPage,
 	revalidateUnlessOnly,
 	SERIES,
-	sortBy,
 	StatTile,
 	usd,
 	useChoice,
@@ -146,32 +144,6 @@ const SERVICE_CATEGORY: Record<string, string> = {
 	filler: 'Filler',
 	'med spa': 'ALL',
 	skin: 'Laser & Skin',
-}
-
-// Words that only say where. "weight loss clinic knoxville" and "weight loss
-// clinic near me" are one search, and one page can win both.
-const PLACE_WORDS = /\b(knoxville|tn|farragut|near me|in)\b/g
-// Searches that name the same thing in other words, so one page can win them.
-const SAME_SEARCH: Record<string, string> = {
-	medspa: 'med spa',
-	aesthetics: 'med spa',
-	'dermal fillers': 'filler',
-	'tear trough filler': 'under eye filler',
-	everesse: 'skin tightening',
-	'weight loss clinic': 'weight loss',
-	'medical weight loss': 'weight loss',
-	'weight loss shots': 'weight loss',
-	'glp-1 weight loss': 'weight loss',
-}
-// Searches for the Botox page and its child pages (masseter, forehead lines,
-// lip flip and more) are one group (Zane, 2026-10-24).
-const BOTOX_SEARCH = /botox|lip flip/
-
-/** The group of a tracked search in the Rank by search table. */
-function searchGroup(kw: string) {
-	if (BOTOX_SEARCH.test(kw)) return 'botox'
-	const core = kw.replace(PLACE_WORDS, ' ').replace(/\s+/g, ' ').trim()
-	return SAME_SEARCH[core] ?? core
 }
 
 /**
@@ -1099,49 +1071,9 @@ const ROW_SORT = {
 	top: (r: SearchRow) => site(r.row?.top_domain ?? null) || null,
 }
 
-type SearchGroup = {
-	name: string
-	rows: SearchRow[]
-	searches: number | null
-	worth: number | null
-}
-
 /**
- * The searches grouped with searchGroup(), with their searches and what #1
- * on all of them is worth. Google gives "botox knoxville" the number of
- * "botox knoxville tn", so searches that differ only by "tn" or "in" and
- * have the same number count once.
- */
-function groupSearches(rows: SearchRow[]): SearchGroup[] {
-	const byName = new Map<string, SearchRow[]>()
-	for (const r of rows) {
-		const name = searchGroup(r.kw)
-		byName.set(name, [...(byName.get(name) ?? []), r])
-	}
-	return [...byName].map(([name, inGroup]) => {
-		const once = [
-			...new Map(
-				inGroup
-					.filter(r => r.searches != null)
-					.map(r => [
-						`${r.kw.replace(/\b(tn|in)\b|\s/g, '')}|${r.searches}`,
-						r,
-					]),
-			).values(),
-		]
-		return {
-			name,
-			rows: inGroup,
-			searches: once.length ? once.reduce((n, r) => n + r.searches!, 0) : null,
-			worth: once.length ? once.reduce((n, r) => n + r.worth!, 0) : null,
-		}
-	})
-}
-
-/**
- * Rank by search: every tracked search, grouped with the searches that one
- * page can win together, the most valuable group first. Every column sorts;
- * a group sorts by its total, or by its top search for that column.
+ * Rank by search: every tracked search, the most valuable first. Every
+ * column sorts.
  */
 function RankBySearch({
 	rows,
@@ -1154,30 +1086,10 @@ function RankBySearch({
 	weekCount: number
 	latestWeek: string
 }) {
-	const topRow = (get: (r: SearchRow) => unknown) => (g: SearchGroup) =>
-		get(sortBy(g.rows, get, -1)[0]!)
-	const {
-		rows: groups,
-		Th,
-		sort,
-	} = useSortable(
-		groupSearches(rows),
-		{
-			search: g => g.name,
-			site: topRow(ROW_SORT.site),
-			searches: g => g.searches,
-			worth: g => g.worth,
-			rank: topRow(ROW_SORT.rank),
-			change: topRow(ROW_SORT.change),
-			page: topRow(ROW_SORT.page),
-			top: topRow(ROW_SORT.top),
-		},
-		{ key: 'worth', dir: -1 },
-	)
-	const order = (inGroup: SearchRow[]) =>
-		sort
-			? sortBy(inGroup, ROW_SORT[sort.key as keyof typeof ROW_SORT], sort.dir)
-			: inGroup
+	const { rows: sorted, Th } = useSortable(rows, ROW_SORT, {
+		key: 'worth',
+		dir: -1,
+	})
 	return (
 		<section>
 			<h2>
@@ -1211,57 +1123,17 @@ function RankBySearch({
 						</tr>
 					</thead>
 					<tbody>
-						{groups.map(g => {
-							const inGroup = order(g.rows)
-							if (inGroup.length === 1)
-								return (
-									<SearchTr key={g.name} r={inGroup[0]!} showSite={showSite} />
-								)
-							const sites = [...new Set(inGroup.map(r => r.site.label))]
-							const top10 = inGroup.filter(
-								r => r.now.rank != null && r.now.rank <= 10,
-							).length
-							return (
-								<Fragment key={g.name}>
-									<tr className="group">
-										<td>
-											{g.name}{' '}
-											<span className="dim">{inGroup.length} searches</span>
-										</td>
-										{showSite ? (
-											<td className="mini">
-												{sites.length === 1
-													? sites[0]
-													: `${sites.length} sites`}
-											</td>
-										) : null}
-										<td className="num">
-											{g.searches != null ? g.searches.toLocaleString() : '-'}
-										</td>
-										<td className="num">{usd(g.worth)}</td>
-										<td colSpan={5} className="dim">
-											in the top 10 on {top10} of {inGroup.length}
-										</td>
-									</tr>
-									{inGroup.map(r => (
-										<SearchTr key={r.kw} r={r} showSite={showSite} indent />
-									))}
-								</Fragment>
-							)
-						})}
+						{sorted.map(r => (
+							<SearchTr key={r.kw} r={r} showSite={showSite} />
+						))}
 					</tbody>
 				</table>
 			</div>
 			<details className="how">
 				<summary>How to read this</summary>
 				<p>
-					Searches that one page can win together are grouped: "weight loss
-					clinic knoxville" and "weight loss clinic near me" differ only in the
-					place. The botox group holds every search for the Botox page and its
-					child pages, such as masseter, forehead lines and lip flip. The groups
-					are in order of what #1 on all their searches is worth, the most
-					first. Click a column title to sort by it; a group sorts by its total,
-					or by its top search for that column.
+					The searches are in order of what #1 is worth a month, the most first.
+					Click a column title to sort by it.
 				</p>
 				<p>
 					#1 is worth a month = searches ×{' '}
@@ -1269,8 +1141,7 @@ function RankBySearch({
 					click the first blue link × {Math.round(SEARCH_VISIT_TO_CLIENT * 100)}
 					% who book as a new client × {PHONE_FACTOR.toFixed(2)} for phone
 					bookings × what a new client spends in their first 6 months, the same
-					math as What #1 is worth above. A group counts a search once when
-					Google gives two of its searches one number.
+					math as What #1 is worth above.
 				</p>
 				<p>
 					Rank is our position among the blue links only: the map box and ads
@@ -1302,22 +1173,14 @@ function RankBySearch({
 }
 
 /** One search's row in the Rank by search table. */
-function SearchTr({
-	r,
-	showSite,
-	indent,
-}: {
-	r: SearchRow
-	showSite: boolean
-	indent?: boolean
-}) {
+function SearchTr({ r, showSite }: { r: SearchRow; showSite: boolean }) {
 	const delta = changeLabel(r.now, r.earlier)
 	const weAreFirst =
 		r.row?.top_domain != null &&
 		site(r.row.top_domain) === site(r.row.my_domain)
 	return (
 		<tr>
-			<td className={indent ? 'indent' : undefined}>{r.kw}</td>
+			<td>{r.kw}</td>
 			{showSite ? <td className="mini">{r.site.label}</td> : null}
 			<td className="num">
 				{r.searches != null
