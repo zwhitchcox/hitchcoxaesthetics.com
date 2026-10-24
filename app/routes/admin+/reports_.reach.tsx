@@ -149,9 +149,9 @@ const SERVICE_CATEGORY: Record<string, string> = {
 }
 
 // Words that only say where. "botox knoxville", "botox knoxville tn" and
-// "botox near me" are one search: the page that ranks for one ranks for all.
+// "botox near me" are one search, and one page can win all of them.
 const PLACE_WORDS = /\b(knoxville|tn|farragut|near me|in)\b/g
-// Searches that name the same thing in other words, so one page wins them.
+// Searches that name the same thing in other words, so one page can win them.
 const SAME_SEARCH: Record<string, string> = {
 	medspa: 'med spa',
 	aesthetics: 'med spa',
@@ -1138,7 +1138,7 @@ function groupSearches(rows: SearchRow[]): SearchGroup[] {
 
 /**
  * Rank by search: every tracked search, grouped with the searches that one
- * page wins together, the most valuable group first. Every column sorts;
+ * page can win together, the most valuable group first. Every column sorts;
  * a group sorts by its total, or by its top search for that column.
  */
 function RankBySearch({
@@ -1253,12 +1253,11 @@ function RankBySearch({
 			<details className="how">
 				<summary>How to read this</summary>
 				<p>
-					Searches that one page wins together are grouped: "botox knoxville",
-					"botox knoxville tn" and "botox near me" differ only in the place, so
-					the page that ranks for one ranks for all. The groups are in order of
-					what #1 on all their searches is worth, the most first. Click a column
-					title to sort by it; a group sorts by its total, or by its top search
-					for that column.
+					Searches that one page can win together are grouped: "botox
+					knoxville", "botox knoxville tn" and "botox near me" differ only in
+					the place. The groups are in order of what #1 on all their searches is
+					worth, the most first. Click a column title to sort by it; a group
+					sorts by its total, or by its top search for that column.
 				</p>
 				<p>
 					#1 is worth a month = searches ×{' '}
