@@ -28,6 +28,11 @@ export const POSTCARD_LINKS: Record<
 		campaign: 'eddm-weight-loss-2026-11',
 		content: 'newspaper',
 	},
+	'wl-weekly': {
+		path: '/weight-loss',
+		campaign: 'eddm-weight-loss-2026-11',
+		content: 'knoxville-weekly',
+	},
 	'bx-relax': {
 		path: '/botox',
 		campaign: 'eddm-botox-2026-11',
