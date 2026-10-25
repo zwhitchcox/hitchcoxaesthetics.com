@@ -33,6 +33,11 @@ export const POSTCARD_LINKS: Record<
 		campaign: 'eddm-weight-loss-2026-11',
 		content: 'knoxville-weekly',
 	},
+	'wl-spoil': {
+		path: '/weight-loss',
+		campaign: 'eddm-weight-loss-2026-11',
+		content: 'spoil-your-appetite',
+	},
 	'bx-relax': {
 		path: '/botox',
 		campaign: 'eddm-botox-2026-11',
