@@ -211,6 +211,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		serpRivals,
 		packRivals,
 		services,
+		referringDomains,
 	] = await Promise.all([
 		// Homes-weighted combined reach (any of our listings top-3) per
 		// keyword per capture date, read from the report_reach_weekly
@@ -317,6 +318,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			`SELECT service, monthly_searches, estimated, main_search
 			 FROM service_search_volume ORDER BY monthly_searches DESC`,
 		),
+		// The newest referring-domain count, spam left out, of each site the
+		// link crawler tracks: ours and the Knoxville competitors
+		// (sha-reports src/backlinks.ts, every 3 days). Never the raw total:
+		// since late September a spam wave inflates it for every site.
+		reportsQuery<{ domain: string; referring_domains: number }>(
+			`SELECT DISTINCT ON (domain) domain,
+			   clean_referring_domains AS referring_domains
+			 FROM (SELECT day, domain, clean_referring_domains
+			       FROM raw_competitor_authority
+			       UNION ALL
+			       SELECT day, target, clean_referring_domains
+			       FROM raw_backlink_summary) counts
+			 WHERE clean_referring_domains IS NOT NULL
+			 ORDER BY domain, day DESC`,
+		),
 	])
 	return json({
 		configured: true as const,
@@ -328,6 +344,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		serpRivals,
 		packRivals,
 		services,
+		referringDomains,
 	})
 }
 
@@ -709,6 +726,7 @@ function OrganicView({ data }: { data: Data }) {
 		volumes,
 		values,
 		services,
+		referringDomains,
 	} = data
 	const [siteKey, setSite] = useChoice('site', SITE_CHOICE_VALUES, 'all')
 	if (!ranks.length)
@@ -726,6 +744,9 @@ function OrganicView({ data }: { data: Data }) {
 		values.map(v => [v.category, Number(v.expected_value)]),
 	)
 	const depth = new Map(serpDepth.map(d => [`${d.week}|${d.keyword}`, d.depth]))
+	const referringByDomain = new Map(
+		referringDomains.map(d => [d.domain, d.referring_domains]),
+	)
 	// One reading per week: the rank, "not found" (checked far enough), or
 	// "not checked" (the capture was cut short and we were not in what it read).
 	const readingAt = (week: string, kw: string): Reading => {
@@ -777,6 +798,7 @@ function OrganicView({ data }: { data: Data }) {
 			const vol = volumeByKw.get(kw)
 			const searches =
 				vol?.monthly_searches != null ? Number(vol.monthly_searches) : null
+			const row = cell.get(`${latestWeek}|${kw}`)
 			return {
 				kw,
 				searches,
@@ -790,8 +812,10 @@ function OrganicView({ data }: { data: Data }) {
 				now,
 				earlier,
 				lastRank,
-				row: cell.get(`${latestWeek}|${kw}`),
+				row,
 				read: depth.get(`${latestWeek}|${kw}`) ?? 0,
+				topReferringDomains:
+					referringByDomain.get(site(row?.top_domain ?? null)) ?? null,
 			}
 		}),
 	)
@@ -1056,6 +1080,8 @@ type SearchRow = {
 	lastRank: Reading | null
 	row: SerpRankRow | undefined
 	read: number
+	/** The #1 site's referring domains, spam left out; null when the link crawler does not track it. */
+	topReferringDomains: number | null
 }
 
 // What each column of the Rank by search table sorts on. Rank is negated, so
@@ -1167,6 +1193,14 @@ function RankBySearch({
 					estimate: Google gives this search the number of a close variant we
 					also track, or hides it ("botox near me").
 				</p>
+				<p>
+					Who is #1: the site in first place. The line under it gives its
+					referring domains: how many websites link to it, with spam left out (a
+					spam score of 25 or more). Many links from one website count as one.
+					The link crawler counts them every 3 days for our sites and for the
+					competitors on the Backlinks page. It does not count other sites, so
+					they have no line.
+				</p>
 			</details>
 		</section>
 	)
@@ -1241,6 +1275,11 @@ function SearchTr({ r, showSite }: { r: SearchRow; showSite: boolean }) {
 				) : (
 					site(r.row?.top_domain ?? null) || '-'
 				)}
+				{r.topReferringDomains != null ? (
+					<span className="sub-line">
+						{`${r.topReferringDomains.toLocaleString()} referring ${r.topReferringDomains === 1 ? 'domain' : 'domains'}`}
+					</span>
+				) : null}
 			</td>
 		</tr>
 	)
