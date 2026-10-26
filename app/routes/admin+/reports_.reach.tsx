@@ -319,9 +319,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			 FROM service_search_volume ORDER BY monthly_searches DESC`,
 		),
 		// The newest referring-domain count, spam left out, of each site the
-		// link crawler tracks: ours and the Knoxville competitors
-		// (sha-reports src/backlinks.ts, every 3 days). Never the raw total:
-		// since late September a spam wave inflates it for every site.
+		// link crawler counts (sha-reports src/backlinks.ts): ours and the
+		// Knoxville competitors every 3 days, every other #1 site once a month.
+		// Never the raw total: since late September a spam wave inflates it for
+		// every site.
 		reportsQuery<{ domain: string; referring_domains: number }>(
 			`SELECT DISTINCT ON (domain) domain,
 			   clean_referring_domains AS referring_domains
@@ -329,7 +330,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			       FROM raw_competitor_authority
 			       UNION ALL
 			       SELECT day, target, clean_referring_domains
-			       FROM raw_backlink_summary) counts
+			       FROM raw_backlink_summary
+			       UNION ALL
+			       SELECT day, domain, clean_referring_domains
+			       FROM raw_top_domain_referring_domains) counts
 			 WHERE clean_referring_domains IS NOT NULL
 			 ORDER BY domain, day DESC`,
 		),
@@ -1080,7 +1084,7 @@ type SearchRow = {
 	lastRank: Reading | null
 	row: SerpRankRow | undefined
 	read: number
-	/** The #1 site's referring domains, spam left out; null when the link crawler does not track it. */
+	/** The #1 site's referring domains, spam left out; null until the link crawler counts it. */
 	topReferringDomains: number | null
 }
 
@@ -1197,9 +1201,9 @@ function RankBySearch({
 					Who is #1: the site in first place. The line under it gives its
 					referring domains: how many websites link to it, with spam left out (a
 					spam score of 25 or more). Many links from one website count as one.
-					The link crawler counts them every 3 days for our sites and for the
-					competitors on the Backlinks page. It does not count other sites, so
-					they have no line.
+					The link crawler counts our sites and the competitors on the Backlinks
+					page every 3 days, and every other #1 site once a month. A site that
+					is new at #1 has no line until the next monthly count.
 				</p>
 			</details>
 		</section>
