@@ -57,12 +57,19 @@ export default function BeardenLocation() {
 			latitude: location.lat,
 			longitude: location.lng,
 		},
+		// Same hours as the Google listing of this office.
 		openingHoursSpecification: [
 			{
 				'@type': 'OpeningHoursSpecification',
 				dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
 				opens: '09:00',
-				closes: '17:00',
+				closes: '19:00',
+			},
+			{
+				'@type': 'OpeningHoursSpecification',
+				dayOfWeek: ['Saturday'],
+				opens: '09:00',
+				closes: '16:00',
 			},
 		],
 	}

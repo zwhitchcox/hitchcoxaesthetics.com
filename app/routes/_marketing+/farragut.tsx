@@ -58,12 +58,13 @@ export default function FarragutLocation() {
 			latitude: location.lat,
 			longitude: location.lng,
 		},
+		// Same hours as the Google listing of this office.
 		openingHoursSpecification: [
 			{
 				'@type': 'OpeningHoursSpecification',
 				dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-				opens: '09:00',
-				closes: '17:00',
+				opens: '10:00',
+				closes: '19:00',
 			},
 		],
 	}
