@@ -13,10 +13,12 @@
  * Backlinks (authority, linking sites, new and lost links, crawl status,
  * competitors' authority) live on /admin/reports/links.
  *
- * Revenue model, every factor from real data where we have it:
- *   monthly searches (Google Ads, Knoxville DMA, keyword_search_volume)
- *   × reach share (share of metro households where we rank top-3)
- *   × search → new client (PACK_VIEW_TO_CLIENT, measured on our own listings)
+ * Map revenue model (app/utils/map-value.ts), every stage measured:
+ *   the times Google showed our listings for each service's searches, last
+ *     30 days (Business Profile views and search words, sha-reports
+ *     src/gbp-performance.ts), at today's reach
+ *   ÷ today's reach × the reach to value (share of metro homes where we rank top 3)
+ *   × view → new client (PACK_VIEW_TO_CLIENT, measured on our own listings)
  *   × 6-month expected value per new client (client_value, real Boulevard cohorts)
  *
  * Organic value of #1 (the organic view's "What #1 is worth, by service"):
@@ -46,6 +48,8 @@ import {
 	usePersistedSearch,
 	useSortable,
 } from '#app/components/report-ui'
+import { prisma } from '#app/utils/db.server.ts'
+import { MAP_SERVICES, mapValueByService } from '#app/utils/map-value.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import {
 	OUR_SITES,
@@ -93,7 +97,10 @@ const PERSONS_PER_HOUSEHOLD = 2.4
 // Bearden and Farragut listings, 2026-07-22 to 2026-10-19 (Business Profile
 // views; PostHog bookings from utm_campaign=gmb visits). It replaced an
 // assumed 15% click x 20% book (3%), which ran about 13 times too high. Calls
-// from the listing are not counted, so this is a floor.
+// from the listing are not counted, so this is a floor. Checked on all our
+// listings 2026-10-27: 23 new clients from 8,512 views in the last 30 days
+// (0.27%), 48 from 26,836 in 90 days (0.18%). On the way there, 5.0% of views
+// clicked to our website and 5.2% of those clicks booked as a new client.
 const PACK_VIEW_TO_CLIENT = 0.0023
 // Organic: the share of searchers who click the blue link at ranks 1 to 10
 // (published click curves). Past #10 we count no clicks.
@@ -125,16 +132,6 @@ const SEARCH_VISIT_TO_CLIENT = 0.03
 // New clients who book by phone, on top of those who book online: 12 booked by
 // staff to 74 online, Boulevard, 2026-07-22 to 2026-10-20.
 const PHONE_FACTOR = 86 / 74
-
-// Which client-value cohort each keyword's searchers convert into.
-const KEYWORD_CATEGORY: Record<string, string> = {
-	'med spa near me': 'ALL',
-	'botox near me': 'Tox',
-	'filler near me': 'Filler',
-	'weight loss near me': 'Weight Loss',
-	'medical weight loss near me': 'Weight Loss',
-	'semaglutide near me': 'Weight Loss',
-}
 
 // Which client-value cohort each service's searchers convert into.
 const SERVICE_CATEGORY: Record<string, string> = {
@@ -197,6 +194,68 @@ function maybeRefreshReachView() {
 	})()
 }
 
+/**
+ * New clients who booked online from a map listing's link in the last `days`
+ * days, cancelled bookings left out: the check on the map model. It matches
+ * the Bookings page's new clients from map listings, without phone bookings
+ * (22 for the 30 days to 2026-10-27 on both).
+ */
+async function mapListingNewClients(days: number) {
+	const since = new Date(Date.now() - days * 86_400_000)
+	const touches = await prisma.blvdAttributionTouch.findMany({
+		where: { occurredAt: { gte: since }, trafficChannel: 'gmb' },
+		select: {
+			bookingCartId: true,
+			blvdClientId: true,
+			appointments: { select: { boulevardAppointmentId: true } },
+		},
+	})
+	const carts = touches
+		.map(t => t.bookingCartId)
+		.filter((v): v is string => Boolean(v))
+	const intents = await prisma.blvdBookingIntent.findMany({
+		where: { bookingCartId: { in: carts } },
+		select: {
+			bookingCartId: true,
+			bookingClientHistorySelection: true,
+			bookingClientType: true,
+		},
+	})
+	// The client's own "I'm new" choice wins, as on the Bookings page.
+	const newCarts = new Set(
+		intents
+			.filter(i =>
+				i.bookingClientHistorySelection
+					? i.bookingClientHistorySelection === 'new'
+					: i.bookingClientType === 'new_client',
+			)
+			.map(i => i.bookingCartId),
+	)
+	const cancelled = new Set(
+		(
+			await prisma.blvdAppointment.findMany({
+				where: {
+					id: {
+						in: touches.flatMap(t =>
+							t.appointments.map(a => a.boulevardAppointmentId),
+						),
+					},
+					cancelled: true,
+				},
+				select: { id: true },
+			})
+		).map(a => a.id),
+	)
+	const kept = touches.filter(
+		t =>
+			t.bookingCartId &&
+			newCarts.has(t.bookingCartId) &&
+			(!t.appointments.length ||
+				t.appointments.some(a => !cancelled.has(a.boulevardAppointmentId))),
+	)
+	return new Set(kept.map(t => t.blvdClientId)).size
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
 	if (!hasReportsDb()) return json({ configured: false as const })
@@ -212,6 +271,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		packRivals,
 		services,
 		referringDomains,
+		gbpViews,
+		gbpWords,
+		mapNewClients,
 	] = await Promise.all([
 		// Homes-weighted combined reach (any of our listings top-3) per
 		// keyword per capture date, read from the report_reach_weekly
@@ -337,6 +399,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			 WHERE clean_referring_domains IS NOT NULL
 			 ORDER BY domain, day DESC`,
 		),
+		// The times Google showed each of our listings in the last 30 days, from
+		// sha-reports src/gbp-performance.ts. Google fills in the newest days
+		// late, so the window ends the day before its newest day with views.
+		reportsQuery<{
+			listing: string
+			views: number
+			from_day: string
+			to_day: string
+		}>(
+			`WITH last AS (
+			   SELECT max(day) - 1 AS d FROM raw_gbp_daily
+			   WHERE views_search + views_maps > 0)
+			 SELECT listing, sum(views_search + views_maps)::int AS views,
+			   to_char(min(day), 'YYYY-MM-DD') AS from_day,
+			   to_char(max(day), 'YYYY-MM-DD') AS to_day
+			 FROM raw_gbp_daily, last
+			 WHERE day > last.d - 30 AND day <= last.d
+			 GROUP BY listing`,
+		),
+		// The search words behind those views, the last three whole months.
+		reportsQuery<{ listing: string; keyword: string; views: number | null }>(
+			`SELECT listing, keyword, views FROM raw_gbp_search_keyword_month
+			 WHERE month > (SELECT max(month) FROM raw_gbp_search_keyword_month)
+			   - interval '3 months'`,
+		),
+		mapListingNewClients(30),
 	])
 	return json({
 		configured: true as const,
@@ -349,6 +437,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		packRivals,
 		services,
 		referringDomains,
+		gbpViews,
+		gbpWords,
+		mapNewClients,
 	})
 }
 
@@ -410,20 +501,24 @@ export default function RankingsReport() {
 /* ------------------------------------------------------------------------ */
 
 function MapPackView({ data }: { data: Data }) {
-	const { reach, volumes, values, packRivals } = data
+	const { reach, values, packRivals, gbpViews, gbpWords, mapNewClients } = data
 	const [metric, setMetric] = useChoice(
 		'metric',
 		['people', 'revenue'] as const,
 		'people',
 	)
 
-	const volumeByKw = new Map(volumes.map(v => [v.keyword, v]))
 	const valueByCat = new Map(
 		values.map(v => [v.category, Number(v.expected_value)]),
 	)
-	// The canonical keywords (the ones with volume data), in a stable order;
-	// one-off experimental capture keywords stay out of the way.
-	const keywords = Object.keys(KEYWORD_CATEGORY).filter(k =>
+	const valueOf = (category: string) =>
+		valueByCat.get(category) ?? valueByCat.get('ALL') ?? 0
+	const serviceOf = new Map(
+		MAP_SERVICES.flatMap(s => s.searches.map(kw => [kw as string, s.label])),
+	)
+	// The tracked searches, in service order; one-off capture keywords stay
+	// out of the way.
+	const keywords = MAP_SERVICES.flatMap(s => [...s.searches]).filter(k =>
 		reach.some(r => r.keyword === k),
 	)
 	const weeks = [...new Set(reach.map(r => r.week))].sort()
@@ -433,54 +528,61 @@ function MapPackView({ data }: { data: Data }) {
 
 	const peopleReached = (r: { homes_reached: string } | undefined) =>
 		r ? Number(r.homes_reached) * PERSONS_PER_HOUSEHOLD : null
-	const valueFor = (kw: string) =>
-		valueByCat.get(KEYWORD_CATEGORY[kw]!) ?? valueByCat.get('ALL') ?? 0
-	const monthlyRevenue = (
-		kw: string,
-		r: { homes_reached: string; total_homes: string } | undefined,
-	) => {
-		const vol = Number(volumeByKw.get(kw)?.monthly_searches ?? 0)
-		const value = valueFor(kw)
-		if (!r || !vol || !value) return null
-		const share = Number(r.homes_reached) / Math.max(1, Number(r.total_homes))
-		return vol * share * PACK_VIEW_TO_CLIENT * value
-	}
+	const valueAt = (week: string | undefined) =>
+		mapValueByService({
+			views: gbpViews.map(v => ({ listing: v.listing, views: Number(v.views) })),
+			words: gbpWords.map(w => ({
+				listing: w.listing,
+				keyword: w.keyword,
+				views: w.views == null ? null : Number(w.views),
+			})),
+			reach: new Map(
+				keywords.flatMap(kw => {
+					const r = week ? cell.get(`${week}|${kw}`) : undefined
+					return r
+						? [
+								[
+									kw,
+									Number(r.homes_reached) / Math.max(1, Number(r.total_homes)),
+								] as const,
+							]
+						: []
+				}),
+			),
+			value: valueOf,
+			rate: PACK_VIEW_TO_CLIENT,
+		})
+	const services = valueAt(latestWeek)
+	const totals = services.reduce(
+		(acc, s) => ({
+			seen: acc.seen + s.seen,
+			clients: acc.clients + s.clients,
+			revenue: acc.revenue + s.revenue,
+			top: acc.top + (s.topRevenue ?? 0),
+		}),
+		{ seen: 0, clients: 0, revenue: 0, top: 0 },
+	)
+	const window = gbpViews[0]
 
 	const latest = keywords.map(kw => {
 		const r = cell.get(`${latestWeek}|${kw}`)
 		const prev = priorWeek ? cell.get(`${priorWeek}|${kw}`) : undefined
-		const vol = volumeByKw.get(kw)
-		const value = valueFor(kw)
-		const searches = Number(vol?.monthly_searches ?? 0)
-		const share = r
-			? Number(r.homes_reached) / Math.max(1, Number(r.total_homes))
-			: 0
-		const clients = searches * share * PACK_VIEW_TO_CLIENT
 		const reachPct = r?.reach_pct != null ? Number(r.reach_pct) : null
 		const prevPct = prev?.reach_pct != null ? Number(prev.reach_pct) : null
 		return {
 			kw,
+			service: serviceOf.get(kw) ?? '',
 			reachPct,
 			change: reachPct != null && prevPct != null ? reachPct - prevPct : null,
 			people: peopleReached(r),
-			searches,
-			estimated: vol?.estimated ?? false,
-			clients,
-			value,
-			revenue: clients * value,
 		}
 	})
-	const totals = latest.reduce(
-		(acc, l) => ({
-			clients: acc.clients + l.clients,
-			revenue: acc.revenue + l.revenue,
-		}),
-		{ clients: 0, revenue: 0 },
-	)
 	const best = [...latest].sort(
 		(a, b) => (b.reachPct ?? -1) - (a.reachPct ?? -1),
 	)[0]
 	const totalHomes = Number(reach[0]?.total_homes ?? 0)
+	const pct = (share: number | null) =>
+		share == null ? '-' : `${Math.round(share * 1000) / 10}%`
 
 	return (
 		<>
@@ -501,14 +603,118 @@ function MapPackView({ data }: { data: Data }) {
 				<StatTile
 					label="New clients a month"
 					value={totals.clients.toFixed(1)}
-					whisper="estimate, all six searches"
+					whisper={`at today's reach; ${mapNewClients} booked online from our listings in the last 30 days`}
 				/>
 				<StatTile
 					label="Revenue a month"
 					value={usd(totals.revenue)}
-					whisper="estimate, 6-month value of those clients"
+					whisper="6-month value of those clients"
+				/>
+				<StatTile
+					label="Top 3 everywhere"
+					value={usd(totals.top)}
+					whisper="revenue a month if every home saw us in the box"
 				/>
 			</div>
+
+			<section>
+				<h2>
+					What the map box is worth{' '}
+					<span className="mini">
+						by service; Google's views
+						{window ? ` from ${window.from_day} to ${window.to_day}` : ''}
+					</span>
+				</h2>
+				<div className="rtable-wrap">
+					<table className="rtable">
+						<thead>
+							<tr>
+								<th>Service</th>
+								<th className="num">Times Google showed us</th>
+								<th className="num">Homes reached</th>
+								<th className="num">New clients a month</th>
+								<th className="num">Revenue a month</th>
+								<th className="num">Top 3 everywhere</th>
+							</tr>
+						</thead>
+						<tbody>
+							{services.map(s => (
+								<tr key={s.key}>
+									<td>{s.label}</td>
+									<td className="num">{Math.round(s.seen).toLocaleString()}</td>
+									<td className="num">{pct(s.reach)}</td>
+									<td className="num">{s.clients.toFixed(1)}</td>
+									<td className={`num ${s.revenue > 0 ? 'good' : ''}`}>
+										{usd(s.revenue)}
+									</td>
+									<td className="num">
+										{s.topRevenue != null ? usd(s.topRevenue) : '-'}
+										{s.topRevenue != null && !s.mainSearchRead ? '*' : ''}
+									</td>
+								</tr>
+							))}
+							<tr>
+								<td style={{ fontWeight: 600 }}>Total</td>
+								<td className="num">
+									<strong>{Math.round(totals.seen).toLocaleString()}</strong>
+								</td>
+								<td className="num">-</td>
+								<td className="num">
+									<strong>{totals.clients.toFixed(1)}</strong>
+								</td>
+								<td className="num">
+									<strong>{usd(totals.revenue)}</strong>
+								</td>
+								<td className="num">
+									<strong>{usd(totals.top)}</strong>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				{services.some(s => !s.mainSearchRead) ? (
+					<p className="note">
+						* Reach for this service comes from its near-me searches only, until
+						the weekly capture reads its biggest search (
+						{services
+							.filter(s => !s.mainSearchRead)
+							.map(s => MAP_SERVICES.find(m => m.key === s.key)!.searches[0])
+							.join(', ')}
+						). That capture runs on Mondays.
+					</p>
+				) : null}
+				<details className="how">
+					<summary>How these numbers are worked out</summary>
+					<p>
+						Times Google showed us: the views of our map listings in the last 30
+						days, from Google Business Profile. Google names the search behind a
+						view when the search brings 15 or more views a month, and each
+						listing's views are split across the services in the same mix.
+						Searches for our own names and job searches count for no service,
+						because they do not depend on reach.
+					</p>
+					<p>
+						Homes reached for a service: the reach of its tracked searches below,
+						each weighted by the views it brings us.
+					</p>
+					<p>
+						New clients a month = times shown ×{' '}
+						{Math.round(PACK_VIEW_TO_CLIENT * 10000) / 100}%, the share of the
+						times Google showed our listings that became a new client booking
+						online (measured on our listings). The check: at today's reach the
+						model gives {totals.clients.toFixed(1)}, and {mapNewClients} new
+						clients booked online from our listings in the last 30 days. Calls
+						from the listing are not counted, so this is a floor. Revenue = new
+						clients × the 6-month value of a new client in that service, from our
+						own Boulevard history.
+					</p>
+					<p>
+						Top 3 everywhere = revenue ÷ today's homes reached: the same views
+						per home if every home in the metro saw one of our listings in the
+						box.
+					</p>
+				</details>
+			</section>
 
 			<section>
 				<h2>
@@ -523,18 +729,17 @@ function MapPackView({ data }: { data: Data }) {
 						<thead>
 							<tr>
 								<th>Search</th>
+								<th>Service</th>
 								<th className="num">Homes reached</th>
 								<th className="num">Change</th>
 								<th className="num">People</th>
-								<th className="num">Searches a month</th>
-								<th className="num">New clients a month</th>
-								<th className="num">Revenue a month</th>
 							</tr>
 						</thead>
 						<tbody>
 							{latest.map(l => (
 								<tr key={l.kw}>
 									<td>{l.kw}</td>
+									<td>{l.service}</td>
 									<td className="num">
 										{l.reachPct != null ? `${l.reachPct}%` : '-'}
 									</td>
@@ -550,63 +755,24 @@ function MapPackView({ data }: { data: Data }) {
 									<td className="num">
 										{l.people != null ? people(l.people) : '-'}
 									</td>
-									<td className="num">
-										{l.searches || '-'}
-										{l.estimated ? '*' : ''}
-									</td>
-									<td className="num">{l.clients.toFixed(1)}</td>
-									<td className={`num ${l.revenue > 0 ? 'good' : ''}`}>
-										{usd(l.revenue)}
-									</td>
 								</tr>
 							))}
-							<tr>
-								<td colSpan={5} style={{ fontWeight: 600 }}>
-									Total
-								</td>
-								<td className="num">
-									<strong>{totals.clients.toFixed(1)}</strong>
-								</td>
-								<td className="num">
-									<strong>{usd(totals.revenue)}</strong>
-								</td>
-							</tr>
 						</tbody>
 					</table>
 				</div>
-				<details className="how">
-					<summary>How these numbers are worked out</summary>
-					<p>
-						Homes reached: the share of metro homes (weighted by census homes
-						per grid point) where at least one of our listings is in the top 3
-						of the map box. People = homes × {PERSONS_PER_HOUSEHOLD}.
-					</p>
-					<p>
-						Searches a month: Google Ads volume for the Knoxville market. * =
-						Google hides the volume for drug terms, so it is estimated from
-						Google Trends (botox gets 2.19× the searches of med spa).
-					</p>
-					<p>
-						New clients a month = searches × homes reached ×{' '}
-						{Math.round(PACK_VIEW_TO_CLIENT * 10000) / 100}%, the share of the
-						times Google showed our listing that became a new client booking
-						online (measured on our Bearden and Farragut listings, 2026-07-22 to
-						2026-10-19). Calls from the listing are not counted, so this is a
-						floor. Revenue = new clients × the 6-month value of a new client in
-						that service, from our own Boulevard history.
-					</p>
-					<p>
-						These six searches stand in for the whole market. All the related
-						searches together ("botox knoxville", "lip filler" and more) are
-						several times bigger, so read the revenue as a floor that grows with
-						reach.
-					</p>
-				</details>
+				<p className="note">
+					Homes reached: the share of metro homes (weighted by census homes per
+					grid point) where at least one of our listings is in the top 3 of the
+					map box. People = homes × {PERSONS_PER_HOUSEHOLD}.
+				</p>
 			</section>
 
 			<section>
 				<h2>
-					Over time <span className="mini">one line per search</span>
+					Over time{' '}
+					<span className="mini">
+						{metric === 'people' ? 'one line per search' : 'one line per service'}
+					</span>
 				</h2>
 				<div className="choices">
 					<Choice
@@ -620,20 +786,37 @@ function MapPackView({ data }: { data: Data }) {
 						]}
 					/>
 				</div>
-				<LineChart
-					labels={weeks}
-					series={keywords.map((kw, i) => ({
-						name: kw.replace(' near me', ''),
-						color: SERIES[i % SERIES.length]!,
-						values: weeks.map(w =>
-							metric === 'people'
-								? peopleReached(cell.get(`${w}|${kw}`))
-								: monthlyRevenue(kw, cell.get(`${w}|${kw}`)),
-						),
-					}))}
-					height={230}
-					format={metric === 'people' ? people : n => usd(n)}
-				/>
+				{metric === 'people' ? (
+					<LineChart
+						labels={weeks}
+						series={keywords.map((kw, i) => ({
+							name: kw.replace(' near me', ''),
+							color: SERIES[i % SERIES.length]!,
+							values: weeks.map(w => peopleReached(cell.get(`${w}|${kw}`))),
+						}))}
+						height={230}
+						format={people}
+					/>
+				) : (
+					<LineChart
+						labels={weeks}
+						series={services.map((s, i) => {
+							const byWeek = new Map(
+								weeks.map(w => [w, valueAt(w).find(x => x.key === s.key)?.reach]),
+							)
+							return {
+								name: s.label,
+								color: SERIES[i % SERIES.length]!,
+								values: weeks.map(w => {
+									const r = byWeek.get(w)
+									return r == null ? null : s.revenueAt(r)
+								}),
+							}
+						})}
+						height={230}
+						format={n => usd(n)}
+					/>
+				)}
 			</section>
 
 			<PackRivals rows={packRivals} />
