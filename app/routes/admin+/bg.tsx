@@ -19,6 +19,7 @@ import {
 	runFinanceReportsJob,
 	runPodcastTopicsJob,
 	runReviewerDaysJob,
+	runGbpListingHoursJob,
 	runPlaidSyncJob,
 	runBlvdAppointmentSyncJob,
 	runBlvdAppointmentBackfillJob,
@@ -51,6 +52,8 @@ const JOB_DESCRIPTIONS = {
 		'Rebuilds the whole Boulevard appointment mirror. Runs on its own once a day at 00:00 UTC.',
 	reviewerDays:
 		'Measures, per New York day, how long the reviewer spent on the review pages against the free time in her Boulevard shift, for the Backlinks report.',
+	gbpListingHours:
+		'Reads the weekly hours of our Google listings, as Google shows them, for the office pages and the brand sites. Runs daily; a Google change also arrives by pub/sub.',
 }
 
 // Maps the job status to the StatusButton status
@@ -142,6 +145,11 @@ export async function action({ request }: Route['ActionArgs']) {
 	if (intent === 'run-reviewerDays') {
 		runReviewerDaysJob().catch(console.error)
 		return json({ success: true, message: 'Reviewer time per day job started' })
+	}
+
+	if (intent === 'run-gbpListingHours') {
+		runGbpListingHoursJob().catch(console.error)
+		return json({ success: true, message: 'Google listing hours job started' })
 	}
 
 	if (intent?.toString().startsWith('clear-error-')) {

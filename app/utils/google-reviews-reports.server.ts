@@ -36,7 +36,7 @@ export function hasGoogleReviewsReportsConfig() {
 	)
 }
 
-async function accessToken(): Promise<string> {
+export async function accessToken(): Promise<string> {
 	const res = await fetch('https://oauth2.googleapis.com/token', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

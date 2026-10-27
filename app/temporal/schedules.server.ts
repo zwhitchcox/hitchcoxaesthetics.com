@@ -21,12 +21,14 @@ import {
 	getPodcastTopicsIntervalMs,
 	getReviewAppointmentSyncIntervalMs,
 	getReviewerDaysIntervalMs,
+	getGbpListingHoursIntervalMs,
 	getScheduleHealthAlertIntervalMs,
 	hasPodcastTopicsConfig,
 } from '#app/utils/background-jobs.server.ts'
 import { articleReminderDestination } from '#app/utils/article-reminder.server.ts'
 import { hasFinanceReportsConfig } from '#app/utils/finance-reports.server.ts'
 import { hasGoogleReviewsReportsConfig } from '#app/utils/google-reviews-reports.server.ts'
+import { hasGbpListingHoursConfig } from '#app/utils/gbp-listing-hours.server.ts'
 import { hasAppointmentLedgerConfig } from '#app/utils/appointment-ledger.server.ts'
 import { hasLapsedPatientsConfig } from '#app/utils/lapsed-patients.server.ts'
 import { hasPlaidConfig } from '#app/utils/plaid-sync.server.ts'
@@ -155,6 +157,14 @@ function getScheduleDefinitions(): Array<ScheduleDefinition> {
 			intervalMs: getReviewerDaysIntervalMs(),
 			// Reads her shifts from Boulevard and her sessions from PostHog.
 			enabled: Boolean(process.env.BLVD_API_KEY?.trim()),
+		},
+		{
+			scheduleId: 'gbp-listing-hours',
+			jobId: 'gbpListingHours',
+			workflowType: 'gbpListingHoursWorkflow',
+			intervalMs: getGbpListingHoursIntervalMs(),
+			// Needs the Google OAuth creds (business.manage).
+			enabled: hasGbpListingHoursConfig(),
 		},
 		{
 			scheduleId: 'google-ads-spend-sync',

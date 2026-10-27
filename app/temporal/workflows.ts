@@ -100,3 +100,7 @@ export async function reviewerDaysWorkflow(): Promise<void> {
 	// The first run reads 35 days from Boulevard one by one: the slow tier.
 	await slowActivities.reviewerDaysActivity()
 }
+
+export async function gbpListingHoursWorkflow(): Promise<void> {
+	await activities.gbpListingHoursActivity()
+}

@@ -4,6 +4,8 @@ import { Hero } from '#app/components/hero.js'
 import { ServiceCardGrid } from '#app/components/service-card-grid.js'
 import { Icon } from '#app/components/ui/icon.js'
 import { useBlvdUrl } from '#app/utils/blvd-context.tsx'
+import { getListingPeriods } from '#app/utils/gbp-listing-hours.server.ts'
+import { openingHoursSpecification } from '#app/utils/gbp-listing-hours.ts'
 import { getLocationById, mapsUrl } from '#app/utils/locations.js'
 import { getSocialMetas } from '#app/utils/seo.ts'
 import { getCategoryPages } from '#app/utils/site-pages.server.js'
@@ -23,11 +25,18 @@ export async function loader() {
 		shortDescription: c.shortDescription,
 		heroImage: c.heroImage,
 	}))
-	return json({ categories })
+	// The hours as Google shows them, from the GbpListingHours mirror.
+	const periods = await getListingPeriods(
+		getLocationById('bearden')!.gbp.locationId,
+	)
+	return json({
+		categories,
+		openingHours: periods ? openingHoursSpecification(periods) : null,
+	})
 }
 
 export default function BeardenLocation() {
-	const { categories } = useLoaderData<typeof loader>()
+	const { categories, openingHours } = useLoaderData<typeof loader>()
 	const location = getLocationById('bearden')!
 	const blvdUrl = useBlvdUrl()
 
@@ -57,21 +66,7 @@ export default function BeardenLocation() {
 			latitude: location.lat,
 			longitude: location.lng,
 		},
-		// Same hours as the Google listing of this office.
-		openingHoursSpecification: [
-			{
-				'@type': 'OpeningHoursSpecification',
-				dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-				opens: '09:00',
-				closes: '19:00',
-			},
-			{
-				'@type': 'OpeningHoursSpecification',
-				dayOfWeek: ['Saturday'],
-				opens: '09:00',
-				closes: '16:00',
-			},
-		],
+		openingHoursSpecification: openingHours ?? undefined,
 	}
 
 	return (

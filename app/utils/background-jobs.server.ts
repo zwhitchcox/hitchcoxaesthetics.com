@@ -29,6 +29,10 @@ import {
 	syncGoogleReviewsToReports,
 } from '#app/utils/google-reviews-reports.server.ts'
 import {
+	hasGbpListingHoursConfig,
+	syncGbpListingHours,
+} from '#app/utils/gbp-listing-hours.server.ts'
+import {
 	hasAppointmentLedgerConfig,
 	syncAppointmentLedger,
 } from '#app/utils/appointment-ledger.server.ts'
@@ -176,6 +180,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	googleReviewsReports: {
 		id: 'googleReviewsReports',
 		name: 'Google Reviews → Reports DB',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	gbpListingHours: {
+		id: 'gbpListingHours',
+		name: 'Google Listing Hours (office pages + brand sites)',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -532,6 +545,39 @@ export function getGoogleReviewsReportsIntervalMs() {
 	// Hourly, Sarah watches same-day reviews; 6h staleness read as "no
 	// reviews today" when four had already landed.
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 60 * 60 * 1000
+}
+
+export async function runGbpListingHoursJob(): Promise<void> {
+	const job = jobStatuses['gbpListingHours']
+	if (!job) return
+	if (job.status === 'running') return
+
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+	try {
+		const result = await syncGbpListingHours()
+		console.log(`Google listing hours: ${result.synced} listings read`)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Google listing hours sync failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getGbpListingHoursIntervalMs(),
+		).toISOString()
+	}
+}
+
+export function getGbpListingHoursIntervalMs() {
+	const raw = process.env.GBP_LISTING_HOURS_INTERVAL_MS?.trim()
+	const parsed = raw ? Number(raw) : NaN
+	// Daily (Zane, 2026-10-27). The pub/sub push brings Google's own changes
+	// at once; this run brings the edits that we make.
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 24 * 60 * 60 * 1000
 }
 
 export async function runAppointmentLedgerJob(): Promise<void> {
@@ -1048,6 +1094,18 @@ function initializeIntervalScheduling() {
 		}, 90_000)
 	}
 
+	if (shouldAutoRunGbpListingHours()) {
+		const intervalMs = getGbpListingHoursIntervalMs()
+		jobIntervals.gbpListingHours = setInterval(() => {
+			runGbpListingHoursJob().catch(console.error)
+		}, intervalMs)
+		const job = jobStatuses['gbpListingHours']
+		if (job) job.nextRun = new Date(Date.now() + intervalMs).toISOString()
+		setTimeout(() => {
+			runGbpListingHoursJob().catch(console.error)
+		}, 100_000)
+	}
+
 	if (shouldAutoRunAppointmentLedger()) {
 		const intervalMs = getAppointmentLedgerIntervalMs()
 		jobIntervals.appointmentLedger = setInterval(() => {
@@ -1094,6 +1152,14 @@ function shouldAutoRunAppointmentLedger() {
 function shouldAutoRunGoogleReviewsReports() {
 	return (
 		hasGoogleReviewsReportsConfig() &&
+		(process.env.NODE_ENV === 'production' ||
+			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1')
+	)
+}
+
+function shouldAutoRunGbpListingHours() {
+	return (
+		hasGbpListingHoursConfig() &&
 		(process.env.NODE_ENV === 'production' ||
 			process.env.ENABLE_DEV_BACKGROUND_JOBS === '1')
 	)

@@ -1165,6 +1165,16 @@ model GoogleAdsSpendDay {
   syncedAt DateTime @updatedAt
 }
 
+// Weekly hours of our Google listings, as Google shows them. Written by the
+// gbp-listing-hours job (daily) and the Business Profile pub/sub push
+// (GOOGLE_UPDATE). The office pages and the brand sites read only this.
+model GbpListingHours {
+  locationId String   @id // locations/<id>
+  title      String
+  periods    String // JSON [{ day: 'Monday', opens: '10:00', closes: '19:00' }]
+  syncedAt   DateTime @updatedAt
+}
+
 // The OFFICIAL revenue table (Zane 2026-08-31): one row per revenue line
 // across systems. Boulevard rows mirror BlvdRevenueItem (written by the same
 // sync); Jane rows come from scripts/import-jane-revenue.ts (Sales export,
