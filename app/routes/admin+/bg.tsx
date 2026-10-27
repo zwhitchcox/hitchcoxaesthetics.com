@@ -53,7 +53,7 @@ const JOB_DESCRIPTIONS = {
 	reviewerDays:
 		'Measures, per New York day, how long the reviewer spent on the review pages against the free time in her Boulevard shift, for the Backlinks report.',
 	gbpListingHours:
-		'Reads the weekly hours of our Google listings, as Google shows them, for the office pages and the brand sites. Runs daily; a Google change also arrives by pub/sub.',
+		'Reads the weekly hours of our Google listings, as Google shows them, for the office pages and the brand sites. Runs hourly; a Google change also arrives by pub/sub.',
 }
 
 // Maps the job status to the StatusButton status

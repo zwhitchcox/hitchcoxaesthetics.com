@@ -1166,7 +1166,7 @@ model GoogleAdsSpendDay {
 }
 
 // Weekly hours of our Google listings, as Google shows them. Written by the
-// gbp-listing-hours job (daily) and the Business Profile pub/sub push
+// gbp-listing-hours job (hourly) and the Business Profile pub/sub push
 // (GOOGLE_UPDATE). The office pages and the brand sites read only this.
 model GbpListingHours {
   locationId String   @id // locations/<id>

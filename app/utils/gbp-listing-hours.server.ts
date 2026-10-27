@@ -1,10 +1,10 @@
 /**
  * Keeps GbpListingHours, the mirror of our Google listings' weekly hours as
  * Google shows them (getGoogleUpdated, so a pending edit shows only once
- * Google publishes it). Two writers: the daily gbp-listing-hours job reads
+ * Google publishes it). Two writers: the hourly gbp-listing-hours job reads
  * every listing, and the Business Profile pub/sub push
  * (routes/resources+/gbp-notifications.ts) reads one listing again when
- * Google changes it. An edit that we make sends no push, so the daily job
+ * Google changes it. An edit that we make sends no push, so the hourly job
  * picks it up. Pages and the brand sites read only the mirror.
  */
 import { prisma } from '#app/utils/db.server.ts'

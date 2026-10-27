@@ -575,9 +575,9 @@ export async function runGbpListingHoursJob(): Promise<void> {
 export function getGbpListingHoursIntervalMs() {
 	const raw = process.env.GBP_LISTING_HOURS_INTERVAL_MS?.trim()
 	const parsed = raw ? Number(raw) : NaN
-	// Daily (Zane, 2026-10-27). The pub/sub push brings Google's own changes
-	// at once; this run brings the edits that we make.
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : 24 * 60 * 60 * 1000
+	// Hourly (Zane, 2026-10-27). The pub/sub push brings Google's own changes
+	// at once. An edit that we make sends no push, so this run brings it.
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 60 * 60 * 1000
 }
 
 export async function runAppointmentLedgerJob(): Promise<void> {

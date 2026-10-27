@@ -7,7 +7,7 @@
  * On GOOGLE_UPDATE for one of our listings, we read that listing's hours
  * again from Google. The payload gives us only the listing id. Pub/Sub
  * sends a message again after a non-2xx answer, so every message that
- * passes the token check gets 200, also when the sync fails (the daily job
+ * passes the token check gets 200, also when the sync fails (the hourly job
  * is the safety net).
  */
 import { type ActionFunctionArgs } from '@remix-run/node'
