@@ -9,12 +9,22 @@
  * Included: Amex cards ...1000 (Zane) and ...1018 (Sarah personal), all of
  * Zane's connected accounts, plus spending on the business cards whose vendor
  * is classified Personal in .plaid-vendor-categories.json. Categories come
- * from Plaid's personal_finance_category taxonomy.
+ * from Plaid's personal_finance_category taxonomy. A transfer or card payment
+ * is left out only when its other side shows up in a linked account
+ * (app/utils/money-movement.ts); Venmo, cash and payments to cards we cannot
+ * see count as spending.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 
 import dotenv from 'dotenv'
+
+import {
+	classifyMoneyMoves,
+	isCardPayment,
+	isSavingsTransfer,
+	matchFrom,
+} from '#app/utils/money-movement.ts'
 
 dotenv.config()
 
@@ -117,10 +127,14 @@ async function main({ start, end, json }: { start: string; end: string; json: bo
 		// no cache: business-card personal spending just won't be included
 	}
 
-	const rows = await prisma.plaidTransaction.findMany({
-		where: { date: { gte: start, lte: end } },
+	// Rows from a few weeks before the window too, so both sides of a move
+	// and the Apple Card CSV coverage are in view.
+	const allRows = await prisma.plaidTransaction.findMany({
+		where: { date: { gte: matchFrom(start), lte: end } },
 		orderBy: { date: 'asc' },
 	})
+	const { internal, bounced } = classifyMoneyMoves(allRows)
+	const rows = allRows.filter(r => r.date >= start)
 
 	type Item = {
 		date: string
@@ -129,30 +143,16 @@ async function main({ start, end, json }: { start: string; end: string; json: bo
 		bucket: string
 		card: string
 	}
-	type Pending = Item & {
-		id: string
-		isReversal: boolean
-		excluded: boolean
-		cancelled?: boolean
-	}
-	const pending: Pending[] = []
+	const items: Item[] = []
+	// Money moved to savings or investments is kept, not spent: it stays out
+	// of the totals and is reported on its own.
+	const saved: Array<{ date: string; amount: number }> = []
 	let income = 0
-	// Cards whose purchases we already track individually — payments TO them
-	// from checking are internal moves, not spending. Payments to any OTHER
-	// issuer (Citi, Apple Card, ...) are the only trace of that card's spending
-	// we have, so they count.
-	const CONNECTED_ISSUERS = /american express|capital one|bank of america|citi/i
-	// Apple Card purchases come from Wallet CSV imports (Plaid can't serve
-	// them at all). From the first covered date, payments TO Apple Card are
-	// internal moves like any tracked card; before it they remain the only
-	// spend signal we have.
-	const APPLE_PAYMENT = /applecard|apple card/i
-	const appleCsvStart =
-		rows.find(r => r.institution === 'Apple Card')?.date ?? '9999-12-31'
 	for (const r of rows) {
-		const name = `${r.merchant ?? ''} ${r.name}`
-		if (r.pfcPrimary === 'TRANSFER_IN' || r.pfcPrimary === 'TRANSFER_OUT')
-			continue
+		// Moves between our own accounts (a card payment that shows up on the
+		// card, a transfer that lands in another linked account), and bounced
+		// payments with the returns that undo them. Every other dollar counts.
+		if (internal.has(r.id) || bounced.has(r.id)) continue
 
 		const amexDigits = r.accountOwner?.match(/\d{4}\s*$/)?.[0]?.trim()
 		const isPersonalAmex =
@@ -171,68 +171,35 @@ async function main({ start, end, json }: { start: string; end: string; json: bo
 			income += -r.amount
 			continue
 		}
+		// Money in from outside our accounts is not spending. Take-home is
+		// counted from the paychecks (finance-reports.server.ts).
+		if (r.pfcPrimary === 'TRANSFER_IN') continue
+		if (r.pfcPrimary === 'TRANSFER_OUT' && isSavingsTransfer(r)) {
+			saved.push({ date: r.date, amount: r.amount })
+			continue
+		}
 		const card = isPersonalAmex
 			? `Amex ...${amexDigits}`
 			: isZane
 				? `${r.institution} (zane)`
 				: `${r.institution} (business card)`
-
-		const isCardPayment =
-			r.pfcDetailed === 'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT' ||
-			/payment thank you|autopay|crd autopay|online payment to|capital one mobile pymt|ach pmt|retry pymt/i.test(
-				name,
-			)
-		// Card payments: on the card side (credit accounts) always internal; on
-		// the checking side internal only when the payee card is one we track.
-		const excluded =
-			isCardPayment &&
-			(r.accountType === 'credit' ||
-				CONNECTED_ISSUERS.test(name) ||
-				(APPLE_PAYMENT.test(name) && r.date >= appleCsvStart))
-		const isUnlinkedCardPayment = isCardPayment && !excluded
-		pending.push({
-			id: r.accountId,
+		items.push({
 			date: r.date,
 			amount: r.amount,
 			merchant: (r.merchant || r.name).slice(0, 40),
-			bucket: isUnlinkedCardPayment
-				? 'Card payments (unlinked cards)'
-				: bucketFor(r.pfcPrimary, r.pfcDetailed),
+			// A payment from checking that did not show up on a linked card paid
+			// a card we cannot see (or the Apple Card after its last CSV
+			// export): it is the only trace of that spending. On a card, a row
+			// like this is a charge (Citi Flex Pay installments).
+			bucket:
+				isCardPayment(r) && r.accountType === 'depository'
+					? 'Card payments (unlinked cards)'
+					: r.pfcPrimary === 'TRANSFER_OUT'
+						? 'Transfers out (Venmo, cash, other accounts)'
+						: bucketFor(r.pfcPrimary, r.pfcDetailed),
 			card,
-			isReversal: /return of posted check/i.test(name) && r.amount < 0,
-			excluded,
 		})
 	}
-
-	// Bounced payments appear three times: the payment posts (+X), bounces
-	// back ("RETURN OF POSTED CHECK", -X), and posts again on retry (+X). Only
-	// the cleared retry is real, so cancel each reversal against the nearest
-	// preceding +X on the same account — whether or not that leg was excluded
-	// (a bounced Amex payment's reversal must die with its excluded leg).
-	// Unmatched reversals stay in (as negatives) so the net total never lies.
-	const dayMs = 24 * 60 * 60 * 1000
-	for (const rev of pending) {
-		if (!rev.isReversal || rev.cancelled) continue
-		const revTime = Date.parse(rev.date)
-		let best: Pending | undefined
-		for (const cand of pending) {
-			if (
-				cand.cancelled ||
-				cand.isReversal ||
-				cand.id !== rev.id ||
-				cand.amount !== -rev.amount
-			)
-				continue
-			const dt = revTime - Date.parse(cand.date)
-			if (dt < 0 || dt > 14 * dayMs) continue
-			if (!best || Date.parse(cand.date) > Date.parse(best.date)) best = cand
-		}
-		if (best) {
-			best.cancelled = true
-			rev.cancelled = true
-		}
-	}
-	const items: Item[] = pending.filter(p => !p.cancelled && !p.excluded)
 
 	const months = [...new Set(items.map(i => i.date.slice(0, 7)))].sort()
 	const buckets = [...new Set(items.map(i => i.bucket))]
@@ -284,6 +251,26 @@ async function main({ start, end, json }: { start: string; end: string; json: bo
 		month: m,
 		total: buckets.reduce((s, b) => s + (cell.get(`${m}|${b}`) ?? 0), 0),
 	}))
+	const savedMonthly = [...new Set(saved.map(s => s.date.slice(0, 7)))]
+		.sort()
+		.map(m => ({
+			month: m,
+			total: saved
+				.filter(s => s.date.startsWith(m))
+				.reduce((sum, s) => sum + s.amount, 0),
+		}))
+	// Day by day, for the bank check on the household profit page.
+	const daily = new Map<string, { spend: number; saved: number }>()
+	for (const i of items) {
+		const d = daily.get(i.date) ?? { spend: 0, saved: 0 }
+		d.spend += i.amount
+		daily.set(i.date, d)
+	}
+	for (const s of saved) {
+		const d = daily.get(s.date) ?? { spend: 0, saved: 0 }
+		d.saved += s.amount
+		daily.set(s.date, d)
+	}
 	const grandTotal = summary.reduce((s, r) => s + r.total, 0)
 	const avgMonth = fullMonths.length ? grandTotal / fullMonths.length : 0
 
@@ -295,6 +282,10 @@ async function main({ start, end, json }: { start: string; end: string; json: bo
 		grandTotal,
 		avgMonth,
 		monthlyTotals,
+		savedMonthly,
+		daily: [...daily.entries()]
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([day, d]) => ({ day, ...d })),
 		summary,
 		topMerchants,
 		recurring,

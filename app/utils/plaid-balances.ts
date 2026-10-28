@@ -69,3 +69,63 @@ export function groupBalances(rows: BalanceRow[]): {
 	const owed = groups.reduce((t, g) => t + g.owed, 0)
 	return { groups, cash, owed, net: cash - owed }
 }
+
+export type BalanceSnapshot = {
+	day: string
+	accountId: string
+	type: string
+	current: number
+}
+
+export type KeptDay = {
+	day: string
+	/** What the report says we kept that day, before taxes. */
+	kept: number
+	/** The part of it that moved to savings, out of the linked accounts. */
+	saved: number
+}
+
+/** The check window: about 3 months, inside the report's 12. */
+const CHECK_DAYS = 92
+
+/**
+ * Checks the household report against the bank. Between the first and the
+ * latest balance snapshot, the change in cash minus debt on the linked
+ * accounts should equal what the report says we kept, less what moved to
+ * savings. A difference that keeps growing means the report misses money;
+ * a small one comes from pending charges and the bank's one-day lag.
+ */
+export function bankCheck(snapshots: BalanceSnapshot[], days: KeptDay[]) {
+	const all = [...new Set(snapshots.map(s => s.day))].sort()
+	const to = all.at(-1)
+	if (!to) return null
+	const earliest = new Date(Date.parse(to) - CHECK_DAYS * 24 * 3600e3)
+		.toISOString()
+		.slice(0, 10)
+	const from = all.find(d => d >= earliest)!
+	if (from === to) return { from, to, ready: false as const }
+	const on = (day: string) =>
+		new Map(snapshots.filter(s => s.day === day).map(s => [s.accountId, s]))
+	const start = on(from)
+	const end = on(to)
+	// Accounts in both snapshots only: a newly linked account is not a gain.
+	let bank = 0
+	for (const [accountId, e] of end) {
+		const s = start.get(accountId)
+		if (!s) continue
+		const sign = isOwed(e.type) ? -1 : 1
+		bank += sign * (e.current - s.current)
+	}
+	const window = days.filter(d => d.day > from && d.day <= to)
+	const kept = window.reduce((t, d) => t + d.kept, 0)
+	const saved = window.reduce((t, d) => t + d.saved, 0)
+	return {
+		from,
+		to,
+		ready: true as const,
+		bank,
+		kept,
+		saved,
+		diff: bank - (kept - saved),
+	}
+}

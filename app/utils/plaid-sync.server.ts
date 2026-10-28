@@ -5,7 +5,8 @@
  * Runs as the plaid-sync background job (Temporal schedule / legacy interval).
  * The table is a permanent archive: institutions cap how far back Plaid can
  * read (Capital One serves only the last 90 days), so we upsert everything we
- * see and never delete, data stays after Plaid's window slides past it.
+ * see and never delete a posted row, data stays after Plaid's window slides
+ * past it. Only pending rows that Plaid stopped returning are removed.
  *
  * Connections come from PLAID_TOKENS_JSON (Fly secret: the contents of
  * .plaid-tokens.json) or, when unset, from the local .plaid-tokens.json file
@@ -82,6 +83,7 @@ export async function syncPlaidTransactions(): Promise<{
 	for (const item of items) {
 		let offset = 0
 		let accounts = new Map<string, { mask: string | null; type: string }>()
+		const seen = new Set<string>()
 		for (;;) {
 			const res = await client.transactionsGet({
 				access_token: item.accessToken,
@@ -121,6 +123,7 @@ export async function syncPlaidTransactions(): Promise<{
 				}
 			}
 			for (const t of res.data.transactions) {
+				seen.add(t.transaction_id)
 				// A posted transaction gets a new id and references the pending row
 				// it replaces, drop the pending one so it doesn't double-count.
 				if (t.pending_transaction_id) {
@@ -159,6 +162,22 @@ export async function syncPlaidTransactions(): Promise<{
 				res.data.transactions.length === 0
 			)
 				break
+		}
+		// Some banks (Bank of America) post a transaction without naming the
+		// pending row it replaces, and a dropped hold never posts. Plaid stops
+		// returning both, so a pending row it no longer returns would
+		// double-count: in 2026 two transfers ($4,000 and $2,500) sat in the
+		// table twice. Remove it.
+		const pendingRows = await prisma.plaidTransaction.findMany({
+			where: { itemId: item.itemId, pending: true },
+			select: { id: true },
+		})
+		const stale = pendingRows.map(p => p.id).filter(id => !seen.has(id))
+		if (stale.length) {
+			const removed = await prisma.plaidTransaction.deleteMany({
+				where: { id: { in: stale } },
+			})
+			replacedPending += removed.count
 		}
 	}
 	return { items: items.length, upserted, replacedPending, balances }

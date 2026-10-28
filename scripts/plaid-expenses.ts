@@ -27,6 +27,8 @@ import path from 'node:path'
 
 import dotenv from 'dotenv'
 
+import { classifyMoneyMoves, matchFrom } from '#app/utils/money-movement.ts'
+
 dotenv.config()
 
 const OPENROUTER_KEY = process.env.OPEN_ROUTER_API_KEY?.trim()
@@ -45,8 +47,8 @@ const ACCOUNT_ONLY: Record<string, string[]> = {
 }
 
 // Deposits into the checking account that are revenue, matched by substring.
-// Anything not matched (and not a transfer/card payment) lands in "Unknown
-// deposits" for manual review.
+// Any other deposit that is not a move between our own accounts (cash and
+// checks deposited at the bank) is revenue too, under its own label.
 const REVENUE_SOURCES: Array<{ label: string; match: string[] }> = [
 	{ label: 'Boulevard payouts (services, net of fees)', match: ['boulevard'] },
 	{ label: 'Cherry financing payouts', match: ['cherry des:funding'] },
@@ -342,7 +344,9 @@ export function classifyExpenseVendor(
 	return ruleMatch(key) ?? null
 }
 
-/** The card-payment / transfer filter the P&L uses, for reuse. */
+/** A quick card-payment / transfer filter for the daily profit model's
+ * vendor ratios. The P&L itself counts a move as internal only when its
+ * other side shows up in a linked account (app/utils/money-movement.ts). */
 export function isExcludedMoneyMovement(row: {
 	merchant?: string | null
 	name: string
@@ -479,10 +483,16 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 		}
 	}
 
-	const rows = await prisma.plaidTransaction.findMany({
-		where: { date: { gte: start, lte: end }, ...(owner ? { owner } : {}) },
+	// Every owner's rows, from a few weeks before the window: the other side
+	// of a business transfer is often on a personal account.
+	const allRows = await prisma.plaidTransaction.findMany({
+		where: { date: { gte: matchFrom(start), lte: end } },
 		orderBy: { date: 'asc' },
 	})
+	const { internal, bounced } = classifyMoneyMoves(allRows)
+	const rows = allRows.filter(
+		r => r.date >= start && (!owner || r.owner === owner),
+	)
 	if (!rows.length) {
 		console.error(
 			`No stored transactions${owner ? ` for owner "${owner}"` : ''} in ${start}..${end}. Run "pnpm plaid:link" first.`,
@@ -504,7 +514,6 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 	// purchase nets out of its vendor's total.
 	const expenses: Txn[] = []
 	const revenue: RevenueTxn[] = []
-	const unknownDeposits: Txn[] = []
 	let excludedTransfers = 0
 	let excludedOtherCards = 0
 	for (const r of rows) {
@@ -526,37 +535,27 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 			institution: r.owner ? `${r.institution} (${r.owner})` : r.institution,
 			accountMask: cardLast4,
 		}
-		// Credit-card payments move money between our own accounts: the card
-		// purchases are the real expenses, the payment that settles them would
-		// double-count.
-		const isCardPayment =
-			r.pfcDetailed === 'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT' ||
-			/payment thank you|autopay|crd autopay|online payment to|capital one mobile pymt/i.test(
-				`${merchant} ${name}`,
-			)
-		if (isCardPayment) {
+		// Moves between our own accounts (a card payment that shows up on the
+		// card, a transfer that lands in another linked account) and bounced
+		// payments would double-count. Every other dollar counts, including
+		// checks and payroll, which Plaid tags as transfers.
+		if (internal.has(r.id) || bounced.has(r.id)) {
 			excludedTransfers++
 			continue
 		}
-		if (r.accountType === 'depository') {
-			if (r.amount < 0) {
-				// Deposit: revenue if it matches a known source; otherwise it goes
-				// to the review list and is NOT counted as revenue.
-				const hay = `${merchant} ${name}`.toLowerCase()
-				const source = REVENUE_SOURCES.find(s =>
-					s.match.some(m => hay.includes(m)),
-				)
-				if (source) revenue.push({ ...txn, source: source.label })
-				else if (r.pfcPrimary === 'TRANSFER_IN') excludedTransfers++
-				else unknownDeposits.push(txn)
-			} else if (r.pfcPrimary === 'TRANSFER_OUT') {
-				excludedTransfers++
-			} else {
-				expenses.push(txn)
-			}
+		if (r.accountType === 'depository' && r.amount < 0) {
+			const hay = `${merchant} ${name}`.toLowerCase()
+			const source = REVENUE_SOURCES.find(s =>
+				s.match.some(m => hay.includes(m)),
+			)
+			if (source) revenue.push({ ...txn, source: source.label })
+			else if (r.pfcPrimary === 'TRANSFER_IN' || r.pfcPrimary === 'INCOME')
+				revenue.push({ ...txn, source: 'Cash, checks and other deposits' })
+			// A refund nets out of its vendor's total.
+			else expenses.push(txn)
 		} else {
-			// Credit account: positive = purchase, negative = refund (card
-			// payments were already excluded above).
+			// Money out of the business account, and card charges (a card
+			// refund is negative).
 			expenses.push(txn)
 		}
 	}
@@ -634,7 +633,6 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 	const totalExpense = businessExpenses.reduce((s, t) => s + t.amount, 0)
 	const totalPersonal = personalExpenses.reduce((s, t) => s + t.amount, 0)
 	const totalRevenue = revenue.reduce((s, t) => s - t.amount, 0)
-	const totalUnknownDeposits = unknownDeposits.reduce((s, t) => s - t.amount, 0)
 
 	const sumBy = <K extends string>(rows: Txn[], pick: (t: Txn) => K, sign = 1) => {
 		const m = new Map<K, { total: number; count: number }>()
@@ -813,15 +811,31 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 		return !c || c.confidence === 'low'
 	})
 
+	// Day by day in plain cash (no amortized bills, no pending payouts), for
+	// the bank check on the household profit page.
+	const daily = new Map<string, { revenue: number; expenses: number }>()
+	for (const t of revenue) {
+		const d = daily.get(t.date) ?? { revenue: 0, expenses: 0 }
+		d.revenue -= t.amount
+		daily.set(t.date, d)
+	}
+	for (const t of businessExpenses) {
+		const d = daily.get(t.date) ?? { revenue: 0, expenses: 0 }
+		d.expenses += t.amount
+		daily.set(t.date, d)
+	}
+
 	const payload = {
 		start,
 		end,
 		totalRevenue,
 		totalExpense,
 		totalPersonal,
-		totalUnknownDeposits,
 		netProfit: totalRevenue - totalExpense,
 		monthly,
+		daily: [...daily.entries()]
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([day, d]) => ({ day, ...d })),
 		byRevenueSource,
 		byService,
 		byCategory,
@@ -834,11 +848,6 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 		personalVendors: sumBy(personalExpenses, t => t.key).map(([k, v]) => ({
 			vendor: k,
 			...v,
-		})),
-		unknownDeposits: unknownDeposits.map(t => ({
-			date: t.date,
-			amount: -t.amount,
-			name: t.merchant || t.name,
 		})),
 	}
 
@@ -869,8 +878,6 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 	console.log(`Net:                ${usd(totalRevenue - totalExpense).padStart(12)}`)
 	if (totalPersonal)
 		console.log(`(Personal spending on these cards, not counted: ${usd(totalPersonal)})`)
-	if (totalUnknownDeposits)
-		console.log(`(Unknown deposits, not counted as revenue: ${usd(totalUnknownDeposits)})`)
 
 	console.log('\nBy month (revenue / expenses / net):')
 	for (const m of monthly)
@@ -888,13 +895,6 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 		console.log(
 			`  ${source.padEnd(46)} ${usd(v.total).padStart(12)}  (${v.count} deposits)`,
 		)
-	if (unknownDeposits.length) {
-		console.log('\nUNKNOWN deposits (not counted as revenue, tell me what these are):')
-		for (const t of unknownDeposits.slice(0, 20))
-			console.log(
-				`  ${t.date}  ${usd(-t.amount).padStart(12)}  ${t.merchant || t.name}`,
-			)
-	}
 
 	console.log('\nExpenses by category:')
 	for (const [category, v] of byCategory) {

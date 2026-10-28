@@ -80,6 +80,12 @@ export async function syncFinanceReports(): Promise<{
 		await q(`create table household_monthly_totals (month text primary key, total numeric not null)`)
 		for (const r of budget.monthlyTotals) await q(`insert into household_monthly_totals values ($1,$2)`, [r.month, r.total])
 
+		// Money moved to savings or investments (Goldman Sachs, crypto): kept,
+		// not spent, but no longer in the linked bank accounts.
+		await q(`drop table if exists household_saved_monthly`)
+		await q(`create table household_saved_monthly (month text primary key, saved numeric not null)`)
+		for (const r of budget.savedMonthly) await q(`insert into household_saved_monthly values ($1,$2)`, [r.month, r.total])
+
 		await q(`drop table if exists household_category_summary`)
 		await q(`create table household_category_summary (bucket text primary key, total numeric, avg_month numeric, median_month numeric)`)
 		for (const r of budget.summary) await q(`insert into household_category_summary values ($1,$2,$3,$4)`, [r.bucket, r.total, r.avg, r.median])
@@ -438,18 +444,71 @@ export async function syncFinanceReports(): Promise<{
 		// weeks at once), Plaid tags them TRANSFER_IN_DEPOSIT, not INCOME. So
 		// take-home = mobile deposits + INCOME rows, excluding tax refunds
 		// (lumpy, prior-year, taxes are handled by the accrual line instead).
-		const income = (await prisma.$queryRawUnsafe(
-			`SELECT substr(date, 1, 7) AS month, sum(-amount) AS takehome
+		const incomeDaily = (await prisma.$queryRawUnsafe(
+			`SELECT date AS day, sum(-amount) AS takehome
 			 FROM PlaidTransaction
 			 WHERE owner = 'zane' AND accountType = 'depository' AND amount < 0 AND (
 			   (pfcDetailed = 'TRANSFER_IN_DEPOSIT' AND name LIKE '%DEPOSIT%MOBILE%')
 			   OR (pfcPrimary = 'INCOME' AND pfcDetailed != 'INCOME_TAX_REFUND'))
 			 GROUP BY 1 ORDER BY 1`,
-		)) as Array<{ month: string; takehome: number }>
+		)) as Array<{ day: string; takehome: number }>
+		const incomeByMonth = new Map<string, number>()
+		for (const r of incomeDaily)
+			incomeByMonth.set(
+				r.day.slice(0, 7),
+				(incomeByMonth.get(r.day.slice(0, 7)) ?? 0) + Number(r.takehome),
+			)
 		await q(`drop table if exists household_income_monthly`)
 		await q(`create table household_income_monthly (month text primary key, takehome numeric not null)`)
-		for (const r of income)
-			await q(`insert into household_income_monthly values ($1,$2)`, [r.month, r.takehome])
+		for (const [month, takehome] of incomeByMonth)
+			await q(`insert into household_income_monthly values ($1,$2)`, [month, takehome])
+
+		// ---- the same cash day by day (no amortized bills, no pending
+		// payouts), for the bank check on the household profit page.
+		const keptByDay = new Map<
+			string,
+			{ revenue: number; expenses: number; takehome: number; spend: number; saved: number }
+		>()
+		const keptDay = (day: string) => {
+			let v = keptByDay.get(day)
+			if (!v) keptByDay.set(day, (v = { revenue: 0, expenses: 0, takehome: 0, spend: 0, saved: 0 }))
+			return v
+		}
+		for (const r of pnl.daily) {
+			keptDay(r.day).revenue += r.revenue
+			keptDay(r.day).expenses += r.expenses
+		}
+		for (const r of budget.daily) {
+			keptDay(r.day).spend += r.spend
+			keptDay(r.day).saved += r.saved
+		}
+		for (const r of incomeDaily) keptDay(r.day).takehome += Number(r.takehome)
+		await q(`drop table if exists household_kept_daily`)
+		await q(`create table household_kept_daily (day text primary key, business_revenue numeric, business_expenses numeric, takehome numeric, household_spend numeric, saved numeric)`)
+		for (const [day, v] of keptByDay)
+			await q(`insert into household_kept_daily values ($1,$2,$3,$4,$5,$6)`, [day, v.revenue, v.expenses, v.takehome, v.spend, v.saved])
+
+		// ---- balance history. PlaidAccountBalance holds only the latest
+		// balance, so keep one row per account per day here (never dropped).
+		// The household profit page checks the report against it.
+		await q(`create table if not exists plaid_balance_daily (
+			day text not null, account_id text not null, owner text, type text,
+			current numeric not null, primary key (day, account_id))`)
+		for (const b of await prisma.plaidAccountBalance.findMany()) {
+			if (b.current == null) continue
+			await q(
+				`insert into plaid_balance_daily values ($1,$2,$3,$4,$5)
+				 on conflict (day, account_id) do update
+				 set owner = excluded.owner, type = excluded.type, current = excluded.current`,
+				[
+					b.fetchedAt.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+					b.accountId,
+					b.owner,
+					b.type,
+					b.current,
+				],
+			)
+		}
 
 		// ---- total household profit: business net + take-home − household spend
 		// − estimated tax accrual. Three tax components (docs/taxes/README.md):
@@ -487,10 +546,13 @@ export async function syncFinanceReports(): Promise<{
 			  -- anyway; their monthly split is already synthetic).
 			  round(b.net + coalesce(i.takehome, 0) - coalesce(h.total, 0)
 			        - greatest(b.net, 0) * 0.30 - b.revenue * 0.00375 - 17
-			        + (b.expenses - b.expenses_smoothed)) as net_household_profit_smoothed
+			        + (b.expenses - b.expenses_smoothed)) as net_household_profit_smoothed,
+			  -- Kept, but moved out of the linked bank accounts.
+			  round(coalesce(s.saved, 0)) as saved_outside
 			from business_pnl_monthly b
 			left join household_income_monthly i using (month)
 			left join household_monthly_totals h using (month)
+			left join household_saved_monthly s using (month)
 			order by b.month`)
 
 		await q(`grant select on all tables in schema public to metabase_ro`)

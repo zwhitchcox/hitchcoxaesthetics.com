@@ -21,7 +21,7 @@ import { SettingsDialog } from '#app/components/settings-dialog.tsx'
 import { handleAnnualFeeForm, loadAnnualFees } from '#app/utils/annual-fees.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
-import { groupBalances, isOwed } from '#app/utils/plaid-balances.ts'
+import { bankCheck, groupBalances, isOwed } from '#app/utils/plaid-balances.ts'
 import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
 
 interface Row {
@@ -37,6 +37,8 @@ interface Row {
 	 * finance sync first writes the column. The cash column above stays the
 	 * FCF truth. */
 	net_household_profit_smoothed?: number
+	/** Kept, but moved to savings outside the linked accounts. */
+	saved_outside?: number
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -54,7 +56,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	})
 	// Latest balance per linked account, written by the plaid-sync job. The
 	// page reads the mirror only; it never calls Plaid.
-	const [balanceRows, latestBalance, fees] = await Promise.all([
+	const checkFrom = new Date(Date.now() - 100 * 24 * 3600e3).toISOString().slice(0, 10)
+	const [balanceRows, latestBalance, fees, snapshots, keptDays] = await Promise.all([
 		prisma.plaidAccountBalance.findMany({
 			select: {
 				accountId: true,
@@ -75,6 +78,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			select: { fetchedAt: true },
 		}),
 		loadAnnualFees(),
+		// The bank check: daily balance history and the report's cash by day,
+		// both written by the finance sync (missing until its first run).
+		reportsQuery<{ day: string; account_id: string; type: string; current: string }>(
+			`SELECT day, account_id, type, current FROM plaid_balance_daily WHERE day >= $1`,
+			[checkFrom],
+		).catch(() => []),
+		reportsQuery<{ day: string; kept: string; saved: string }>(
+			`SELECT day, business_revenue - business_expenses + takehome - household_spend AS kept, saved
+			 FROM household_kept_daily WHERE day >= $1`,
+			[checkFrom],
+		).catch(() => []),
 	])
 	const balancesAsOf = latestBalance
 		? latestBalance.fetchedAt.toLocaleString('en-US', {
@@ -90,6 +104,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const lastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1))
 		.toISOString()
 		.slice(0, 7)
+	const ytdRows = rows.filter(r => r.month >= `${now.getUTCFullYear()}-01`)
 	const full = rows.filter(r => r.month < curMonth)
 	const last12 = full.slice(-12)
 	const lastRow = full.find(r => r.month === lastMonth)
@@ -107,12 +122,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		avg12: last12.length
 			? last12.reduce((s, r) => s + r.net_household_profit, 0) / last12.length
 			: null,
-		ytd: rows
-			.filter(r => r.month >= `${now.getUTCFullYear()}-01`)
-			.reduce((s, r) => s + r.net_household_profit, 0),
-		ytdCash: rows
-			.filter(r => r.month >= `${now.getUTCFullYear()}-01`)
-			.reduce((s, r) => s + r.net_household_profit + r.est_tax_accrual, 0),
+		ytd: ytdRows.reduce((s, r) => s + r.net_household_profit, 0),
+		ytdCash: ytdRows.reduce(
+			(s, r) => s + r.net_household_profit + r.est_tax_accrual,
+			0,
+		),
+		ytdSaved: ytdRows.reduce((s, r) => s + (r.saved_outside || 0), 0),
+		check: bankCheck(
+			snapshots.map(r => ({
+				day: r.day,
+				accountId: r.account_id,
+				type: r.type,
+				current: Number(r.current),
+			})),
+			keptDays.map(r => ({ day: r.day, kept: Number(r.kept), saved: Number(r.saved) })),
+		),
 	})
 }
 
@@ -127,8 +151,20 @@ export default function HouseholdProfit() {
 	const data = useLoaderData<typeof loader>()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
-	const { rows, fees, balances, balancesAsOf, last, lastCash, lastMonth, avg12, ytd, ytdCash } =
-		data
+	const {
+		rows,
+		fees,
+		balances,
+		balancesAsOf,
+		last,
+		lastCash,
+		lastMonth,
+		avg12,
+		ytd,
+		ytdCash,
+		ytdSaved,
+		check,
+	} = data
 	return (
 		<ReportPage
 			title="Household profit"
@@ -163,9 +199,47 @@ export default function HouseholdProfit() {
 					label="YTD cash kept (pre-tax)"
 					value={usd(ytdCash)}
 					tone={ytdCash < 0 ? 'bad' : 'good'}
-					whisper="before the unpaid tax accrual"
+					whisper={
+						ytdSaved > 0
+							? `before taxes; ${usd(ytdSaved)} of it moved to savings`
+							: 'before the unpaid tax accrual'
+					}
 				/>
 			</div>
+			{check ? (
+				<p className="note">
+					{check.ready ? (
+						<>
+							<strong>
+								Bank check, {check.from} to {check.to}:
+							</strong>{' '}
+							the linked accounts (cash minus card debt) changed{' '}
+							{usd(check.bank)}. The report says we kept {usd(check.kept)}
+							{check.saved > 0
+								? `, and ${usd(check.saved)} of it moved to savings`
+								: ''}
+							. Difference:{' '}
+							<strong
+								style={
+									Math.abs(check.diff) > 1000
+										? { color: 'var(--bad-text)' }
+										: undefined
+								}
+							>
+								{usd(check.diff)}
+							</strong>
+							. A small difference comes from pending charges and the
+							bank's one-day lag. A difference that keeps growing means the
+							report misses money.
+						</>
+					) : (
+						<>
+							<strong>Bank check:</strong> the first daily balance is from{' '}
+							{check.from}. The check starts after the next daily sync.
+						</>
+					)}
+				</p>
+			) : null}
 
 			<section>
 				<h2>
@@ -246,20 +320,24 @@ export default function HouseholdProfit() {
 				</div>
 				<p className="note">
 					Reading a row left to right is the equation: revenue minus expenses is business
-					net; plus take-home, minus household spending, equals <strong>cash kept</strong> -
-					the money that actually moved. The last column re-states net with
-					the once-a-year business fees from Settings (top right) spread ÷12 -
-					the trend view; every other column stays cash-true so FCF is always
-					visible. The tax column is an <strong>accrual</strong>, not a
-					payment: no quarterlies have been paid, so "net after taxes" is what's left once
-					the April bill is honestly set aside. Cash kept ≈ $0 is why the cards can be paid
-					in full each month while nothing accumulates. For the current partial
-					month, fixed monthly business bills (rent, software, insurance) are
-					accrued evenly across the month instead of on their payment date;
-					variable spend (supplies etc.) stays on actual dates. Revenue for the
-					current month also includes Boulevard money collected after the last
-					banked payout (payouts lag 2-3 business days), so a busy day shows up
-					the same day instead of when the deposit lands.
+					net; plus take-home, minus household spending, equals <strong>cash kept</strong>,
+					the money that actually moved. Every dollar that enters or leaves the bank
+					counts. A transfer or card payment is left out only when its other side
+					shows up in another linked account. So business checks and payroll are
+					business expenses, cash and check deposits are revenue, and Venmo, cash
+					and payments to cards we cannot see (the Apple Card after its last export,
+					a second Citi card that is not linked) are household spending. Money moved to
+					savings (Goldman Sachs) counts as kept. The last column re-states net with
+					the once-a-year business fees from Settings (top right) spread ÷12, the
+					trend view; every other column stays cash-true. The tax column is an{' '}
+					<strong>accrual</strong>, not a payment: no quarterlies have been paid, so
+					"net after taxes" is what's left once the April bill is set aside. For the
+					current partial month, fixed monthly business bills (rent, software,
+					insurance) are accrued evenly across the month instead of on their
+					payment date; variable spend (supplies etc.) stays on actual dates.
+					Revenue for the current month also includes Boulevard money collected
+					after the last banked payout (payouts lag 2-3 business days), so a busy
+					day shows up the same day instead of when the deposit lands.
 				</p>
 			</section>
 
