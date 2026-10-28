@@ -9,21 +9,26 @@ import {
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
 } from '@remix-run/node'
-import { useLoaderData } from '@remix-run/react'
+import { useLoaderData, useSearchParams } from '@remix-run/react'
 import { Fragment } from 'react'
 import {
 	BarChart,
-	Choice,
 	ReportPage,
 	StatTile,
 	revalidateUnlessOnly,
-	useChoice,
 	usd,
 } from '#app/components/report-ui'
 import { SettingsDialog } from '#app/components/settings-dialog.tsx'
 import { handleAnnualFeeForm, loadAnnualFees } from '#app/utils/annual-fees.server.ts'
-import { monthsInRange, type ProfitRange } from '#app/utils/household-profit.ts'
 import { prisma } from '#app/utils/db.server.ts'
+import { HISTORY_FROM } from '#app/utils/finance-reports.server.ts'
+import {
+	buildTable,
+	RANGE_KEYS,
+	RANGE_OPTIONS,
+	type RangeKey,
+	resolveRange,
+} from '#app/utils/household-profit.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import { bankCheck, groupBalances, isOwed } from '#app/utils/plaid-balances.ts'
 import { hasReportsDb, reportsQuery } from '#app/utils/reports-db.server'
@@ -61,7 +66,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	// Latest balance per linked account, written by the plaid-sync job. The
 	// page reads the mirror only; it never calls Plaid.
 	const checkFrom = new Date(Date.now() - 100 * 24 * 3600e3).toISOString().slice(0, 10)
-	const [balanceRows, latestBalance, fees, snapshots, keptDays] = await Promise.all([
+	const [balanceRows, latestBalance, fees, snapshots, dailyRows] = await Promise.all([
 		prisma.plaidAccountBalance.findMany({
 			select: {
 				accountId: true,
@@ -88,12 +93,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			`SELECT day, account_id, type, current FROM plaid_balance_daily WHERE day >= $1`,
 			[checkFrom],
 		).catch(() => []),
-		reportsQuery<{ day: string; kept: string; saved: string }>(
-			`SELECT day, business_revenue - business_expenses + takehome - household_spend AS kept, saved
-			 FROM household_kept_daily WHERE day >= $1`,
-			[checkFrom],
+		reportsQuery<{
+			day: string
+			business_revenue: string
+			business_expenses: string
+			takehome: string
+			household_spend: string
+			saved: string
+		}>(
+			`SELECT day, business_revenue, business_expenses, takehome, household_spend, saved
+			 FROM household_kept_daily WHERE day >= $1 ORDER BY day`,
+			[HISTORY_FROM],
 		).catch(() => []),
 	])
+	// The bank's cash day by day: the date ranges that are not whole months
+	// add these up, and the bank check compares them with the balances.
+	const days = dailyRows.map(r => ({
+		day: r.day,
+		revenue: Number(r.business_revenue),
+		expenses: Number(r.business_expenses),
+		takehome: Number(r.takehome),
+		spend: Number(r.household_spend),
+		saved: Number(r.saved),
+	}))
 	const balancesAsOf = latestBalance
 		? latestBalance.fetchedAt.toLocaleString('en-US', {
 				timeZone: 'America/New_York',
@@ -115,7 +137,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return json({
 		configured: true as const,
 		rows,
-		curMonth,
+		days,
+		today: now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+		firstDay: HISTORY_FROM,
+		dataThrough: days.at(-1)?.day ?? HISTORY_FROM,
 		fees,
 		balances: groupBalances(balanceRows),
 		balancesAsOf,
@@ -140,15 +165,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
 				type: r.type,
 				current: Number(r.current),
 			})),
-			keptDays.map(r => ({ day: r.day, kept: Number(r.kept), saved: Number(r.saved) })),
+			days
+				.filter(d => d.day >= checkFrom)
+				.map(d => ({
+					day: d.day,
+					kept: d.revenue - d.expenses + d.takehome - d.spend,
+					saved: d.saved,
+				})),
 		),
 	})
 }
 
-// The month range lives in the URL and only filters the loaded rows.
-export const shouldRevalidate = revalidateUnlessOnly(['range'])
+// The date range lives in the URL and only filters the loaded rows.
+export const shouldRevalidate = revalidateUnlessOnly(['range', 'from', 'to'])
 
-const RANGES = ['year', '12m', 'all'] as const satisfies readonly ProfitRange[]
+const longDay = (day: string) =>
+	new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+		timeZone: 'UTC',
+	})
+const shortDay = (day: string) =>
+	new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric',
+		timeZone: 'UTC',
+	})
 
 // The Settings dialog's annual fee forms post here.
 export async function action({ request }: ActionFunctionArgs) {
@@ -159,12 +203,15 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function HouseholdProfit() {
 	const data = useLoaderData<typeof loader>()
-	const [range, setRange] = useChoice('range', RANGES, '12m')
+	const [searchParams, setSearchParams] = useSearchParams()
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
 	const {
 		rows,
-		curMonth,
+		days,
+		today,
+		firstDay,
+		dataThrough,
 		fees,
 		balances,
 		balancesAsOf,
@@ -177,22 +224,44 @@ export default function HouseholdProfit() {
 		ytdSaved,
 		check,
 	} = data
-	const shown = monthsInRange(rows, range, curMonth)
-	const sum = (pick: (r: Row) => number | undefined) =>
-		shown.reduce((t, r) => {
-			const v = pick(r)
-			return t + (v != null && Number.isFinite(v) ? v : 0)
-		}, 0)
-	const totalCash = sum(r => r.net_household_profit + r.est_tax_accrual)
-	const totalNet = sum(r => r.net_household_profit)
-	const totalSmoothed = sum(r => r.net_household_profit_smoothed)
-	const firstMonth = rows[0]
-		? new Date(`${rows[0].month}-15T12:00:00Z`).toLocaleDateString('en-US', {
-				month: 'short',
-				year: 'numeric',
-				timeZone: 'UTC',
-			})
-		: ''
+	// Last 12 months by default, as before. Custom keeps its days in the URL.
+	const range: RangeKey =
+		RANGE_KEYS.find(k => k === searchParams.get('range')) ?? 'last12Months'
+	const custom = {
+		from: searchParams.get('from') ?? undefined,
+		to: searchParams.get('to') ?? undefined,
+	}
+	const table = buildTable({
+		key: range,
+		today,
+		custom,
+		firstDay,
+		dataThrough,
+		months: rows,
+		days,
+	})
+	const setParams = (next: Record<string, string | null>) =>
+		setSearchParams(
+			prev => {
+				const p = new URLSearchParams(prev)
+				for (const [k, v] of Object.entries(next)) {
+					if (v == null) p.delete(k)
+					else p.set(k, v)
+				}
+				return p
+			},
+			{ replace: true, preventScrollReset: true },
+		)
+	const pickRange = (next: RangeKey) => {
+		if (next === 'custom') {
+			// Start the custom days from the range on screen.
+			const shown = resolveRange(range, today, custom)
+			setParams({ range: 'custom', from: shown.from, to: shown.to })
+		} else setParams({ range: next === 'last12Months' ? null : next, from: null, to: null })
+	}
+	const rowLabel = (key: string) => (table.unit === 'day' ? shortDay(key) : key)
+	const tone = (v: number | null) => (v == null ? '' : v < 0 ? 'bad' : 'good')
+	const { total } = table
 	return (
 		<ReportPage
 			title="Household profit"
@@ -269,41 +338,73 @@ export default function HouseholdProfit() {
 				</p>
 			) : null}
 
-			<div className="choices">
-				<Choice
-					label="Months shown"
+			<div className="controls" style={{ flexWrap: 'wrap' }}>
+				<label htmlFor="date-range">Date range</label>
+				<select
+					id="date-range"
 					value={range}
-					onChange={setRange}
-					options={[
-						{ value: 'year', label: curMonth.slice(0, 4) },
-						{ value: '12m', label: '12 months' },
-						{ value: 'all', label: `All, since ${firstMonth}` },
-					]}
-				/>
+					onChange={e => pickRange(e.target.value as RangeKey)}
+				>
+					{RANGE_OPTIONS.map(o => (
+						<option key={o.value} value={o.value}>
+							{o.label}
+						</option>
+					))}
+				</select>
+				{range === 'custom' ? (
+					<>
+						<input
+							type="date"
+							aria-label="First day"
+							value={table.from}
+							min={firstDay}
+							max={today}
+							onChange={e => e.target.value && setParams({ from: e.target.value })}
+						/>
+						<span>to</span>
+						<input
+							type="date"
+							aria-label="Last day"
+							value={table.to}
+							min={firstDay}
+							max={today}
+							onChange={e => e.target.value && setParams({ to: e.target.value })}
+						/>
+					</>
+				) : null}
+				<span className="dim">
+					{longDay(table.from)} to {longDay(table.to)}
+					{table.unit === 'day' || table.to > dataThrough
+						? ` · bank data through ${longDay(dataThrough)}`
+						: ''}
+				</span>
 			</div>
 
 			<section>
 				<h2>
-					What we kept, by month{' '}
+					What we kept, by {table.unit}{' '}
 					<span className="mini">
 						cash kept = actual cash flow; after taxes = with 30% of biz net set aside
 					</span>
 				</h2>
 				<BarChart
-					labels={shown.map(r => r.month)}
+					labels={table.rows.map(r => rowLabel(r.key))}
 					series={[
 						{
 							name: 'Cash kept (pre-tax)',
 							color: 'var(--series-1)',
-							values: shown.map(
-								r => r.net_household_profit + r.est_tax_accrual,
-							),
+							values: table.rows.map(r => r.kept),
 						},
-						{
-							name: 'Net after taxes',
-							color: 'var(--series-3)',
-							values: shown.map(r => r.net_household_profit),
-						},
+						// Taxes are estimated month by month only on whole-month ranges.
+						...(table.rows.every(r => r.afterTax != null)
+							? [
+									{
+										name: 'Net after taxes',
+										color: 'var(--series-3)',
+										values: table.rows.map(r => r.afterTax ?? 0),
+									},
+								]
+							: []),
 					]}
 					showTotal={false}
 					height={190}
@@ -311,12 +412,12 @@ export default function HouseholdProfit() {
 			</section>
 
 			<section>
-				<h2>Monthly breakdown</h2>
+				<h2>{table.unit === 'day' ? 'Daily' : 'Monthly'} breakdown</h2>
 				<div className="rtable-wrap">
 					<table className="rtable">
 						<thead>
 							<tr>
-								<th>Month</th>
+								<th>{table.unit === 'day' ? 'Day' : 'Month'}</th>
 								<th className="num">Biz revenue</th>
 								<th className="num">Biz expenses</th>
 								<th className="num">Biz net</th>
@@ -329,51 +430,49 @@ export default function HouseholdProfit() {
 							</tr>
 						</thead>
 						<tbody>
-							{shown.map(r => (
-								<tr key={r.month}>
-									<td>{r.month}</td>
-									<td className="num">+ {usd(r.business_revenue)}</td>
-									<td className="num">− {usd(r.business_expenses)}</td>
-									<td className="num">{usd(r.business_net)}</td>
-									<td className="num">+ {usd(r.zane_takehome)}</td>
-									<td className="num">− {usd(r.household_spend)}</td>
-									<td
-										className={`num ${r.net_household_profit + r.est_tax_accrual < 0 ? 'bad' : 'good'}`}
-									>
-										{usd(r.net_household_profit + r.est_tax_accrual)}
+							{table.rows.length === 0 ? (
+								<tr>
+									<td colSpan={10} className="dim">
+										The bank has not reported these days yet. Bank data goes
+										through {longDay(dataThrough)}.
 									</td>
-									<td className="num">− {usd(r.est_tax_accrual)}</td>
-									<td className={`num ${r.net_household_profit < 0 ? 'bad' : 'good'}`}>
-										{usd(r.net_household_profit)}
+								</tr>
+							) : null}
+							{table.rows.map(r => (
+								<tr key={r.key}>
+									<td>{rowLabel(r.key)}</td>
+									<td className="num">+ {usd(r.revenue)}</td>
+									<td className="num">− {usd(r.expenses)}</td>
+									<td className="num">{usd(r.net)}</td>
+									<td className="num">+ {usd(r.takehome)}</td>
+									<td className="num">− {usd(r.spend)}</td>
+									<td className={`num ${r.kept < 0 ? 'bad' : 'good'}`}>{usd(r.kept)}</td>
+									<td className="num">{r.tax == null ? '-' : `− ${usd(r.tax)}`}</td>
+									<td className={`num ${tone(r.afterTax)}`}>
+										{r.afterTax == null ? '-' : usd(r.afterTax)}
 									</td>
-									<td
-										className={`num ${(r.net_household_profit_smoothed ?? 0) < 0 ? 'bad' : 'good'}`}
-									>
-										{r.net_household_profit_smoothed != null &&
-										!Number.isNaN(r.net_household_profit_smoothed)
-											? usd(r.net_household_profit_smoothed)
-											: '-'}
+									<td className={`num ${tone(r.smoothed)}`}>
+										{r.smoothed == null ? '-' : usd(r.smoothed)}
 									</td>
 								</tr>
 							))}
 						</tbody>
 						<tfoot>
 							<tr>
-								<td>Total, {shown.length} months</td>
-								<td className="num">+ {usd(sum(r => r.business_revenue))}</td>
-								<td className="num">− {usd(sum(r => r.business_expenses))}</td>
-								<td className="num">{usd(sum(r => r.business_net))}</td>
-								<td className="num">+ {usd(sum(r => r.zane_takehome))}</td>
-								<td className="num">− {usd(sum(r => r.household_spend))}</td>
-								<td className={`num ${totalCash < 0 ? 'bad' : 'good'}`}>
-									{usd(totalCash)}
+								<td>
+									Total, {table.rows.length} {table.unit}
+									{table.rows.length === 1 ? '' : 's'}
 								</td>
-								<td className="num">− {usd(sum(r => r.est_tax_accrual))}</td>
-								<td className={`num ${totalNet < 0 ? 'bad' : 'good'}`}>
-									{usd(totalNet)}
-								</td>
-								<td className={`num ${totalSmoothed < 0 ? 'bad' : 'good'}`}>
-									{usd(totalSmoothed)}
+								<td className="num">+ {usd(total.revenue)}</td>
+								<td className="num">− {usd(total.expenses)}</td>
+								<td className="num">{usd(total.net)}</td>
+								<td className="num">+ {usd(total.takehome)}</td>
+								<td className="num">− {usd(total.spend)}</td>
+								<td className={`num ${total.kept < 0 ? 'bad' : 'good'}`}>{usd(total.kept)}</td>
+								<td className="num">− {usd(total.tax)}</td>
+								<td className={`num ${tone(total.afterTax)}`}>{usd(total.afterTax)}</td>
+								<td className={`num ${tone(total.smoothed)}`}>
+									{total.smoothed == null ? '-' : usd(total.smoothed)}
 								</td>
 							</tr>
 						</tfoot>
@@ -398,9 +497,12 @@ export default function HouseholdProfit() {
 					payment date; variable spend (supplies etc.) stays on actual dates.
 					Revenue for the current month also includes Boulevard money collected
 					after the last banked payout (payouts lag 2-3 business days), so a busy
-					day shows up the same day instead of when the deposit lands. The months
-					go back to {firstMonth}, the first full month with data from every linked bank
-					account and card; the Total row adds up the months shown.
+					day shows up the same day instead of when the deposit lands. The data
+					goes back to {longDay(firstDay)}, the first full month with data from every
+					linked bank account and card; the Total row adds up the rows shown. A date
+					range of whole months uses these monthly numbers. Any other range adds up
+					the bank's cash day by day, as it posted (no payouts on the way, no bills
+					spread over the month), and estimates the taxes on its total only.
 				</p>
 			</section>
 

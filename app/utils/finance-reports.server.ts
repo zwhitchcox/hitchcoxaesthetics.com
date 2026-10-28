@@ -510,7 +510,10 @@ export async function syncFinanceReports(): Promise<{
 			keptDay(r.day).spend += r.spend
 			keptDay(r.day).saved += r.saved
 		}
-		for (const r of incomeDaily) keptDay(r.day).takehome += Number(r.takehome)
+		// Take-home goes back further than the other columns; keep the days
+		// that have every account.
+		for (const r of incomeDaily)
+			if (r.day >= HISTORY_FROM) keptDay(r.day).takehome += Number(r.takehome)
 		await q(`drop table if exists household_kept_daily`)
 		await q(`create table household_kept_daily (day text primary key, business_revenue numeric, business_expenses numeric, takehome numeric, household_spend numeric, saved numeric)`)
 		for (const [day, v] of keptByDay)
