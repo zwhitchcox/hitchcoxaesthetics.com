@@ -68,6 +68,7 @@ table.rtable { width: 100%; border-collapse: collapse; font-variant-numeric: tab
 .rtable th.sortable:hover { color: var(--ink); }
 .rtable td.good { color: var(--good-text); }
 .rtable td.bad { color: var(--bad-text); }
+.rtable tfoot td { border-top: 2px solid var(--axis); border-bottom: none; font-weight: 600; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-2); margin: 2px 0 6px; }
 .legend .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 .chart-wrap { position: relative; }

@@ -13,12 +13,16 @@ import { useLoaderData } from '@remix-run/react'
 import { Fragment } from 'react'
 import {
 	BarChart,
+	Choice,
 	ReportPage,
 	StatTile,
+	revalidateUnlessOnly,
+	useChoice,
 	usd,
 } from '#app/components/report-ui'
 import { SettingsDialog } from '#app/components/settings-dialog.tsx'
 import { handleAnnualFeeForm, loadAnnualFees } from '#app/utils/annual-fees.server.ts'
+import { monthsInRange, type ProfitRange } from '#app/utils/household-profit.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { requireUserWithRole } from '#app/utils/permissions.server'
 import { bankCheck, groupBalances, isOwed } from '#app/utils/plaid-balances.ts'
@@ -111,6 +115,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	return json({
 		configured: true as const,
 		rows,
+		curMonth,
 		fees,
 		balances: groupBalances(balanceRows),
 		balancesAsOf,
@@ -140,6 +145,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	})
 }
 
+// The month range lives in the URL and only filters the loaded rows.
+export const shouldRevalidate = revalidateUnlessOnly(['range'])
+
+const RANGES = ['year', '12m', 'all'] as const satisfies readonly ProfitRange[]
+
 // The Settings dialog's annual fee forms post here.
 export async function action({ request }: ActionFunctionArgs) {
 	await requireUserWithRole(request, 'admin')
@@ -149,10 +159,12 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function HouseholdProfit() {
 	const data = useLoaderData<typeof loader>()
+	const [range, setRange] = useChoice('range', RANGES, '12m')
 	if (!data.configured)
 		return <p style={{ padding: 32 }}>Reports database is not configured (REPORTS_DATABASE_URL).</p>
 	const {
 		rows,
+		curMonth,
 		fees,
 		balances,
 		balancesAsOf,
@@ -165,6 +177,22 @@ export default function HouseholdProfit() {
 		ytdSaved,
 		check,
 	} = data
+	const shown = monthsInRange(rows, range, curMonth)
+	const sum = (pick: (r: Row) => number | undefined) =>
+		shown.reduce((t, r) => {
+			const v = pick(r)
+			return t + (v != null && Number.isFinite(v) ? v : 0)
+		}, 0)
+	const totalCash = sum(r => r.net_household_profit + r.est_tax_accrual)
+	const totalNet = sum(r => r.net_household_profit)
+	const totalSmoothed = sum(r => r.net_household_profit_smoothed)
+	const firstMonth = rows[0]
+		? new Date(`${rows[0].month}-15T12:00:00Z`).toLocaleDateString('en-US', {
+				month: 'short',
+				year: 'numeric',
+				timeZone: 'UTC',
+			})
+		: ''
 	return (
 		<ReportPage
 			title="Household profit"
@@ -241,6 +269,19 @@ export default function HouseholdProfit() {
 				</p>
 			) : null}
 
+			<div className="choices">
+				<Choice
+					label="Months shown"
+					value={range}
+					onChange={setRange}
+					options={[
+						{ value: 'year', label: curMonth.slice(0, 4) },
+						{ value: '12m', label: '12 months' },
+						{ value: 'all', label: `All, since ${firstMonth}` },
+					]}
+				/>
+			</div>
+
 			<section>
 				<h2>
 					What we kept, by month{' '}
@@ -249,19 +290,19 @@ export default function HouseholdProfit() {
 					</span>
 				</h2>
 				<BarChart
-					labels={rows.map(r => r.month)}
+					labels={shown.map(r => r.month)}
 					series={[
 						{
 							name: 'Cash kept (pre-tax)',
 							color: 'var(--series-1)',
-							values: rows.map(
+							values: shown.map(
 								r => r.net_household_profit + r.est_tax_accrual,
 							),
 						},
 						{
 							name: 'Net after taxes',
 							color: 'var(--series-3)',
-							values: rows.map(r => r.net_household_profit),
+							values: shown.map(r => r.net_household_profit),
 						},
 					]}
 					showTotal={false}
@@ -288,7 +329,7 @@ export default function HouseholdProfit() {
 							</tr>
 						</thead>
 						<tbody>
-							{rows.map(r => (
+							{shown.map(r => (
 								<tr key={r.month}>
 									<td>{r.month}</td>
 									<td className="num">+ {usd(r.business_revenue)}</td>
@@ -316,6 +357,26 @@ export default function HouseholdProfit() {
 								</tr>
 							))}
 						</tbody>
+						<tfoot>
+							<tr>
+								<td>Total, {shown.length} months</td>
+								<td className="num">+ {usd(sum(r => r.business_revenue))}</td>
+								<td className="num">− {usd(sum(r => r.business_expenses))}</td>
+								<td className="num">{usd(sum(r => r.business_net))}</td>
+								<td className="num">+ {usd(sum(r => r.zane_takehome))}</td>
+								<td className="num">− {usd(sum(r => r.household_spend))}</td>
+								<td className={`num ${totalCash < 0 ? 'bad' : 'good'}`}>
+									{usd(totalCash)}
+								</td>
+								<td className="num">− {usd(sum(r => r.est_tax_accrual))}</td>
+								<td className={`num ${totalNet < 0 ? 'bad' : 'good'}`}>
+									{usd(totalNet)}
+								</td>
+								<td className={`num ${totalSmoothed < 0 ? 'bad' : 'good'}`}>
+									{usd(totalSmoothed)}
+								</td>
+							</tr>
+						</tfoot>
 					</table>
 				</div>
 				<p className="note">
@@ -337,7 +398,9 @@ export default function HouseholdProfit() {
 					payment date; variable spend (supplies etc.) stays on actual dates.
 					Revenue for the current month also includes Boulevard money collected
 					after the last banked payout (payouts lag 2-3 business days), so a busy
-					day shows up the same day instead of when the deposit lands.
+					day shows up the same day instead of when the deposit lands. The months
+					go back to {firstMonth}, the first month with data from every linked bank
+					account and card; the Total row adds up the months shown.
 				</p>
 			</section>
 

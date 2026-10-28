@@ -327,9 +327,12 @@ async function main({ start, end, json }: { start: string; end: string; json: bo
 
 export type HouseholdBudgetJson = Awaited<ReturnType<typeof main>>
 
-/** Programmatic entry (Temporal worker): default last-12-full-months window. */
-export async function computeHouseholdBudget(): Promise<HouseholdBudgetJson> {
-	return await main({ ...parseArgs([]), json: false })
+/** Programmatic entry (Temporal worker): from `from`, by default the last
+ * 12 full months. */
+export async function computeHouseholdBudget(
+	from?: string,
+): Promise<HouseholdBudgetJson> {
+	return await main({ ...parseArgs(from ? ['--from', from] : []), json: false })
 }
 
 if (process.argv[1]?.includes('household-budget')) {

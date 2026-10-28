@@ -25,6 +25,11 @@ export function hasFinanceReportsConfig() {
 }
 
 const PROJECTION_MONTHS = 6
+/** The household profit page goes back to here: the first month with data
+ * from every linked bank account and card (Bank of America starts on
+ * 2025-01-07; before that only the Amex is there). The other pages keep
+ * their 12 months. */
+export const HISTORY_FROM = '2025-01-01'
 
 /**
  * First of the current month → first of +6 months, in business time. When
@@ -56,6 +61,9 @@ export async function syncFinanceReports(): Promise<{
 
 	const budget = await computeHouseholdBudget()
 	const pnl = await computeBusinessPnl()
+	// The same two reports from HISTORY_FROM, for the household profit page.
+	const budgetHistory = await computeHouseholdBudget(HISTORY_FROM)
+	const pnlHistory = await computeBusinessPnl(HISTORY_FROM)
 	const { fromDate, toDate } = projectionWindow()
 	const projection = await runRevenueProjection({ fromDate, toDate, json: false })
 
@@ -84,7 +92,13 @@ export async function syncFinanceReports(): Promise<{
 		// not spent, but no longer in the linked bank accounts.
 		await q(`drop table if exists household_saved_monthly`)
 		await q(`create table household_saved_monthly (month text primary key, saved numeric not null)`)
-		for (const r of budget.savedMonthly) await q(`insert into household_saved_monthly values ($1,$2)`, [r.month, r.total])
+		for (const r of budgetHistory.savedMonthly) await q(`insert into household_saved_monthly values ($1,$2)`, [r.month, r.total])
+
+		// Household spending by month from HISTORY_FROM, for the household
+		// profit page (household_monthly_totals keeps the budget page's 12).
+		await q(`drop table if exists household_spend_history`)
+		await q(`create table household_spend_history (month text primary key, total numeric not null)`)
+		for (const r of budgetHistory.monthlyTotals) await q(`insert into household_spend_history values ($1,$2)`, [r.month, r.total])
 
 		await q(`drop table if exists household_category_summary`)
 		await q(`create table household_category_summary (bucket text primary key, total numeric, avg_month numeric, median_month numeric)`)
@@ -405,13 +419,15 @@ export async function syncFinanceReports(): Promise<{
 				? Math.min(1, Math.max(0.9, settledBanked / settledCollected))
 				: 0.97
 		const pendingUsd = Math.max(0, totalCollected * settledRatio - totalBanked)
-		const currentMonthRow = pnl.monthly.find(
-			r => r.month === new Date().toISOString().slice(0, 7),
-		)
-		if (currentMonthRow && pendingUsd > 0) {
-			currentMonthRow.revenue += pendingUsd
-			currentMonthRow.net += pendingUsd
-			currentMonthRow.netSmoothed += pendingUsd
+		for (const report of [pnl, pnlHistory]) {
+			const currentMonthRow = report.monthly.find(
+				r => r.month === new Date().toISOString().slice(0, 7),
+			)
+			if (currentMonthRow && pendingUsd > 0) {
+				currentMonthRow.revenue += pendingUsd
+				currentMonthRow.net += pendingUsd
+				currentMonthRow.netSmoothed += pendingUsd
+			}
 		}
 		// expenses = true cash out (FCF stays visible); the class columns
 		// split it into COGS / monthly overhead / annual fees / one-time, and
@@ -434,6 +450,17 @@ export async function syncFinanceReports(): Promise<{
 					m.expensesSmoothed, m.netSmoothed,
 				],
 			)
+
+		// The same cash columns from HISTORY_FROM, for the household profit
+		// page. Only the class split depends on the window, and it is not here.
+		await q(`drop table if exists business_pnl_history`)
+		await q(`create table business_pnl_history (
+			month text primary key, revenue numeric, expenses numeric, net numeric,
+			expenses_smoothed numeric)`)
+		for (const m of pnlHistory.monthly)
+			await q(`insert into business_pnl_history values ($1,$2,$3,$4,$5)`, [
+				m.month, m.revenue, m.expenses, m.net, m.expensesSmoothed,
+			])
 
 		await q(`drop table if exists business_pnl_meta`)
 		await q(`create table business_pnl_meta (id int primary key, period_start text, period_end text, total_revenue numeric, total_expense numeric, net_profit numeric, loaded_at timestamptz)`)
@@ -474,11 +501,11 @@ export async function syncFinanceReports(): Promise<{
 			if (!v) keptByDay.set(day, (v = { revenue: 0, expenses: 0, takehome: 0, spend: 0, saved: 0 }))
 			return v
 		}
-		for (const r of pnl.daily) {
+		for (const r of pnlHistory.daily) {
 			keptDay(r.day).revenue += r.revenue
 			keptDay(r.day).expenses += r.expenses
 		}
-		for (const r of budget.daily) {
+		for (const r of budgetHistory.daily) {
 			keptDay(r.day).spend += r.spend
 			keptDay(r.day).saved += r.saved
 		}
@@ -549,9 +576,9 @@ export async function syncFinanceReports(): Promise<{
 			        + (b.expenses - b.expenses_smoothed)) as net_household_profit_smoothed,
 			  -- Kept, but moved out of the linked bank accounts.
 			  round(coalesce(s.saved, 0)) as saved_outside
-			from business_pnl_monthly b
+			from business_pnl_history b
 			left join household_income_monthly i using (month)
-			left join household_monthly_totals h using (month)
+			left join household_spend_history h using (month)
 			left join household_saved_monthly s using (month)
 			order by b.month`)
 

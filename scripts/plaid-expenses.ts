@@ -943,17 +943,18 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 export type BusinessPnlJson = Awaited<ReturnType<typeof main>>
 
 /**
- * Programmatic entry (Temporal worker): Sarah's business P&L over the last 12
- * full months. Skips the Plaid pre-sync (the plaid-sync job owns that) and the
- * AI classifier (cache/rules only — prod has no OpenRouter dependency).
+ * Programmatic entry (Temporal worker): Sarah's business P&L from `from`
+ * (default: the last 12 full months). Skips the Plaid pre-sync (the
+ * plaid-sync job owns that) and the AI classifier (cache/rules only — prod
+ * has no OpenRouter dependency).
  */
-export async function computeBusinessPnl(): Promise<BusinessPnlJson> {
-	const from = new Date()
-	from.setUTCDate(1)
-	from.setUTCMonth(from.getUTCMonth() - 12)
+export async function computeBusinessPnl(from?: string): Promise<BusinessPnlJson> {
+	const twelveMonths = new Date()
+	twelveMonths.setUTCDate(1)
+	twelveMonths.setUTCMonth(twelveMonths.getUTCMonth() - 12)
 	return await main({
 		...parseArgs([]),
-		start: from.toISOString().slice(0, 10),
+		start: from ?? twelveMonths.toISOString().slice(0, 10),
 		json: false,
 		owner: 'sarah',
 		noAi: true,
