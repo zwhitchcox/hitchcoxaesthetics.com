@@ -945,7 +945,7 @@ export type BusinessPnlJson = Awaited<ReturnType<typeof main>>
 /**
  * Programmatic entry (Temporal worker): Sarah's business P&L from `from`
  * (default: the last 12 full months). Skips the Plaid pre-sync (the
- * plaid-sync job owns that) and the AI classifier (cache/rules only — prod
+ * plaid-sync job owns that) and the AI classifier (cache/rules only: prod
  * has no OpenRouter dependency).
  */
 export async function computeBusinessPnl(from?: string): Promise<BusinessPnlJson> {

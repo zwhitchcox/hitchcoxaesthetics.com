@@ -399,7 +399,7 @@ export default function HouseholdProfit() {
 					Revenue for the current month also includes Boulevard money collected
 					after the last banked payout (payouts lag 2-3 business days), so a busy
 					day shows up the same day instead of when the deposit lands. The months
-					go back to {firstMonth}, the first month with data from every linked bank
+					go back to {firstMonth}, the first full month with data from every linked bank
 					account and card; the Total row adds up the months shown.
 				</p>
 			</section>

@@ -1,7 +1,7 @@
 /**
  * The months the household profit page shows. The rows go back to
- * HISTORY_FROM (finance-reports.server.ts), the first month with data from
- * every linked account.
+ * HISTORY_FROM (finance-reports.server.ts), the first full month with data
+ * from every linked account.
  */
 export type ProfitRange = 'year' | '12m' | 'all'
 

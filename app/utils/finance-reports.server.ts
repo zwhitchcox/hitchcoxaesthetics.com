@@ -25,11 +25,12 @@ export function hasFinanceReportsConfig() {
 }
 
 const PROJECTION_MONTHS = 6
-/** The household profit page goes back to here: the first month with data
- * from every linked bank account and card (Bank of America starts on
- * 2025-01-07; before that only the Amex is there). The other pages keep
- * their 12 months. */
-export const HISTORY_FROM = '2025-01-01'
+/** The household profit page goes back to here: the first full month with
+ * data from every linked bank account and card. Bank of America starts on
+ * 2025-01-07, so January 2025 misses the bills paid on the 1st (its
+ * household spending read $9k against $15k-$36k in every other month);
+ * before that only the Amex is there. The other pages keep their 12 months. */
+export const HISTORY_FROM = '2025-02-01'
 
 /**
  * First of the current month → first of +6 months, in business time. When
