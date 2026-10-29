@@ -26,7 +26,7 @@ export type RetellBookingAgentBrand = RetellBookingBrandConfig & {
 // voice". grok-voice-3.0 is xAI's speech-to-speech model inside Retell; pair
 // it with an xai-* voice. Move a brand back with OPENAI_REALTIME.
 const GROK_VOICE = { s2sModel: 'grok-voice-3.0', voiceId: 'xai-Eve' }
-const OPENAI_REALTIME = { s2sModel: 'gpt-realtime-2.1', voiceId: 'openai-Cimo' }
+export const OPENAI_REALTIME = { s2sModel: 'gpt-realtime-2.1', voiceId: 'openai-Cimo' }
 
 export const RETELL_BOOKING_AGENT_BRANDS: Record<
 	RetellBookingBrandKey,
