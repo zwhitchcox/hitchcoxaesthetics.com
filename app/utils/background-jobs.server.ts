@@ -40,6 +40,7 @@ import {
 	hasLapsedPatientsConfig,
 	syncLapsedPatients,
 } from '#app/utils/lapsed-patients.server.ts'
+import { runRetellFailureAlert } from '#app/utils/retell-failure-alert.server.ts'
 import { runScheduleHealthCheck } from '#app/utils/schedule-health.server.ts'
 import {
 	hasPodcastTopicsConfig,
@@ -216,6 +217,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	scheduleHealthAlert: {
 		id: 'scheduleHealthAlert',
 		name: 'Temporal Schedule Health Alert',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	retellFailureAlert: {
+		id: 'retellFailureAlert',
+		name: 'Retell Failed-Call Alert',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -1293,6 +1303,40 @@ export function getScheduleHealthAlertIntervalMs() {
 	const raw = process.env.SCHEDULE_HEALTH_ALERT_INTERVAL_MS?.trim()
 	const parsed = raw ? Number(raw) : NaN
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 24 * 60 * 60 * 1000
+}
+
+/** Every 5 minutes: a rejected Retell call fires no webhook, so the alert
+ * polls (retell-failure-alert.server.ts). */
+export function getRetellFailureAlertIntervalMs() {
+	const minutes = Number.parseInt(
+		process.env.RETELL_FAILURE_ALERT_INTERVAL_MINUTES ?? '5',
+		10,
+	)
+	return (Number.isFinite(minutes) && minutes >= 1 ? minutes : 5) * 60 * 1000
+}
+
+export async function runRetellFailureAlertJob(): Promise<void> {
+	const job = jobStatuses['retellFailureAlert']
+	if (!job) return
+	if (job.status === 'running') return
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+	try {
+		const result = await runRetellFailureAlert()
+		if (result.smsSent) console.log('Retell failed-call alert sent:', result)
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Retell failed-call alert failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+		job.nextRun = new Date(
+			Date.now() + getRetellFailureAlertIntervalMs(),
+		).toISOString()
+	}
 }
 
 export function getPlaidSyncIntervalMs() {

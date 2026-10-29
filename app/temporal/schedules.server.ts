@@ -23,6 +23,7 @@ import {
 	getReviewerDaysIntervalMs,
 	getGbpListingHoursIntervalMs,
 	getScheduleHealthAlertIntervalMs,
+	getRetellFailureAlertIntervalMs,
 	hasPodcastTopicsConfig,
 } from '#app/utils/background-jobs.server.ts'
 import { articleReminderDestination } from '#app/utils/article-reminder.server.ts'
@@ -180,6 +181,17 @@ function getScheduleDefinitions(): Array<ScheduleDefinition> {
 			intervalMs: getScheduleHealthAlertIntervalMs(),
 			// Needs a destination number for the failure texts.
 			enabled: Boolean(process.env.SCHEDULE_ALERT_SMS_TO?.trim()),
+		},
+		{
+			scheduleId: 'retell-failure-alert',
+			jobId: 'retellFailureAlert',
+			workflowType: 'retellFailureAlertWorkflow',
+			intervalMs: getRetellFailureAlertIntervalMs(),
+			// Texts the same number as the schedule health alert.
+			enabled: Boolean(
+				process.env.RETELL_API_KEY?.trim() &&
+					process.env.SCHEDULE_ALERT_SMS_TO?.trim(),
+			),
 		},
 		{
 			scheduleId: 'podcast-topics',
