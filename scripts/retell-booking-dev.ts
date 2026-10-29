@@ -4,20 +4,24 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { config as loadDotenv } from 'dotenv'
 
+import { findRetellBookingAgentBrandByPhoneNumber } from './retell-booking-brands.ts'
+
 loadDotenv({ override: true })
 
-const DEFAULT_PORT = 4000
+// Zane's own dev server runs on 4000 and 4001. Agents use 4100 or higher.
+const DEFAULT_PORT = 4100
 const DEFAULT_AGENT_ID = 'agent_178c33cf9d7656523e2195005f'
 const DEFAULT_LLM_ID = 'llm_07c575abf8676e565f273447b229'
-const DEFAULT_PHONE_NUMBER = '+18656068139'
 const DEFAULT_S2S_MODEL = 'gpt-realtime-2'
 const REQUIRED_PHONE_NUMBER_TYPE = 'retell-twilio'
 
 const port = Number(process.env.PORT || DEFAULT_PORT)
 const agentId = process.env.RETELL_TEST_AGENT_ID?.trim() || DEFAULT_AGENT_ID
 const llmId = process.env.RETELL_TEST_LLM_ID?.trim() || DEFAULT_LLM_ID
-const configuredPhoneNumber =
-	process.env.RETELL_TEST_PHONE_NUMBER?.trim() || DEFAULT_PHONE_NUMBER
+// No default: the script binds a number only when you name one. The old
+// default, (865) 606-8139, is the live Knoxville Laser Clinic number since
+// 2026-10-06.
+const testPhoneNumber = process.env.RETELL_TEST_PHONE_NUMBER?.trim()
 const agentDisplayName =
 	process.env.RETELL_TEST_AGENT_DISPLAY_NAME?.trim() || 'Adrian'
 const realtimeModel =
@@ -57,6 +61,7 @@ const retellAgentWatchFiles = [
 if (!apiKey) {
 	throw new Error('RETELL_API_KEY is required in .env.')
 }
+if (testPhoneNumber) assertNotBrandPhoneNumber(testPhoneNumber)
 
 const children: ChildProcess[] = []
 const retellAgentWatchers: FSWatcher[] = []
@@ -76,8 +81,9 @@ const publicUrl = await ensureNgrok()
 await updateEnvValue('RETELL_AGENT_WEBHOOK_BASE_URL', publicUrl)
 await updateRetellToolUrls(publicUrl)
 await smokeTest(publicUrl)
-const phoneNumber = await findAgentPhoneNumber()
-if (phoneNumber) await bindPhoneNumberToAgent(phoneNumber.e164)
+const phoneNumber = testPhoneNumber
+	? await bindPhoneNumberToAgent(testPhoneNumber)
+	: null
 
 console.log('')
 console.log('Retell booking test environment is ready.')
@@ -88,7 +94,9 @@ console.log(`Retell LLM: ${llmId}`)
 if (phoneNumber) {
 	console.log(`Phone number: ${phoneNumber.pretty} (${phoneNumber.e164})`)
 } else {
-	console.log('Phone number: none found for this Retell agent')
+	console.log(
+		'Phone number: none bound. Set RETELL_TEST_PHONE_NUMBER to bind a test number.',
+	)
 }
 if (!process.env.CALLRAIL_API_KEY?.trim()) {
 	console.log(
@@ -654,122 +662,25 @@ async function smokeTest(publicUrl: string) {
 	}
 }
 
-async function findAgentPhoneNumber(): Promise<RetellPhoneNumber | null> {
-	const configured = await getConfiguredPhoneNumber()
-	if (configured) {
-		assertTwilioPhoneNumber(configured)
-		return configured
-	}
-
-	const phoneNumbers = await listRetellPhoneNumbers()
-
-	const match = phoneNumbers.find(phoneNumber => {
-		if (!phoneNumber || typeof phoneNumber !== 'object') return false
-		const record = phoneNumber as Record<string, unknown>
-		if (record.phone_number_type !== REQUIRED_PHONE_NUMBER_TYPE) return false
-		return (
-			record.inbound_agent_id === agentId ||
-			(Array.isArray(record.inbound_agents) &&
-				record.inbound_agents.some(
-					inboundAgent =>
-						inboundAgent &&
-						typeof inboundAgent === 'object' &&
-						(inboundAgent as Record<string, unknown>).agent_id === agentId,
-				))
-		)
-	})
-
-	if (!match || typeof match !== 'object') return null
-	const record = match as Record<string, unknown>
-	const e164 =
-		typeof record.phone_number === 'string' ? record.phone_number : null
-	const pretty =
-		typeof record.phone_number_pretty === 'string'
-			? record.phone_number_pretty
-			: e164
-	const type =
-		typeof record.phone_number_type === 'string'
-			? record.phone_number_type
-			: null
-
-	return e164 && pretty ? { e164, pretty, type } : null
-}
-
-async function listRetellPhoneNumbers() {
-	const phoneNumbers: Array<unknown> = []
-	let paginationKey: string | null = null
-	let hasMore = true
-
-	while (hasMore) {
-		const params = new URLSearchParams({ limit: '1000' })
-		if (paginationKey) params.set('pagination_key', paginationKey)
-		const payload = (await retellFetch(
-			`/v2/list-phone-numbers?${params}`,
-			undefined,
-			'GET',
-		)) as unknown
-		phoneNumbers.push(...readArray(payload, 'items'))
-		paginationKey = readString(payload, 'pagination_key')
-		hasMore =
-			Boolean(
-				payload &&
-				typeof payload === 'object' &&
-				(payload as Record<string, unknown>).has_more,
-			) && Boolean(paginationKey)
-	}
-
-	return phoneNumbers
-}
-
-async function getConfiguredPhoneNumber(): Promise<RetellPhoneNumber | null> {
-	try {
-		const phoneNumber = (await retellFetch(
-			`/get-phone-number/${encodeURIComponent(configuredPhoneNumber)}`,
-			undefined,
-			'GET',
-		)) as unknown
-		if (!phoneNumber || typeof phoneNumber !== 'object') return null
-		const record = phoneNumber as Record<string, unknown>
-		const e164 =
-			typeof record.phone_number === 'string' ? record.phone_number : null
-		const pretty =
-			typeof record.phone_number_pretty === 'string'
-				? record.phone_number_pretty
-				: e164
-		const type =
-			typeof record.phone_number_type === 'string'
-				? record.phone_number_type
-				: null
-		return e164 && pretty ? { e164, pretty, type } : null
-	} catch {
-		return null
-	}
-}
-
 async function bindPhoneNumberToAgent(phoneNumber: string) {
 	const retellPhoneNumber = await getRetellPhoneNumber(phoneNumber)
+	// Check Retell's own E.164 form too, in case the env value was formatted.
+	assertNotBrandPhoneNumber(retellPhoneNumber.e164)
 	assertTwilioPhoneNumber(retellPhoneNumber)
 
-	const updated = await retellFetch(
-		`/update-phone-number/${encodeURIComponent(phoneNumber)}`,
-		{
-			inbound_agent_id: agentId,
-			inbound_agents: [
-				{
-					agent_id: agentId,
-					weight: 1,
-				},
-			],
-			inbound_webhook_url: null,
-		},
-	)
-	const record =
-		updated && typeof updated === 'object'
-			? (updated as Record<string, unknown>)
-			: {}
-	console.log(
-		`Bound phone number to Retell agent: ${record.inbound_agent_id ?? agentId}`,
-	)
+	// Retell 400s on the deprecated inbound_agent_id field, so bind through
+	// inbound_agents only, as retell-deploy-booking-agents.ts does.
+	await retellFetch(`/update-phone-number/${encodeURIComponent(phoneNumber)}`, {
+		inbound_agents: [
+			{
+				agent_id: agentId,
+				weight: 1,
+			},
+		],
+		inbound_webhook_url: null,
+	})
+	console.log(`Bound ${retellPhoneNumber.pretty} to Retell agent ${agentId}.`)
+	return retellPhoneNumber
 }
 
 async function getRetellPhoneNumber(
@@ -798,6 +709,14 @@ async function getRetellPhoneNumber(
 		throw new Error('Retell phone number response was missing phone fields.')
 	}
 	return { e164, pretty, type }
+}
+
+function assertNotBrandPhoneNumber(phoneNumber: string) {
+	const brand = findRetellBookingAgentBrandByPhoneNumber(phoneNumber)
+	if (!brand) return
+	throw new Error(
+		`Refusing to bind ${phoneNumber} because it is the live ${brand.agentName} number in scripts/retell-booking-brands.ts. Real callers would reach this dev agent. Set RETELL_TEST_PHONE_NUMBER to a test number.`,
+	)
 }
 
 function assertTwilioPhoneNumber(phoneNumber: RetellPhoneNumber) {

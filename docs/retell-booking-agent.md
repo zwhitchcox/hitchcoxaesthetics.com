@@ -33,7 +33,11 @@ Optional:
   `x-retell-tool-secret` or `Authorization: Bearer ...`
 - `RETELL_TEST_AGENT_VOICE_ID`; defaults to `11labs-Adrian`
 - `RETELL_TEST_AGENT_MODEL`; defaults to `gpt-5.1`
-- `RETELL_TEST_PHONE_NUMBER`; defaults to `+18653389694`
+- `RETELL_TEST_PHONE_NUMBER`; no default. A Retell Twilio number to bind to the
+  test agent. The dev script refuses the live brand numbers in
+  `scripts/retell-booking-brands.ts`.
+- `PORT`; defaults to `4100`. Do not use 4000 or 4001: Zane's own dev server
+  uses them.
 
 ## Setup
 
@@ -43,10 +47,14 @@ For day-to-day testing, run:
 pnpm run retell:booking:dev
 ```
 
-That command starts the local app if needed, starts ngrok if needed, writes the
-current ngrok URL to `.env`, patches the Retell LLM tool URLs, binds the Retell
-phone number to the test agent, and runs a Botox lookup smoke test. Leave it
-running while testing calls.
+That command starts the local app on port 4100 if needed, starts ngrok if
+needed, writes the current ngrok URL to `.env`, patches the Retell LLM tool
+URLs, and runs a Botox lookup smoke test. If `RETELL_TEST_PHONE_NUMBER` is set,
+it then binds that number to the test agent. Leave it running while testing
+calls.
+
+The test agent keeps its own number, (865) 338-9694. That is a Telnyx number, so
+the script refuses to bind it. Calls to it already reach the test agent.
 
 To create a fresh Retell test agent instead:
 

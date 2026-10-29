@@ -100,3 +100,11 @@ export function getRetellBookingAgentBrand(key: RetellBookingBrandKey) {
 export function getRetellBookingAgentBrandKeys() {
 	return Object.keys(RETELL_BOOKING_AGENT_BRANDS) as RetellBookingBrandKey[]
 }
+
+// The brand whose live Retell number this is, if any. retell-booking-dev.ts
+// uses it to refuse binding a live number to the test agent.
+export function findRetellBookingAgentBrandByPhoneNumber(phoneNumber: string) {
+	return Object.values(RETELL_BOOKING_AGENT_BRANDS).find(
+		brand => brand.phoneNumber === phoneNumber,
+	)
+}
