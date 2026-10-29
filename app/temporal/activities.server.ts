@@ -23,6 +23,7 @@ import {
 	runReviewsFetchJob,
 	runScheduleHealthAlertJob,
 	runRetellFailureAlertJob,
+	runPhoneCheckJob,
 } from '#app/utils/background-jobs.server.ts'
 
 async function runJobAndReport(
@@ -103,6 +104,9 @@ export function createActivities() {
 		},
 		async retellFailureAlertActivity() {
 			await runJobAndReport('retellFailureAlert', runRetellFailureAlertJob)
+		},
+		async phoneCheckActivity() {
+			await runJobAndReport('phoneCheck', runPhoneCheckJob)
 		},
 		async reviewerDaysActivity() {
 			await runJobAndReport('reviewerDays', runReviewerDaysJob)

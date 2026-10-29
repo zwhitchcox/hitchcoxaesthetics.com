@@ -24,6 +24,8 @@ import {
 	getGbpListingHoursIntervalMs,
 	getScheduleHealthAlertIntervalMs,
 	getRetellFailureAlertIntervalMs,
+	PHONE_CHECK_INTERVAL_MS,
+	PHONE_CHECK_OFFSET_MS,
 	hasPodcastTopicsConfig,
 } from '#app/utils/background-jobs.server.ts'
 import { articleReminderDestination } from '#app/utils/article-reminder.server.ts'
@@ -41,6 +43,9 @@ interface ScheduleDefinition {
 	jobId: string
 	workflowType: string
 	intervalMs: number
+	/** Shifts the runs from midnight UTC, e.g. 12 hours for a daily job at
+	 * 12:00 UTC. */
+	offsetMs?: number
 	enabled: boolean
 }
 
@@ -183,6 +188,15 @@ function getScheduleDefinitions(): Array<ScheduleDefinition> {
 			enabled: Boolean(process.env.SCHEDULE_ALERT_SMS_TO?.trim()),
 		},
 		{
+			scheduleId: 'phone-check',
+			jobId: 'phoneCheck',
+			workflowType: 'phoneCheckWorkflow',
+			intervalMs: PHONE_CHECK_INTERVAL_MS,
+			offsetMs: PHONE_CHECK_OFFSET_MS,
+			// Texts the same number as the schedule health alert.
+			enabled: Boolean(process.env.RETELL_API_KEY?.trim()),
+		},
+		{
 			scheduleId: 'retell-failure-alert',
 			jobId: 'retellFailureAlert',
 			workflowType: 'retellFailureAlertWorkflow',
@@ -256,6 +270,12 @@ export async function describeSchedules(
 	}
 }
 
+function scheduleInterval(definition: ScheduleDefinition) {
+	return definition.offsetMs
+		? { every: definition.intervalMs, offset: definition.offsetMs }
+		: { every: definition.intervalMs }
+}
+
 /**
  * Idempotently creates one Temporal Schedule per background job with the same
  * cadences (and env-var overrides) as the legacy setInterval scheduler. If a
@@ -273,9 +293,7 @@ export async function ensureSchedules(address: string): Promise<void> {
 			try {
 				await client.schedule.create({
 					scheduleId: definition.scheduleId,
-					spec: {
-						intervals: [{ every: definition.intervalMs }],
-					},
+					spec: { intervals: [scheduleInterval(definition)] },
 					action: {
 						type: 'startWorkflow',
 						workflowType: definition.workflowType,
@@ -292,14 +310,19 @@ export async function ensureSchedules(address: string): Promise<void> {
 					try {
 						const handle = client.schedule.getHandle(definition.scheduleId)
 						const description = await handle.describe()
-						const currentMs = description.spec.intervals?.[0]?.every
-						if (currentMs !== definition.intervalMs) {
+						const current = description.spec.intervals?.[0]
+						const currentMs = current?.every
+						const currentOffset = Number(current?.offset ?? 0)
+						if (
+							currentMs !== definition.intervalMs ||
+							currentOffset !== (definition.offsetMs ?? 0)
+						) {
 							await handle.update(previous => ({
 								...previous,
-								spec: { intervals: [{ every: definition.intervalMs }] },
+								spec: { intervals: [scheduleInterval(definition)] },
 							}))
 							console.log(
-								`Updated Temporal schedule "${definition.scheduleId}" interval ${String(currentMs)} -> ${definition.intervalMs}ms`,
+								`Updated Temporal schedule "${definition.scheduleId}" interval ${String(currentMs)} -> ${definition.intervalMs}ms, offset ${currentOffset} -> ${definition.offsetMs ?? 0}ms`,
 							)
 						}
 					} catch (updateError) {

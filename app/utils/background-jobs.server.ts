@@ -40,6 +40,7 @@ import {
 	hasLapsedPatientsConfig,
 	syncLapsedPatients,
 } from '#app/utils/lapsed-patients.server.ts'
+import { runPhoneCheck } from '#app/utils/phone-check.server.ts'
 import { runRetellFailureAlert } from '#app/utils/retell-failure-alert.server.ts'
 import { runScheduleHealthCheck } from '#app/utils/schedule-health.server.ts'
 import {
@@ -226,6 +227,15 @@ let jobStatuses: Record<string, JobStatus> = {
 	retellFailureAlert: {
 		id: 'retellFailureAlert',
 		name: 'Retell Failed-Call Alert',
+		status: 'idle',
+		lastRun: null,
+		nextRun: null,
+		lastRunDuration: null,
+		lastError: null,
+	},
+	phoneCheck: {
+		id: 'phoneCheck',
+		name: 'Daily Phone Check',
 		status: 'idle',
 		lastRun: null,
 		nextRun: null,
@@ -1313,6 +1323,31 @@ export function getRetellFailureAlertIntervalMs() {
 		10,
 	)
 	return (Number.isFinite(minutes) && minutes >= 1 ? minutes : 5) * 60 * 1000
+}
+
+/** Once a day at 12:00 UTC (8 AM ET, 7 AM in winter): every 24 hours,
+ * offset 12 hours from midnight UTC (phone-check.server.ts). */
+export const PHONE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+export const PHONE_CHECK_OFFSET_MS = 12 * 60 * 60 * 1000
+
+export async function runPhoneCheckJob(): Promise<void> {
+	const job = jobStatuses['phoneCheck']
+	if (!job) return
+	if (job.status === 'running') return
+	const startTime = Date.now()
+	job.status = 'running'
+	job.lastRun = new Date().toISOString()
+	try {
+		console.log('Daily phone check:', await runPhoneCheck())
+		job.status = 'completed'
+		job.lastError = null
+	} catch (error) {
+		console.error('Daily phone check failed:', error)
+		job.status = 'failed'
+		job.lastError = error instanceof Error ? error.message : String(error)
+	} finally {
+		job.lastRunDuration = Date.now() - startTime
+	}
 }
 
 export async function runRetellFailureAlertJob(): Promise<void> {
