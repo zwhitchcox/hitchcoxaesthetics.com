@@ -18,7 +18,15 @@ export type RetellBookingAgentBrand = RetellBookingBrandConfig & {
 	llmIdEnv: string
 	phoneNumber?: string
 	phoneNumberEnv: string
+	s2sModel: string
+	voiceId: string
 }
+
+// Zane, 2026-10-29: "Move everything to Grok voice." grok-voice-3.0 is xAI's
+// speech-to-speech model inside Retell. Pair it with an xai-* voice.
+// Move a brand back with OPENAI_REALTIME.
+const GROK_VOICE = { s2sModel: 'grok-voice-3.0', voiceId: 'xai-Eve' }
+const OPENAI_REALTIME = { s2sModel: 'gpt-realtime-2.1', voiceId: 'openai-Cimo' }
 
 export const RETELL_BOOKING_AGENT_BRANDS: Record<
 	RetellBookingBrandKey,
@@ -26,6 +34,7 @@ export const RETELL_BOOKING_AGENT_BRANDS: Record<
 > = {
 	sarah: {
 		...DEFAULT_RETELL_BOOKING_BRAND,
+		...OPENAI_REALTIME,
 		agentDisplayName: 'Adrian',
 		agentId: 'agent_01931c39dd6b893c7653b3c4a1',
 		agentIdEnv: 'RETELL_SARAH_AGENT_ID',
@@ -36,6 +45,7 @@ export const RETELL_BOOKING_AGENT_BRANDS: Record<
 		phoneNumberEnv: 'RETELL_SARAH_PHONE_NUMBER',
 	},
 	'botox-knox': {
+		...OPENAI_REALTIME,
 		agentDisplayName: 'Adrian',
 		agentId: 'agent_2d6a0de3088f3066a2081539c0',
 		agentIdEnv: 'RETELL_BOTOX_KNOX_AGENT_ID',
@@ -48,6 +58,7 @@ export const RETELL_BOOKING_AGENT_BRANDS: Record<
 		serviceFocus: 'botox',
 	},
 	'weight-loss-knox': {
+		...OPENAI_REALTIME,
 		agentDisplayName: 'Adrian',
 		agentId: 'agent_ba54c0b712bf2771c8d4209c7b',
 		agentIdEnv: 'RETELL_WEIGHT_LOSS_KNOX_AGENT_ID',
@@ -62,6 +73,8 @@ export const RETELL_BOOKING_AGENT_BRANDS: Record<
 	// Added 2026-10-06. (865) 606-8139 was a spare number on the test agent;
 	// Zane chose to reuse it for this brand.
 	'knoxville-laser-clinic': {
+		// On Grok since 2026-10-29 (set by hand in the Retell dashboard first).
+		...GROK_VOICE,
 		agentDisplayName: 'Adrian',
 		agentId: 'agent_c1cca9cc6388b2b19c227a9757',
 		agentIdEnv: 'RETELL_KNOXVILLE_LASER_CLINIC_AGENT_ID',

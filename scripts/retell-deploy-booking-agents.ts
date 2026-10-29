@@ -46,18 +46,6 @@ type DeployMetadata = {
 const args = parseArgs(process.argv.slice(2))
 const apiKey = process.env.RETELL_API_KEY?.trim()
 const sharedSecret = process.env.RETELL_TOOL_SHARED_SECRET?.trim()
-const voiceId =
-	process.env.RETELL_DEPLOY_AGENT_VOICE_ID?.trim() ??
-	process.env.RETELL_TEST_AGENT_VOICE_ID?.trim() ??
-	'openai-Cimo'
-const realtimeModel =
-	process.env.RETELL_DEPLOY_AGENT_S2S_MODEL?.trim() ??
-	process.env.RETELL_TEST_AGENT_S2S_MODEL?.trim() ??
-	'gpt-realtime-2.1'
-const textModel =
-	process.env.RETELL_DEPLOY_AGENT_MODEL?.trim() ??
-	process.env.RETELL_TEST_AGENT_MODEL?.trim() ??
-	'gpt-5.1'
 
 if (!apiKey) throw new Error('RETELL_API_KEY is required.')
 
@@ -115,7 +103,8 @@ async function deployBrand(
 		model_temperature: 0,
 		start_speaker: 'agent',
 		tool_call_strict_mode: true,
-		...(realtimeModel ? { s2s_model: realtimeModel } : { model: textModel }),
+		// Each brand's speech-to-speech model (retell-booking-brands.ts).
+		s2s_model: brand.s2sModel,
 	}
 
 	let llmId = existingLlmId
@@ -134,7 +123,7 @@ async function deployBrand(
 				llm_id: llmId,
 				type: 'retell-llm',
 			},
-			voice_id: voiceId,
+			voice_id: brand.voiceId,
 		}
 		const agent = agentId
 			? await retellFetch(`/update-agent/${agentId}`, agentPayload)
@@ -158,6 +147,8 @@ async function deployBrand(
 		llm_id: llmId,
 		phone_number: brand.phoneNumber ?? null,
 		phone_number_bound: phoneNumberBound,
+		s2s_model: brand.s2sModel,
+		voice_id: brand.voiceId,
 		service_focus: brand.serviceFocus ?? 'all',
 		webhook_base_url: normalizedBaseUrl,
 	}
