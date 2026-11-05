@@ -207,6 +207,7 @@ export interface RevenueProjectionJson {
 			expectedUsd: number
 			expectedUsdV1: number
 			expectedUsdV4: number
+			expectedVisitsV4: number
 		}>
 		[key: string]: unknown
 	} | null
@@ -1173,6 +1174,10 @@ type ForecastDay = {
 	expectedUsd: number
 	expectedUsdV1: number
 	expectedUsdV4: number
+	/** Visits expected to happen, net of cancellations: each booked visit at its
+	 * chance of being kept, plus the kept visits still to book. bookedCount and
+	 * expectedNewCount count service lines and leave cancellations in. */
+	expectedVisitsV4: number
 }
 
 type ServiceArrival = {
@@ -1259,7 +1264,7 @@ function collectArrivalStats(segments: AppointmentServiceSegment[]) {
 	return { typeStats, pooledLeads, observedStartMs }
 }
 
-function buildArrivalForecast({
+export function buildArrivalForecast({
 	end,
 	historyEnd,
 	historySegments,
@@ -1337,12 +1342,28 @@ function buildArrivalForecast({
 	}
 	const shareBookedWithin = shareBookedWithinUsing(pooledLeads)
 	const shareBookedWithinV4 = shareBookedWithinUsing(statsV4.pooledLeads)
+	// The same arrival rates per visit, not per service line, for the visit
+	// count. The history holds kept visits only, so the visits still to come
+	// are already net of cancellations.
+	const visitStatsV4 = collectArrivalStats([
+		...new Map(recent.map(segment => [segment.appointmentId, segment])).values(),
+	])
+	const shareVisitsBookedWithin = shareBookedWithinUsing(
+		visitStatsV4.pooledLeads,
+	)
 
 	const todayStartMs = startOfLocalDay(now)
 	const bookedByDate = new Map<
 		string,
-		{ usd: number; usdV1: number; usdV4: number; count: number }
+		{
+			usd: number
+			usdV1: number
+			usdV4: number
+			count: number
+			visitsV4: number
+		}
 	>()
+	const countedVisits = new Set<string>()
 	for (const row of rows) {
 		if (row.cancelled) continue
 		const key = localDateKey(row.startAt)
@@ -1351,6 +1372,7 @@ function buildArrivalForecast({
 			usdV1: 0,
 			usdV4: 0,
 			count: 0,
+			visitsV4: 0,
 		}
 		entry.usd += row.projectedUsdV2
 		entry.usdV1 += row.projectedUsd
@@ -1360,6 +1382,11 @@ function buildArrivalForecast({
 		entry.usdV4 +=
 			daysOut > 0 ? row.projectedUsdV4 * keptProbability(daysOut) : row.projectedUsdV4
 		entry.count += 1
+		// A visit counts once, however many services it has.
+		if (!countedVisits.has(row.appointmentId)) {
+			countedVisits.add(row.appointmentId)
+			entry.visitsV4 += daysOut > 0 ? keptProbability(daysOut) : 1
+		}
 		bookedByDate.set(key, entry)
 	}
 
@@ -1381,12 +1408,14 @@ function buildArrivalForecast({
 			usdV1: 0,
 			usdV4: 0,
 			count: 0,
+			visitsV4: 0,
 		}
 
 		let fillUsd = 0
 		let fillUsdV1 = 0
 		let fillUsdV4 = 0
 		let expectedNewCount = 0
+		let newVisitsV4 = 0
 		if (daysOut > 0) {
 			for (const stats of typeStats.values()) {
 				const weekdayCount = stats.weekdayCounts.get(weekday) ?? 0
@@ -1440,6 +1469,14 @@ function buildArrivalForecast({
 						? wlValuesV4.lookup(null)
 						: serviceValuesV4.lookup(stats.serviceId, stats.serviceName))
 			}
+			for (const stats of visitStatsV4.typeStats.values()) {
+				const weekdayCount = stats.weekdayCounts.get(weekday) ?? 0
+				const occurrences = weekdayOccurrencesV4.get(weekday) ?? 0
+				if (weekdayCount === 0 || occurrences === 0) continue
+				newVisitsV4 +=
+					(weekdayCount / occurrences) *
+					shareVisitsBookedWithin(stats.leads, daysOut)
+			}
 		}
 
 		days.push({
@@ -1459,6 +1496,7 @@ function buildArrivalForecast({
 			expectedUsdV4: roundCurrency(
 				(booked.usdV4 + fillUsdV4) * (1 + retailUpliftRatio),
 			),
+			expectedVisitsV4: roundTo(booked.visitsV4 + newVisitsV4, 1),
 		})
 	}
 

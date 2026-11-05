@@ -121,12 +121,14 @@ export async function syncFinanceReports(): Promise<{
 		const winStart = new Date(projection.window.start)
 		await q(`drop view if exists report_revenue_projection_monthly`)
 		await q(`drop table if exists revenue_projection_daily`)
-		await q(`create table revenue_projection_daily (day date primary key, weekday text, booked_usd numeric, booked_count int, fill_usd numeric, expected_new_count numeric, expected_usd numeric, booked_usd_v4 numeric, fill_usd_v4 numeric, expected_usd_v4 numeric)`)
+		// expected_visits_v4: visits expected to happen, net of cancellations
+		// (booked_count and expected_new_count count service lines, gross).
+		await q(`create table revenue_projection_daily (day date primary key, weekday text, booked_usd numeric, booked_count int, fill_usd numeric, expected_new_count numeric, expected_usd numeric, booked_usd_v4 numeric, fill_usd_v4 numeric, expected_usd_v4 numeric, expected_visits_v4 numeric)`)
 		const days = projection.expected_fill?.days ?? []
 		for (let i = 0; i < days.length; i++) {
 			const day = new Date(winStart.getTime() + i * 86400_000).toISOString().slice(0, 10)
 			const r = days[i]!
-			await q(`insert into revenue_projection_daily values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [day, r.weekday, r.bookedUsd, r.bookedCount, r.fillUsd, r.expectedNewCount, r.expectedUsd, r.bookedUsdV4, r.fillUsdV4, r.expectedUsdV4])
+			await q(`insert into revenue_projection_daily values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [day, r.weekday, r.bookedUsd, r.bookedCount, r.fillUsd, r.expectedNewCount, r.expectedUsd, r.bookedUsdV4, r.fillUsdV4, r.expectedUsdV4, r.expectedVisitsV4])
 		}
 
 		// Frozen daily forecasts, APPEND-ONLY, one row per (compute_date, day,
@@ -227,11 +229,16 @@ export async function syncFinanceReports(): Promise<{
 		// Same forward snapshot under the v4 label, so week-over-week projection
 		// accuracy can be compared between models on equal terms. v4 is already
 		// net, so lo/hi are a plain +/-15% band (roughly the backtested spread)
-		// rather than another cancellation haircut.
+		// rather than another cancellation haircut. projected_visits_net is the
+		// visits expected to happen; projected_appts stays the gross service-line
+		// count it has always been, so older snapshots keep their meaning.
+		await q(
+			`alter table revenue_projection add column if not exists projected_visits_net numeric`,
+		)
 		await q(
 			`insert into revenue_projection
 			   (week, booked_appts, lead_share, rev_per_appt, projected_appts,
-			    projected_revenue, projected_lo, projected_hi, model)
+			    projected_revenue, projected_lo, projected_hi, model, projected_visits_net)
 			 select date_trunc('week', day)::date,
 			   coalesce(sum(booked_count), 0),
 			   0,
@@ -242,7 +249,8 @@ export async function syncFinanceReports(): Promise<{
 			   round(sum(expected_usd_v4)),
 			   round(sum(expected_usd_v4) * 0.85),
 			   round(sum(expected_usd_v4) * 1.15),
-			   'daily_fill_v4'
+			   'daily_fill_v4',
+			   round(sum(expected_visits_v4))
 			 from revenue_projection_daily
 			 where date_trunc('week', day) >= date_trunc('week', now())
 			 group by 1 order by 1 limit 4`,

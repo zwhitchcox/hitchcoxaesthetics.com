@@ -218,6 +218,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			projected: string
 			lo: string | null
 			hi: string | null
+			visits: string | null
 			actual: string | null
 			err_pct: string | null
 		}>(
@@ -226,16 +227,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
 			// than letting two same-timestamp rows race. Weeks forecast before
 			// daily_fill_v4 existed still show their v2 (or unlabelled) snapshot,
 			// which is the honest record of what was predicted at the time.
+			// visits (visits expected to happen, net of cancellations) exists only
+			// in snapshots from 2026-11-05 on.
 			`WITH snap AS (
 				SELECT DISTINCT ON (week) week::date AS week,
-					projected_revenue, projected_lo AS lo, projected_hi AS hi
+					projected_revenue, projected_lo AS lo, projected_hi AS hi,
+					projected_visits_net AS visits
 				FROM revenue_projection
 				WHERE computed_at < week
 				ORDER BY week,
 					(model = 'daily_fill_v4') DESC,
 					computed_at DESC)
 			 SELECT to_char(s.week, 'YYYY-MM-DD') AS week, s.projected_revenue AS projected,
-				 s.lo, s.hi, round(w.revenue) AS actual,
+				 s.lo, s.hi, s.visits, round(w.revenue) AS actual,
 				 CASE WHEN w.revenue > 0
 					 THEN round(100 * (s.projected_revenue - w.revenue) / w.revenue, 1) END AS err_pct
 			 FROM snap s LEFT JOIN weekly_revenue w ON w.week = s.week
@@ -292,11 +296,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		// expected_usd_v4 is ALREADY net: v4 discounts each booked slot by its own
 		// survival probability and values services per KEPT visit, so applying
 		// the summary cancellation_rate on top would take the haircut twice.
-		// The pre-v4 fallback column still needs it.
+		// The pre-v4 fallback column still needs it. Expected appointments are
+		// the visits expected to happen, net of cancellations, like the dollars.
 		tryQuery<{ day: string; expected: string; expected_appts: string | null }>(
 			`SELECT to_char(day, 'YYYY-MM-DD') AS day,
 				round(${expectedNetUsd('d')}) AS expected,
-				booked_count + expected_new_count AS expected_appts
+				coalesce(expected_visits_v4, booked_count + expected_new_count) AS expected_appts
 			 FROM revenue_projection_daily d
 			 WHERE day >= '${win.fromDay}'::date AND day <= '${win.toDay}'::date
 			 ORDER BY day`,
@@ -1579,12 +1584,11 @@ export default function Revenue() {
 									// not booked yet at snapshot time.
 									const projCatTotal = projRows.reduce((t, r) => t + r.usd, 0)
 									const fillUsd = Math.round(Number(a.projected) - projCatTotal)
-									// Week-level counts: booked appointments at snapshot time
-									// (pre-snapshot weeks have none) and the calendar's count for
-									// the week, which a future week already has.
-									const projAppts = projRows.length
-										? projRows.reduce((t, r) => t + r.appts, 0)
-										: null
+									// Week-level counts: the visits the forecast expects to
+									// happen (snapshots before 2026-11-05 have none) and the
+									// calendar's count for the week, which a future week
+									// already has.
+									const projAppts = a.visits == null ? null : Number(a.visits)
 									const actAppts = apptsByWeek[a.week] ?? null
 									return (
 									<tr key={a.week}>
@@ -1596,7 +1600,7 @@ export default function Revenue() {
 														<thead>
 															<tr>
 																<th>Type</th>
-																<th className="num">Proj appts</th>
+																<th className="num">Booked appts</th>
 																<th className="num">Proj $</th>
 																<th className="num">Actual appts</th>
 																<th className="num">Actual $</th>
@@ -1672,11 +1676,15 @@ export default function Revenue() {
 						Positive (green) = actual beat the forecast; negative (red) = came
 						in under. The current week scores what has happened so far against
 						the forecast prorated to this point in the week, then freezes when
-						the week ends. Actual appts is the calendar: every appointment booked
-						in that week, cancellations and no-shows removed, so a coming week
-						shows what is on the books so far. Actual revenue is what has been
-						collected, which is $0 until a week begins. The per-type rows inside
-						a week count paid visits.
+						the week ends. Proj appts is the visits the forecast expects to
+						happen: each booked visit at its chance of being kept, plus the
+						visits still expected to book, net of cancellations. Forecasts from
+						before 2026-11-05 did not save it. Actual appts is the calendar:
+						every appointment booked in that week, cancellations and no-shows
+						removed, so a coming week shows what is on the books so far. Actual
+						revenue is what has been collected, which is $0 until a week begins.
+						Inside a week, Booked appts is what was on the books when the
+						forecast was saved, and the per-type actual rows count paid visits.
 					</p>
 				</section>
 			) : null}
