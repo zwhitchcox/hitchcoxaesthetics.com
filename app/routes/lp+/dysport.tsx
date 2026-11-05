@@ -3,6 +3,7 @@ import { useLoaderData } from '@remix-run/react'
 import { useBlvdHtml } from '#app/utils/blvd-context.tsx'
 import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
 import { getEnv } from '#app/utils/env.server.ts'
+import { TOX_OFFER_MINIMUM } from '#app/utils/service-pricing.ts'
 
 // Ad landing page, noindex to avoid duplicate content with the main service pages
 export const meta: MetaFunction = () => [
@@ -221,6 +222,11 @@ const html = `<!DOCTYPE html>
         .b-hero-price strong {
             color: var(--black);
             font-weight: 700;
+        }
+        .fine-print {
+            font-size: 12px;
+            color: var(--gray-500);
+            margin: -12px 0 20px;
         }
         .b-hero-rating {
             display: flex;
@@ -540,6 +546,11 @@ const html = `<!DOCTYPE html>
             max-width: 400px;
             margin-left: auto;
             margin-right: auto;
+        }
+        .b-final .fine-print {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: -16px;
         }
         .b-final-ctas {
             display: flex;
@@ -1010,7 +1021,8 @@ const html = `<!DOCTYPE html>
                         </div>
 
                         <h1>20% Off<br>Your First <span>Dysport Treatment</span></h1>
-                        <p class="b-hero-price">New clients save <strong>20% on their first Dysport treatment</strong>. A smooth, airbrushed finish, naturally.</p>
+                        <p class="b-hero-price">New clients save <strong>20% on their first Dysport treatment</strong>.* A smooth, airbrushed finish, naturally.</p>
+                        <p class="fine-print">*${TOX_OFFER_MINIMUM}</p>
 
                         <div class="b-hero-rating">
                             <div class="b-hero-rating-score">5.0</div>
@@ -1106,7 +1118,7 @@ const html = `<!DOCTYPE html>
                     <div class="c-price-card">
                         <div>
                             <div class="c-price-card-name" style="color: var(--accent)">First Visit Special</div>
-                            <div class="c-price-card-desc">20% off any treatment</div>
+                            <div class="c-price-card-desc">20% off any treatment. Dysport: minimum 40 units.</div>
                         </div>
                         <div class="c-price-card-right">
                             <div class="c-price-card-amount" style="color:var(--accent)">20% Off</div>
@@ -1366,7 +1378,7 @@ const html = `<!DOCTYPE html>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div class="c-faq-a">
-                        <div class="c-faq-a-inner">Dysport is $13 per unit. The total cost depends on how many units your treatment areas need. New clients get 20% off their first visit. Sarah will go over your personalized plan during a free consultation.</div>
+                        <div class="c-faq-a-inner">Dysport is $13 per unit. The total cost depends on how many units your treatment areas need. New clients get 20% off their first visit, with a minimum of 40 units. Sarah will go over your personalized plan during a free consultation.</div>
                     </div>
                 </div>
             </div>
@@ -1432,7 +1444,8 @@ const html = `<!DOCTYPE html>
                 <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             </div>
             <h2>Ready for Smoother Skin?</h2>
-            <p>New clients get 20% off their first Dysport treatment. Book your appointment today.</p>
+            <p>New clients get 20% off their first Dysport treatment.* Book your appointment today.</p>
+            <p class="fine-print">*${TOX_OFFER_MINIMUM}</p>
             <div class="b-final-ctas">
                 <a href="${DEFAULT_BLVD_BOOKING_URL}" class="b-btn-white" target="_blank" rel="noopener">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>

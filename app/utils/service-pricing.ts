@@ -27,8 +27,8 @@ export type BlvdPriceRange = {
 /** The new-client Botox offer shown next to the unit price. */
 export const FIRST_VISIT_OFFER = '20% off your first visit'
 /** Fine print for the offer (Zane, 2026-11-05). */
-export const BOTOX_OFFER_MINIMUM =
-	'20% off Botox for new clients requires a minimum of 40 units.'
+export const TOX_OFFER_MINIMUM =
+	'20% off Botox, Dysport, Jeuveau and lip flips for new clients requires a minimum of 40 units.'
 
 export const PUBLIC_SERVICE_PRICING: Record<
 	PublicPricingKey,

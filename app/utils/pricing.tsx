@@ -11,7 +11,7 @@
 import React from 'react'
 
 import {
-	BOTOX_OFFER_MINIMUM,
+	TOX_OFFER_MINIMUM,
 	FIRST_VISIT_OFFER,
 	PUBLIC_SERVICE_PRICING,
 } from '#app/utils/service-pricing.ts'
@@ -49,7 +49,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 				},
 				{ name: 'Lip Flip', price: PUBLIC_SERVICE_PRICING.lipFlip.display },
 			],
-			footnotes: [BOTOX_OFFER_MINIMUM],
+			footnotes: [TOX_OFFER_MINIMUM],
 		},
 		{
 			title: 'Dermal Filler',
@@ -85,7 +85,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 				},
 				{ name: 'Lip Flip', price: PUBLIC_SERVICE_PRICING.lipFlip.display },
 			],
-			footnotes: [BOTOX_OFFER_MINIMUM],
+			footnotes: [TOX_OFFER_MINIMUM],
 		},
 	],
 	dysport: [
@@ -97,6 +97,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 					price: <FirstVisitSpecialPrice />,
 				},
 			],
+			footnotes: [TOX_OFFER_MINIMUM],
 		},
 	],
 	jeuveau: [
@@ -108,6 +109,7 @@ export const pricingData: Record<string, PricingCategory[]> = {
 					price: <FirstVisitSpecialPrice />,
 				},
 			],
+			footnotes: [TOX_OFFER_MINIMUM],
 		},
 	],
 

@@ -3,7 +3,7 @@ import { useLoaderData } from '@remix-run/react'
 import { useBlvdHtml } from '#app/utils/blvd-context.tsx'
 import { DEFAULT_BLVD_BOOKING_URL } from '#app/utils/blvd.ts'
 import { getEnv } from '#app/utils/env.server.ts'
-import { BOTOX_OFFER_MINIMUM } from '#app/utils/service-pricing.ts'
+import { TOX_OFFER_MINIMUM } from '#app/utils/service-pricing.ts'
 
 // Ad landing page, noindex to avoid duplicate content with the main service pages
 export const meta: MetaFunction = () => [
@@ -1236,7 +1236,7 @@ const html = `<!doctype html>
 								New clients save <strong>20% on their first treatment</strong>.*
 								RN-administered with a perfect 5-star rating.
 							</p>
-							<p class="fine-print">*${BOTOX_OFFER_MINIMUM}</p>
+							<p class="fine-print">*${TOX_OFFER_MINIMUM}</p>
 
 							<div class="b-hero-rating">
 								<div class="b-hero-rating-score">5.0</div>
@@ -2185,8 +2185,8 @@ const html = `<!doctype html>
 							<div class="c-faq-a-inner">
 								New clients receive 20% off their first treatment. No code
 								needed -- just mention it at your appointment or book through
-								this page. It applies to all services. For Botox, it requires a
-								minimum of 40 units.
+								this page. It applies to all services. For Botox, Dysport, Jeuveau
+								and lip flips, it requires a minimum of 40 units.
 							</div>
 						</div>
 					</div>
@@ -2339,7 +2339,7 @@ const html = `<!doctype html>
 					New clients get 20% off their first Botox treatment.* Book your
 					appointment today.
 				</p>
-				<p class="fine-print">*${BOTOX_OFFER_MINIMUM}</p>
+				<p class="fine-print">*${TOX_OFFER_MINIMUM}</p>
 				<div class="b-final-ctas">
 					<a
 						href="${DEFAULT_BLVD_BOOKING_URL}"
