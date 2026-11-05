@@ -23,6 +23,7 @@ import {
 } from '#app/utils/reviews.server.ts'
 import { getSocialMetas } from '#app/utils/seo.ts'
 import {
+	BOTOX_OFFER_MINIMUM,
 	FIRST_VISIT_OFFER,
 	PUBLIC_SERVICE_PRICING,
 } from '#app/utils/service-pricing.ts'
@@ -809,9 +810,12 @@ export default function MasseterBotoxPage() {
 								<span className="text-xl text-muted-foreground">per unit</span>
 							</p>
 							<span className="mb-2 rounded-full bg-gold/15 px-3 py-1 text-sm font-semibold text-foreground">
-								{FIRST_VISIT_OFFER}
+								{FIRST_VISIT_OFFER}*
 							</span>
 						</div>
+						<p className="mt-3 text-xs text-muted-foreground">
+							* {BOTOX_OFFER_MINIMUM}
+						</p>
 						<ul className="mt-8 space-y-4 text-lg">
 							{[
 								'Free consultation with Sarah',
