@@ -803,6 +803,12 @@ async function main({ start, end, json, owner, noAi, noSync }: ExpensesArgs) {
 			curRow.expenses = variableActuals + fixedAccrued
 			curRow.net = curRow.revenue - curRow.expenses
 			curRow.amortized = true
+			// The ÷12 view starts from the same accrued month, with this
+			// month's annual fees swapped for the list's monthly share, as in
+			// every full month.
+			curRow.expensesSmoothed =
+				curRow.expenses - curRow.annualCash + curRow.annualAmortized
+			curRow.netSmoothed = curRow.revenue - curRow.expensesSmoothed
 		}
 	}
 
